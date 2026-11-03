@@ -11,13 +11,13 @@ def _rec(cmd: str, stdout: str = "", exit_status: int = 0, stderr: str = "") -> 
 def test_ubus_command_format() -> None:
     assert ubus_command("system", "board") == "ubus call system board"
     assert ubus_command("network.wireless", "get_validate", {"device": "radio0"}) == (
-        "ubus call network.wireless get_validate '{\"device\":\"radio0\"}'"
+        'ubus call network.wireless get_validate \'{"device":"radio0"}\''
     )
 
 
 def test_ubus_command_sorts_keys() -> None:
     assert ubus_command("uci", "get", {"section": "lan", "config": "dhcp"}) == (
-        "ubus call uci get '{\"config\":\"dhcp\",\"section\":\"lan\"}'"
+        'ubus call uci get \'{"config":"dhcp","section":"lan"}\''
     )
 
 

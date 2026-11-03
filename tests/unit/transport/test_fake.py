@@ -55,7 +55,7 @@ async def test_passwd_sets_root_password() -> None:
 
 
 async def test_root_password_state_follows_sim_state() -> None:
-    cmd = "awk -F: '$1==\"root\"{print ($2==\"\" ? \"none\" : \"set\")}' /etc/shadow"
+    cmd = 'awk -F: \'$1=="root"{print ($2=="" ? "none" : "set")}\' /etc/shadow'
     state = SimState(root_password=None)
     t = ReplayTransport({}, state=state)
     assert (await t.run(cmd)).stdout == "none\n"

@@ -14,7 +14,11 @@ def test_settings_defaults(tmp_path: Path) -> None:
     assert s.audit_retention_days == 90
     assert s.guard.lock_files == [r"D:\Essence_SC\wifi_ref\iperf_txsweep\voip.lock.own"]
     assert s.guard.processes == [
-        "dima_night.py", "rh_soak.py", "overnight_wifi*", "txlab_*.py", "voip_chain.py"
+        "dima_night.py",
+        "rh_soak.py",
+        "overnight_wifi*",
+        "txlab_*.py",
+        "voip_chain.py",
     ]
     assert s.guard.router_ssids == ["OpenWrtB", "OpenWrtC"]
     assert s.guard.router_processes == []
