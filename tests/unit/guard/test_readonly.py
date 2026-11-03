@@ -19,10 +19,15 @@ ALLOWED = [
     'ubus call network.wireless get_validate \'{"device":"radio0"}\'',
     "top -bn1",
     "uci get dhcp.lan.ignore",
-    "sed -n 1,5p /etc/config/network",
+    "awk -F: '{print $1}' /etc/passwd",
     "find /etc -name '*.json'",
 ]
 REFUSED = [
+    "awk 'BEGIN{system(\"reboot\")}'",
+    "awk '{ \"reboot\" | getline x }' /etc/passwd",
+    "sed 'e reboot' /etc/hosts",
+    "sed -n 'w /tmp/x' /etc/hosts",
+    "find / -fprint /tmp/x",
     "uci set wireless.radio0.channel=6",
     "wifi up",
     "reboot",

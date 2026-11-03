@@ -24,7 +24,6 @@ _ALWAYS = frozenset(
         "ifstatus",
         "iwinfo",
         "jsonfilter",
-        "awk",
         "sort",
         "uniq",
         "cut",
@@ -58,6 +57,7 @@ _UBUS_READ_METHODS = frozenset(
         "get_proto_handlers",
     ]
 )
+_FIND_ACTIONS = frozenset({"-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fprintf", "-fls"})
 _IP_OBJECTS = frozenset({"addr", "address", "link", "route", "neigh", "rule"})
 _CHANGE_WORDS = frozenset({"add", "del", "delete", "set", "flush", "change", "replace"})
 _IW_CHANGE_WORDS = frozenset({"set", "del", "add", "connect", "disconnect", "join", "leave"})
@@ -69,10 +69,11 @@ def _segment_ok(words: list[str]) -> bool:
     prog, args = words[0], words[1:]
     if prog in _ALWAYS:
         return True
-    if prog == "sed":
-        return not any(a.startswith("-i") for a in args)
+    if prog == "awk":
+        # awk can run programs (system, getline from a command) and write files (print > f).
+        return not any(word in a for a in args for word in ("system", "getline"))
     if prog == "find":
-        return not any(a in ("-delete", "-exec", "-execdir") for a in args)
+        return not any(a in _FIND_ACTIONS for a in args)
     if prog == "top":
         return any(a.startswith("-b") for a in args)
     if prog == "uci":
