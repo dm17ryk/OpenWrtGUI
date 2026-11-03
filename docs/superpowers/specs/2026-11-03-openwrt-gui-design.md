@@ -176,7 +176,7 @@ docs/            manual/ (user manual, synced to the wiki) · design/ · superpo
 
 ## 7. Screens
 
-Mockups for screens 1–12 are on the canvas (`docs/design/canvas/project/`). Screens 13 (terminal and audit log) and 14 (LuCI fallback pages) are specified here only. The mockups predate D18: they do not show the "All options" sections or the LuCI entries on Discovery. Every screen works in light and dark.
+Mockups for screens 1–12 are on the canvas (`docs/design/canvas/project/`). Screen 14 (a LuCI page inside the app) is on the canvas too; screen 13 (terminal and audit log) is specified here only. The D18 parts are drawn on Wi-Fi, Network, LTE and Discovery; the "All options" lists in the mockups are AP2's real ones. Every screen works in light and dark.
 
 ### 7.1 Dashboard (1)
 - Shows: routers with state; the 2.4 / 5 / 6 GHz air map (on air vs parked/staged); per-router cards (radio, RF summary, stations, network, faults, login type, ownership tags); "Needs attention" (drift with known-writer attribution, password-only login, files added after flashing).
@@ -273,7 +273,7 @@ The wizard described in section 5.
   - registration, radio type, roaming, operator
   - RSSI / RSRP / RSRQ / SNR, each with a quality label and history chart
   - session uptime, IPv4, data counters
-- **Settings** (uci `network.lte`): APN, auth (none/PAP/CHAP/both) with user/password, PIN, PDP type, MTU, metric, autoconnect, default route. `lte_4` stays DHCP; the UI explains why. The other options of the `qmi` handler (25 in all, e.g. `modes`, `plmn`, `delay`, `profile`, `v6apn`) appear under **All options**.
+- **Settings** (uci `network.lte`): APN, auth (none/PAP/CHAP/both) with user/password, PIN, PDP type (`ipv4` / `ipv6` / `ipv4v6`), MTU (1420 on AP2), metric, bring up at boot, default route. The `qmi` option `autoconnect` is the modem's own autoconnect: this image's `qmi.sh` (custom `dwr921_qmi_*` functions) writes it into the modem's memory, so the UI keeps it apart from "bring up at boot". `lte_4` stays DHCP; the UI explains why. The other options of the `qmi` handler (25 in all, e.g. `modes`, `plmn`, `delay`, `profile`, `v6apn`) appear under **All options**.
 - **Modem**:
   - info: manufacturer, model, firmware (ATI); IMEI hidden until revealed
   - network mode order (`AT+BMMODODR`; code names still to map)

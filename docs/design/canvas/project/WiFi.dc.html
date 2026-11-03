@@ -67,6 +67,11 @@ a{color:#1F5FCC}a:hover{color:#174A9F}
 .tab{font:inherit;font-size:13px;font-weight:500;padding:10px 14px;border:0;border-bottom:2px solid transparent;background:transparent;color:#575F67;min-height:44px}
 .tab.on{color:#15181C;border-bottom-color:#15181C}
 .step{font-size:12px;padding:4px 9px;border-radius:6px;background:#ECEEEA;color:#3E454C}
+.tg{font:inherit;display:inline-flex;align-items:center;gap:8px;background:transparent;border:0;color:#15181C;cursor:pointer;padding:0;min-height:40px;font-size:13px}
+.track{width:36px;height:20px;border-radius:999px;position:relative;flex:none}
+.knob{position:absolute;top:2px;width:16px;height:16px;border-radius:50%;background:#FFFFFF}
+.typ{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;padding:2px 6px;border-radius:4px;background:#ECEEEA;color:#3E454C}
+.tg:focus-visible{outline:2px solid #1F5FCC;outline-offset:2px}
 </style>
 </helmet>
 <div class="app">
@@ -285,6 +290,58 @@ a{color:#1F5FCC}a:hover{color:#174A9F}
         <a class="btn" href="Network.dc.html">Open MAC access control</a>
       </section>
 
+      <section class="card" aria-labelledby="ao-h" style="display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+          <h2 id="ao-h" style="margin: 0; font-size: 16px; font-weight: 600">All options</h2>
+          <span style="color: #575F67; font-size: 13px">every option this radio and its SSIDs accept, from the router's own list (<span class="mono">network.wireless get_validate</span>)</span>
+          <div class="spacer"></div>
+          <div class="seg" role="group" aria-label="Option group">
+            <sc-for list="{{aoGrps}}" as="g" hint-placeholder-count="2"><button type="button" class="{{g.cls}}" aria-pressed="{{g.on}}" onClick="{{g.pick}}">{{g.label}}</button></sc-for>
+          </div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+          <input class="in" type="search" placeholder="Find an option, e.g. beacon, rts, wmm" aria-label="Find an option" value="{{aoQ}}" onChange="{{aoSetQ}}" style="flex: 1 1 260px; max-width: 360px">
+          <div class="seg" role="group" aria-label="Show">
+            <sc-for list="{{aoFilters}}" as="f" hint-placeholder-count="3"><button type="button" class="{{f.cls}}" aria-pressed="{{f.on}}" onClick="{{f.pick}}">{{f.label}}</button></sc-for>
+          </div>
+          <span style="font-size: 13px; color: #575F67">{{aoCount}}</span>
+        </div>
+        <div style="overflow-x: auto">
+          <table class="tbl">
+            <thead><tr><th>Option</th><th>Type</th><th>Value</th><th>Note</th></tr></thead>
+            <tbody>
+              <sc-for list="{{aoRows}}" as="r" hint-placeholder-count="8">
+                <tr>
+                  <td class="mono">{{r.name}}</td>
+                  <td><span class="typ">{{r.type}}</span></td>
+                  <td>
+                    <sc-if value="{{r.isBool}}" hint-placeholder-val="{{ false }}">
+                      <button class="tg" type="button" role="switch" aria-checked="{{r.onStr}}" aria-label="{{r.name}}" onClick="{{r.toggle}}"><span class="track" style="{{r.track}}"><span class="knob" style="{{r.knob}}"></span></span>{{r.boolLabel}}</button>
+                    </sc-if>
+                    <sc-if value="{{r.isText}}" hint-placeholder-val="{{ true }}">
+                      <input class="in mono" type="{{r.inType}}" value="{{r.val}}" placeholder="{{r.ph}}" aria-label="{{r.name}}" onChange="{{r.set}}" readOnly="{{r.ro}}" style="width: 220px; min-height: 40px; padding: 8px 10px; font-size: 13px">
+                    </sc-if>
+                  </td>
+                  <td style="white-space: normal">
+                    <sc-if value="{{r.hasLink}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: #575F67">set above: {{r.link}}</span> </sc-if>
+                    <sc-if value="{{r.hasWriter}}" hint-placeholder-val="{{ false }}"><span class="b har">{{r.writer}}</span> </sc-if>
+                    <sc-if value="{{r.edited}}" hint-placeholder-val="{{ false }}"><span class="b park">changed, not applied</span></sc-if>
+                  </td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <sc-if value="{{aoHasMore}}" hint-placeholder-val="{{ true }}">
+          <div style="font-size: 13px; color: #575F67">{{aoMore}}</div>
+        </sc-if>
+        <sc-if value="{{aoHasEdits}}" hint-placeholder-val="{{ false }}">
+          <div class="code"><sc-for list="{{aoLines}}" as="l" hint-placeholder-count="4"><div class="{{l.cls}}" style="white-space: pre">{{l.t}}</div></sc-for></div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px"><button class="btn pri" type="button">Apply</button><button class="btn" type="button" onClick="{{aoDiscard}}">Discard</button></div>
+        </sc-if>
+        <div style="font-size: 13px; color: #575F67">Empty value = not in the config, so the driver default applies. Options with their own control above link to it. The list comes from the router, so a newer image or another driver brings its own options without an app update.</div>
+      </section>
+
       <section class="card" aria-labelledby="sta-h">
         <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 10px">
           <h2 id="sta-h" style="margin: 0; font-size: 16px; font-weight: 600">Stations on AP1</h2>
@@ -312,7 +369,7 @@ a{color:#1F5FCC}a:hover{color:#174A9F}
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1760}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2560}}'>
 class Component extends DCLogic {
   state = {
     modeSel: 'set',
@@ -323,7 +380,8 @@ class Component extends DCLogic {
     sec: 'psk2',
     power: 20,
     country: 'IL',
-    ssid: 'OpenWrt'
+    ssid: 'OpenWrt',
+    aoGrp: 'dev', aoQ: '', aoF: 'set', aoEdit: {}
   };
 
   renderVals() {
@@ -472,6 +530,62 @@ class Component extends DCLogic {
     stepModes.forEach(m => stepChans.forEach(c => steps.push(m + ' @ ' + c)));
     if (s.use === 'step' && !err && !steps.length) err = 'Step-through needs at least one channel.';
 
+    const AO_SRC = { dev: 'acs_chan_bias:s acs_exclude_dfs:b airtime_mode:u antenna_gain:u assoc_sa_query_max_timeout:u assoc_sa_query_retry_timeout:u auth_cache:b background_radar:b band:s basic_rate:l basic_rates:l beacon_int:u beacon_rate:s beamformee_antennas:u beamformer_antennas:u bssid:s cell_density:u chanbw:u chanlist:l channel:s channel_list:l channels:l country:s country3:s country_code:s country_ie:b disabled:b distance:u doth:b dsss_cck_40:b eht_mu_beamformer:b eht_su_beamformee:b eht_su_beamformer:b enable_background_radar:b frag:u greenfield:b he_6ghz_reg_pwr_type:u he_bss_color:u he_bss_color_enabled:b he_default_pe_duration:u he_mu_beamformer:b he_mu_edca_ac_be_aci:u he_mu_edca_ac_be_aifsn:u he_mu_edca_ac_be_ecwmax:u he_mu_edca_ac_be_ecwmin:u he_mu_edca_ac_be_timer:u he_mu_edca_ac_bk_aci:u he_mu_edca_ac_bk_aifsn:u he_mu_edca_ac_bk_ecwmax:u he_mu_edca_ac_bk_ecwmin:u he_mu_edca_ac_bk_timer:u he_mu_edca_ac_vi_aci:u he_mu_edca_ac_vi_aifsn:u he_mu_edca_ac_vi_ecwmax:u he_mu_edca_ac_vi_ecwmin:u he_mu_edca_ac_vi_timer:u he_mu_edca_ac_vo_aci:u he_mu_edca_ac_vo_aifsn:u he_mu_edca_ac_vo_ecwmax:u he_mu_edca_ac_vo_ecwmin:u he_mu_edca_ac_vo_timer:u he_mu_edca_qos_info_param_count:u he_mu_edca_qos_info_q_ack:u he_mu_edca_qos_info_queue_request:u he_mu_edca_qos_info_txop_request:u he_oper_centr_freq_seg0_idx:s he_oper_chwidth:s he_rts_threshold:u he_spr_non_srg_obss_pd_max_offset:u he_spr_psr_enabled:b he_spr_sr_control:u he_su_beamformee:b he_su_beamformer:b he_twt_required:b he_twt_responder:b hostapd_options:l ht_coex:b htc_vht:b htmode:s hw_mode:s hwmode:s ieee80211d:b ieee80211h:b ieee80211w:u ieee80211w_max_timeout:u ieee80211w_mgmt_cipher:s ieee80211w_retry_timeout:u iface_max_num_sta:u ifname_prefix:s ldpc:b legacy_rates:b local_pwr_constraint:u log_80211:b log_8021x:b log_driver:b log_iapp:b log_level:u log_mlme:b log_radius:b log_wpa:b logger_stdout:b logger_stdout_level:u logger_syslog:b logger_syslog_level:u macaddr:s macaddr_base:s max_amsdu:b maxassoc:u mbssid:u min_tx_power:u mu_beamformee:b mu_beamformer:b multiple_bssid:u noscan:b num_global_macaddr:u okc:b path:s phy:s radio:u reg_power_type:u require_mode:s rnr_beacon:s rsn_preauth:b rssi_ignore_probe_request:u rssi_reject_assoc_rssi:u rssi_reject_assoc_timeout:u rts:u rts_threshold:u rx_antenna_pattern:b rx_stbc:u rxantenna:u rxldpc:b scan_list:l short_gi_160:b short_gi_20:b short_gi_40:b short_gi_80:b spectrum_mgmt_required:b stationary_ap:b su_beamformee:b su_beamformer:b supported_rates:l tx_antenna_pattern:b tx_burst:u tx_queue_data2_burst:u tx_stbc:b tx_stbc_2by1:b txantenna:u txpower:u type:s vht160:u vht_link_adapt:u vht_max_a_mpdu_len_exp:u vht_max_mpdu:u vht_txop_ps:b', ssid: 'access_network_type:u acct_interval:u acct_port:u acct_secret:s acct_server:l acct_server_addr:l acct_server_port:u acct_server_shared_secret:s airtime_bss_limit:b airtime_bss_weight:u airtime_sta_weight:l altsubject_match:l altsubject_match2:l anonymous_identity:s anqp_3gpp_cell_net:l anqp_domain_id:u anqp_elem:l ap_isolate:b ap_max_inactivity:u ap_pin:s ap_setup_locked:b asra:b assoc_sa_query_max_timeout:u assoc_sa_query_retry_timeout:u auth:s auth_cache:b auth_port:u auth_secret:s auth_server:l auth_server_addr:l auth_server_port:u auth_server_shared_secret:s basic_rate:l beacon_prot:b bridge_isolate:b bss_load_update_period:u bss_transition:b bssid:s bssid_blacklist:l bssid_whitelist:l ca_cert:s ca_cert2:s ca_cert2_usesystem:b ca_cert_usesystem:b chan_util_avg_period:u civic:s client_cert:s client_cert2:s dae_client:s dae_port:u dae_secret:s default_disabled:b device:l device_name:s device_type:s disable_dgaf:b disabled:b disassoc_low_ack:b domain_match:l domain_match2:l domain_name:l domain_suffix_match:l domain_suffix_match2:l dtim_period:u dynamic_own_ip_addr:b dynamic_ownip:b dynamic_vlan:u eap_reauth_period:u eap_server:b eap_type:s eap_user_file:s eapol_version:u enable:b encryption:s esr:b ext_registrar:b fils:b fils_dhcp:s ft_iface:s ft_over_ds:b ft_psk_generate_local:b ftm_responder:b gas_address3:s gcmp256:b hessid:s hidden:b hostapd_bss_options:l hs20:b hs20_conn_capab:l hs20_deauth_req_timeout:u hs20_operating_class:s hs20_t_c_filename:s hs20_t_c_server_url:s hs20_t_c_timestamp:s hs20_wan_metrics:s identity:s ieee80211k:b ieee80211r:b ieee80211w:u ieee80211w_max_timeout:u ieee80211w_mgmt_cipher:s ieee80211w_retry_timeout:u ifname:s ignore_broadcast_ssid:b internet:b isolate:b iw_access_network_type:u iw_anqp_3gpp_cell_net:l iw_anqp_elem:l iw_asra:b iw_domain_name:l iw_enabled:b iw_esr:b iw_gas_address3:s iw_hessid:s iw_internet:b iw_ipaddr_type_availability:u iw_nai_realm:l iw_network_auth_type:s iw_qos_map_set:s iw_uesa:b iw_venue_group:s iw_venue_name:l iw_venue_type:s iw_venue_url:l key:s lci:s macaddr:s macfile:s macfilter:s maclist:l manufacturer:s max_inactivity:u max_listen_int:u max_listen_interval:u max_num_sta:u maxassoc:u mbo:b mcast_rate:u mesh_auto_open_plinks:b mesh_awake_window:u mesh_confirm_timeout:u mesh_element_ttl:u mesh_fwding:b mesh_gate_announcements:u mesh_holding_timeout:u mesh_hwmp_active_path_timeout:u mesh_hwmp_active_path_to_root_timeout:u mesh_hwmp_confirmation_interval:u mesh_hwmp_max_preq_retries:u mesh_hwmp_net_diameter_traversal_time:u mesh_hwmp_preq_min_interval:u mesh_hwmp_rann_interval:u mesh_hwmp_root_interval:u mesh_hwmp_rootmode:u mesh_id:s mesh_max_peer_links:u mesh_max_retries:u mesh_min_discovery_timeout:u mesh_nolearn:b mesh_path_refresh_time:u mesh_plink_timeout:u mesh_power_mode:s mesh_retry_timeout:u mesh_rssi_threshold:u mesh_sync_offset_max_neighor:u mesh_ttl:u mlo:b mobility_domain:s mode:s multi_ap:u multi_ap_backhaul_key:s multi_ap_backhaul_ssid:s multi_ap_profile:u multi_ap_vlanid:u multicast_to_unicast:b multicast_to_unicast_all:b na_mcast_to_ucast:b nai_realm:l nas_identifier:s nasid:s network:l network_auth_type:s network_vlan:l no_probe_resp_if_max_sta:b ocv:u okc:b owe_transition:b owe_transition_bssid:s owe_transition_ifname:s owe_transition_ssid:s own_ip_addr:s ownip:s password:k pbc_in_m1:b per_sta_vif:b pmk_r1_push:b port:p powersave:b ppsk:b preamble:b priv_key:s priv_key2:s priv_key2_pwd:s priv_key_pwd:s private_key:s private_key2:s private_key2_passwd:s private_key_passwd:s proxy_arp:b qos_map_set:s r0_key_lifetime:u r0kh:l r1_key_holder:s r1kh:l radio_macaddr:l radios:l radius_acct_interim_interval:u radius_acct_req_attr:l radius_auth_req_attr:l radius_client_addr:s radius_das_client:s radius_das_port:u radius_das_secret:s radius_request_cui:b reassociation_deadline:u request_cui:b rnr:b roaming_consortium:l rrm_beacon_report:b rrm_neighbor_report:b rsn_preauth:b sae_ext_key:b sae_password_file:s sae_pwe:u sae_require_mfp:b sae_track_password:u server:h server_cert:s server_id:s short_preamble:b skip_inactivity_poll:b spp_amsdu:b ssid:s start_disabled:u subject_match:s subject_match2:s supported_rates:l tdls_prohibit:b time_advertisement:u time_zone:s transition_disable:l uapsd:b uapsd_advertisement_enabled:b uesa:b utf8_ssid:b uuid:s vendor_elements:l venue_group:s venue_name:l venue_type:s venue_url:l vlan_bridge:s vlan_file:s vlan_naming:b vlan_no_bridge:b vlan_tagged_interface:s wds:b wds_bridge:s wds_sta:b wnm_sleep_mode:b wnm_sleep_mode_no_keys:b wpa_disable_eapol_key_retries:b wpa_gmk_rekey:u wpa_group_rekey:u wpa_master_rekey:u wpa_pair_rekey:u wpa_psk_file:s wpa_ptk_rekey:u wpa_strict_rekey:b wps_ap_setup_locked:b wps_device_name:s wps_device_type:s wps_independent:u wps_label:b wps_manufacturer:s wps_pbc_in_m1:b wps_pin:s wps_pushbutton:b' };
+    const AO_TYPE = { b: 'bool', u: 'uinteger', s: 'string', l: 'list', k: 'wpakey', p: 'port', h: 'host' };
+    const AO_SET = {
+      dev: {
+        type: 'mac80211', path: 'platform/10180000.wmac', band: '2g',
+        channel: s.chanSel === 'set' && chanList.length === 1 ? String(chanList[0]) : (s.chanSel === 'none' ? '1' : 'auto'),
+        channels: s.chanSel === 'set' && chanList.length > 1 ? chanList.join(' ') : (s.chanSel === 'all' ? '1-13' : undefined),
+        disabled: s.chanSel === 'none' ? '1' : undefined,
+        htmode: s.modes.n40 ? 'HT40' : 'HT20', country: s.country, cell_density: '0', legacy_rates: '1', txpower: String(s.power)
+      },
+      ssid: { device: 'radio0', network: 'lan', mode: 'ap', ssid: s.ssid, encryption: s.sec, key: '' }
+    };
+    const AO_RO = { type: 1, path: 1, device: 1, key: 1 };
+    const AO_LINK = {
+      dev: { channel: 'Channels', channels: 'Channels', htmode: 'Modes', legacy_rates: 'Modes', supported_rates: 'Modes', basic_rate: 'Modes', noscan: 'Modes', txpower: 'TX power', country: 'Country', disabled: 'Channels (None = parked)' },
+      ssid: { ssid: 'SSID', encryption: 'Security', key: 'Security (hidden)', macfilter: 'Network & DHCP › Wi-Fi access by MAC', maclist: 'Network & DHCP › Wi-Fi access by MAC' }
+    };
+    const AO_WRITER = { dev: { country: 'dima_night', cell_density: 'dima_night', legacy_rates: 'dima_night' }, ssid: {} };
+    const g = s.aoGrp, set = AO_SET[g], edits = s.aoEdit;
+    const all = AO_SRC[g].split(' ').map(x => { const p = x.split(':'); return { name: p[0], t: p[1] }; });
+    const q = (s.aoQ || '').trim().toLowerCase();
+    const isSet = o => set[o.name] !== undefined || edits[g + '.' + o.name] !== undefined;
+    let list = all.filter(o => !q || o.name.indexOf(q) >= 0);
+    if (!q && s.aoF === 'set') list = list.filter(isSet);
+    if (!q && s.aoF === 'harness') list = list.filter(o => AO_WRITER[g][o.name]);
+    const SHOW = 14;
+    const aoRows = list.slice(0, SHOW).map(o => {
+      const k = g + '.' + o.name;
+      const cur = edits[k] !== undefined ? edits[k] : (set[o.name] !== undefined ? set[o.name] : '');
+      const on = cur === '1';
+      const putEdit = v => { const e = Object.assign({}, edits); e[k] = v; this.setState({ aoEdit: e }); };
+      return {
+        name: o.name, type: AO_TYPE[o.t] || o.t,
+        isBool: o.t === 'b', isText: o.t !== 'b',
+        onStr: on ? 'true' : 'false', boolLabel: cur === '' ? 'default' : (on ? 'on' : 'off'),
+        track: 'background: ' + (cur === '' ? '#C9CDC5' : (on ? '#3FA36F' : '#8A9199')), knob: 'left: ' + (on ? '18px' : '2px'),
+        toggle: () => putEdit(on ? '0' : '1'),
+        inType: o.t === 'k' ? 'password' : 'text', ro: !!AO_RO[o.name],
+        val: o.name === 'key' ? '' : cur, ph: o.name === 'key' ? 'hidden' : (o.t === 'l' ? 'driver default · a, b, c' : 'driver default'),
+        set: e => putEdit(e.target.value),
+        hasLink: !!AO_LINK[g][o.name], link: AO_LINK[g][o.name] || '',
+        hasWriter: !!AO_WRITER[g][o.name], writer: 'set by ' + (AO_WRITER[g][o.name] || ''),
+        edited: edits[k] !== undefined
+      };
+    });
+    const aoLines = [];
+    Object.keys(edits).forEach(k => {
+      const p = k.split('.'), sec = p[0] === 'dev' ? 'radio0' : 'default_radio0', v = edits[k];
+      aoLines.push({ t: v === '' ? 'uci -q delete wireless.' + sec + '.' + p[1] : 'uci set wireless.' + sec + '.' + p[1] + "='" + v + "'", cls: '' });
+    });
+    if (aoLines.length) {
+      aoLines.push({ t: 'uci commit wireless', cls: '' });
+      aoLines.push({ t: 'wifi reload radio0   # restarts Wi-Fi on this radio; stations rejoin', cls: '' });
+    }
+    const counts = { dev: AO_SRC.dev.split(' ').length, ssid: AO_SRC.ssid.split(' ').length };
+
     return {
       modeSegs: modeSegs, modeItems: modeItems, modeSummary: modeSummary,
       chanSegs: chanSegs, chanItems: chanItems, chanSummary: chanSummary,
@@ -483,7 +597,13 @@ class Component extends DCLogic {
       width: width, power: s.power, country: s.country, ssid: s.ssid,
       setPower: e => this.setState({ power: Number(e.target.value) }),
       setCountry: e => this.setState({ country: e.target.value }),
-      setSsid: e => this.setState({ ssid: e.target.value })
+      setSsid: e => this.setState({ ssid: e.target.value }),
+      aoGrps: [['dev', 'Radio radio0 · ' + counts.dev], ['ssid', 'SSID ' + s.ssid + ' · ' + counts.ssid]].map(x => ({ label: x[1], cls: g === x[0] ? 'on' : '', on: g === x[0] ? 'true' : 'false', pick: () => this.setState({ aoGrp: x[0] }) })),
+      aoFilters: [['set', 'Set in config'], ['all', 'All'], ['harness', 'Set by a harness']].map(x => ({ label: x[1], cls: s.aoF === x[0] ? 'on' : '', on: s.aoF === x[0] ? 'true' : 'false', pick: () => this.setState({ aoF: x[0] }) })),
+      aoQ: s.aoQ, aoSetQ: e => this.setState({ aoQ: e.target.value }),
+      aoCount: list.length + ' of ' + all.length + ' options' + (q ? ' match' : ''),
+      aoRows: aoRows, aoHasMore: list.length > SHOW, aoMore: (list.length - SHOW) + ' more: type in the search box to narrow the list',
+      aoHasEdits: aoLines.length > 0, aoLines: aoLines, aoDiscard: () => this.setState({ aoEdit: {} })
     };
   }
 }

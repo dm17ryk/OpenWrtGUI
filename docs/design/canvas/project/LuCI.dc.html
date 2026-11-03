@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>LuCI page in the app</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.app{--bg:#F2F3EF;--surface:#FFFFFF;--surface2:#F6F7F4;--ink:#15181C;--ink2:#3E454C;--muted:#575F67;--line:#D8DBD4;--line2:#E8EAE5;--accent:#1F5FCC;--accent-ink:#FFFFFF;--accent-soft:#EEF3FC;--ok:#16784A;--ok-soft:#E3F2EA;--warn:#9A5A00;--warn-soft:#FBEFD9;--bad:#B3361A;--bad-soft:#FBE7E1;--neu-soft:#ECEEEA;--har:#5A3EBF;--har-soft:#ECE7FA;--top:#15181C;--top-ink:#F2F3EF;--link:#1F5FCC}
+.app.dark{--bg:#111316;--surface:#1A1D21;--surface2:#20242A;--ink:#ECEEEF;--ink2:#C5CAD0;--muted:#9AA3AC;--line:#2F343B;--line2:#262A30;--accent:#5B92F0;--accent-ink:#0B0D10;--accent-soft:#1D2A40;--ok:#5CC98F;--ok-soft:#17301F;--warn:#E2A54A;--warn-soft:#33260F;--bad:#F08A6C;--bad-soft:#3A1E16;--neu-soft:#262A30;--har:#B7A6F2;--har-soft:#2A2340;--top:#0B0D10;--top-ink:#ECEEEF;--link:#8DB4F5}
+.app{font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--ink);background:var(--bg);font-size:14px;line-height:1.45;min-height:100vh}
+.app a{color:var(--link)}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;padding:10px 24px;background:var(--top);color:var(--top-ink)}
+.brand{font-weight:600;font-size:15px;display:flex;align-items:center;gap:10px}
+.nav{display:flex;flex-wrap:wrap;gap:2px}
+.nav a{color:#C3C8CE;text-decoration:none;padding:10px 12px;border-radius:6px;font-size:13px}
+.nav a:hover{color:#FFFFFF;background:#262A30}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;padding:6px 12px;border-radius:999px}
+.theme,.gear{font:inherit;display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#E6E8EA;background:#2E343B;border:0;border-radius:999px;padding:0 14px;min-height:40px;cursor:pointer;text-decoration:none}
+.app .gear{color:#E6E8EA}
+.wrap{max-width:1440px;margin:0 auto;padding:24px;box-sizing:border-box;display:flex;flex-direction:column;gap:16px}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.b{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.air{background:var(--ok-soft);color:var(--ok)}.neu{background:var(--neu-soft);color:var(--ink2)}.warnb{background:var(--warn-soft);color:var(--warn)}.har{background:var(--har-soft);color:var(--har)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.btn{font:inherit;font-size:13px;font-weight:500;padding:10px 14px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;min-height:44px;box-sizing:border-box;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{background:var(--surface2)}
+.btn:focus-visible,.nav a:focus-visible,.theme:focus-visible,.gear:focus-visible,.lbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.strip{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:12px 16px;border-radius:10px;border:1px solid var(--har);background:var(--har-soft);font-size:13px}
+.frame{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.ftab{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 20px}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:10px;border-bottom:1px solid var(--line2);vertical-align:middle}
+/* inside the frame: LuCI's own look (bootstrap theme), not the app's */
+.luci{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#404040;background:#FFFFFF;font-size:13px}
+.lhead{display:flex;flex-wrap:wrap;align-items:center;gap:4px 18px;padding:0 20px;min-height:44px;background:linear-gradient(#333,#222);color:#BFBFBF}
+.lhead .host{color:#FFFFFF;font-size:18px;font-weight:300;margin-right:10px}
+.lhead span{padding:12px 0}
+.lhead .act{color:#FFFFFF}
+.lbody{padding:20px 24px 24px;display:flex;flex-direction:column;gap:14px}
+.lbody h2{margin:0;font-size:24px;font-weight:400;color:#404040}
+.ltabs{display:flex;gap:2px;border-bottom:1px solid #DDD}
+.ltabs span{padding:8px 14px;border:1px solid transparent;border-bottom:0;border-radius:4px 4px 0 0;color:#0069D6}
+.ltabs span.on{border-color:#DDD;background:#FFF;color:#555;margin-bottom:-1px}
+.lrow{display:grid;grid-template-columns:minmax(160px,260px) minmax(0,1fr);gap:8px 20px;align-items:center;padding:8px 0;border-bottom:1px solid #EEE}
+.lrow label{text-align:right;color:#404040}
+.lin{font:inherit;padding:6px 8px;border:1px solid #CCC;border-radius:3px;min-height:32px;box-sizing:border-box;width:240px;max-width:100%;background:#FFF;color:#404040}
+.lin:disabled{background:#F5F5F5;color:#999}
+.lhint{font-size:12px;color:#999;grid-column:2}
+.lbtn{font:inherit;padding:6px 14px;border-radius:4px;border:1px solid #CCC;background:#FFF;color:#333;cursor:pointer;min-height:34px}
+.lbtn.blue{background:#0069D6;border-color:#0069D6;color:#FFF}
+.lbtn:disabled{opacity:.5;cursor:not-allowed}
+</style>
+</helmet>
+<div class="{{appCls}}">
+  <header class="top">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7FD1A8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5a10 10 0 0 1 14 0"></path><path d="M8 15.5a6 6 0 0 1 8 0"></path><circle cx="12" cy="19" r="1.4" fill="#7FD1A8"></circle></svg>
+      <span>OpenWrt Bench</span>
+    </div>
+    <nav class="nav" aria-label="Screens">
+      <a href="Main.dc.html">Dashboard</a>
+      <a href="WiFi.dc.html">Wi-Fi</a>
+      <a href="RF.dc.html">RF live</a>
+      <a href="Network.dc.html">Network &amp; DHCP</a>
+      <a href="Ports.dc.html">Ports &amp; VLANs</a>
+      <a href="Firewall.dc.html">Firewall</a>
+      <a href="Faults.dc.html">Faults &amp; capture</a>
+      <a href="LTE.dc.html">LTE modem</a>
+      <a href="System.dc.html">System</a>
+      <a href="Discovery.dc.html">Discovery</a>
+    </nav>
+    <div class="spacer"></div>
+    <span class="pill" style="{{guardPillStyle}}"><span class="dot" style="{{guardDotStyle}}"></span>{{guardPill}}</span>
+    <a class="gear" href="Settings.dc.html" aria-label="App settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path></svg>Settings</a>
+    <button class="theme" type="button" aria-pressed="{{darkStr}}" onClick="{{toggleTheme}}">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>
+      {{themeLabel}}
+    </button>
+  </header>
+
+  <div class="wrap">
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 16px">
+      <div>
+        <div class="eyebrow">AP1 · <span class="mono">192.168.1.1</span> · LuCI page</div>
+        <h1 style="margin: 2px 0 0; font-size: 28px; font-weight: 600; letter-spacing: -0.01em">SQM QoS</h1>
+      </div>
+      <span class="b neu">example: <span class="mono">luci-app-sqm</span> from a newer image</span>
+      <div class="spacer"></div>
+      <a class="btn" href="Discovery.dc.html">Back to Discovery</a>
+      <button class="btn" type="button">Close and end session</button>
+    </div>
+
+    <div class="strip" role="note">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v5M12 16h.01"></path></svg>
+      <span style="flex: 1 1 520px">{{stripText}}</span>
+      <span class="{{accessCls}}">{{accessLabel}}</span>
+      <span class="b neu">session ends 5 min idle or on close</span>
+    </div>
+
+    <div class="frame">
+      <div class="ftab"><span class="dot" style="background: #6CD39B"></span><span class="mono">LuCI · admin/network/sqm</span><span>· via SSH tunnel to AP1, logged in by the app, no password typed</span><div class="spacer"></div><span>LuCI's own look: the app theme does not apply inside</span></div>
+      <div class="luci">
+        <div class="lhead"><span class="host">AP1</span><span>Status</span><span>System</span><span class="act">Network</span><span>Logout</span></div>
+        <div class="lbody">
+          <h2>Smart Queue Management</h2>
+          <div style="color: #777">With SQM you can enable traffic shaping, better mixing (Fair Queueing), active queue length management (AQM) and prioritisation on one network interface.</div>
+          <div class="ltabs"><span class="on">Basic Settings</span><span>Queue Discipline</span><span>Link Layer Adaptation</span></div>
+          <div>
+            <div class="lrow"><label for="l1">Enable this SQM instance.</label><div><input id="l1" type="checkbox" checked="{{enabled}}" onChange="{{toggleEnabled}}" disabled="{{ro}}" style="width: 16px; height: 16px"></div></div>
+            <div class="lrow"><label for="l2">Interface name</label><div><select id="l2" class="lin" disabled="{{ro}}"><option>eth0.2 (wan)</option></select></div></div>
+            <div class="lrow"><label for="l3">Download speed (ingress)</label><div><input id="l3" class="lin" type="text" value="{{down}}" onChange="{{setDown}}" disabled="{{ro}}"></div><span class="lhint">kbit/s; 0 to disable ingress shaping</span></div>
+            <div class="lrow"><label for="l4">Upload speed (egress)</label><div><input id="l4" class="lin" type="text" value="{{up}}" onChange="{{setUp}}" disabled="{{ro}}"></div><span class="lhint">kbit/s; 0 to disable egress shaping</span></div>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; padding-top: 6px">
+            <button class="lbtn blue" type="button" onClick="{{saveApply}}" disabled="{{ro}}">Save &amp; Apply</button>
+            <button class="lbtn" type="button" disabled="{{ro}}">Save</button>
+            <button class="lbtn" type="button" onClick="{{resetForm}}" disabled="{{ro}}">Reset</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="card" aria-labelledby="chh" style="display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px">
+        <h2 id="chh" style="margin: 0; font-size: 16px; font-weight: 600">Changed via LuCI since you opened this page</h2>
+        <span style="font-size: 13px; color: var(--muted)">the app compares the config before and after; it cannot preview LuCI's changes</span>
+      </div>
+      <sc-if value="{{noChanges}}" hint-placeholder-val="{{ true }}">
+        <div style="font-size: 13px; color: var(--muted)">Nothing yet. Press Save &amp; Apply in the page above to see how a change shows up here.</div>
+      </sc-if>
+      <sc-if value="{{hasChanges}}" hint-placeholder-val="{{ false }}">
+        <div style="overflow-x: auto">
+          <table class="tbl">
+            <thead><tr><th>Option</th><th>Before</th><th>After</th><th></th></tr></thead>
+            <tbody>
+              <sc-for list="{{changes}}" as="c" hint-placeholder-count="2">
+                <tr><td class="mono">{{c.opt}}</td><td class="mono">{{c.before}}</td><td class="mono">{{c.after}}</td><td><span class="b warnb">changed via LuCI</span></td></tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <div style="font-size: 13px; color: var(--muted)">Audit log: "LuCI page admin/network/sqm opened 14:52, closed 14:58; changed {{changedList}}". The dashboard lists the change like any other drift until you accept it.</div>
+      </sc-if>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"harnessRunning":{"editor":"boolean","default":false,"section":"Bench Guard"},"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Look"},"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+  state = { dark: null, enabled: false, down: '0', up: '0', applied: null };
+
+  renderVals() {
+    const s = this.state;
+    const dark = s.dark === null ? (this.props.theme ?? 'light') === 'dark' : s.dark;
+    const ro = !!this.props.harnessRunning;
+    const BEFORE = { enabled: '0', download: '0', upload: '0' };
+    const ap = s.applied;
+    const changes = ap ? [['enabled', ap.enabled ? '1' : '0'], ['download', ap.down], ['upload', ap.up]]
+      .filter(x => x[1] !== BEFORE[x[0]])
+      .map(x => ({ opt: 'sqm.eth1.' + x[0], before: BEFORE[x[0]], after: x[1] })) : [];
+
+    return {
+      appCls: dark ? 'app dark' : 'app', darkStr: dark ? 'true' : 'false', themeLabel: dark ? 'Dark' : 'Light',
+      toggleTheme: () => this.setState({ dark: !dark }),
+      guardPill: ro ? 'dima_night running · read-only' : 'No harness running · writes allowed',
+      guardPillStyle: ro ? 'background: #3A2F5C; color: #DCD3FA' : 'background: #1E3A2B; color: #BFE8CF',
+      guardDotStyle: 'background: ' + (ro ? '#B7A6F2' : '#6CD39B'),
+      stripText: ro
+        ? 'This is LuCI\'s own page, shown inside the app. A harness run is in progress, so the session can only read: LuCI shows the page but cannot save.'
+        : 'This is LuCI\'s own page, shown inside the app, for a feature with no screen here yet. Changes made here skip the app\'s preview and its 60 s rollback; LuCI applies them with its own rollback. The app shows what changed below.',
+      accessCls: ro ? 'b har' : 'b warnb', accessLabel: ro ? 'read-only session' : 'can change: SQM settings only',
+      ro: ro,
+      enabled: s.enabled, toggleEnabled: () => this.setState({ enabled: !s.enabled }),
+      down: s.down, up: s.up,
+      setDown: e => this.setState({ down: e.target.value }), setUp: e => this.setState({ up: e.target.value }),
+      saveApply: () => {
+        const d = s.down === '0' ? '50000' : s.down, u = s.up === '0' ? '10000' : s.up;
+        this.setState({ enabled: true, down: d, up: u, applied: { enabled: true, down: d, up: u } });
+      },
+      resetForm: () => this.setState({ enabled: false, down: '0', up: '0' }),
+      noChanges: changes.length === 0, hasChanges: changes.length > 0, changes: changes,
+      changedList: changes.map(c => c.opt).join(', ')
+    };
+  }
+}
+</script>
+</body>
+</html>

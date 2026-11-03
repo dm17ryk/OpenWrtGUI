@@ -180,14 +180,38 @@ body{margin:0}
           </div>
         </div>
         <div class="grid">
-          <div class="field"><label for="mtu">MTU</label><input id="mtu" class="in mono" type="text" value="" placeholder="from the network" readOnly></div>
+          <div class="field"><label for="mtu">MTU</label><input id="mtu" class="in mono" type="text" value="1420" readOnly></div>
           <div class="field"><label for="met">Route metric</label><input id="met" class="in mono" type="text" value="20" readOnly></div>
         </div>
         <div style="display: flex; flex-wrap: wrap; gap: 0 22px">
-          <label class="chk"><input type="checkbox" checked>Connect at start-up</label>
+          <label class="chk"><input type="checkbox" checked>Bring up at boot</label>
           <label class="chk"><input type="checkbox" checked>Default route through LTE</label>
         </div>
         <div class="note"><strong class="mono">lte_4</strong> (IPv4 on <span class="mono">wwan0</span>) stays a DHCP client and cannot be changed here: the modem itself hands the address out on that link, so a static address there cuts the data path.</div>
+        <div style="border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px">
+            <strong>All options</strong>
+            <span style="font-size: 12px; color: var(--muted)">from the <span class="mono">qmi</span> protocol handler on this router</span>
+            <div class="spacer"></div>
+            <div class="seg" role="group" aria-label="Show">
+              <sc-for list="{{qFilters}}" as="f" hint-placeholder-count="2"><button type="button" class="{{f.cls}}" aria-pressed="{{f.on}}" onClick="{{f.pick}}">{{f.label}}</button></sc-for>
+            </div>
+          </div>
+          <div style="overflow-x: auto">
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px">
+              <tbody>
+                <sc-for list="{{qRows}}" as="r" hint-placeholder-count="7">
+                  <tr style="border-bottom: 1px solid var(--line2)">
+                    <td class="mono" style="padding: 8px 6px; white-space: nowrap">{{r.name}}</td>
+                    <td style="padding: 8px 6px"><span class="mono" style="font-size: 11px; padding: 2px 6px; border-radius: 4px; background: var(--neu-soft); color: var(--ink2)">{{r.type}}</span></td>
+                    <td class="mono" style="padding: 8px 6px; white-space: nowrap">{{r.val}}</td>
+                    <td style="padding: 8px 6px; font-size: 12px; color: var(--muted)">{{r.note}}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+        </div>
         <div class="code"><sc-for list="{{setLines}}" as="l" hint-placeholder-count="5"><div class="{{l.cls}}" style="white-space: pre">{{l.t}}</div></sc-for></div>
         <div style="display: flex; flex-wrap: wrap; gap: 8px"><button class="btn pri" type="button">Apply and reconnect</button><button class="btn" type="button">Discard</button></div>
       </section>
@@ -249,9 +273,9 @@ body{margin:0}
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Look"},"$preview":{"width":1440,"height":1900}}'>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Look"},"$preview":{"width":1440,"height":2200}}'>
 class Component extends DCLogic {
-  state = { dark: null, metric: 'rsrp', auth: 'none', pdp: 'ip', imei: false, act: null, port: 'ttyUSB2', at: null, connected: true };
+  state = { dark: null, metric: 'rsrp', auth: 'none', pdp: 'ipv4', qAll: false, imei: false, act: null, port: 'ttyUSB2', at: null, connected: true };
 
   renderVals() {
     const s = this.state;
@@ -284,7 +308,18 @@ class Component extends DCLogic {
     const metrics = ['rsrp', 'rsrq', 'snr', 'rssi'].map(k => ({ label: M[k].name, cls: s.metric === k ? 'on' : '', on: s.metric === k ? 'true' : 'false', pick: () => this.setState({ metric: k }) }));
 
     const AUTH = [['none', 'None'], ['pap', 'PAP'], ['chap', 'CHAP'], ['both', 'PAP or CHAP']];
-    const PDP = [['ip', 'IPv4'], ['ipv6', 'IPv6'], ['ipv4v6', 'IPv4 + IPv6']];
+    const PDP = [['ipv4', 'IPv4'], ['ipv6', 'IPv6'], ['ipv4v6', 'IPv4 + IPv6']];
+    const QMI = 'device:device apn:string v6apn:string auth:string username:string password:string pincode:string delay:uinteger modes:string pdptype:string profile:uinteger v6profile:uinteger devpath:string dhcp:bool dhcpv6:bool sourcefilter:bool delegate:bool autoconnect:bool plmn:uinteger timeout:uinteger mtu:uinteger defaultroute:bool peerdns:bool renew:bool metric:uinteger';
+    const QSET = { device: '/dev/cdc-wdm0', apn: 'uinternet', auth: s.auth, pdptype: s.pdp, metric: '20', autoconnect: '0', mtu: '1420' };
+    const QNOTE = {
+      apn: 'above', auth: 'above', username: 'above', password: 'above, masked', pincode: 'above (SIM PIN)', pdptype: 'above (IP type)', mtu: 'above', metric: 'above', defaultroute: 'above',
+      device: 'control port of the modem', v6apn: 'used with IPv4 + IPv6',
+      autoconnect: "the modem's own autoconnect; this image's qmi.sh writes it into the modem's memory",
+      modes: 'allowed radio modes, e.g. lte or all', plmn: 'force an operator (MCC MNC)', delay: 'seconds to wait for the modem at start'
+    };
+    const qRows = QMI.split(' ').map(x => { const p = x.split(':'); return { name: p[0], type: p[1] }; })
+      .filter(o => s.qAll || QSET[o.name] !== undefined)
+      .map(o => ({ name: o.name, type: o.type, val: QSET[o.name] !== undefined ? QSET[o.name] : '—', note: QNOTE[o.name] || '' }));
     const seg = (list, key) => list.map(x => ({ label: x[1], cls: s[key] === x[0] ? 'on' : '', on: s[key] === x[0] ? 'true' : 'false', pick: () => this.setState({ [key]: x[0] }) }));
     const setLines = [];
     const sadd = (t, c) => setLines.push({ t: t, cls: c ? 'c' : '' });
@@ -337,6 +372,8 @@ class Component extends DCLogic {
       tipX: (hx - 162).toFixed(1), tipTx: (hx - 150).toFixed(1),
       tipVal: pts[HI].toFixed(0) + ' ' + cur.unit,
       auths: seg(AUTH, 'auth'), pdps: seg(PDP, 'pdp'), needCreds: s.auth !== 'none', setLines: setLines,
+      qRows: qRows,
+      qFilters: [[false, 'Set in config · 7'], [true, 'All · 25']].map(x => ({ label: x[1], cls: s.qAll === x[0] ? 'on' : '', on: s.qAll === x[0] ? 'true' : 'false', pick: () => this.setState({ qAll: x[0] }) })),
       imei: s.imei ? '[IMEI read from the modem]' : '•••••••••••••••', imeiBtn: s.imei ? 'Hide' : 'Reveal',
       toggleImei: () => this.setState({ imei: !s.imei }),
       acts: acts, actOpen: !!A, actNote: A ? A.note : '', actGo: A ? A.go : '',

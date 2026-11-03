@@ -51,6 +51,9 @@ a{color:#1F5FCC}a:hover{color:#174A9F}
 .code{background:#15181C;color:#E6E8EA;border-radius:8px;padding:12px 14px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;line-height:1.6;overflow-x:auto;white-space:pre}
 .stat{display:flex;flex-direction:column;gap:2px;padding:14px 16px;border-radius:10px;border:1px solid #D8DBD4;background:#FFFFFF}
 .stat .n{font-size:28px;font-weight:600;letter-spacing:-0.01em}
+.src{border:1px solid #D8DBD4;border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:13px;background:#F6F7F4}
+.src-h{display:flex;align-items:center;gap:8px;font-size:13px}
+.src-f{font-size:12px;color:#575F67;margin-top:auto}
 </style>
 </helmet>
 <div class="app">
@@ -128,6 +131,21 @@ a{color:#1F5FCC}a:hover{color:#174A9F}
         <div class="stat" style="border-color: #B9A8EC"><span class="n" style="color: #5A3EBF">7</span><span style="font-size: 13px; color: #575F67">files added after flashing</span></div>
       </div>
 
+      <section class="card" aria-labelledby="sd" style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px">
+          <h2 id="sd" style="margin: 0; font-size: 16px; font-weight: 600">What AP1 says about itself</h2>
+          <span style="color: #575F67; font-size: 13px">read on every connect, the same sources LuCI uses; no image needed</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px">
+          <article class="src"><div class="src-h"><strong class="mono">/etc/board.json</strong></div><div>D-Link DWR-921 C3 (U-Boot) · switch0: LAN1–LAN4 + WAN + CPU, printed labels run backwards (internal 0–3 = LAN4–LAN1) · LED <span class="mono">green:lan</span> · radio 2G, HT20/HT40</div><div class="src-f">drives <a href="Ports.dc.html">Ports front panel</a> · radio bands</div></article>
+          <article class="src"><div class="src-h"><strong class="mono">ubus -v list</strong></div><div>40 services with method signatures: <span class="mono">network.*</span>, <span class="mono">hostapd</span>, <span class="mono">iwinfo</span>, <span class="mono">uci</span>, <span class="mono">file</span>, <span class="mono">system</span>, <span class="mono">luci</span>, <span class="mono">luci-rpc</span>…</div><div class="src-f">decides which features are available</div></article>
+          <article class="src"><div class="src-h"><strong class="mono">network.wireless get_validate</strong></div><div>Typed option lists: radio 155 · SSID 289 · station 4 · VLAN 9</div><div class="src-f">drives <a href="WiFi.dc.html">Wi-Fi › All options</a></div></article>
+          <article class="src"><div class="src-h"><strong class="mono">network get_proto_handlers</strong></div><div>Protocols: <span class="mono">static</span> (9 options) · <span class="mono">dhcp</span> (20) · <span class="mono">dhcpv6</span> · <span class="mono">ppp</span> · <span class="mono">pppoe</span> · <span class="mono">qmi</span> (25) · <span class="mono">wwan</span></div><div class="src-f">drives <a href="Network.dc.html">Router addresses</a> · <a href="LTE.dc.html">LTE settings</a></div></article>
+          <article class="src"><div class="src-h"><strong class="mono">luci getFeatures</strong></div><div style="display: flex; flex-wrap: wrap; gap: 6px"><span class="cap yes">SAE</span><span class="cap yes">OWE</span><span class="cap yes">WPS</span><span class="cap yes">802.11r</span><span class="cap yes">swconfig</span><span class="cap yes">firewall4</span><span class="cap yes">apk</span><span class="cap no">WEP</span><span class="cap no">802.11be</span></div><div class="src-f">decides which security choices <a href="WiFi.dc.html">Wi-Fi</a> offers</div></article>
+          <article class="src"><div class="src-h"><strong class="mono">LuCI menu and ACL files</strong></div><div>5 LuCI packages, 64 menu entries, each with its conditions and the configs it touches</div><div class="src-f">parity check · LuCI pages below</div></article>
+        </div>
+      </section>
+
       <section class="card" aria-labelledby="cp" style="display: flex; flex-direction: column; gap: 14px">
         <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
           <h2 id="cp" style="margin: 0; font-size: 16px; font-weight: 600">What AP1 can do</h2>
@@ -198,11 +216,31 @@ dwr921-portctl restore-all-ports</div>
         </div>
         <div style="font-size: 13px; color: #575F67">Click one to see the difference against the image's default <span class="mono">/rom/etc/config</span> file.</div>
       </section>
+
+      <section class="card" aria-labelledby="lp">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; margin-bottom: 10px">
+          <h2 id="lp" style="margin: 0; font-size: 16px; font-weight: 600">LuCI pages on AP1</h2>
+          <span style="color: #575F67; font-size: 13px">every page LuCI would show here, and where it lives in this app. A page with no screen here yet opens in LuCI, inside the app.</span>
+        </div>
+        <div style="overflow-x: auto">
+          <table class="tbl">
+            <thead><tr><th>LuCI package</th><th>Pages</th><th>In this app</th><th></th></tr></thead>
+            <tbody>
+              <tr><td class="mono">luci-mod-network</td><td>Interfaces, Wireless, Switch, Routing, DHCP and DNS, Diagnostics</td><td><span class="b air">native</span> Network &amp; DHCP · Wi-Fi · Ports</td><td></td></tr>
+              <tr><td class="mono">luci-app-firewall</td><td>Zones, Port forwards, Traffic rules, NAT rules, IP sets, Custom rules</td><td><span class="b air">native</span> Firewall</td><td></td></tr>
+              <tr><td class="mono">luci-mod-system</td><td>System, Administration, Startup, Scheduled tasks, Mount points, LEDs, Backup / Flash, Reboot</td><td><span class="b air">native</span> System</td><td></td></tr>
+              <tr><td class="mono">luci-mod-status</td><td>Overview, Routing, Firewall, Logs, Processes, Channel analysis, Realtime graphs</td><td><span class="b air">native</span> Dashboard · System › Status · RF live</td><td></td></tr>
+              <tr style="background: #F4F0FD"><td class="mono">luci-app-sqm <span class="b neu">example</span></td><td>Network › SQM QoS</td><td><span class="b har">no screen here yet</span></td><td><a class="btn" href="LuCI.dc.html">Open in LuCI</a></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="font-size: 13px; color: #575F67; margin-top: 10px">The last row shows what happens when a newer image brings a LuCI app this version of OpenWrtGUI has no screen for; AP1's image has none.</div>
+      </section>
     </main>
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1260}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1960}}'>
 class Component extends DCLogic {
   renderVals() {
     return {};

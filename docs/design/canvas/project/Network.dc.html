@@ -134,6 +134,16 @@ body{margin:0}
         <sc-if value="{{isNone}}" hint-placeholder-val="{{ false }}">
           <div class="note">No address on lan. The bridge still forwards traffic, but the router itself is unreachable on this network: only the serial console gets back in.</div>
         </sc-if>
+        <sc-if value="{{hasProtoOpts}}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 8px; background: var(--surface2)">
+            <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px"><strong style="font-size: 13px">All options for {{protoLabel}}</strong><span style="font-size: 12px; color: var(--muted)">{{protoOptNote}}</span></div>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px">
+              <sc-for list="{{protoOpts}}" as="o" hint-placeholder-count="9">
+                <button type="button" style="{{o.style}}" aria-label="{{o.aria}}"><span class="mono">{{o.name}}</span><span class="mono" style="font-size: 11px; color: var(--muted)">{{o.type}}</span><span class="mono" style="color: var(--ink)">{{o.val}}</span></button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
         <div style="display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center">
           <span class="lbl" style="font-size: 12px; color: var(--muted); font-weight: 500">Bridge members</span>
           <label class="chk"><input type="checkbox" checked>eth0.1 (LAN ports)</label>
@@ -276,7 +286,7 @@ body{margin:0}
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Look"},"$preview":{"width":1440,"height":1780}}'>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Look"},"$preview":{"width":1440,"height":1900}}'>
 class Component extends DCLogic {
   state = { dark: null, proto: 'static', serve: { pc: true, eth: true, wifi: true }, last: null };
 
@@ -304,6 +314,19 @@ class Component extends DCLogic {
     }
     add('uci commit network');
     add('# arm the 60 s rollback on the router, then: /etc/init.d/network reload', true);
+
+    const PROTO_OPTS = {
+      static: 'ipaddr:ip4addr ip6addr:ip6addr netmask:netmask broadcast:ipaddr ptpaddr:ip4addr gateway:ip4addr ip6gw:ip6addr ip6prefix:ip6addr ip6deprecated:bool',
+      dhcp: 'ipaddr:ipaddr hostname:hostname clientid:string sendclientid:string vendorid:string broadcast:bool norelease:bool reqopts:list(string) defaultreqopts:bool iface6rd:string sendopts:list(string) delegate:bool zone6rd:string zone:string mtu6rd:string customroutes:string classlessroute:bool timeout:uinteger retry:uinteger tryagain:uinteger'
+    };
+    const PROTO_VAL = { static: { ipaddr: '192.168.1.1/24' }, dhcp: { hostname: 'AP1' } };
+    const popts = (PROTO_OPTS[s.proto] || '').split(' ').filter(Boolean).map(x => {
+      const i = x.indexOf(':'), name = x.slice(0, i), val = (PROTO_VAL[s.proto] || {})[name];
+      return {
+        name: name, type: x.slice(i + 1), val: val || '—', aria: name + (val ? ' = ' + val : ', not set'),
+        style: 'font: inherit; font-size: 12px; display: inline-flex; align-items: center; gap: 8px; padding: 0 10px; min-height: 36px; border-radius: 999px; cursor: pointer; background: var(--surface); color: var(--ink2); border: 1px solid ' + (val ? 'var(--accent)' : 'var(--line)')
+      };
+    });
 
     const H = [
       { id: 'pc', name: 'PC · ES-DmitryKo-LT', mac: '08:3a:88:5c:a8:39', ip: '192.168.1.10', lease: 'default', sec: 'pc' },
@@ -344,7 +367,10 @@ class Component extends DCLogic {
       isStatic: s.proto === 'static', isDhcp: s.proto === 'dhcp', isNone: s.proto === 'none',
       lanProtoLabel: s.proto === 'static' ? 'Static' : (s.proto === 'dhcp' ? 'DHCP client' : 'No address'),
       lanAddr: s.proto === 'static' ? '192.168.1.1/24' : (s.proto === 'dhcp' ? 'from DHCP' : '—'),
-      ifLines: ifLines, hosts: hosts, hostLines: hostLines
+      ifLines: ifLines, hosts: hosts, hostLines: hostLines,
+      hasProtoOpts: popts.length > 0, protoOpts: popts,
+      protoLabel: s.proto === 'static' ? 'Static' : 'DHCP client',
+      protoOptNote: 'from the router\'s ' + s.proto + ' protocol handler · ' + popts.length + ' options · outlined = set · click one to edit · MTU, DNS and metric are interface-wide, above'
     };
   }
 }
