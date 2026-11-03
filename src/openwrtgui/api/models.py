@@ -119,6 +119,13 @@ class Health(BaseModel):
     mode: str
 
 
+class AppInfo(BaseModel):
+    version: str
+    mode: str
+    data_dir: str
+    can_install: bool
+
+
 def wire(msg: dict[str, Any], has_previous: bool = False) -> Any:
     """Turn a hub message into JSON-ready data with the same shapes as the REST responses."""
     if msg.get("type") == "guard":

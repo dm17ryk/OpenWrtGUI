@@ -37,3 +37,4 @@ export type TerminalMessage =
   | { type: 'refused'; line: string; reason: string }
   | { type: 'exit'; status: number }
   | { type: 'error'; detail: string }
+export type AppInfo = S['AppInfo']

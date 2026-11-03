@@ -128,6 +128,17 @@ async def test_update_install_asks_when_terminals_open(authed: httpx.AsyncClient
     assert r.status_code == 409 and r.json()["open_terminals"] == 1
 
 
+async def test_app_info(authed: httpx.AsyncClient, client: httpx.AsyncClient, ctx: AppContext) -> None:
+    info = (await authed.get("/api/app/info")).json()
+    assert info == {
+        "version": APP_VERSION,
+        "mode": "simulator",
+        "data_dir": str(ctx.data.root),
+        "can_install": False,
+    }
+    assert (await client.get("/api/app/info")).status_code == 401
+
+
 async def test_quit_sets_event(authed: httpx.AsyncClient, ctx: AppContext) -> None:
     assert (await authed.post("/api/app/quit")).status_code == 200
     assert ctx.quit_event.is_set()

@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse, PlainTextResponse
 
 from openwrtgui.api.deps import get_ctx, require_token
-from openwrtgui.api.models import AppKeyOut, GuardOut, Health, Ok
+from openwrtgui.api.models import AppInfo, AppKeyOut, GuardOut, Health, Ok
 from openwrtgui.context import AppContext
 from openwrtgui.guard.audit import AuditEntry
 from openwrtgui.store.settings import Settings
@@ -74,6 +74,16 @@ async def audit_export(ctx: Ctx) -> FileResponse:
     exports.mkdir(exist_ok=True)
     path = ctx.audit.export_zip(exports / f"openwrtgui-audit-{date.today().isoformat()}.zip")
     return FileResponse(path, media_type="application/zip", filename=path.name)
+
+
+@router.get("/app/info")
+async def app_info(ctx: Ctx) -> AppInfo:
+    return AppInfo(
+        version=APP_VERSION,
+        mode=ctx.mode,
+        data_dir=str(ctx.data.root),
+        can_install=ctx.updater.status().can_install,
+    )
 
 
 @router.post("/app/open-data-dir")
