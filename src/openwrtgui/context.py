@@ -106,6 +106,7 @@ def build_context(
     pool = ConnectionPool(factory)
     hub = LiveHub()
     statuses: dict[str, RouterStatus] = {}
+    descriptions: dict[str, SelfDescription] = {}
     onboard = OnboardService(
         connector=connector,
         host_keys=host_keys,
@@ -123,7 +124,9 @@ def build_context(
         install_dir=install_dir,
         hub=hub,
     )
-    poller = StatusPoller(routers=routers, pool=pool, guard=guard, hub=hub, statuses=statuses)
+    poller = StatusPoller(
+        routers=routers, pool=pool, guard=guard, hub=hub, statuses=statuses, descriptions=descriptions
+    )
     return AppContext(
         data=data,
         settings=settings,
@@ -142,4 +145,5 @@ def build_context(
         mode="simulator" if simulator is not None else "real",
         web_dir=web_dir,
         statuses=statuses,
+        descriptions=descriptions,
     )

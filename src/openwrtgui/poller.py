@@ -9,6 +9,7 @@ from collections.abc import Awaitable, Callable
 
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.live import LiveHub
+from openwrtgui.probe.describe import SelfDescription, describe_router
 from openwrtgui.probe.status import RouterStatus, read_status, ssids_on_air
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import TransportError
@@ -26,6 +27,7 @@ class StatusPoller:
         guard: BenchGuard,
         hub: LiveHub,
         statuses: dict[str, RouterStatus],
+        descriptions: dict[str, SelfDescription] | None = None,
         interval_s: float = 5.0,
         guard_interval_s: float = 2.0,
     ) -> None:
@@ -34,6 +36,7 @@ class StatusPoller:
         self.guard = guard
         self.hub = hub
         self.statuses = statuses
+        self.descriptions = descriptions
         self.interval_s = interval_s
         self.guard_interval_s = guard_interval_s
         self._last_guard: tuple[bool, tuple[str, ...]] | None = None
@@ -58,6 +61,8 @@ class StatusPoller:
             self._offline(rec)
             return
         try:
+            if self.descriptions is not None and rec.id not in self.descriptions:
+                self.descriptions[rec.id] = await describe_router(transport)
             status = await read_status(transport)
         except (TransportError, ValueError) as exc:
             log.debug("reading %s failed: %s", rec.id, exc)

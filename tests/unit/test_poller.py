@@ -62,6 +62,32 @@ async def test_poll_publishes_status_with_station(tmp_path: Path) -> None:
     assert statuses["ap1"].radios[0].up
 
 
+async def test_poll_describes_each_router_once(tmp_path: Path) -> None:
+    transport = ReplayTransport(sim_commands(SIM_DIR, "ap1"))
+
+    async def factory(rec: RouterRecord) -> Transport:
+        return transport
+
+    store = RouterStore(tmp_path / "routers.json")
+    store.upsert(_rec("ap1"))
+    descriptions: dict[str, Any] = {}
+    poller = StatusPoller(
+        routers=store,
+        pool=ConnectionPool(factory),
+        guard=BenchGuard(GuardWatchList(lock_files=[], processes=[]), lister=lambda: []),
+        hub=LiveHub(),
+        statuses={},
+        descriptions=descriptions,
+    )
+    rec = store.get("ap1")
+    assert rec is not None
+    await poller.poll_router(rec)
+    calls_after_first = len(transport.calls)
+    await poller.poll_router(rec)
+    assert descriptions["ap1"].identity.hostname == "AP1"
+    assert "cat /etc/board.json" not in transport.calls[calls_after_first:]
+
+
 async def test_run_ssid_on_air_makes_guard_live(tmp_path: Path) -> None:
     commands = sim_commands(SIM_DIR, "ap1")
     status = commands[WIRELESS_STATUS]

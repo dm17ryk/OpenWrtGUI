@@ -23,6 +23,20 @@ export function radioLine(status: RouterStatus): string {
   return 'parked'
 }
 
+/** "−52 dBm" with a real minus sign, as on the mockups. */
+export function dbm(value: number): string {
+  return `${value < 0 ? '−' : ''}${Math.abs(value)} dBm`
+}
+
+export function hhmm(iso: string): string {
+  const d = new Date(iso)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+export function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? '' : 's'}`
+}
+
 export function stationCount(status: RouterStatus | null | undefined): number {
   return status ? status.radios.reduce((sum, r) => sum + r.stations.length, 0) : 0
 }

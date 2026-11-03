@@ -38,6 +38,13 @@ async def test_routers_list_has_three_sim_routers(authed: httpx.AsyncClient) -> 
     assert next(i for i in items if i["record"]["id"] == "ap3")["record"]["auth"] == "none"
 
 
+async def test_router_list_carries_cached_summary(authed: httpx.AsyncClient) -> None:
+    await authed.post("/api/routers/ap2/describe")
+    items = {i["record"]["id"]: i for i in (await authed.get("/api/routers")).json()}
+    assert items["ap2"]["summary"]["revision"] == "r35692-b8bffeefdf"
+    assert items["ap1"]["summary"] is None
+
+
 async def test_router_detail_describes_on_demand(authed: httpx.AsyncClient) -> None:
     detail = (await authed.get("/api/routers/ap2")).json()
     assert detail["summary"]["model"] == "D-Link DWR-921 C3 (U-Boot)"

@@ -33,7 +33,12 @@ async def _describe(ctx: AppContext, rec: RouterRecord) -> DescriptionSummary:
 @router.get("")
 async def list_routers(ctx: Ctx) -> list[RouterItem]:
     return [
-        RouterItem(record=r, health=ctx.pool.health(r.id), status=ctx.statuses.get(r.id))
+        RouterItem(
+            record=r,
+            health=ctx.pool.health(r.id),
+            status=ctx.statuses.get(r.id),
+            summary=summarize(d) if (d := ctx.descriptions.get(r.id)) else None,
+        )
         for r in ctx.routers.list()
     ]
 

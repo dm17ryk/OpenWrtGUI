@@ -7,6 +7,7 @@ const item = (id: string): RouterItem => ({
   record: { id, name: id, host: '192.168.1.2', port: 22, username: 'root', auth: 'key', port_labels: {}, added_at: '2026-11-03T09:00:00' },
   health: { online: true, since: '2026-11-03T09:00:00', error: null },
   status: null,
+  summary: null,
 })
 
 test('router-offline marks only that router offline', () => {

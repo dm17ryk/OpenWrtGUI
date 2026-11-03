@@ -49,10 +49,11 @@ class RouterItem(BaseModel):
     record: RouterRecord
     health: RouterHealth
     status: RouterStatus | None
+    summary: DescriptionSummary | None
 
 
 class RouterDetail(RouterItem):
-    summary: DescriptionSummary | None
+    pass
 
 
 class ReleaseOut(BaseModel):

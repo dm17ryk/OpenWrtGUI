@@ -716,6 +716,7 @@ export interface components {
             health: components["schemas"]["RouterHealth"];
             record: components["schemas"]["RouterRecord"];
             status: components["schemas"]["RouterStatus"] | null;
+            summary: components["schemas"]["DescriptionSummary"] | null;
         };
         /** RouterRecord */
         RouterRecord: {
