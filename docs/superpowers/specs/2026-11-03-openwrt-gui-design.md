@@ -1,0 +1,398 @@
+# OpenWrtGUI: design spec
+
+| | |
+|---|---|
+| Date | 2026-11-03 |
+| Status | Draft for review |
+| Owner | Dmitry Kokotov |
+| Repository | https://github.com/dm17ryk/OpenWrtGUI (public, GPL-3.0, default branch `master`) |
+| Screen mockups | Design canvas "OpenWrtGUI screens" (private claude.ai artifact); source in `docs/design/canvas/project/` |
+
+## 1. Purpose
+
+The Wi-Fi test bench uses OpenWrt routers as access points. Everything on them is done today over SSH: by hand, or through
+Python harness scripts (`bench_net.py`, `aps.py`, `dima_night.py`, `txlab_*.py`). The routers' own web UI (LuCI) is hard
+to use, and it does not cover the custom tools added to the bench image.
+
+OpenWrtGUI is a Windows desktop app that lets one engineer see and operate every bench router from one window. It covers
+everything LuCI does, the bench's custom tools, and the test-specific controls a Wi-Fi test needs: pure-mode and channel
+selection, RF readings, fault injection, MAC blocking and packet capture.
+
+Success means:
+
+1. Any setting LuCI offers on these routers can be made in OpenWrtGUI, and so can anything else that is routinely done over SSH today.
+2. A new router family is added by importing its firmware image. No code change is needed unless it brings a new mechanism.
+3. The app never disturbs a running test harness.
+4. It installs and updates itself from GitHub Releases, with nothing preinstalled on the PC.
+
+## 2. Context and constraints (measured, 2026-11-03)
+
+| Fact | Source |
+|---|---|
+| 3 routers: D-Link DWR-921 C3 (U-Boot), OpenWrt SNAPSHOT r35692-b8bffeefdf, ramips/mt7620, kernel 6.18.41, `apk` | `/etc/openwrt_release` on AP2 |
+| AP1 192.168.1.1 (bench, LAN DHCP server, `wifi-mirror`, BENCHSIPGUARD, plink + password); AP2 .1.2 and AP3 .1.3 (DHCP off, radio parked, OpenSSH key) | `aps.py`, txctl session |
+| 55 MB RAM (≈12 MB free), 4.5 MB free overlay flash, no python3 / lua / curl / base64 / openssl CLI | AP2 probe |
+| Present: uhttpd + LuCI + ubus over HTTP, rpcd, dropbear 2026.92 (ed25519, `scp`, no sftp-server), `iw`, `iwinfo`, `hostapd_cli`, `tcpdump`, `iperf3`, `socat`, `nft`, `tc`/netem, `ifb`, `conntrack`, `swconfig`, `uqmi`, `microcom`, `jsonfilter` | AP2 probe |
+| Radio: `rt2800_wmac`, 2.4 GHz only, ch 1–13 (14 disabled in IL), HT20/HT40, 20 dBm max, monitor mode. No STA_TX_PWR and no ACK-signal feature. debugfs `phy0/statistics` present (`dot11ACKFailureCount` etc.) | `iw phy`, debugfs |
+| TX power: uci `txpower` set → `iw phy phy0 set txpower fixed N00`; unset → `auto` (regulatory max) | `/lib/netifd/wireless/mac80211.sh:98-109` |
+| MAC ACL: `hostapd_cli deny_acl/accept_acl`; ubus `hostapd.<if>` `del_client` with `ban_time`, `list_bans`; uci `macfilter` + `maclist` | `hostapd_cli`/`wpad` strings, `hostapd.sh:360-1049` |
+| Your custom packages in the image: `dwr921-portctl` v2, `dwr921-diag` v2, `dwr921-internet-led` v4 | `/lib/apk/db/installed` |
+| LTE modem: BroadMobi BM806C (USB 2020:2033), firmware M1.2.0_E1.0.3_A1.1.8, QMI on `/dev/cdc-wdm0`, AT on `ttyUSB1`/`ttyUSB2`. QMI signal gives rssi, rsrq, rsrp, snr. `AT+BMMODODR?` → 17. `AT%SYSCMD` → ERROR | AP2 probe |
+| The BM806C is the DHCP server on its 802.3 link. `lte_4` must stay DHCP: a static address stops downlink | Dmitry's port notes |
+| Firmware image: `D:\Essence_SC\DWR_921-c3-uboot\…squashfs-sysupgrade.bin` (sha256 d340a53f…), GitHub release dm17ryk/openwrt v25.12.5 | memory, release |
+| Harness rules: while `dima_night` / `rh_soak` / `overnight_wifi` runs, every router is read-only. AP1 is the only DHCP server. Only one radio on air per SSID. BENCHSIPGUARD, `voipdscp` and `wifi-mirror` stay untouched | txctl session |
+| `dima_night` sets `country=IL`, `cell_density=0`, `legacy_rates=1` on each AP turn (`dima_night.py:265`) and restores only the mode keys | txctl session |
+| PC: Windows 11, WebView2 156 present. SentinelOne kills scripts that run outside `C:\Essence_SC` or `D:\Essence_SC` | probe, Dmitry's rule |
+
+## 3. Decisions
+
+| # | Decision | By |
+|---|---|---|
+| D1 | Scope: routers/APs only, but everything doable over SSH, plus discovery and a dashboard. Test-run orchestration stays in the harness | Dmitry |
+| D2 | PC-hosted, localhost, single user | Dmitry |
+| D3 | Installable Windows app with bundled Python; nothing needs to be installed on the PC | Dmitry |
+| D4 | Independent engine: the harness (`aps.py`, `bench_net.py`) stays untouched | Dmitry |
+| D5 | Capability model "C": typed drivers for stateful and risky operations, a generic prober, and a panel for discovered unknown tools | agreed |
+| D6 | New router families are added through their firmware image (image profiles) | Dmitry |
+| D7 | Radio model is multi-band from day one (2.4 / 5 / 6 GHz); switch model covers swconfig and DSA | Dmitry |
+| D8 | Mode and channel selectors: Auto / All (plus None for channels) or checkboxes; ticked = auto restricted to the ticked set. A selection is either applied (router picks within it) or stepped through (one pure mode × one channel per step) | Dmitry |
+| D9 | MAC access control lives on Network & DHCP | Dmitry |
+| D10 | Light and dark themes; follow Windows by default, with a manual toggle | Dmitry |
+| D11 | Firewall supports both models: allow-all + block rules, and block-all + allow rules | Dmitry |
+| D12 | Tables owned by other programs (harness) can be unlocked and then edited, deleted or added | Dmitry |
+| D13 | LuCI parity: every LuCI page on the image has an equivalent | Dmitry |
+| D14 | LTE modem management, including the modem reset that the D-Link firmware had | Dmitry |
+| D15 | Self-update from GitHub Releases; stable and pre-release (CI) channels | Dmitry |
+| D16 | Run as a professional open project: README with screenshots, user manual, wiki, issue templates, CI, release pipeline, roadmap | Dmitry |
+| D17 | Phase 2: one page per tool listed under "What this router can do" | Dmitry |
+
+## 4. Architecture
+
+```
+OpenWrtGUI.exe  (PyInstaller onedir, bundled CPython 3.13)
+├─ Window: pywebview → Edge WebView2 (falls back to the default browser if WebView2 is missing)
+├─ Web UI: React + TypeScript (built at release time; static files at runtime)
+├─ Local API: FastAPI + uvicorn on 127.0.0.1:<random port>, per-launch bearer token, WebSocket for live data
+├─ Guard: Bench Guard · write lock per router · command preview · 60 s rollback · audit log
+├─ Drivers: radio · wifi_acl · rf · network · dhcp · dns · routes · switch_swconfig · switch_dsa · mirror ·
+│           firewall · faults · capture · lte · system · services · tools
+├─ Prober + image profiles (pure-Python squashfs reader)
+└─ Transport: asyncssh, one pooled session per router, host keys pinned
+```
+
+- **Nothing is installed on the routers.** The only change the app makes for itself is one line added to `/etc/dropbear/authorized_keys` (D4, and the 4.5 MB flash limit).
+- **Transport.** All routers use asyncssh, so the app depends on neither plink nor Windows OpenSSH. File transfer goes through `scp` (Dropbear has no sftp-server) or `cat >` over an exec channel. The app sends the exact command text it shows in the preview.
+- **Local API security.** The API listens on loopback only, on a random port, and every request needs the per-launch token. This stops other local programs and web pages from driving routers.
+- **Packaging.** Inno Setup installer, per-user, no admin. Install folder is chosen at install time. On the bench PC it must be inside `C:\Essence_SC\` (SentinelOne rule), e.g. `C:\Essence_SC\apps\OpenWrtGUI`. PyInstaller "onefile" is not used: it unpacks to `%TEMP%` on every launch.
+- **Data folder** (chosen at install, default `%LOCALAPPDATA%\OpenWrtGUI`, bench PC `C:\Essence_SC\apps\OpenWrtGUI-data`): `routers.json`, `known_hosts`, `keys/` (the app's ed25519 key, readable by the user only), `profiles/`, `baselines/`, `audit/`, `updates/`. Captures and RF recordings go to `Documents\OpenWrtGUI\`. Updates and uninstall leave the data folder alone (uninstall asks).
+- **Secrets.** Router passwords are used once and never stored or logged. Wi-Fi keys are never shown in previews or logs (`<hidden>`). The IMEI is hidden until the user reveals it.
+
+Source layout:
+
+```
+src/openwrtgui/  main.py (launcher) · app.py (FastAPI) · transport/ · probe/ · profiles/ · drivers/ · guard/ · api/ · store/ · update/
+frontend/        React app (Vite)
+installer/       OpenWrtGUI.iss
+tests/           unit · contract (recorded router outputs) · e2e (Playwright) · hardware (opt-in)
+docs/            manual/ (user manual, synced to the wiki) · design/ · superpowers/specs, plans
+.github/         workflows · ISSUE_TEMPLATE · PULL_REQUEST_TEMPLATE.md · dependabot.yml
+```
+
+## 5. Routers, discovery and image profiles
+
+**Adding a router** (wizard, screen 7):
+1. Enter the address.
+2. Accept the host key; it is pinned. A changed host key blocks the connection with an explanation (a reflash regenerates it).
+3. Log in once with the root password. A fresh OpenWrt has no password, and the wizard offers to set one.
+4. The app generates its own ed25519 key once per PC and appends it to `authorized_keys` only if it is not already there. Existing keys and password login stay as they are.
+5. The app reconnects with the key only and confirms it works.
+6. Identify the router and match it to a profile.
+7. Map the ports, then run the self-test.
+
+**Image profile.**
+- Import a sysupgrade `.bin`. The app finds the squashfs and reads `lib/apk/db/installed` (packages, versions, descriptions), the kernel modules (which qdiscs, which switch framework), binaries on `PATH`, custom packages with their usage text, and the `/etc/config` defaults.
+- The profile is keyed by board name, `DISTRIB_REVISION` and image SHA-256.
+- If an image cannot be parsed, the same profile is built from a connected router's `/rom`.
+
+**On connect**, the app reads identity (`/etc/openwrt_release`, `ubus call system board`) and matches a profile. Live probing then adds:
+- **Added after flashing**: `/overlay/upper` files and packages that are not in the profile.
+- **Config changed**: `/etc/config` compared with `/rom/etc/config`.
+- **Runtime state**: nft tables, qdiscs, monitor interfaces, mirror hooks, radio state.
+- **Firmware match**: the firmware partition hash compared with the image.
+
+**Capabilities.** Each driver declares what it needs (for example swconfig, `ifb` + netem, `uqmi`). The UI shows a feature only when the router has it, and greys it out with the reason otherwise. Unknown custom executables appear on the Discovery screen with "Run `--help`" and "Promote to a card". Promotion takes a small descriptor (name, commands, arguments, read-only or write), shown as a card with the same preview, guard and audit as built-in features.
+
+**Port map and self-test.** The port map is found read-only (switch MAC table and link state), then by unplugging and replugging sockets. The app never disables the port that carries its own SSH. The self-test checks monitor mode, port-disable carrier drop (on a free port), netem effect and nft insert/readback. Radio checks run only with explicit consent. Results are saved per router model.
+
+**Baselines and known writers.**
+- A baseline is a per-router snapshot of uci plus runtime state. Differences from it are shown on the dashboard.
+- A difference that matches a known writer's signature is labelled with that writer instead of raised as an error. Example: `dima_night` lab options `country`, `cell_density`, `legacy_rates`.
+- Known-writer signatures are kept in a small registry in Settings.
+
+**Future routers.**
+- 5 and 6 GHz radios use the same uci `wireless` and `iw` model. Channel, width and power lists come from `iw phy` and the country code.
+- DFS channels show the radar-check wait (CAC: 60 s, or 10 min on channels 120–128).
+- On 6 GHz only SAE or OWE with PMF can be selected.
+- The DSA switch backend implements the same interface as swconfig. It is built when the first DSA router and its image are on the bench.
+
+## 6. Safety
+
+| Mechanism | Behaviour |
+|---|---|
+| Bench Guard | Detects a live harness run: lock files (e.g. `iperf_txsweep/voip.lock.own`), processes (`dima_night.py`, `rh_soak.py`, `overnight_wifi`, `txlab_*.py`, `voip_chain.py`), router markers (run SSIDs `OpenWrtB` / `OpenWrtC`, armed radio dead-man jobs). While one is live, every router is read-only and a banner names the run. Reading, RF, capture and read-only terminal commands keep working. The watch list is editable in Settings |
+| Write lock | One write at a time per router. Reads run in parallel |
+| Preview | Every write shows the exact commands before Apply. Secrets are masked |
+| Verify by effect | A write is reported as done only when the effect is proven. Radio park: uci committed + netifd settled + no AP in `iw dev`. Link up: polled for up to 20 s. nft rule: present, ahead of `ct state established accept`, counter readable |
+| Rollback | Changes that can cut the app's own path (lan address, VLAN 1, firewall input on the app's zone, bridge members) arm a router-side 60 s restore timer first. The app reconnects, confirms and cancels the timer; otherwise the router restores itself |
+| Own path | The PC's switch port and the app's SSH rule cannot be disabled from the UI |
+| Ownership | Every nft table and tc hook has an owner: fw4, the app, the harness, or unknown. Tables owned by someone else are locked by default. **Unlock** names the owner and what depends on it (e.g. "dima_night expects BENCHSIPGUARD") and asks for confirmation; after that edit, delete and add are allowed (D12). Bench Guard still wins during a run |
+| Timed faults | A timer on the router clears them, so they end on time even if the PC goes away |
+| DHCP conflict | Before enabling a DHCP server, the app checks the other routers on the same subnet |
+| Audit log | Every command sent: time, router, screen, command (masked), exit code, verify result. Exportable for bug reports |
+| Dev router | Development and hardware tests use AP2 only. Tell the txctl session before any wifi or network reload on AP2. AP1 and AP3 are not touched |
+
+## 7. Screens
+
+Mockups for screens 1–9 are on the canvas. Screens 10–13 are specified here and will be drawn next. Every screen works in light and dark.
+
+### 7.1 Dashboard (1)
+- Shows: routers with state; the 2.4 / 5 / 6 GHz air map (on air vs parked/staged); per-router cards (radio, RF summary, stations, network, faults, login type, ownership tags); "Needs attention" (drift with known-writer attribution, password-only login, files added after flashing).
+- Header: Bench Guard status and the theme toggle.
+
+### 7.2 Wi-Fi (2)
+- **Per radio tab**: band, channel, width, TX power, country, SSID(s), security (Open / WPA2-PSK / WPA3-SAE / WPA2+WPA3; on 6 GHz only SAE/OWE).
+- **Mode selector**: Auto / All, or checkboxes b · g · n20 · n40 (ac/ax/be added for 5/6 GHz radios). Ticked modes are compiled to:
+  - `htmode` (NOHT / HT20 / HT40)
+  - `legacy_rates`, `supported_rates` and `basic_rate` (kb/s)
+  - `noscan=1` only when n40 is ticked without n20
+  - a runtime TX mask `iw dev <if> set bitrates legacy-2.4 … ht-mcs-2.4 …`, re-applied after every Wi-Fi reload
+
+  Auto removes all overrides. On this image Auto means no 802.11b rates unless `legacy_rates=1`. n-only still beacons at 6 Mb/s OFDM; the UI says so.
+- **Channel selector**: Auto / All / None, or checkboxes 1–13. Rules:
+  - one ticked: `channel=N`
+  - several ticked: `channel=auto` + `channels='…'`
+  - All: `channels='1-13'`
+  - None: radio parked (`disabled=1`)
+- **TX power**: Auto (shows the actual maximum) / Fixed N / Cap N. Cap is shown only when the driver can use it. The actual value from `iw dev … info` is shown next to the requested one.
+- **Apply**: the router picks within the selection. The result is verified on air: radio up, channel, width, and beacon rates read through `mon0`.
+- **Step-through**: every ticked mode × ticked channel × (optional) ticked power, one pure mode per step. Each step is proven on air before its dwell. Advance on a timer, manually, or when a station re-joins. AP restored at the end or on Stop. Blocked by Bench Guard.
+- **Stations**: MAC, name/IP (leases), signal, TX/RX rate, mode, connected time; actions: RF, Block, Deauth.
+- **Who may join**: one-line summary linking to Network & DHCP.
+
+### 7.3 RF live (8)
+- **Colours**: blue = RX at AP (station → AP), orange = TX from AP (AP → station), used the same way everywhere.
+- **Radio**: channel/width/frequency, TX power set vs actual, air busy % (survey), noise floor (shown "not reported" where the driver gives none, as on rt2800), ACK failures/s (debugfs).
+- **Per station, RX**: signal now/avg, per antenna, RX rate and mode, packets, drops, last frame.
+- **Per station, TX**: TX rate, MCS, width and GI, retry %, failed/s, expected throughput, ACK signal (where supported).
+- **Charts**: signal over time and TX vs RX rate, with hover readout. Window: 1 min / 5 min / 1 h.
+- **"Which rates reach the station"**: minstrel `rc_stats` (attempts, success %, in-use rate).
+- **Frame analysis via `mon0`** (off by default; costs router CPU): rate mix per direction, signal histogram, retry-flag share, bad-FCS share.
+- **Record to CSV** (1 s samples).
+- **Channel analysis** (LuCI parity): scan of nearby networks and channel survey per channel.
+
+### 7.4 Network & DHCP (9)
+- **Router addresses**: every interface (lan, wan, lte, VLAN interfaces) as Static / DHCP client / No address / LTE (QMI) / PPP. Address is always written as `address/prefix` (a bare address becomes /32 on this image). Also gateway, DNS, MTU and bridge members. Changes to the app's own path apply with rollback, and the app follows a changed address.
+- **DHCP server** per interface: on/off with conflict check; pool start/size, lease time; options by code (3, 6, 15, 42, any); IPv6 DHCPv6/RA.
+- **Fixed addresses by MAC**: name, MAC, IP, lease time, and **Gets an address** (off = `ignore=1`: the device joins but gets no IP).
+- **Active leases**, with Make fixed.
+- **Wi-Fi access by MAC**: Everyone / Block listed / Only listed, for all SSIDs or ticked ones. Per device, three ways to block:
+  - Now, no Wi-Fi restart: `hostapd_cli deny_acl ADD_MAC`.
+  - For N s: ubus `del_client` with `ban_time`.
+  - Saved: uci `macfilter` / `maclist` plus a reload.
+- **DNS** (LuCI DNS page): forwarders, local domain, rebind protection, per-domain overrides (`address=/host/ip`), and similar options.
+- **Static routes and rules** (LuCI Routing page): IPv4/IPv6 routes, policy rules, live routing table.
+
+### 7.5 Ports, VLANs, mirroring (3)
+- **Front panel**: printed labels ↔ internal ports, link/speed, per-port enable via `dwr921-portctl` or `swconfig … enable`. The SSH port is locked. "Enable all ports" button.
+- **VLAN matrix** (— / U / T per port, CPU included). Changes to VLAN 1 apply with rollback.
+- **Switch port mirror**: monitor port, sources with RX/TX.
+- **Wi-Fi mirror** (`wifi-mirror` where present): status, stop/restart, excluded MACs, warning before iperf.
+
+### 7.6 Firewall (4)
+
+The canvas mockup predates D11 and D12; it is redrawn with the next set of screens.
+
+- **Filtering model per zone and direction** (D11):
+  - **Allow all, block by rules**: zone policy ACCEPT, user rules drop/reject.
+  - **Block all, allow by rules**: zone policy REJECT/DROP, user rules accept.
+
+  Switching model keeps the existing rules and flags any that no longer do anything. In "Block all" on the zone that carries the app's SSH, the app pins "allow SSH from this PC" and, where this router serves DHCP/DNS there, "allow DHCP + DNS". Pins can be removed after a warning. Changes apply with rollback.
+- **Zones**: networks, input/output/forward policy, masquerade, MSS clamp, forwardings.
+- **Tabs (LuCI parity)**: Traffic rules (with live counters), Port forwards, NAT rules, IP sets, Custom rules (`/etc/nftables.d` includes), All nftables tables, Raw ruleset.
+- **Other tables** (BENCHSIPGUARD, `voipdscp`, the app's `benchfault`, unknown): owner badge, **Unlock**, then edit rules, delete table, or add a table (D12). Each change can be runtime-only or persisted as an fw4 include, and is applied atomically with `nft -f` and rollback.
+
+### 7.7 Faults and capture (5)
+- **Target**: a known device or any IP/MAC. Panel ETH and Wi-Fi MACs differ, so matching is by remembered MAC or lease hostname, never by vendor prefix.
+- **Layers**:
+  - L1 link down (Ethernet only)
+  - L2 isolate
+  - L3 block flows (`rtp_in`, `sip_in`, `rtp_out`, `all_in`, `all_out`, `blackout`), with loss %; RTP ports come from conntrack
+  - netem impair (delay, jitter, distribution, loss, reorder, duplicate, direction; scoped to the target)
+  - Wi-Fi (deauth, Block for N s, AP down)
+- **Duration**: until cleared, or hold N s (cleared by a router-side timer).
+- **Capture**: br-lan / Wi-Fi interface / `mon0` (created on demand) / wwan0. Filter, duration, Live in Wireshark (if installed) or save `.pcap`.
+
+### 7.8 Discovery and tools (6)
+- Image match and firmware hash; capability map (in image / added after flashing / missing); your custom packages (card, service, or "no card yet" with `--help` and Promote); files added after flashing (copy to another router, save as a reflash checklist); config changed vs image defaults, with diff.
+- **Phase 2** (D17): each capability chip links to its own tool page. Planned pages:
+  - Throughput: iperf3 / iperf 2, router as server or client.
+  - Air survey: `iw` scan and survey.
+  - Station management: `hostapd_cli` (802.11v BSS transition, 802.11k neighbour reports).
+  - Traffic generator: `socat`.
+  - Port statistics: `ethtool` and switch MIB counters.
+  - Connections: `conntrack`, SIP ALG toggle.
+
+### 7.9 Add router (7)
+The wizard described in section 5.
+
+### 7.10 LTE modem (new; LuCI `luci-proto-qmi` parity plus what the D-Link UI had)
+- **Status**:
+  - registration, radio type, roaming, operator
+  - RSSI / RSRP / RSRQ / SNR, each with a quality label and history chart
+  - session uptime, IPv4, data counters
+- **Settings** (uci `network.lte`): APN, auth (none/PAP/CHAP/both) with user/password, PIN, PDP type, MTU, metric, autoconnect, default route. `lte_4` stays DHCP; the UI explains why.
+- **Modem**:
+  - info: manufacturer, model, firmware (ATI); IMEI hidden until revealed
+  - network mode order (`AT+BMMODODR`; code names still to map)
+- **Actions**:
+  - connect / disconnect (`ifup`/`ifdown lte`)
+  - reboot modem (QMI operating mode reset, or AT; to be verified)
+  - **Reset modem to defaults** (D14; command still to be found, open item O1)
+  - AT console with history
+- **Phase 2**: SIM PIN management, SMS, USSD (the D-Link UI had these).
+
+### 7.11 System (new; LuCI System and Status parity)
+- System: hostname, time zone, NTP client/server, log buffer, remote syslog.
+- Access: root password; SSH (port, interface, password auth, root login); SSH keys (each labelled: app, harness, other); HTTP(S) (LuCI on/off, redirect to HTTPS).
+- Services: init scripts (enabled, running, start/stop/restart/enable/disable), `rc.local`.
+- Scheduled tasks (crontab), LED configuration, mount points.
+- **Backup and firmware**:
+  - backup download (`sysupgrade -b`), restore
+  - reset to defaults (`firstboot`), with a warning that the LAN address returns to 192.168.1.1 and would clash with AP1
+  - **Flash firmware from an imported image**: board and hash checked, keep-settings option, upload over scp, reconnect, verify the new revision. The expected host-key change is handled.
+  - reboot
+- Status: overview, routes, system log, kernel log, processes, realtime load/bandwidth/connections, diagnostics (ping, traceroute, nslookup run on the router).
+
+### 7.12 App settings and updates (new)
+- Updates (section 9), theme (System / Light / Dark), data folder, known devices (name ↔ MACs: the panel's ETH and Wi-Fi MACs are unrelated).
+- Bench Guard watch list, known-writer signatures.
+- App SSH key: fingerprint, export public key, rotate (re-deploys to every router, then removes the old key).
+- Audit log retention and export.
+
+### 7.13 Terminal and audit log
+- An xterm.js terminal per router over the same session. During a run it accepts read-only commands only.
+- Audit log viewer with filters and export.
+
+## 8. LuCI parity (every LuCI page installed on the image)
+
+| LuCI page | OpenWrtGUI |
+|---|---|
+| Status › Overview | Dashboard; System › Status |
+| Status › Routing | Network › Static routes (live table) |
+| Status › Firewall (nftables) | Firewall › Raw ruleset |
+| Status › System log, Kernel log | System › Status |
+| Status › Processes | System › Status |
+| Status › Channel analysis | RF live › Channel analysis |
+| Status › Realtime graphs (load, bandwidth, wireless, connections) | System › Status (load, bandwidth, connections); RF live (wireless) |
+| System › System | System › System |
+| System › Administration (router password, password policy, SSH access, SSH keys, HTTP(S) access, repo public keys) | System › Access (repo keys: read-only list) |
+| System › Plugins | not applicable (LuCI's internal plugin switches) |
+| System › Startup | System › Services |
+| System › Scheduled tasks | System › Scheduled tasks |
+| System › Mount points | System › Mount points |
+| System › LED configuration | System › LEDs |
+| System › Backup / Flash firmware | System › Backup and firmware |
+| System › Reboot | System › Reboot |
+| Network › Interfaces (incl. protocols qmi, ppp, ipv6) | Network & DHCP › Router addresses; LTE modem |
+| Network › Wireless | Wi-Fi; Network & DHCP › Wi-Fi access by MAC |
+| Network › Switch, Switch/VLAN config | Ports, VLANs, mirroring |
+| Network › Routing | Network & DHCP › Static routes and rules |
+| Network › DHCP, DNS | Network & DHCP › DHCP server, Fixed addresses, DNS |
+| Network › Diagnostics | System › Status › Diagnostics |
+| Network › Firewall (zones, port forwards, traffic rules, NAT rules, IP sets, custom rules) | Firewall (all tabs) |
+| Services, VPN | empty on this image; an app installed later shows up under Discovery |
+
+New router images may bring more LuCI apps. The prober lists their menu entries, so missing coverage shows up as a Discovery finding.
+
+## 9. Updates from GitHub Releases
+
+- **Check**: at start-up and daily, `GET https://api.github.com/repos/dm17ryk/OpenWrtGUI/releases`. Anonymous, since the repo is public.
+  - Stable channel: the latest release that is not a pre-release.
+  - Pre-release channel: also CI pre-releases.
+- **Offer**: version, release notes, size; Update now / Skip this version / Later. Auto-check can be switched off.
+- **Install**:
+  1. Download `OpenWrtGUI-Setup-<ver>.exe` and `SHA256SUMS.txt` into `<data>\updates\`.
+  2. Verify SHA-256.
+  3. Stop live operations; if a step-through or capture is running, ask first.
+  4. Start the installer silently into the current install folder (`/VERYSILENT /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS /DIR=…`) and exit.
+  5. The installer relaunches the app. The previous installer is kept for "Reinstall previous version".
+- **Trust**: HTTPS to GitHub plus the SHA-256 match. Authenticode signing is open item O7.
+
+## 10. Project and repository (D16)
+
+- **README**: what it is, hero screenshot, feature tour with screenshots, install, quick start (add a router), safety model, supported routers (via image profiles), roadmap link, contributing, license. Screenshots are generated in CI by Playwright against the router simulator (section 11), so they stay current.
+- **User manual** in `docs/manual/`, published to the GitHub wiki by a workflow on every push to `master`; the repo is the single source.
+  - Pages: Install, Updating, First router, each screen, Bench Guard, Adding a router family (image import), Troubleshooting, FAQ.
+- **Issues**: issue forms for Bug (version, router model and image, audit-log export, steps), Feature request, and **New router support** (image link, `ubus call system board` output, `iw phy` output). `config.yml` turns off blank issues and points questions to Discussions. Labels: `type:*`, `area:*`, `router-support`, `good first issue`, `needs-hardware`.
+- **Pull requests**: template with checklist (tests, screenshots for UI, docs, CHANGELOG). Conventional commits.
+- **Agents**:
+  - `AGENTS.md`: repo conventions for AI coding agents (layout, commands, safety rules: never touch AP1/AP3, AP2 only with the guard), with `CLAUDE.md` pointing to it.
+  - Optional Claude Code GitHub Action for `@claude` on issues and PRs; needs an `ANTHROPIC_API_KEY` secret, Dmitry's call (O12).
+- **GitHub Actions**:
+  - `ci.yml` on push and PR: ruff + mypy + pytest (coverage ≥ 80 % on `transport`, `probe`, `drivers`, `guard`, `update`); eslint + tsc + vitest; Playwright e2e and screenshots; a Windows job that builds the frontend, PyInstaller onedir and the Inno Setup installer and uploads it as a workflow artifact.
+  - `prerelease.yml` after CI succeeds on `master`: publishes a pre-release `vX.Y.Z-ci.<run>` with the installer and `SHA256SUMS.txt` (the CI update channel); keeps the last 10.
+  - `release.yml` on tag `vX.Y.Z`: version stamped from the tag; build, checksums; GitHub Release with notes from `CHANGELOG.md`; stable channel.
+  - `wiki.yml`: syncs `docs/manual/` to the wiki.
+  - Dependabot (pip, npm, actions) and CodeQL.
+- **Versioning**: SemVer, `CHANGELOG.md` in Keep a Changelog format.
+- **Roadmap**: `ROADMAP.md`, plus GitHub milestones matching section 12 and a GitHub Project board.
+- **Repo files**: `CONTRIBUTING.md` (dev setup, tests, hardware-test rules), `SECURITY.md` (private reporting; what the app stores locally), `CODE_OF_CONDUCT.md`, `LICENSE` (GPL-3.0, already in the repo).
+
+## 11. Testing
+
+- **Unit**: the command compilers (mode/channel → uci + iw; firewall model → fw4; ACL methods; DHCP), parsers (`iw`, `iwinfo`, `ubus`, `uci show`, `nft -j`, `tc`, `uqmi`, `ATI`), the profile reader, the guard and the updater. Written test-first.
+- **Contract**: real router outputs recorded from AP2 (sanitized: no keys, no IMEI) and replayed through a fake transport.
+- **Router simulator**: the fake transport plus state. Serves the UI for e2e tests, screenshots and demos without hardware.
+- **E2E**: Playwright drives the built UI against the simulator, in light and dark, at 1440 and 375 px widths.
+- **Hardware** (opt-in, `pytest -m hardware --router 192.168.1.2`): runs only when Bench Guard is clear and the txctl session has been told. Restores the router afterwards and checks it matches its baseline.
+- **Release check**: the installer installs, starts and updates on a clean Windows VM (manual for v0.1, automated later).
+
+## 12. Roadmap (milestones; the order can change)
+
+| Milestone | Content |
+|---|---|
+| v0.1 Foundation | Repo setup (README, templates, AGENTS.md, CI, pre-release and release workflows, wiki sync), installer, update check, app shell with themes, Add-router wizard (password → key), router list, read-only dashboard, Bench Guard, audit log, terminal |
+| v0.2 Wi-Fi | Wi-Fi screen (selectors, TX power, security, apply + verify on air), stations, RF live (radio and stations, charts, CSV) |
+| v0.3 Network | Router addresses with rollback, DHCP, fixed addresses, Wi-Fi access by MAC, DNS, routes; ports/VLANs/mirroring (swconfig) |
+| v0.4 Firewall and faults | Both filtering models, zones, rules, port forwards, NAT, IP sets, custom rules, other tables with unlock; faults and capture |
+| v0.5 Discovery and images | Image import and profiles, overlay difference, custom tools panel, flash firmware from image |
+| v0.6 LTE and System | LTE screen (status, settings, actions, AT console), System screen (all LuCI System and Status pages) |
+| v0.7 Test helpers | Step-through runner, `mon0` frame analysis, channel analysis |
+| v1.0 | LuCI parity complete, manual complete, hardening |
+| 1.x (phase 2) | Tool pages, SIM PIN / SMS / USSD, DSA backend and 5/6 GHz checked on real hardware |
+
+Each milestone gets its own implementation plan. The first plan covers v0.1 Foundation.
+
+## 13. Open items
+
+| # | Item | How to close it |
+|---|---|---|
+| O1 | BM806C "reset to defaults" command. The D-Link firmware's `libusbmodem.so` resets its DWP-812 modem profile with `AT%SYSCMD="/etc/sysconfig/script/cus_restore_default.sh"`, but the BM806C answers `AT%SYSCMD=?` with ERROR. `usbmodem_set_defaults` references `AT+BMMODODR=17`. An earlier Claude Code session reportedly reset this modem over SSH; the command is not in the local transcripts | Ask Dmitry for the command, or disassemble `usbmodem_set_defaults`; then test on AP2's modem with Dmitry's OK |
+| O2 | Names for the `AT+BMMODODR` codes (17 now) | BroadMobi AT manual |
+| O3 | Operator name from QMI comes back garbled (encoding) | Decode per QMI spec, or `AT+COPS?` |
+| O4 | rt2800 noise floor and RX/TX air-time split are expected missing; confirm with the radio up | Check on AP2 during a planned radio-on window |
+| O5 | `txpower limit` on rt2800 is expected to equal fixed | Measure |
+| O6 | minstrel `rc_stats` path with a station associated | Check on AP2 |
+| O7 | Authenticode signing certificate (SmartScreen, SentinelOne) | Dmitry / IT |
+| O8 | Runtime `deny_acl` combined with a saved `maclist` across reloads | Test on AP2 |
+| O9 | What the panel sees for each block method (auth reject vs no probe response) | `mon0` capture on AP2 |
+| O10 | Known-writer signatures for each harness | Collect from the harness sources |
+| O11 | Installing the app key on AP1 (live bench router) | Dmitry's go |
+| O12 | Claude Code GitHub Action (needs an API key secret) | Dmitry's call |
+
+## 14. Out of scope
+
+- Running or orchestrating board tests (relays, flashing, serial). The harness keeps that.
+- Remote or multi-user access; the app is bound to localhost.
+- Managing routers that are not OpenWrt.
+- Building router firmware. The app imports images; it does not build them.

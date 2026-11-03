@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Add router</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F2F3EF}
+a{color:#1F5FCC}a:hover{color:#174A9F}
+.app{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#15181C;background:#F2F3EF;font-size:14px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;padding:10px 24px;background:#15181C;color:#F2F3EF}
+.brand{font-weight:600;font-size:15px;display:flex;align-items:center;gap:10px}
+.nav{display:flex;flex-wrap:wrap;gap:2px}
+.nav a{color:#C3C8CE;text-decoration:none;padding:10px 12px;border-radius:6px;font-size:13px}
+.nav a:hover{color:#FFFFFF;background:#262A30}
+.spacer{flex:1}
+.wrap{max-width:1040px;margin:0 auto;padding:28px 24px 40px;box-sizing:border-box;display:flex;flex-direction:column;gap:20px}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#575F67;font-weight:600}
+.card{background:#FFFFFF;border:1px solid #D8DBD4;border-radius:10px;padding:22px 24px}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:6px;padding:0;margin:0;list-style:none}
+.st{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:8px;border:1px solid #D8DBD4;background:#FFFFFF;font-size:13px}
+.st .num{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;color:#575F67}
+.st.done{background:#E3F2EA;border-color:#BFDCCB}
+.st.done .num{color:#16784A}
+.st.cur{border-color:#15181C;border-width:2px;padding:9px 11px}
+.btn{font:inherit;font-size:13px;font-weight:500;padding:10px 16px;border-radius:6px;border:1px solid #C9CDC5;background:#FFFFFF;color:#15181C;cursor:pointer;min-height:44px;box-sizing:border-box;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{background:#F2F3EF;color:#15181C}
+.btn:focus-visible,.nav a:focus-visible{outline:2px solid #1F5FCC;outline-offset:2px}
+.btn.pri{background:#1F5FCC;border-color:#1F5FCC;color:#FFFFFF}.btn.pri:hover{background:#174A9F;color:#FFFFFF}
+.btn:disabled{color:#8A9199;background:#F2F3EF;border-color:#D8DBD4;cursor:not-allowed}
+.field{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.field label{color:#575F67;font-size:12px;font-weight:500}
+.in{font:inherit;font-size:14px;padding:10px 12px;border-radius:6px;border:1px solid #C9CDC5;background:#FFFFFF;color:#15181C;min-height:44px;box-sizing:border-box;width:100%}
+.b{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.air{background:#E3F2EA;color:#16784A}.park{background:#FBEFD9;color:#9A5A00}.neu{background:#ECEEEA;color:#3E454C}
+.log{display:flex;flex-direction:column;gap:0;font-size:13px}
+.log div{display:flex;gap:12px;align-items:baseline;padding:9px 0;border-top:1px solid #E8EAE5}
+.ok{color:#16784A;font-weight:600;width:18px;flex:none}
+.note{font-size:13px;color:#3E454C;padding:10px 12px;border-radius:8px;background:#F2F3EF}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#575F67;padding:8px 10px;border-bottom:1px solid #D8DBD4;white-space:nowrap}
+.tbl td{padding:10px;border-bottom:1px solid #E8EAE5;vertical-align:middle;white-space:nowrap}
+</style>
+</helmet>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7FD1A8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5a10 10 0 0 1 14 0"></path><path d="M8 15.5a6 6 0 0 1 8 0"></path><circle cx="12" cy="19" r="1.4" fill="#7FD1A8"></circle></svg>
+      <span>OpenWrt Bench</span>
+    </div>
+    <nav class="nav" aria-label="Screens">
+      <a href="Main.dc.html">← Back to dashboard</a>
+    </nav>
+  </header>
+
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">Add router</div>
+      <h1 style="margin: 2px 0 0; font-size: 28px; font-weight: 600; letter-spacing: -0.01em">{{title}}</h1>
+    </div>
+
+    <ol class="steps" aria-label="Steps">
+      <sc-for list="{{steps}}" as="s" hint-placeholder-count="7">
+        <li class="{{s.cls}}" aria-current="{{s.current}}"><span class="num">{{s.num}}</span><span style="font-weight: 600">{{s.label}}</span></li>
+      </sc-for>
+    </ol>
+
+    <section class="card" style="display: flex; flex-direction: column; gap: 16px">
+      <sc-if value="{{s1}}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px">
+            <div class="field"><label for="ip">Router address</label><input id="ip" class="in mono" type="text" value="192.168.1.4" readOnly></div>
+            <div class="field"><label for="nm">Name on the bench</label><input id="nm" class="in" type="text" value="AP4" readOnly></div>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center"><button class="btn" type="button">Find routers on this LAN</button><span style="font-size: 13px; color: #575F67">looks for SSH on the LAN subnet and lists anything that answers like OpenWrt</span></div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{s2}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; gap: 14px">
+          <div style="font-size: 14px">First contact with <span class="mono">192.168.1.4</span>. Its host key:</div>
+          <div class="mono" style="font-size: 15px; padding: 14px 16px; border-radius: 8px; background: #15181C; color: #E6E8EA; overflow-x: auto">ED25519 · SHA256:[host key fingerprint]</div>
+          <div class="note">To be sure it is the right box, compare with <span class="mono">dropbear -y -f /etc/dropbear/dropbear_ed25519_host_key</span> on its serial console. Once accepted, the key is pinned. A changed key later (a reflash does that) stops the connection and asks you again.</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{s3}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; gap: 14px">
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px">
+            <div class="field"><label for="us">User</label><input id="us" class="in mono" type="text" value="root" readOnly></div>
+            <div class="field"><label for="pw">Password</label><input id="pw" class="in mono" type="password" value="xxxxxxxx" readOnly></div>
+          </div>
+          <div class="note">Used once, for the next step only. It is not saved anywhere and not written to the log.</div>
+          <div class="note" style="background: #FBEFD9">A freshly flashed OpenWrt has no root password. If so, the app says so here and lets you set one before going on.</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{s4}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; gap: 12px">
+          <div class="log" role="list">
+            <div role="listitem"><span class="ok" aria-hidden="true">✓</span><span>App key ready: <span class="mono">ed25519</span>, created once on this PC, readable only by your Windows account</span></div>
+            <div role="listitem"><span class="ok" aria-hidden="true">✓</span><span>Read <span class="mono">/etc/dropbear/authorized_keys</span>: app key not present</span></div>
+            <div role="listitem"><span class="ok" aria-hidden="true">✓</span><span>Appended one line. Existing keys untouched (the harness key stays)</span></div>
+            <div role="listitem"><span class="ok" aria-hidden="true">✓</span><span>New connection with the key only, password disabled for the test: <strong>works</strong></span></div>
+            <div role="listitem"><span class="ok" aria-hidden="true">✓</span><span>Password login on the router left as it was</span></div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{s5}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; gap: 14px">
+          <div style="display: grid; grid-template-columns: 160px minmax(0, 1fr); gap: 8px 16px; font-size: 14px">
+            <span style="color: #575F67">Model</span><span>[model from /tmp/sysinfo/model]</span>
+            <span style="color: #575F67">Board</span><span class="mono">[board_name]</span>
+            <span style="color: #575F67">OpenWrt</span><span class="mono">[DISTRIB_REVISION · target]</span>
+            <span style="color: #575F67">Image profile</span><span><span class="b park">no matching image</span></span>
+          </div>
+          <div class="note">No imported image matches this router. Import its firmware image for the full picture (custom packages, what was added after flashing), or build the profile from this router's own <span class="mono">/rom</span> now.</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px"><button class="btn pri" type="button">Import firmware image…</button><button class="btn" type="button">Build profile from /rom</button></div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{s6}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; gap: 14px">
+          <div class="note">Read-only first: your PC's MAC was learned on <strong>internal port 3</strong>. Which socket is the PC plugged into?</div>
+          <div class="field" style="max-width: 320px"><label for="pcs">PC socket</label><select id="pcs" class="in"><option>LAN1</option><option>LAN2</option><option>LAN3</option><option>LAN4</option></select></div>
+          <div style="font-size: 14px">Now unplug and re-plug each other socket. The app watches link state and fills in the table. It never turns a port off for this.</div>
+          <div style="overflow-x: auto">
+            <table class="tbl">
+              <thead><tr><th>Socket</th><th>Internal port</th><th>How it was found</th></tr></thead>
+              <tbody>
+                <tr><td>LAN1</td><td class="mono">3</td><td>PC MAC learned there</td></tr>
+                <tr><td>LAN2</td><td class="mono">2</td><td>link dropped while unplugged</td></tr>
+                <tr><td>LAN3</td><td class="mono">—</td><td>waiting: unplug LAN3</td></tr>
+                <tr><td>LAN4</td><td class="mono">—</td><td>waiting</td></tr>
+                <tr><td>WAN</td><td class="mono">—</td><td>waiting</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{s7}}" hint-placeholder-val="{{ false }}">
+        <div style="display: flex; flex-direction: column; gap: 12px">
+          <div style="font-size: 14px">Which test functions really work on this hardware. Each check undoes itself; the radio checks run only if you allow taking Wi-Fi down for a moment.</div>
+          <div class="log" role="list">
+            <div role="listitem"><span class="ok" aria-hidden="true">✓</span><span>Monitor interface can be created and captures frames</span></div>
+            <div role="listitem"><span class="ok" aria-hidden="true">✓</span><span>Disabling a free port drops its carrier (checked on LAN3, nothing plugged in)</span></div>
+            <div role="listitem"><span class="ok" aria-hidden="true">✓</span><span>netem delay measured by ping: requested 100 ms, measured within range</span></div>
+            <div role="listitem"><span class="ok" aria-hidden="true">✓</span><span>nft rule insert and counter read-back</span></div>
+            <div role="listitem"><span style="width: 18px; flex: none; color: #9A5A00; font-weight: 600" aria-hidden="true">–</span><span>Radio up/down: skipped, you chose not to touch Wi-Fi</span></div>
+          </div>
+          <div class="note">Results are saved for this router model, so the next router of the same model skips the checks that already passed.</div>
+        </div>
+      </sc-if>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; padding-top: 8px; border-top: 1px solid #E8EAE5">
+        <button class="btn" type="button" onClick="{{back}}" disabled="{{isFirst}}">Back</button>
+        <div class="spacer"></div>
+        <button class="btn pri" type="button" onClick="{{next}}">{{nextLabel}}</button>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1060}}'>
+class Component extends DCLogic {
+  state = { step: 4 };
+
+  renderVals() {
+    const cur = this.state.step;
+    const LABELS = ['Address', 'Host key', 'First login', 'Install key', 'Identify', 'Port map', 'Self-test'];
+    const TITLES = ['Where is the router?', 'Check the router is the one you mean', 'Log in once with the root password', 'Install the app’s key', 'What is this router?', 'Map the sockets', 'Check what works on this hardware'];
+    const NEXT = ['Connect', 'Accept and pin', 'Log in', 'Continue', 'Continue', 'Save port map', 'Finish'];
+    const steps = LABELS.map((l, i) => ({
+      num: String(i + 1).padStart(2, '0'),
+      label: l,
+      cls: 'st' + (i + 1 < cur ? ' done' : '') + (i + 1 === cur ? ' cur' : ''),
+      current: i + 1 === cur ? 'step' : 'false'
+    }));
+    return {
+      steps: steps,
+      title: TITLES[cur - 1],
+      nextLabel: NEXT[cur - 1],
+      isFirst: cur === 1,
+      s1: cur === 1, s2: cur === 2, s3: cur === 3, s4: cur === 4, s5: cur === 5, s6: cur === 6, s7: cur === 7,
+      next: () => this.setState({ step: cur >= 7 ? 1 : cur + 1 }),
+      back: () => this.setState({ step: Math.max(1, cur - 1) })
+    };
+  }
+}
+</script>
+</body>
+</html>

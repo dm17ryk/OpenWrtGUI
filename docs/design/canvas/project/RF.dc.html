@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Router RF live</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1F5FCC}a:hover{color:#174A9F}
+.app{--bg:#F2F3EF;--surface:#FFFFFF;--surface2:#F6F7F4;--ink:#15181C;--ink2:#3E454C;--muted:#575F67;--line:#D8DBD4;--line2:#E8EAE5;--accent:#1F5FCC;--accent-ink:#FFFFFF;--ok:#16784A;--ok-soft:#E3F2EA;--warn:#9A5A00;--warn-soft:#FBEFD9;--bad:#B3361A;--bad-soft:#FBE7E1;--neu-soft:#ECEEEA;--top:#15181C;--top-ink:#F2F3EF;--rx:#2a78d6;--tx:#eb6834;--grid:#E1E0D9;--axis:#C3C2B7;--tip:#15181C;--tip-ink:#FFFFFF;--link:#1F5FCC}
+.app.dark{--bg:#111316;--surface:#1A1D21;--surface2:#20242A;--ink:#ECEEEF;--ink2:#C5CAD0;--muted:#9AA3AC;--line:#2F343B;--line2:#262A30;--accent:#5B92F0;--accent-ink:#0B0D10;--ok:#5CC98F;--ok-soft:#17301F;--warn:#E2A54A;--warn-soft:#33260F;--bad:#F08A6C;--bad-soft:#3A1E16;--neu-soft:#262A30;--top:#0B0D10;--top-ink:#ECEEEF;--rx:#3987e5;--tx:#d95926;--grid:#2C2C2A;--axis:#383835;--tip:#ECEEEF;--tip-ink:#111316;--link:#8DB4F5}
+.app{font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--ink);background:var(--bg);font-size:14px;line-height:1.45}
+.app a{color:var(--link)}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;padding:10px 24px;background:var(--top);color:var(--top-ink)}
+.brand{font-weight:600;font-size:15px;display:flex;align-items:center;gap:10px}
+.nav{display:flex;flex-wrap:wrap;gap:2px}
+.nav a{color:#C3C8CE;text-decoration:none;padding:10px 12px;border-radius:6px;font-size:13px}
+.nav a:hover{color:#FFFFFF;background:#262A30}
+.nav a.cur{color:#FFFFFF;background:#2E343B}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;padding:6px 12px;border-radius:999px}
+.theme{font:inherit;display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#E6E8EA;background:#2E343B;border:0;border-radius:999px;padding:0 14px;min-height:40px;cursor:pointer}
+.wrap{max-width:1440px;margin:0 auto;padding:24px;box-sizing:border-box;display:flex;flex-direction:column;gap:20px}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+.b{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.air{background:var(--ok-soft);color:var(--ok)}.neu{background:var(--neu-soft);color:var(--ink2)}.warnb{background:var(--warn-soft);color:var(--warn)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.btn{font:inherit;font-size:13px;font-weight:500;padding:10px 14px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;min-height:44px;box-sizing:border-box;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{background:var(--surface2)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:focus-visible,.nav a:focus-visible,.theme:focus-visible,.seg button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.tile .v{font-size:26px;font-weight:600;letter-spacing:-0.01em}
+.tile .s{font-size:12px;color:var(--muted)}
+.cols{display:flex;flex-wrap:wrap;gap:20px}
+.col{flex:1 1 520px;min-width:0;display:flex;flex-direction:column;gap:14px}
+.dir{display:flex;align-items:center;gap:10px;font-weight:600;font-size:15px}
+.sw{width:14px;height:14px;border-radius:3px;display:inline-block}
+.kv{display:grid;grid-template-columns:150px minmax(0,1fr);gap:8px 14px;margin:0;font-size:13px}
+.kv dt{color:var(--muted)}.kv dd{margin:0}
+.big{font-size:22px;font-weight:600}
+.na{color:var(--muted);font-style:italic}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-size:13px;font-weight:500;border:0;border-right:1px solid var(--line);background:var(--surface);color:var(--ink);padding:0 14px;min-height:44px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--ink);color:var(--surface)}
+.tbl{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+.tbl th{text-align:left;font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:8px 10px;border-bottom:1px solid var(--line2);vertical-align:middle;white-space:nowrap}
+.bar{height:10px;border-radius:0 4px 4px 0;background:var(--tx)}
+.track{height:10px;border-radius:4px;background:var(--surface2);min-width:120px}
+.meter{height:12px;border-radius:6px;background:var(--surface2);overflow:hidden}
+</style>
+</helmet>
+<div class="{{appCls}}">
+  <header class="top">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7FD1A8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5a10 10 0 0 1 14 0"></path><path d="M8 15.5a6 6 0 0 1 8 0"></path><circle cx="12" cy="19" r="1.4" fill="#7FD1A8"></circle></svg>
+      <span>OpenWrt Bench</span>
+    </div>
+    <nav class="nav" aria-label="Screens">
+      <a href="Main.dc.html">Dashboard</a>
+      <a href="WiFi.dc.html">Wi-Fi</a>
+      <a class="cur" href="RF.dc.html">RF live</a>
+      <a href="Network.dc.html">Network &amp; DHCP</a>
+      <a href="Ports.dc.html">Ports &amp; VLANs</a>
+      <a href="Firewall.dc.html">Firewall</a>
+      <a href="Faults.dc.html">Faults &amp; capture</a>
+      <a href="Discovery.dc.html">Discovery</a>
+    </nav>
+    <div class="spacer"></div>
+    <button class="theme" type="button" aria-pressed="{{darkStr}}" onClick="{{toggleTheme}}">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>
+      {{themeLabel}}
+    </button>
+  </header>
+
+  <div class="wrap">
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 20px">
+      <div>
+        <div class="eyebrow">AP1 · <span class="mono">192.168.1.1</span> · radio0 · rt2800</div>
+        <h1 style="margin: 2px 0 0; font-size: 28px; font-weight: 600; letter-spacing: -0.01em">RF live</h1>
+      </div>
+      <span class="b neu">sample readings</span>
+      <div class="spacer"></div>
+      <div class="seg" role="group" aria-label="Station">
+        <button type="button" class="on" aria-pressed="true">panel · f4:12:fa:f3:57:68</button>
+        <button type="button" aria-pressed="false">all stations</button>
+      </div>
+      <div class="seg" role="group" aria-label="Window">
+        <button type="button" aria-pressed="false">1 min</button>
+        <button type="button" class="on" aria-pressed="true">5 min</button>
+        <button type="button" aria-pressed="false">1 h</button>
+      </div>
+      <button class="btn" type="button">Pause</button>
+      <button class="btn pri" type="button">Record to CSV</button>
+    </div>
+
+    <div class="tiles">
+      <div class="tile"><span class="eyebrow">Channel</span><span class="v mono">1 · HT20</span><span class="s mono">2412 MHz</span></div>
+      <div class="tile"><span class="eyebrow">TX power</span><span class="v mono">20 dBm</span><span class="s">set: fixed 20 · actual 20.00</span></div>
+      <div class="tile">
+        <span class="eyebrow">Air busy</span><span class="v mono">23 %</span>
+        <div class="meter" role="img" aria-label="Channel busy 23 percent"><div style="width: 23%; height: 100%; background: var(--ink2); border-radius: 0 4px 4px 0"></div></div>
+        <span class="s">this driver reports busy time only, no RX/TX split</span>
+      </div>
+      <div class="tile"><span class="eyebrow">Noise floor</span><span class="v na" style="font-size: 18px; padding-top: 6px">not reported</span><span class="s">rt2800 gives no noise value; shown on radios that do</span></div>
+      <div class="tile"><span class="eyebrow">ACK failures</span><span class="v mono">3 /s</span><span class="s mono">dot11ACKFailureCount Δ</span></div>
+    </div>
+
+    <div class="cols">
+      <section class="col" aria-labelledby="rxh">
+        <div class="card" style="display: flex; flex-direction: column; gap: 14px">
+          <div class="dir" id="rxh"><span class="sw" style="background: var(--rx)"></span>RX at AP · station → AP</div>
+          <dl class="kv">
+            <dt>Signal</dt><dd><span class="big mono">−52 dBm</span> <span class="mono" style="color: var(--muted)">avg −53</span></dd>
+            <dt>Per antenna</dt><dd class="mono">−54 / −55 dBm</dd>
+            <dt>RX rate</dt><dd class="mono">54.0 Mb/s · 802.11g 54M</dd>
+            <dt>RX packets</dt><dd class="mono">212 /s · 41 kB/s</dd>
+            <dt>RX drops</dt><dd class="mono">0</dd>
+            <dt>Last frame</dt><dd class="mono">40 ms ago</dd>
+          </dl>
+        </div>
+        <figure class="card" style="margin: 0; display: flex; flex-direction: column; gap: 8px">
+          <figcaption style="display: flex; align-items: baseline; gap: 10px"><strong>Signal from the panel</strong><span style="font-size: 12px; color: var(--muted)">dBm · last 5 min</span></figcaption>
+          <svg viewBox="0 0 640 210" style="width: 100%; height: auto" role="img" aria-label="Signal from the panel over the last 5 minutes, mostly around minus 53 dBm with a dip to minus 66 dBm about one minute ago">
+            <sc-for list="{{sigGrid}}" as="g" hint-placeholder-count="5">
+              <line x1="48" x2="624" y1="{{g.y}}" y2="{{g.y}}" stroke="var(--grid)" stroke-width="1"></line>
+              <text x="40" y="{{g.ty}}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono">{{g.label}}</text>
+            </sc-for>
+            <text x="48" y="200" font-size="11" fill="var(--muted)">−5 min</text>
+            <text x="624" y="200" text-anchor="end" font-size="11" fill="var(--muted)">now</text>
+            <path d="{{sigPath}}" fill="none" stroke="var(--rx)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+            <line x1="{{hx}}" x2="{{hx}}" y1="16" y2="176" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3"></line>
+            <circle cx="{{hx}}" cy="{{hy}}" r="5" fill="var(--rx)" stroke="var(--surface)" stroke-width="2"></circle>
+            <rect x="{{tipX}}" y="22" width="150" height="40" rx="6" fill="var(--tip)"></rect>
+            <text x="{{tipTx}}" y="38" font-size="11" fill="var(--tip-ink)">−1 min 05 s</text>
+            <text x="{{tipTx}}" y="54" font-size="13" font-weight="600" fill="var(--tip-ink)" font-family="IBM Plex Mono">−66 dBm</text>
+          </svg>
+        </figure>
+      </section>
+
+      <section class="col" aria-labelledby="txh">
+        <div class="card" style="display: flex; flex-direction: column; gap: 14px">
+          <div class="dir" id="txh"><span class="sw" style="background: var(--tx)"></span>TX from AP · AP → station</div>
+          <dl class="kv">
+            <dt>TX rate</dt><dd><span class="big mono">65.0 Mb/s</span> <span class="mono" style="color: var(--muted)">MCS 7 · HT20 · long GI</span></dd>
+            <dt>Retries</dt><dd class="mono">4.1 % of frames</dd>
+            <dt>Failed</dt><dd class="mono">0.2 /s</dd>
+            <dt>Expected throughput</dt><dd class="mono">38 Mb/s</dd>
+            <dt>TX packets</dt><dd class="mono">198 /s · 36 kB/s</dd>
+            <dt>ACK signal</dt><dd class="na">not reported by this driver</dd>
+          </dl>
+        </div>
+        <figure class="card" style="margin: 0; display: flex; flex-direction: column; gap: 8px">
+          <figcaption style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px"><strong>Data rate</strong><span style="font-size: 12px; color: var(--muted)">Mb/s · last 5 min</span><div class="spacer"></div>
+            <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink2)"><span class="sw" style="background: var(--tx); width: 12px; height: 3px; border-radius: 2px"></span>TX from AP</span>
+            <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink2)"><span class="sw" style="background: var(--rx); width: 12px; height: 3px; border-radius: 2px"></span>RX at AP</span>
+          </figcaption>
+          <svg viewBox="0 0 640 210" style="width: 100%; height: auto" role="img" aria-label="TX rate mostly 65 Mb/s and RX rate mostly 54 Mb/s over the last 5 minutes, both dropping during the signal dip">
+            <sc-for list="{{rateGrid}}" as="g" hint-placeholder-count="5">
+              <line x1="48" x2="584" y1="{{g.y}}" y2="{{g.y}}" stroke="var(--grid)" stroke-width="1"></line>
+              <text x="40" y="{{g.ty}}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono">{{g.label}}</text>
+            </sc-for>
+            <text x="48" y="200" font-size="11" fill="var(--muted)">−5 min</text>
+            <text x="584" y="200" text-anchor="end" font-size="11" fill="var(--muted)">now</text>
+            <path d="{{txPath}}" fill="none" stroke="var(--tx)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+            <path d="{{rxPath}}" fill="none" stroke="var(--rx)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+            <text x="590" y="{{txLabelY}}" font-size="11" fill="var(--ink2)" font-family="IBM Plex Mono">TX 65</text>
+            <text x="590" y="{{rxLabelY}}" font-size="11" fill="var(--ink2)" font-family="IBM Plex Mono">RX 54</text>
+          </svg>
+        </figure>
+      </section>
+    </div>
+
+    <section class="card" aria-labelledby="rch">
+      <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-bottom: 10px">
+        <h2 id="rch" style="margin: 0; font-size: 16px; font-weight: 600">Which rates reach the panel</h2>
+        <span style="font-size: 13px; color: var(--muted)">AP → panel, from the router's rate control (minstrel). Success = frames the panel acknowledged.</span>
+      </div>
+      <div style="overflow-x: auto">
+        <table class="tbl">
+          <thead><tr><th>Rate</th><th>Mode</th><th>Attempts</th><th>Success</th><th style="width: 40%"></th><th></th></tr></thead>
+          <tbody>
+            <sc-for list="{{rates}}" as="r" hint-placeholder-count="8">
+              <tr>
+                <td class="mono">{{r.rate}}</td>
+                <td>{{r.mode}}</td>
+                <td class="mono">{{r.att}}</td>
+                <td class="mono">{{r.pct}} %</td>
+                <td><div class="track"><div class="bar" style="{{r.barStyle}}"></div></div></td>
+                <td><sc-if value="{{r.now}}" hint-placeholder-val="{{ false }}"><span class="b air">in use</span></sc-if></td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="mah" style="display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+        <h2 id="mah" style="margin: 0; font-size: 16px; font-weight: 600">Frame analysis through mon0</h2>
+        <span class="b warnb">off</span>
+        <div class="spacer"></div>
+        <button class="btn" type="button">Start analysis</button>
+      </div>
+      <div style="font-size: 13px; color: var(--ink2)">Reads every frame on the channel, both directions: data-rate mix per direction (b / g / n), signal histogram, retry-flag share and frames with a bad checksum. It costs router CPU, so it is off until you start it, and the monitor interface is removed when you stop.</div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Look"},"$preview":{"width":1440,"height":1640}}'>
+class Component extends DCLogic {
+  state = { dark: null };
+
+  renderVals() {
+    const dark = this.state.dark === null ? (this.props.theme ?? 'dark') === 'dark' : this.state.dark;
+    const N = 60;
+    const sig = [];
+    for (let i = 0; i < N; i++) {
+      let v = -53 + 2.2 * Math.sin(i * 0.7) + 1.3 * Math.sin(i * 1.9 + 1);
+      if (i >= 44 && i <= 50) v -= 13 * Math.sin((i - 44) / 6 * Math.PI);
+      sig.push(v);
+    }
+    const sx = i => 48 + i * (576 / (N - 1));
+    const sy = v => 16 + ((-40 - v) / 40) * 160;
+    const sigPath = sig.map((v, i) => (i ? 'L' : 'M') + sx(i).toFixed(1) + ' ' + sy(v).toFixed(1)).join(' ');
+    const hi = 47;
+    const hx = sx(hi);
+    const sigGrid = [-40, -50, -60, -70, -80].map(d => ({ y: sy(d), ty: sy(d) + 4, label: String(d) }));
+
+    const rx = [], tx = [];
+    for (let i = 0; i < N; i++) {
+      let r = (i % 9 === 3) ? 48 : 54;
+      let t = (i % 7 === 2) ? 58.5 : 65;
+      if (i >= 44 && i <= 50) { r = i === 47 ? 24 : 36; t = i === 47 ? 26 : 39; }
+      rx.push(r); tx.push(t);
+    }
+    const rxw = 536;
+    const rxX = i => 48 + i * (rxw / (N - 1));
+    const ry = v => 16 + ((72 - v) / 72) * 160;
+    const toPath = arr => arr.map((v, i) => (i ? 'L' : 'M') + rxX(i).toFixed(1) + ' ' + ry(v).toFixed(1)).join(' ');
+    const rateGrid = [72, 54, 36, 18, 0].map(d => ({ y: ry(d), ty: ry(d) + 4, label: String(d) }));
+
+    const RATES = [
+      { rate: 'MCS 7 · 72.2', mode: 'n20 short GI', att: 1840, pct: 61 },
+      { rate: 'MCS 7 · 65.0', mode: 'n20', att: 9120, pct: 94, now: true },
+      { rate: 'MCS 6 · 58.5', mode: 'n20', att: 2210, pct: 97 },
+      { rate: 'MCS 5 · 52.0', mode: 'n20', att: 1104, pct: 99 },
+      { rate: 'MCS 4 · 39.0', mode: 'n20', att: 640, pct: 99 },
+      { rate: 'MCS 2 · 19.5', mode: 'n20', att: 212, pct: 100 },
+      { rate: '6.0', mode: 'g OFDM', att: 96, pct: 100 },
+      { rate: '1.0', mode: 'b CCK', att: 31, pct: 100 }
+    ].map(r => Object.assign({}, r, { now: !!r.now, barStyle: 'width: ' + r.pct + '%' }));
+
+    return {
+      appCls: dark ? 'app dark' : 'app',
+      darkStr: dark ? 'true' : 'false',
+      themeLabel: dark ? 'Dark' : 'Light',
+      toggleTheme: () => this.setState({ dark: !dark }),
+      sigPath: sigPath, sigGrid: sigGrid,
+      hx: hx.toFixed(1), hy: sy(sig[hi]).toFixed(1),
+      tipX: (hx - 162).toFixed(1), tipTx: (hx - 150).toFixed(1),
+      txPath: toPath(tx), rxPath: toPath(rx), rateGrid: rateGrid,
+      txLabelY: (ry(tx[N - 1]) + 4).toFixed(1), rxLabelY: (ry(rx[N - 1]) + 4).toFixed(1),
+      rates: RATES
+    };
+  }
+}
+</script>
+</body>
+</html>

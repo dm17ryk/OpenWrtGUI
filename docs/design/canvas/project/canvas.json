@@ -1,0 +1,23 @@
+{
+  "v": 3,
+  "createdOnFiles": {"v": 1, "at": "2026-11-03T15:45:00Z"},
+  "title": "OpenWrtGUI screens",
+  "launch": {"view": "canvas"},
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {"x": 0, "y": 0, "w": 1440, "h": 1300, "title": "1 · Bench dashboard (light / dark toggle in the header)", "expand": "fill", "is_interactive": true},
+    "WiFi.dc.html": {"x": 1520, "y": 0, "w": 1440, "h": 1860, "title": "2 · Router › Wi-Fi (modes, channels, step-through)", "expand": "fill", "is_interactive": true},
+    "Ports.dc.html": {"x": 3040, "y": 0, "w": 1440, "h": 1240, "title": "3 · Router › Ports, VLANs, mirroring", "expand": "fill", "is_interactive": true},
+    "Firewall.dc.html": {"x": 4560, "y": 0, "w": 1440, "h": 1120, "title": "4 · Router › Firewall", "expand": "fill", "is_interactive": true},
+    "Faults.dc.html": {"x": 0, "y": 2320, "w": 1440, "h": 1300, "title": "5 · Router › Faults and capture", "expand": "fill", "is_interactive": true},
+    "Discovery.dc.html": {"x": 1520, "y": 2320, "w": 1440, "h": 1260, "title": "6 · Router › Discovery and tools", "expand": "fill", "is_interactive": true},
+    "Onboard.dc.html": {"x": 3040, "y": 2320, "w": 1440, "h": 1060, "title": "7 · Add router (first login, key install)", "expand": "fill", "is_interactive": true},
+    "RF.dc.html": {"x": 4560, "y": 1240, "w": 1440, "h": 1640, "title": "8 · Router › RF live (TX / RX, signal, rates) · opens dark", "expand": "fill", "is_interactive": true},
+    "Network.dc.html": {"x": 0, "y": 3740, "w": 1440, "h": 2400, "title": "9 · Router › Network and DHCP (router IP, DHCP server, fixed addresses, MAC access control)", "expand": "fill", "is_interactive": true}
+  },
+  "order": ["Main.dc.html", "WiFi.dc.html", "Ports.dc.html", "Firewall.dc.html", "Faults.dc.html", "Discovery.dc.html", "Onboard.dc.html", "RF.dc.html", "Network.dc.html"],
+  "notes": {
+    "title": {"x": 0, "y": -300, "text": "OpenWrtGUI — screen design (draft for review)", "kind": "title1", "maxW": 6000}
+  },
+  "designSystems": []
+}

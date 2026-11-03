@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Router network and DHCP</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.app{--bg:#F2F3EF;--surface:#FFFFFF;--surface2:#F6F7F4;--ink:#15181C;--ink2:#3E454C;--muted:#575F67;--line:#D8DBD4;--line2:#E8EAE5;--accent:#1F5FCC;--accent-ink:#FFFFFF;--accent-soft:#EEF3FC;--ok:#16784A;--ok-soft:#E3F2EA;--warn:#9A5A00;--warn-soft:#FBEFD9;--bad:#B3361A;--bad-soft:#FBE7E1;--neu-soft:#ECEEEA;--top:#15181C;--top-ink:#F2F3EF;--code-bg:#15181C;--code-ink:#E6E8EA;--code-c:#93A8BA;--link:#1F5FCC}
+.app.dark{--bg:#111316;--surface:#1A1D21;--surface2:#20242A;--ink:#ECEEEF;--ink2:#C5CAD0;--muted:#9AA3AC;--line:#2F343B;--line2:#262A30;--accent:#5B92F0;--accent-ink:#0B0D10;--accent-soft:#1D2A40;--ok:#5CC98F;--ok-soft:#17301F;--warn:#E2A54A;--warn-soft:#33260F;--bad:#F08A6C;--bad-soft:#3A1E16;--neu-soft:#262A30;--top:#0B0D10;--top-ink:#ECEEEF;--code-bg:#0B0D10;--code-ink:#E6E8EA;--code-c:#8FA3B5;--link:#8DB4F5}
+.app{font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--ink);background:var(--bg);font-size:14px;line-height:1.45}
+.app a{color:var(--link)}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;padding:10px 24px;background:var(--top);color:var(--top-ink)}
+.brand{font-weight:600;font-size:15px;display:flex;align-items:center;gap:10px}
+.nav{display:flex;flex-wrap:wrap;gap:2px}
+.nav a{color:#C3C8CE;text-decoration:none;padding:10px 12px;border-radius:6px;font-size:13px}
+.nav a:hover{color:#FFFFFF;background:#262A30}
+.nav a.cur{color:#FFFFFF;background:#2E343B}
+.spacer{flex:1}
+.theme{font:inherit;display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#E6E8EA;background:#2E343B;border:0;border-radius:999px;padding:0 14px;min-height:40px;cursor:pointer}
+.wrap{max-width:1440px;margin:0 auto;padding:24px;box-sizing:border-box;display:flex;flex-direction:column;gap:20px}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+.b{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.air{background:var(--ok-soft);color:var(--ok)}.neu{background:var(--neu-soft);color:var(--ink2)}.warnb{background:var(--warn-soft);color:var(--warn)}.badb{background:var(--bad-soft);color:var(--bad)}
+.btn{font:inherit;font-size:13px;font-weight:500;padding:10px 14px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;min-height:44px;box-sizing:border-box;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{background:var(--surface2)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:focus-visible,.nav a:focus-visible,.theme:focus-visible,.seg button:focus-visible,.tg:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-size:13px;font-weight:500;border:0;border-right:1px solid var(--line);background:var(--surface);color:var(--ink);padding:0 14px;min-height:44px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--ink);color:var(--surface)}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:10px;border-bottom:1px solid var(--line2);vertical-align:middle;white-space:nowrap}
+.tbl tr.sel td{background:var(--accent-soft)}
+.field{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.field label,.field .lbl{color:var(--muted);font-size:12px;font-weight:500}
+.in{font:inherit;font-size:14px;padding:10px 12px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);min-height:44px;box-sizing:border-box;width:100%}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.code{background:var(--code-bg);color:var(--code-ink);border-radius:8px;padding:12px 14px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;line-height:1.65;overflow-x:auto}
+.code .c{color:var(--code-c)}
+.note{font-size:13px;color:var(--ink2);padding:10px 12px;border-radius:8px;background:var(--surface2)}
+.note.w{background:var(--warn-soft)}
+.tg{font:inherit;display:inline-flex;align-items:center;gap:8px;background:transparent;border:0;color:var(--ink);cursor:pointer;padding:0;min-height:44px;font-size:13px}
+.track{width:36px;height:20px;border-radius:999px;position:relative;flex:none}
+.knob{position:absolute;top:2px;width:16px;height:16px;border-radius:50%;background:#FFFFFF}
+.chk{display:inline-flex;align-items:center;gap:8px;font-size:13px;min-height:44px}
+.chk input{width:18px;height:18px;accent-color:var(--accent)}
+</style>
+</helmet>
+<div class="{{appCls}}">
+  <header class="top">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7FD1A8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5a10 10 0 0 1 14 0"></path><path d="M8 15.5a6 6 0 0 1 8 0"></path><circle cx="12" cy="19" r="1.4" fill="#7FD1A8"></circle></svg>
+      <span>OpenWrt Bench</span>
+    </div>
+    <nav class="nav" aria-label="Screens">
+      <a href="Main.dc.html">Dashboard</a>
+      <a href="WiFi.dc.html">Wi-Fi</a>
+      <a href="RF.dc.html">RF live</a>
+      <a class="cur" href="Network.dc.html">Network &amp; DHCP</a>
+      <a href="Ports.dc.html">Ports &amp; VLANs</a>
+      <a href="Firewall.dc.html">Firewall</a>
+      <a href="Faults.dc.html">Faults &amp; capture</a>
+      <a href="Discovery.dc.html">Discovery</a>
+    </nav>
+    <div class="spacer"></div>
+    <button class="theme" type="button" aria-pressed="{{darkStr}}" onClick="{{toggleTheme}}">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>
+      {{themeLabel}}
+    </button>
+  </header>
+
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">AP1 · <span class="mono">192.168.1.1</span> · DWR-921 C3</div>
+      <h1 style="margin: 2px 0 0; font-size: 28px; font-weight: 600; letter-spacing: -0.01em">Network and DHCP</h1>
+    </div>
+
+    <section class="card" aria-labelledby="ifh" style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+        <h2 id="ifh" style="margin: 0; font-size: 16px; font-weight: 600">Router addresses</h2>
+        <span style="font-size: 13px; color: var(--muted)">each network interface of the router: static, DHCP client, LTE</span>
+        <div class="spacer"></div>
+        <button class="btn" type="button">+ Interface</button>
+      </div>
+      <div style="overflow-x: auto">
+        <table class="tbl">
+          <thead><tr><th>Interface</th><th>Device</th><th>Protocol</th><th>Address</th><th>Gateway</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr class="sel"><td><strong>lan</strong></td><td class="mono">br-lan · eth0.1 + phy0-ap0</td><td>{{lanProtoLabel}}</td><td class="mono">{{lanAddr}}</td><td class="mono">—</td><td><span class="b air">up</span></td></tr>
+            <tr><td><strong>wan</strong></td><td class="mono">eth0.2</td><td>DHCP client</td><td class="mono">10.0.0.18</td><td class="mono">from DHCP</td><td><span class="b air">up</span></td></tr>
+            <tr><td><strong>lte</strong></td><td class="mono">wwan0 · QMI</td><td>LTE · APN uinternet</td><td class="mono">from carrier</td><td class="mono">from carrier</td><td><span class="b air">up</span></td></tr>
+            <tr><td><strong>vlan3</strong></td><td class="mono">eth0.3</td><td>Static</td><td class="mono">192.168.3.1/24</td><td class="mono">—</td><td><span class="b air">up</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div style="border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+          <strong>Edit lan</strong>
+          <div class="seg" role="group" aria-label="lan protocol">
+            <sc-for list="{{protoSegs}}" as="p" hint-placeholder-count="3">
+              <button type="button" class="{{p.cls}}" aria-pressed="{{p.pressed}}" onClick="{{p.pick}}">{{p.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+        <sc-if value="{{isStatic}}" hint-placeholder-val="{{ true }}">
+          <div class="grid">
+            <div class="field"><label for="ip">IPv4 address / prefix</label><input id="ip" class="in mono" type="text" value="192.168.1.1/24" readOnly></div>
+            <div class="field"><label for="gw">Gateway</label><input id="gw" class="in mono" type="text" value="" placeholder="none" readOnly></div>
+            <div class="field"><label for="dns">DNS servers</label><input id="dns" class="in mono" type="text" value="" placeholder="none" readOnly></div>
+            <div class="field"><label for="mtu">MTU</label><input id="mtu" class="in mono" type="text" value="1500" readOnly></div>
+          </div>
+        </sc-if>
+        <sc-if value="{{isDhcp}}" hint-placeholder-val="{{ false }}">
+          <div class="grid">
+            <div class="field"><label for="hn">Hostname to send</label><input id="hn" class="in mono" type="text" value="AP1" readOnly></div>
+            <div class="field"><label for="rq">Ask for address</label><input id="rq" class="in mono" type="text" value="" placeholder="any" readOnly></div>
+            <label class="chk"><input type="checkbox" checked>Use DNS from the DHCP server</label>
+          </div>
+        </sc-if>
+        <sc-if value="{{isNone}}" hint-placeholder-val="{{ false }}">
+          <div class="note">No address on lan. The bridge still forwards traffic, but the router itself is unreachable on this network: only the serial console gets back in.</div>
+        </sc-if>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center">
+          <span class="lbl" style="font-size: 12px; color: var(--muted); font-weight: 500">Bridge members</span>
+          <label class="chk"><input type="checkbox" checked>eth0.1 (LAN ports)</label>
+          <label class="chk"><input type="checkbox" checked>phy0-ap0 (Wi-Fi)</label>
+          <label class="chk"><input type="checkbox">eth0.3</label>
+        </div>
+        <div class="note w">This app reaches AP1 through lan. Address changes apply with a <strong>60 s rollback</strong>: the app reconnects at the new address and confirms; if it cannot, the router restores the old settings by itself. The address is always written as <span class="mono">address/prefix</span>, because on this image a bare address becomes a /32.</div>
+        <div class="code"><sc-for list="{{ifLines}}" as="l" hint-placeholder-count="6"><div class="{{l.cls}}" style="white-space: pre">{{l.t}}</div></sc-for></div>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="dh" style="display: flex; flex-direction: column; gap: 14px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+        <h2 id="dh" style="margin: 0; font-size: 16px; font-weight: 600">DHCP server on lan</h2>
+        <button class="tg" type="button" role="switch" aria-checked="true">
+          <span class="track" style="background: #3FA36F"><span class="knob" style="left: 18px"></span></span>Serving addresses
+        </button>
+        <div class="spacer"></div>
+        <span class="b neu">AP2, AP3: off on this LAN</span>
+      </div>
+      <div class="grid">
+        <div class="field"><label for="st">Pool start</label><input id="st" class="in mono" type="text" value="100" readOnly></div>
+        <div class="field"><label for="lm">Pool size</label><input id="lm" class="in mono" type="text" value="150" readOnly></div>
+        <div class="field"><span class="lbl">Range</span><span class="in mono" style="display: flex; align-items: center; background: var(--surface2)">192.168.1.100 – .249</span></div>
+        <div class="field"><label for="lt">Lease time</label><input id="lt" class="in mono" type="text" value="12h" readOnly></div>
+      </div>
+      <div>
+        <div class="eyebrow" style="margin-bottom: 6px">Options sent to clients</div>
+        <div style="overflow-x: auto">
+          <table class="tbl">
+            <thead><tr><th>Option</th><th>Code</th><th>Value</th><th></th></tr></thead>
+            <tbody>
+              <tr><td>Router (gateway)</td><td class="mono">3</td><td class="mono">192.168.1.1 · default</td><td><button class="btn" type="button">Change</button></td></tr>
+              <tr><td>DNS servers</td><td class="mono">6</td><td class="mono">192.168.1.1 · default</td><td><button class="btn" type="button">Change</button></td></tr>
+              <tr><td>NTP servers</td><td class="mono">42</td><td class="mono" style="color: var(--muted)">not sent</td><td><button class="btn" type="button">Set</button></td></tr>
+              <tr><td>Domain</td><td class="mono">15</td><td class="mono">lan</td><td><button class="btn" type="button">Change</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px"><button class="btn" type="button">+ Any option by code</button><button class="btn" type="button">IPv6: DHCPv6 and RA</button></div>
+      </div>
+      <div class="note w">Before turning DHCP on, the app checks the other routers on the same subnet. Two DHCP servers on one LAN give out conflicting addresses, and on this bench AP1 is the only one.</div>
+    </section>
+
+    <section class="card" aria-labelledby="slh" style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+        <h2 id="slh" style="margin: 0; font-size: 16px; font-weight: 600">Fixed addresses by MAC</h2>
+        <span style="font-size: 13px; color: var(--muted)">"Gets an address" off = the router ignores this device's DHCP requests, so it joins Wi-Fi but gets no IP</span>
+        <div class="spacer"></div>
+        <button class="btn" type="button">+ Fixed address</button>
+      </div>
+      <div style="overflow-x: auto">
+        <table class="tbl">
+          <thead><tr><th>Device</th><th>MAC</th><th>IP</th><th>Lease</th><th>Gets an address</th></tr></thead>
+          <tbody>
+            <sc-for list="{{hosts}}" as="h" hint-placeholder-count="3">
+              <tr>
+                <td>{{h.name}}</td>
+                <td class="mono">{{h.mac}}</td>
+                <td class="mono">{{h.ip}}</td>
+                <td class="mono">{{h.lease}}</td>
+                <td>
+                  <button class="tg" type="button" role="switch" aria-checked="{{h.onStr}}" onClick="{{h.toggle}}">
+                    <span class="track" style="{{h.trackStyle}}"><span class="knob" style="{{h.knobStyle}}"></span></span>{{h.onLabel}}
+                  </button>
+                </td>
+              </tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+      <div class="code"><sc-for list="{{hostLines}}" as="l" hint-placeholder-count="3"><div class="{{l.cls}}" style="white-space: pre">{{l.t}}</div></sc-for></div>
+    </section>
+
+    <section class="card" aria-labelledby="aclh" style="display: flex; flex-direction: column; gap: 14px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+        <h2 id="aclh" style="margin: 0; font-size: 16px; font-weight: 600">Wi-Fi access by MAC</h2>
+        <div class="seg" role="group" aria-label="MAC access control">
+          <button type="button" aria-pressed="false">Everyone</button>
+          <button type="button" class="on" aria-pressed="true">Block listed</button>
+          <button type="button" aria-pressed="false">Only listed</button>
+        </div>
+        <span style="color: var(--muted); font-size: 13px">SSID <span class="mono">OpenWrt</span> · on routers with several SSIDs: All or ticked ones</span>
+        <div class="spacer"></div>
+        <button class="btn" type="button">+ Device</button>
+      </div>
+      <div style="overflow-x: auto">
+        <table class="tbl">
+          <thead><tr><th>Device</th><th>MAC</th><th>Wi-Fi</th><th>How</th><th></th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Panel Wi-Fi · espressif</td>
+              <td class="mono">f4:12:fa:f3:57:68</td>
+              <td><span class="b badb">blocked</span></td>
+              <td>
+                <div class="seg" role="group" aria-label="How the panel is blocked">
+                  <button type="button" class="on" aria-pressed="true">Now · no Wi-Fi restart</button>
+                  <button type="button" aria-pressed="false">For 60 s</button>
+                  <button type="button" aria-pressed="false">Saved</button>
+                </div>
+              </td>
+              <td><button class="btn" type="button">Unblock</button></td>
+            </tr>
+            <tr>
+              <td>Phone · Dmitry-s-S26-Ultra</td>
+              <td class="mono">b2:4f:b7:9f:ac:d6</td>
+              <td><span class="b air">allowed</span></td>
+              <td style="color: var(--muted)">—</td>
+              <td><button class="btn" type="button">Block</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px">
+        <div class="note"><strong>Now, no Wi-Fi restart.</strong> Kicks the station if it is connected and refuses it from then on. Other stations are not touched. Gone after the next Wi-Fi restart.</div>
+        <div class="note"><strong>For a time.</strong> Kick and ban for N seconds, then the station may join again: a timed outage for one device.</div>
+        <div class="note"><strong>Saved.</strong> Written to the Wi-Fi config, survives reboot. Applying it restarts Wi-Fi for every station.</div>
+      </div>
+      <div class="code"><div class="c" style="white-space: pre"># panel: block now, no Wi-Fi restart</div><div style="white-space: pre">hostapd_cli -i phy0-ap0 deny_acl ADD_MAC f4:12:fa:f3:57:68</div><div class="c" style="white-space: pre"># "For 60 s" instead:</div><div style="white-space: pre">ubus call hostapd.phy0-ap0 del_client '{"addr":"f4:12:fa:f3:57:68","reason":5,"deauth":true,"ban_time":60000}'</div><div class="c" style="white-space: pre"># "Saved" instead:</div><div style="white-space: pre">uci set wireless.default_radio0.macfilter='deny'; uci add_list wireless.default_radio0.maclist='f4:12:fa:f3:57:68'</div><div style="white-space: pre">uci commit wireless; wifi up radio0</div></div>
+      <div class="note w">Two different tests: <strong>blocked here</strong> = the panel cannot join Wi-Fi at all. <strong>"Gets an address" off</strong> in the table above = the panel joins Wi-Fi but gets no IP.</div>
+    </section>
+
+    <section class="card" aria-labelledby="alh">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 10px">
+        <h2 id="alh" style="margin: 0; font-size: 16px; font-weight: 600">Active leases</h2>
+        <span style="font-size: 13px; color: var(--muted)">from <span class="mono">/tmp/dhcp.leases</span></span>
+      </div>
+      <div style="overflow-x: auto">
+        <table class="tbl">
+          <thead><tr><th>Hostname</th><th>MAC</th><th>IP</th><th>Expires</th><th></th></tr></thead>
+          <tbody>
+            <tr><td>ES-DmitryKo-LT</td><td class="mono">08:3a:88:5c:a8:39</td><td class="mono">192.168.1.10</td><td class="mono">fixed</td><td><span class="b neu">fixed</span></td></tr>
+            <tr><td>espressif</td><td class="mono">30:09:f9:85:1d:40</td><td class="mono">192.168.1.20</td><td class="mono">fixed</td><td><span class="b neu">fixed</span></td></tr>
+            <tr><td>espressif</td><td class="mono">f4:12:fa:f3:57:68</td><td class="mono">192.168.1.30</td><td class="mono">never</td><td><span class="b neu">fixed</span></td></tr>
+            <tr><td>Dmitry-s-S26-Ultra</td><td class="mono">b2:4f:b7:9f:ac:d6</td><td class="mono">192.168.1.229</td><td class="mono">in 7 h 12 m</td><td><button class="btn" type="button">Make fixed</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Look"},"$preview":{"width":1440,"height":1780}}'>
+class Component extends DCLogic {
+  state = { dark: null, proto: 'static', serve: { pc: true, eth: true, wifi: true }, last: null };
+
+  renderVals() {
+    const s = this.state;
+    const dark = s.dark === null ? (this.props.theme ?? 'light') === 'dark' : s.dark;
+    const P = [{ id: 'static', label: 'Static' }, { id: 'dhcp', label: 'DHCP client' }, { id: 'none', label: 'No address' }];
+    const protoSegs = P.map(p => ({
+      label: p.label, cls: p.id === s.proto ? 'on' : '', pressed: p.id === s.proto ? 'true' : 'false',
+      pick: () => this.setState({ proto: p.id })
+    }));
+    const ifLines = [];
+    const add = (t, c) => ifLines.push({ t: t, cls: c ? 'c' : '' });
+    add('# lan: ' + (P.find(p => p.id === s.proto) || P[0]).label, true);
+    if (s.proto === 'static') {
+      add("uci set network.lan.proto='static'");
+      add("uci set network.lan.ipaddr='192.168.1.1/24'");
+    } else if (s.proto === 'dhcp') {
+      add("uci set network.lan.proto='dhcp'");
+      add('uci -q delete network.lan.ipaddr');
+      add("uci set network.lan.hostname='AP1'");
+    } else {
+      add("uci set network.lan.proto='none'");
+      add('uci -q delete network.lan.ipaddr');
+    }
+    add('uci commit network');
+    add('# arm the 60 s rollback on the router, then: /etc/init.d/network reload', true);
+
+    const H = [
+      { id: 'pc', name: 'PC · ES-DmitryKo-LT', mac: '08:3a:88:5c:a8:39', ip: '192.168.1.10', lease: 'default', sec: 'pc' },
+      { id: 'eth', name: 'Panel ETH · espressif', mac: '30:09:f9:85:1d:40', ip: '192.168.1.20', lease: 'default', sec: 'panel_eth' },
+      { id: 'wifi', name: 'Panel Wi-Fi · espressif', mac: 'f4:12:fa:f3:57:68', ip: '192.168.1.30', lease: 'infinite', sec: 'panel_wifi' }
+    ];
+    const hosts = H.map(h => {
+      const on = !!s.serve[h.id];
+      return {
+        name: h.name, mac: h.mac, ip: h.ip, lease: h.lease,
+        onStr: on ? 'true' : 'false', onLabel: on ? 'Yes' : 'Ignored',
+        trackStyle: 'background: ' + (on ? '#3FA36F' : '#8A9199'),
+        knobStyle: 'left: ' + (on ? '18px' : '2px'),
+        toggle: () => {
+          if (h.id === 'pc') return;
+          const serve = Object.assign({}, s.serve);
+          serve[h.id] = !on;
+          this.setState({ serve: serve, last: { sec: h.sec, name: h.name, on: !on } });
+        }
+      };
+    });
+    const l = s.last;
+    const hostLines = l ? [
+      { t: '# ' + l.name + ': ' + (l.on ? 'gets an address again' : 'DHCP requests ignored'), cls: 'c' },
+      { t: l.on ? ('uci -q delete dhcp.' + l.sec + '.ignore') : ('uci set dhcp.' + l.sec + ".ignore='1'"), cls: '' },
+      { t: 'uci commit dhcp; /etc/init.d/dnsmasq reload', cls: '' }
+    ] : [
+      { t: '# the PC row cannot be switched off: it is how this app reaches AP1', cls: 'c' },
+      { t: '# switch a panel row to see the commands', cls: 'c' }
+    ];
+
+    return {
+      appCls: dark ? 'app dark' : 'app',
+      darkStr: dark ? 'true' : 'false',
+      themeLabel: dark ? 'Dark' : 'Light',
+      toggleTheme: () => this.setState({ dark: !dark }),
+      protoSegs: protoSegs,
+      isStatic: s.proto === 'static', isDhcp: s.proto === 'dhcp', isNone: s.proto === 'none',
+      lanProtoLabel: s.proto === 'static' ? 'Static' : (s.proto === 'dhcp' ? 'DHCP client' : 'No address'),
+      lanAddr: s.proto === 'static' ? '192.168.1.1/24' : (s.proto === 'dhcp' ? 'from DHCP' : '—'),
+      ifLines: ifLines, hosts: hosts, hostLines: hostLines
+    };
+  }
+}
+</script>
+</body>
+</html>

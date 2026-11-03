@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Router ports, VLANs, mirroring</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F2F3EF}
+a{color:#1F5FCC}a:hover{color:#174A9F}
+.app{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#15181C;background:#F2F3EF;font-size:14px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;padding:10px 24px;background:#15181C;color:#F2F3EF}
+.brand{font-weight:600;font-size:15px;display:flex;align-items:center;gap:10px}
+.nav{display:flex;flex-wrap:wrap;gap:2px}
+.nav a{color:#C3C8CE;text-decoration:none;padding:10px 12px;border-radius:6px;font-size:13px}
+.nav a:hover{color:#FFFFFF;background:#262A30}
+.nav a.cur{color:#FFFFFF;background:#2E343B}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;padding:6px 12px;border-radius:999px}
+.shell{display:flex;flex-wrap:wrap;gap:24px;padding:24px;max-width:1440px;margin:0 auto;box-sizing:border-box}
+.rail{flex:1 1 230px;display:flex;flex-direction:column;gap:6px}
+.main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#575F67;font-weight:600}
+.rt{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:8px;text-decoration:none;color:#15181C;border:1px solid transparent}
+.rt:hover{background:#FFFFFF;border-color:#D8DBD4;color:#15181C}
+.rt.cur{background:#FFFFFF;border-color:#15181C}
+.card{background:#FFFFFF;border:1px solid #D8DBD4;border-radius:10px;padding:18px 20px}
+.b{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.air{background:#E3F2EA;color:#16784A}.park{background:#FBEFD9;color:#9A5A00}.flt{background:#FBE7E1;color:#B3361A}.har{background:#ECE7FA;color:#5A3EBF}.neu{background:#ECEEEA;color:#3E454C}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.btn{font:inherit;font-size:13px;font-weight:500;padding:10px 14px;border-radius:6px;border:1px solid #C9CDC5;background:#FFFFFF;color:#15181C;cursor:pointer;min-height:44px;box-sizing:border-box;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{background:#F2F3EF;color:#15181C}
+.btn:focus-visible,.rt:focus-visible,.nav a:focus-visible,.sw:focus-visible,.cell:focus-visible{outline:2px solid #1F5FCC;outline-offset:2px}
+.btn.pri{background:#1F5FCC;border-color:#1F5FCC;color:#FFFFFF}.btn.pri:hover{background:#174A9F;color:#FFFFFF}
+.btn.dan{color:#B3361A;border-color:#E9B8AA}
+.panel{background:#23272D;border-radius:12px;padding:18px;display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:12px;min-width:680px}
+.sock{background:#2E343B;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;color:#E6E8EA}
+.jack{height:44px;border-radius:4px;background:#15181C;border:2px solid #4A5059;position:relative}
+.led{position:absolute;top:6px;width:8px;height:8px;border-radius:2px}
+.sw{font:inherit;display:inline-flex;align-items:center;gap:8px;background:transparent;border:0;color:#E6E8EA;cursor:pointer;padding:6px 0;min-height:44px;font-size:13px}
+.track{width:36px;height:20px;border-radius:999px;position:relative;flex:none}
+.knob{position:absolute;top:2px;width:16px;height:16px;border-radius:50%;background:#FFFFFF}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#575F67;padding:8px 10px;border-bottom:1px solid #D8DBD4;white-space:nowrap}
+.tbl td{padding:8px 10px;border-bottom:1px solid #E8EAE5;vertical-align:middle;white-space:nowrap}
+.cell{font:inherit;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:13px;min-width:44px;min-height:40px;border-radius:6px;border:1px solid #D8DBD4;background:#FFFFFF;color:#8A9199;cursor:pointer}
+.cell.u{background:#15181C;color:#FFFFFF;border-color:#15181C}
+.cell.t{background:#EEF3FC;color:#1F5FCC;border-color:#1F5FCC}
+.code{background:#15181C;color:#E6E8EA;border-radius:8px;padding:12px 14px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;line-height:1.65;overflow-x:auto;white-space:pre}
+.code .c{color:#93A8BA}
+.chk{display:inline-flex;align-items:center;gap:8px;font-size:13px;min-height:44px}
+.chk input{width:18px;height:18px;accent-color:#1F5FCC}
+</style>
+</helmet>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7FD1A8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5a10 10 0 0 1 14 0"></path><path d="M8 15.5a6 6 0 0 1 8 0"></path><circle cx="12" cy="19" r="1.4" fill="#7FD1A8"></circle></svg>
+      <span>OpenWrt Bench</span>
+    </div>
+    <nav class="nav" aria-label="Screens">
+      <a href="Main.dc.html">Dashboard</a>
+      <a href="WiFi.dc.html">Wi-Fi</a>
+      <a href="RF.dc.html">RF live</a>
+      <a href="Network.dc.html">Network &amp; DHCP</a>
+      <a class="cur" href="Ports.dc.html">Ports &amp; VLANs</a>
+      <a href="Firewall.dc.html">Firewall</a>
+      <a href="Faults.dc.html">Faults &amp; capture</a>
+      <a href="Discovery.dc.html">Discovery</a>
+    </nav>
+    <div class="spacer"></div>
+    <span class="pill" style="background: #1E3A2B; color: #BFE8CF"><span class="dot" style="background: #6CD39B"></span>No harness running · writes allowed</span>
+  </header>
+
+  <div class="shell">
+    <aside class="rail" aria-label="Routers">
+      <div class="eyebrow" style="padding: 0 12px 4px">Routers</div>
+      <a class="rt cur" href="Ports.dc.html">
+        <span style="display: flex; align-items: center; gap: 8px; font-weight: 600"><span class="dot" style="background: #16784A"></span>AP1 · bench</span>
+        <span class="mono" style="font-size: 12px; color: #575F67">192.168.1.1</span>
+      </a>
+      <a class="rt" href="Ports.dc.html">
+        <span style="display: flex; align-items: center; gap: 8px; font-weight: 600"><span class="dot" style="background: #9A5A00"></span>AP2 · office</span>
+        <span class="mono" style="font-size: 12px; color: #575F67">192.168.1.2</span>
+      </a>
+      <a class="rt" href="Ports.dc.html">
+        <span style="display: flex; align-items: center; gap: 8px; font-weight: 600"><span class="dot" style="background: #9A5A00"></span>AP3 · QA stands</span>
+        <span class="mono" style="font-size: 12px; color: #575F67">192.168.1.3</span>
+      </a>
+      <div class="eyebrow" style="padding: 20px 12px 4px">AP1 sections</div>
+      <a class="rt" href="WiFi.dc.html">Wi-Fi</a>
+      <a class="rt" href="Ports.dc.html" style="font-weight: 600">Ports, VLANs, mirroring</a>
+      <a class="rt" href="Firewall.dc.html">Firewall</a>
+      <a class="rt" href="Faults.dc.html">Faults and capture</a>
+      <a class="rt" href="Discovery.dc.html">Discovery and tools</a>
+    </aside>
+
+    <main class="main">
+      <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 24px">
+        <div>
+          <div class="eyebrow">AP1 · <span class="mono">192.168.1.1</span> · DWR-921 C3</div>
+          <h1 style="margin: 2px 0 0; font-size: 28px; font-weight: 600; letter-spacing: -0.01em">Ports, VLANs, mirroring</h1>
+        </div>
+        <div class="spacer"></div>
+        <span class="b neu mono">switch0 · mt7620 · swconfig</span>
+        <span class="b air">per-port enable (patched)</span>
+      </div>
+
+      <section class="card" aria-labelledby="fp" style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+          <h2 id="fp" style="margin: 0; font-size: 16px; font-weight: 600">Front panel</h2>
+          <span style="color: #575F67; font-size: 13px">Socket labels as printed. Internal port numbers were measured when the router was added; on this model they run backwards.</span>
+          <div class="spacer"></div>
+          <button class="btn" type="button">Re-map ports</button>
+          <button class="btn" type="button">Enable all ports</button>
+        </div>
+        <div style="overflow-x: auto">
+          <div class="panel">
+            <sc-for list="{{ports}}" as="p" hint-placeholder-count="5">
+              <div class="sock">
+                <div style="display: flex; align-items: baseline; justify-content: space-between">
+                  <strong style="font-size: 15px">{{p.label}}</strong>
+                  <span class="mono" style="font-size: 11px; color: #A9B0B8">port {{p.idx}}</span>
+                </div>
+                <div class="jack"><span class="led" style="{{p.ledStyle}}"></span></div>
+                <span class="mono" style="font-size: 12px; color: #C3C8CE">{{p.link}}</span>
+                <span style="font-size: 13px">{{p.host}}</span>
+                <sc-if value="{{p.locked}}" hint-placeholder-val="{{ false }}">
+                  <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: #FFD58A; min-height: 44px">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFD58A" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+                    carries this app's SSH
+                  </span>
+                </sc-if>
+                <sc-if value="{{p.free}}" hint-placeholder-val="{{ true }}">
+                  <button class="sw" type="button" role="switch" aria-checked="{{p.onStr}}" onClick="{{p.toggle}}">
+                    <span class="track" style="{{p.trackStyle}}"><span class="knob" style="{{p.knobStyle}}"></span></span>
+                    {{p.onLabel}}
+                  </button>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div class="code"><span class="c"># {{lastCmdNote}}</span>
+{{lastCmd}}</div>
+      </section>
+
+      <section class="card" aria-labelledby="vl" style="display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+          <h2 id="vl" style="margin: 0; font-size: 16px; font-weight: 600">VLANs</h2>
+          <span style="color: #575F67; font-size: 13px">Click a cell: — not a member · U untagged · T tagged</span>
+          <div class="spacer"></div>
+          <button class="btn" type="button">+ Add VLAN</button>
+        </div>
+        <div style="overflow-x: auto">
+          <table class="tbl">
+            <thead><tr><th>VLAN</th><th>Interface</th><th>LAN1 · 3</th><th>LAN2 · 2</th><th>LAN3 · 1</th><th>LAN4 · 0</th><th>WAN · 4</th><th>CPU · 6</th></tr></thead>
+            <tbody>
+              <tr>
+                <td class="mono"><strong>1</strong></td><td class="mono">eth0.1 → br-lan</td>
+                <td><button class="cell u" type="button" aria-label="VLAN 1 LAN1 untagged">U</button></td>
+                <td><button class="cell u" type="button" aria-label="VLAN 1 LAN2 untagged">U</button></td>
+                <td><button class="cell u" type="button" aria-label="VLAN 1 LAN3 untagged">U</button></td>
+                <td><button class="cell u" type="button" aria-label="VLAN 1 LAN4 untagged">U</button></td>
+                <td><button class="cell" type="button" aria-label="VLAN 1 WAN not a member">—</button></td>
+                <td><button class="cell t" type="button" aria-label="VLAN 1 CPU tagged">T</button></td>
+              </tr>
+              <tr>
+                <td class="mono"><strong>2</strong></td><td class="mono">eth0.2 → wan</td>
+                <td><button class="cell" type="button" aria-label="VLAN 2 LAN1 not a member">—</button></td>
+                <td><button class="cell" type="button" aria-label="VLAN 2 LAN2 not a member">—</button></td>
+                <td><button class="cell" type="button" aria-label="VLAN 2 LAN3 not a member">—</button></td>
+                <td><button class="cell" type="button" aria-label="VLAN 2 LAN4 not a member">—</button></td>
+                <td><button class="cell u" type="button" aria-label="VLAN 2 WAN untagged">U</button></td>
+                <td><button class="cell t" type="button" aria-label="VLAN 2 CPU tagged">T</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="font-size: 13px; color: #3E454C; padding: 10px 12px; border-radius: 8px; background: #FBEFD9">A change to VLAN 1 can cut this PC off (LAN1 is the SSH path). Such changes apply with a <strong>60 s rollback</strong>: if the app cannot reach AP1 again and confirm, the router restores the previous network config by itself.</div>
+      </section>
+
+      <section class="card" aria-labelledby="mr" style="display: flex; flex-direction: column; gap: 16px">
+        <h2 id="mr" style="margin: 0; font-size: 16px; font-weight: 600">Mirroring</h2>
+        <div style="display: flex; flex-wrap: wrap; gap: 16px">
+          <div style="flex: 1 1 380px; border: 1px solid #D8DBD4; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; align-items: center; gap: 10px"><strong>Switch port mirror</strong><div class="spacer"></div><span class="b air">on · saved in /etc/config/network</span></div>
+            <div style="font-size: 13px; color: #575F67">Ethernet only: Wi-Fi traffic never crosses the switch.</div>
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; font-size: 13px">
+              <span>Monitor port</span>
+              <select class="btn mono" aria-label="Monitor port"><option>LAN1 · port 3 (PC)</option><option>LAN2 · port 2</option><option>LAN3 · port 1</option></select>
+            </div>
+            <div style="overflow-x: auto">
+              <table class="tbl">
+                <thead><tr><th>Source</th><th>RX</th><th>TX</th></tr></thead>
+                <tbody>
+                  <tr><td>LAN2 · port 2</td><td><label class="chk"><input type="checkbox" checked aria-label="LAN2 rx"></label></td><td><label class="chk"><input type="checkbox" checked aria-label="LAN2 tx"></label></td></tr>
+                  <tr><td>LAN3 · port 1</td><td><label class="chk"><input type="checkbox" checked aria-label="LAN3 rx"></label></td><td><label class="chk"><input type="checkbox" checked aria-label="LAN3 tx"></label></td></tr>
+                  <tr><td>LAN4 · port 0 · panel</td><td><label class="chk"><input type="checkbox" checked aria-label="LAN4 rx"></label></td><td><label class="chk"><input type="checkbox" checked aria-label="LAN4 tx"></label></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div style="font-size: 12px; color: #575F67">Open Wireshark in promiscuous mode: the PC's NIC filters mirrored frames in hardware, so its own counters show nothing.</div>
+          </div>
+
+          <div style="flex: 1 1 380px; border: 1px solid #D8DBD4; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px"><strong>Wi-Fi mirror</strong><span class="b har">wifi-mirror · added after flashing</span><div class="spacer"></div><span class="b air">running</span></div>
+            <dl style="display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 6px 12px; margin: 0; font-size: 13px">
+              <dt style="color: #575F67">From</dt><dd class="mono" style="margin: 0">phy0-ap0</dd>
+              <dt style="color: #575F67">To</dt><dd class="mono" style="margin: 0">eth0.1 → LAN1</dd>
+              <dt style="color: #575F67">Excluded</dt><dd class="mono" style="margin: 0">08:3a:88:5c:a8:39 (PC)</dd>
+              <dt style="color: #575F67">Copies marked</dt><dd class="mono" style="margin: 0">02:00:00:00:00:01 from station · :02 to station</dd>
+              <dt style="color: #575F67">Hooks on phy0-ap0</dt><dd class="mono" style="margin: 0">2 · re-applied on every Wi-Fi restart</dd>
+            </dl>
+            <div style="font-size: 13px; color: #3E454C; padding: 10px 12px; border-radius: 8px; background: #FBEFD9">Stop it before a max-throughput iperf run: every Wi-Fi frame is copied by the CPU.</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px">
+              <button class="btn dan" type="button">Stop</button>
+              <button class="btn" type="button">Restart</button>
+              <a class="btn" href="Faults.dc.html">Or capture remotely instead</a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+  state = { en: { WAN: true, LAN1: true, LAN2: true, LAN3: true, LAN4: true }, last: null };
+
+  renderVals() {
+    const s = this.state;
+    const DEF = [
+      { label: 'WAN', idx: 4, host: 'unused · uplink is LTE', link: 'no link' },
+      { label: 'LAN1', idx: 3, host: 'PC · 08:3a:88:5c:a8:39', link: '100 Mb/s full', locked: true },
+      { label: 'LAN2', idx: 2, host: 'free', link: 'no link' },
+      { label: 'LAN3', idx: 1, host: 'free', link: 'no link' },
+      { label: 'LAN4', idx: 0, host: 'panel ETH · 30:09:f9:85:1d:40', link: '100 Mb/s full' }
+    ];
+    const ports = DEF.map(p => {
+      const on = !!s.en[p.label];
+      const up = on && p.link !== 'no link';
+      return {
+        label: p.label, idx: p.idx, host: p.host,
+        link: on ? p.link : 'disabled · carrier down',
+        locked: !!p.locked, free: !p.locked,
+        onStr: on ? 'true' : 'false',
+        onLabel: on ? 'Enabled' : 'Disabled',
+        ledStyle: 'left: 8px; background: ' + (up ? '#6CD39B' : (on ? '#4A5059' : '#FF8A5C')),
+        trackStyle: 'background: ' + (on ? '#3FA36F' : '#6B7178'),
+        knobStyle: 'left: ' + (on ? '18px' : '2px'),
+        toggle: () => {
+          const en = Object.assign({}, s.en);
+          en[p.label] = !on;
+          this.setState({ en: en, last: { label: p.label, idx: p.idx, on: !on } });
+        }
+      };
+    });
+    const l = s.last;
+    return {
+      ports: ports,
+      lastCmdNote: l ? (l.label + ' ' + (l.on ? 'enabled' : 'disabled') + ' · runtime only, lost on reboot · link polled up to 20 s') : 'per-port on/off uses the image’s own tool; link state is polled, never read once',
+      lastCmd: l ? ('dwr921-portctl ' + (l.on ? 'port-enable ' : 'port-disable ') + l.label.toLowerCase() + '   # = swconfig dev switch0 port ' + l.idx + ' set enable ' + (l.on ? 1 : 0)) : 'dwr921-portctl port-status lan4'
+    };
+  }
+}
+</script>
+</body>
+</html>

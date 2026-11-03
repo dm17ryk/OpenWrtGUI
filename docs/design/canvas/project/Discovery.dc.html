@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Router discovery and tools</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F2F3EF}
+a{color:#1F5FCC}a:hover{color:#174A9F}
+.app{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#15181C;background:#F2F3EF;font-size:14px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;padding:10px 24px;background:#15181C;color:#F2F3EF}
+.brand{font-weight:600;font-size:15px;display:flex;align-items:center;gap:10px}
+.nav{display:flex;flex-wrap:wrap;gap:2px}
+.nav a{color:#C3C8CE;text-decoration:none;padding:10px 12px;border-radius:6px;font-size:13px}
+.nav a:hover{color:#FFFFFF;background:#262A30}
+.nav a.cur{color:#FFFFFF;background:#2E343B}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;padding:6px 12px;border-radius:999px}
+.shell{display:flex;flex-wrap:wrap;gap:24px;padding:24px;max-width:1440px;margin:0 auto;box-sizing:border-box}
+.rail{flex:1 1 230px;display:flex;flex-direction:column;gap:6px}
+.main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#575F67;font-weight:600}
+.rt{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:8px;text-decoration:none;color:#15181C;border:1px solid transparent}
+.rt:hover{background:#FFFFFF;border-color:#D8DBD4;color:#15181C}
+.rt.cur{background:#FFFFFF;border-color:#15181C}
+.card{background:#FFFFFF;border:1px solid #D8DBD4;border-radius:10px;padding:18px 20px}
+.b{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.air{background:#E3F2EA;color:#16784A}.park{background:#FBEFD9;color:#9A5A00}.flt{background:#FBE7E1;color:#B3361A}.har{background:#ECE7FA;color:#5A3EBF}.neu{background:#ECEEEA;color:#3E454C}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.btn{font:inherit;font-size:13px;font-weight:500;padding:10px 14px;border-radius:6px;border:1px solid #C9CDC5;background:#FFFFFF;color:#15181C;cursor:pointer;min-height:44px;box-sizing:border-box;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{background:#F2F3EF;color:#15181C}
+.btn:focus-visible,.rt:focus-visible,.nav a:focus-visible{outline:2px solid #1F5FCC;outline-offset:2px}
+.btn.pri{background:#1F5FCC;border-color:#1F5FCC;color:#FFFFFF}.btn.pri:hover{background:#174A9F;color:#FFFFFF}
+.cap{display:inline-flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;padding:5px 10px;border-radius:6px;border:1px solid #D8DBD4;background:#FFFFFF}
+.cap.yes::before{content:"";width:7px;height:7px;border-radius:50%;background:#16784A}
+.cap.no{color:#6B737B;background:#F6F7F4;text-decoration:line-through}
+.cap.added{border-color:#B9A8EC;background:#F4F0FD}
+.cap.added::before{content:"";width:7px;height:7px;border-radius:50%;background:#5A3EBF}
+.grp{display:grid;grid-template-columns:120px minmax(0,1fr);gap:10px 16px;align-items:start}
+.grp dt{font-size:12px;font-weight:600;color:#575F67;padding-top:6px}
+.grp dd{margin:0;display:flex;flex-wrap:wrap;gap:6px}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#575F67;padding:8px 10px;border-bottom:1px solid #D8DBD4;white-space:nowrap}
+.tbl td{padding:10px;border-bottom:1px solid #E8EAE5;vertical-align:middle}
+.code{background:#15181C;color:#E6E8EA;border-radius:8px;padding:12px 14px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;line-height:1.6;overflow-x:auto;white-space:pre}
+.stat{display:flex;flex-direction:column;gap:2px;padding:14px 16px;border-radius:10px;border:1px solid #D8DBD4;background:#FFFFFF}
+.stat .n{font-size:28px;font-weight:600;letter-spacing:-0.01em}
+</style>
+</helmet>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7FD1A8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5a10 10 0 0 1 14 0"></path><path d="M8 15.5a6 6 0 0 1 8 0"></path><circle cx="12" cy="19" r="1.4" fill="#7FD1A8"></circle></svg>
+      <span>OpenWrt Bench</span>
+    </div>
+    <nav class="nav" aria-label="Screens">
+      <a href="Main.dc.html">Dashboard</a>
+      <a href="WiFi.dc.html">Wi-Fi</a>
+      <a href="RF.dc.html">RF live</a>
+      <a href="Network.dc.html">Network &amp; DHCP</a>
+      <a href="Ports.dc.html">Ports &amp; VLANs</a>
+      <a href="Firewall.dc.html">Firewall</a>
+      <a href="Faults.dc.html">Faults &amp; capture</a>
+      <a class="cur" href="Discovery.dc.html">Discovery</a>
+    </nav>
+    <div class="spacer"></div>
+    <span class="pill" style="background: #1E3A2B; color: #BFE8CF"><span class="dot" style="background: #6CD39B"></span>No harness running · writes allowed</span>
+  </header>
+
+  <div class="shell">
+    <aside class="rail" aria-label="Routers">
+      <div class="eyebrow" style="padding: 0 12px 4px">Routers</div>
+      <a class="rt cur" href="Discovery.dc.html">
+        <span style="display: flex; align-items: center; gap: 8px; font-weight: 600"><span class="dot" style="background: #16784A"></span>AP1 · bench</span>
+        <span class="mono" style="font-size: 12px; color: #575F67">192.168.1.1</span>
+      </a>
+      <a class="rt" href="Discovery.dc.html">
+        <span style="display: flex; align-items: center; gap: 8px; font-weight: 600"><span class="dot" style="background: #9A5A00"></span>AP2 · office</span>
+        <span class="mono" style="font-size: 12px; color: #575F67">192.168.1.2</span>
+      </a>
+      <a class="rt" href="Discovery.dc.html">
+        <span style="display: flex; align-items: center; gap: 8px; font-weight: 600"><span class="dot" style="background: #9A5A00"></span>AP3 · QA stands</span>
+        <span class="mono" style="font-size: 12px; color: #575F67">192.168.1.3</span>
+      </a>
+      <div class="eyebrow" style="padding: 20px 12px 4px">Firmware images</div>
+      <a class="rt cur" href="Discovery.dc.html">
+        <span style="font-weight: 600">DWR-921 C3 (U-Boot)</span>
+        <span class="mono" style="font-size: 12px; color: #575F67">r35692 · d340a53f</span>
+      </a>
+      <div style="display: flex; flex-direction: column; gap: 8px; padding-top: 10px">
+        <button class="btn" type="button">Import firmware image…</button>
+        <button class="btn" type="button">Compare two images</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 24px">
+        <div>
+          <div class="eyebrow">AP1 · <span class="mono">192.168.1.1</span></div>
+          <h1 style="margin: 2px 0 0; font-size: 28px; font-weight: 600; letter-spacing: -0.01em">Discovery and tools</h1>
+        </div>
+        <div class="spacer"></div>
+        <button class="btn" type="button">Probe again</button>
+        <button class="btn" type="button">Open terminal</button>
+      </div>
+
+      <section class="card" style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; border-color: #BFDCCB; background: #F3FAF6">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#16784A" stroke-width="2" aria-hidden="true"><path d="M20 6L9 17l-5-5"></path></svg>
+        <div style="flex: 1 1 420px; display: flex; flex-direction: column; gap: 2px">
+          <strong>Running the image it was flashed with</strong>
+          <span class="mono" style="font-size: 13px; color: #3E454C">DWR-921 C3 (U-Boot) · OpenWrt r35692-b8bffeefdf · ramips/mt7620 · image d340a53f · firmware partition hash matches</span>
+        </div>
+        <span class="b neu">profile from your image</span>
+      </section>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px">
+        <div class="stat"><span class="n">226</span><span style="font-size: 13px; color: #575F67">packages in the image</span></div>
+        <div class="stat"><span class="n">3</span><span style="font-size: 13px; color: #575F67">custom packages (yours)</span></div>
+        <div class="stat" style="border-color: #B9A8EC"><span class="n" style="color: #5A3EBF">7</span><span style="font-size: 13px; color: #575F67">files added after flashing</span></div>
+      </div>
+
+      <section class="card" aria-labelledby="cp" style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+          <h2 id="cp" style="margin: 0; font-size: 16px; font-weight: 600">What AP1 can do</h2>
+          <span class="cap yes">in image</span><span class="cap added">added after flashing</span><span class="cap no">missing</span>
+        </div>
+        <dl class="grp">
+          <dt>Radio</dt><dd><span class="cap yes">2.4 GHz · ch 1–13</span><span class="cap no">5 GHz</span><span class="cap no">6 GHz</span><span class="cap yes">AP</span><span class="cap yes">monitor mode</span><span class="cap yes">HT20 / HT40</span><span class="cap yes">wpad-openssl · WPA3, 802.11r/k/v</span></dd>
+          <dt>Switch</dt><dd><span class="cap yes">swconfig</span><span class="cap yes">per-port enable (patched)</span><span class="cap yes">port mirror</span><span class="cap no">DSA</span></dd>
+          <dt>Firewall</dt><dd><span class="cap yes">nftables · fw4</span><span class="cap yes">conntrack</span><span class="cap yes">SIP ALG module</span></dd>
+          <dt>Shaping</dt><dd><span class="cap yes">tc · netem</span><span class="cap yes">ifb</span><span class="cap yes">htb · tbf · hfsc · codel</span><span class="cap no">prio</span><span class="cap added">netem distribution tables</span></dd>
+          <dt>Tools</dt><dd><span class="cap yes">tcpdump</span><span class="cap yes">iperf3</span><span class="cap added">iperf 2</span><span class="cap yes">socat</span><span class="cap yes">ethtool</span><span class="cap yes">hostapd_cli</span><span class="cap yes">iwinfo</span><span class="cap added">wifi-mirror</span></dd>
+        </dl>
+      </section>
+
+      <section class="card" aria-labelledby="ct" style="display: flex; flex-direction: column; gap: 14px">
+        <h2 id="ct" style="margin: 0; font-size: 16px; font-weight: 600">Your custom packages</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px">
+          <article style="border: 1px solid #D8DBD4; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; align-items: center; gap: 8px"><strong class="mono">dwr921-portctl</strong><span class="b neu">v2</span><div class="spacer"></div><span class="b air">has a card</span></div>
+            <div style="font-size: 13px">Per-port on/off by printed label. Drives the switches on the Ports screen.</div>
+            <div class="code">dwr921-portctl {port-status|port-enable|port-disable}
+               {lan1|lan2|lan3|lan4|wan}
+dwr921-portctl restore-all-ports</div>
+          </article>
+          <article style="border: 1px solid #D8DBD4; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; align-items: center; gap: 8px"><strong class="mono">dwr921-internet-led</strong><span class="b neu">v4</span><div class="spacer"></div><span class="b air">service</span></div>
+            <div style="font-size: 13px">Service with its own config <span class="mono">/etc/config/dwr921-internet-led</span>. Shown as a service you can start, stop and edit.</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px"><button class="btn" type="button">Edit config</button><button class="btn" type="button">Restart</button></div>
+          </article>
+          <article style="border: 1.5px dashed #B9A8EC; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; align-items: center; gap: 8px"><strong class="mono">dwr921-diag</strong><span class="b neu">v2</span><div class="spacer"></div><span class="b har">no card yet</span></div>
+            <div style="font-size: 13px">Found in the image, not known to the app yet. Run its help to see what it does, then promote it to a card with real controls.</div>
+            <div class="code" style="color: #93A8BA">[output of dwr921-diag --help appears here]</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px"><button class="btn" type="button">Run --help</button><button class="btn pri" type="button">Promote to a card</button></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="ad">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 10px">
+          <h2 id="ad" style="margin: 0; font-size: 16px; font-weight: 600">Added after flashing</h2>
+          <span style="color: #575F67; font-size: 13px">from <span class="mono">/overlay/upper</span>: not in the image, will be lost on reflash</span>
+        </div>
+        <div style="overflow-x: auto">
+          <table class="tbl">
+            <thead><tr><th>Path</th><th>Recognised as</th><th>Used by</th></tr></thead>
+            <tbody>
+              <tr><td class="mono">/usr/sbin/wifi-mirror</td><td>Wi-Fi mirror tool</td><td><a href="Ports.dc.html">Mirroring</a></td></tr>
+              <tr><td class="mono">/etc/wifi-mirror.conf</td><td>its config</td><td><a href="Ports.dc.html">Mirroring</a></td></tr>
+              <tr><td class="mono">/etc/hotplug.d/net/60-wifi-mirror</td><td>hook: re-applies the mirror on Wi-Fi restart</td><td><a href="Ports.dc.html">Mirroring</a></td></tr>
+              <tr><td class="mono">/usr/lib/tc/normal.dist</td><td>netem table</td><td><a href="Faults.dc.html">Impair · distributions</a></td></tr>
+              <tr><td class="mono">/usr/lib/tc/pareto.dist</td><td>netem table</td><td><a href="Faults.dc.html">Impair · distributions</a></td></tr>
+              <tr><td class="mono">/usr/lib/tc/paretonormal.dist</td><td>netem table</td><td><a href="Faults.dc.html">Impair · distributions</a></td></tr>
+              <tr><td class="mono">/usr/bin/iperf</td><td>iperf 2 (installed with apk)</td><td>Throughput tests</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px">
+          <button class="btn" type="button">Copy these to another router</button>
+          <button class="btn" type="button">Save as a reflash checklist</button>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="cf" style="display: flex; flex-direction: column; gap: 10px">
+        <h2 id="cf" style="margin: 0; font-size: 16px; font-weight: 600">Config changed from image defaults</h2>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px">
+          <button class="btn mono" type="button">network</button><button class="btn mono" type="button">wireless</button><button class="btn mono" type="button">dhcp</button><button class="btn mono" type="button">firewall</button><button class="btn mono" type="button">system</button><button class="btn mono" type="button">dropbear</button><button class="btn mono" type="button">uhttpd</button><button class="btn mono" type="button">rpcd</button><button class="btn mono" type="button">luci</button><button class="btn mono" type="button">…</button>
+        </div>
+        <div style="font-size: 13px; color: #575F67">Click one to see the difference against the image's default <span class="mono">/rom/etc/config</span> file.</div>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1260}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>
