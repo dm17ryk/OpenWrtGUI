@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Router system</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.app{--bg:#F2F3EF;--surface:#FFFFFF;--surface2:#F6F7F4;--ink:#15181C;--ink2:#3E454C;--muted:#575F67;--line:#D8DBD4;--line2:#E8EAE5;--accent:#1F5FCC;--accent-ink:#FFFFFF;--accent-soft:#EEF3FC;--ok:#16784A;--ok-soft:#E3F2EA;--warn:#9A5A00;--warn-soft:#FBEFD9;--bad:#B3361A;--bad-soft:#FBE7E1;--neu-soft:#ECEEEA;--har:#5A3EBF;--har-soft:#ECE7FA;--top:#15181C;--top-ink:#F2F3EF;--code-bg:#15181C;--code-ink:#E6E8EA;--code-c:#93A8BA;--link:#1F5FCC;--rx:#2a78d6;--tx:#eb6834;--series:#2a78d6;--grid:#E1E0D9}
+.app.dark{--bg:#111316;--surface:#1A1D21;--surface2:#20242A;--ink:#ECEEEF;--ink2:#C5CAD0;--muted:#9AA3AC;--line:#2F343B;--line2:#262A30;--accent:#5B92F0;--accent-ink:#0B0D10;--accent-soft:#1D2A40;--ok:#5CC98F;--ok-soft:#17301F;--warn:#E2A54A;--warn-soft:#33260F;--bad:#F08A6C;--bad-soft:#3A1E16;--neu-soft:#262A30;--har:#B7A6F2;--har-soft:#2A2340;--top:#0B0D10;--top-ink:#ECEEEF;--code-bg:#0B0D10;--code-ink:#E6E8EA;--code-c:#8FA3B5;--link:#8DB4F5;--rx:#3987e5;--tx:#d95926;--series:#3987e5;--grid:#2C2C2A}
+.app{font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--ink);background:var(--bg);font-size:14px;line-height:1.45;min-height:100vh}
+.app a{color:var(--link)}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;padding:10px 24px;background:var(--top);color:var(--top-ink)}
+.brand{font-weight:600;font-size:15px;display:flex;align-items:center;gap:10px}
+.nav{display:flex;flex-wrap:wrap;gap:2px}
+.nav a{color:#C3C8CE;text-decoration:none;padding:10px 12px;border-radius:6px;font-size:13px}
+.nav a:hover{color:#FFFFFF;background:#262A30}
+.nav a.cur{color:#FFFFFF;background:#2E343B}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;padding:6px 12px;border-radius:999px}
+.theme,.gear{font:inherit;display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#E6E8EA;background:#2E343B;border:0;border-radius:999px;padding:0 14px;min-height:40px;cursor:pointer;text-decoration:none}
+.app .gear{color:#E6E8EA}
+.wrap{max-width:1440px;margin:0 auto;padding:24px;box-sizing:border-box;display:flex;flex-direction:column;gap:20px}
+.shell{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.side{flex:1 1 200px;max-width:240px;display:flex;flex-direction:column;gap:2px}
+.side button{font:inherit;font-size:14px;text-align:left;padding:0 12px;min-height:44px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--ink);cursor:pointer}
+.side button:hover{background:var(--surface)}
+.side button.on{background:var(--surface);border-color:var(--ink);font-weight:600}
+.main{flex:999 1 600px;min-width:0;display:flex;flex-direction:column;gap:20px}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+.b{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.air{background:var(--ok-soft);color:var(--ok)}.neu{background:var(--neu-soft);color:var(--ink2)}.warnb{background:var(--warn-soft);color:var(--warn)}.badb{background:var(--bad-soft);color:var(--bad)}.har{background:var(--har-soft);color:var(--har)}.own{background:var(--accent-soft);color:var(--accent)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.btn{font:inherit;font-size:13px;font-weight:500;padding:10px 14px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;min-height:44px;box-sizing:border-box;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{background:var(--surface2)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{border-color:var(--bad);color:var(--bad)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn:focus-visible,.nav a:focus-visible,.theme:focus-visible,.gear:focus-visible,.seg button:focus-visible,.side button:focus-visible,.tg:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-size:13px;font-weight:500;border:0;border-right:1px solid var(--line);background:var(--surface);color:var(--ink);padding:0 14px;min-height:44px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--ink);color:var(--surface)}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:10px;border-bottom:1px solid var(--line2);vertical-align:middle}
+.field{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.field label,.field .lbl{color:var(--muted);font-size:12px;font-weight:500}
+.in{font:inherit;font-size:14px;padding:10px 12px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);min-height:44px;box-sizing:border-box;width:100%}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.tile{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;background:var(--surface2)}
+.tile .v{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:18px;font-weight:500}
+.code{background:var(--code-bg);color:var(--code-ink);border-radius:8px;padding:12px 14px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;line-height:1.65;overflow-x:auto}
+.code .c{color:var(--code-c)}
+.note{font-size:13px;color:var(--ink2);padding:10px 12px;border-radius:8px;background:var(--surface2)}
+.note.w{background:var(--warn-soft)}
+.note.x{background:var(--bad-soft)}
+.tg{font:inherit;display:inline-flex;align-items:center;gap:8px;background:transparent;border:0;color:var(--ink);cursor:pointer;padding:0;min-height:44px;font-size:13px}
+.track{width:36px;height:20px;border-radius:999px;position:relative;flex:none}
+.knob{position:absolute;top:2px;width:16px;height:16px;border-radius:50%;background:#FFFFFF}
+.chk{display:inline-flex;align-items:center;gap:8px;font-size:13px;min-height:44px}
+.chk input{width:18px;height:18px;accent-color:var(--accent)}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;counter-reset:st}
+.steps li{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:start;font-size:13px}
+.steps li::before{counter-increment:st;content:counter(st);width:24px;height:24px;border-radius:50%;background:var(--neu-soft);color:var(--ink2);font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.ok{color:var(--ok);font-weight:600}
+.img{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:12px 14px;border:1px solid var(--ink);border-radius:8px;background:var(--surface2)}
+</style>
+</helmet>
+<div class="{{appCls}}">
+  <header class="top">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7FD1A8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5a10 10 0 0 1 14 0"></path><path d="M8 15.5a6 6 0 0 1 8 0"></path><circle cx="12" cy="19" r="1.4" fill="#7FD1A8"></circle></svg>
+      <span>OpenWrt Bench</span>
+    </div>
+    <nav class="nav" aria-label="Screens">
+      <a href="Main.dc.html">Dashboard</a>
+      <a href="WiFi.dc.html">Wi-Fi</a>
+      <a href="RF.dc.html">RF live</a>
+      <a href="Network.dc.html">Network &amp; DHCP</a>
+      <a href="Ports.dc.html">Ports &amp; VLANs</a>
+      <a href="Firewall.dc.html">Firewall</a>
+      <a href="Faults.dc.html">Faults &amp; capture</a>
+      <a href="LTE.dc.html">LTE modem</a>
+      <a class="cur" href="System.dc.html">System</a>
+      <a href="Discovery.dc.html">Discovery</a>
+    </nav>
+    <div class="spacer"></div>
+    <span class="pill" style="background: #1E3A2B; color: #BFE8CF"><span class="dot" style="background: #6CD39B"></span>No harness running · writes allowed</span>
+    <a class="gear" href="Settings.dc.html" aria-label="App settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path></svg>Settings</a>
+    <button class="theme" type="button" aria-pressed="{{darkStr}}" onClick="{{toggleTheme}}">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>
+      {{themeLabel}}
+    </button>
+  </header>
+
+  <div class="wrap">
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 24px">
+      <div>
+        <div class="eyebrow">AP2 · <span class="mono">192.168.1.2</span> · DWR-921 C3</div>
+        <h1 style="margin: 2px 0 0; font-size: 28px; font-weight: 600; letter-spacing: -0.01em">System</h1>
+      </div>
+      <div class="spacer"></div>
+      <span class="b neu mono">OpenWrt 25.12.5 · dm17ryk build</span>
+      <span class="b neu mono">up 6 d 02 h</span>
+    </div>
+
+    <div class="shell">
+      <nav class="side" aria-label="System sections">
+        <sc-for list="{{secs}}" as="x" hint-placeholder-count="8"><button type="button" class="{{x.cls}}" aria-current="{{x.cur}}" onClick="{{x.pick}}">{{x.label}}</button></sc-for>
+      </nav>
+
+      <div class="main">
+        <sc-if value="{{isFw}}" hint-placeholder-val="{{ true }}">
+          <section class="card" aria-labelledby="flh" style="display: flex; flex-direction: column; gap: 14px">
+            <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px">
+              <h2 id="flh" style="margin: 0; font-size: 16px; font-weight: 600">Flash firmware</h2>
+              <span style="font-size: 13px; color: var(--muted)">from an image imported on the Discovery screen; board and hash are checked before anything is sent</span>
+            </div>
+            <div class="img">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M8 7h8M8 11h8M8 15h5"></path></svg>
+              <div style="display: flex; flex-direction: column; gap: 2px; flex: 1 1 340px; min-width: 0">
+                <strong class="mono" style="font-size: 13px; overflow-wrap: anywhere">openwrt-25.12.5-ramips-mt7620-dlink_dwr-921-c3-squashfs-sysupgrade.bin</strong>
+                <span class="mono" style="font-size: 12px; color: var(--muted)">dm17ryk/openwrt v25.12.5 · sha256 d340a53f…</span>
+              </div>
+              <span class="b neu">same as AP2 runs now · reflash</span>
+              <button class="btn" type="button">Import another image…</button>
+            </div>
+            <div style="overflow-x: auto">
+              <table class="tbl">
+                <tbody>
+                  <tr><td>Board</td><td class="mono">dlink,dwr-921-c3 = dlink,dwr-921-c3</td><td><span class="ok">✓ matches</span></td></tr>
+                  <tr><td>Image hash</td><td class="mono">matches the imported profile</td><td><span class="ok">✓ matches</span></td></tr>
+                  <tr><td>Size</td><td class="mono">fits the firmware partition</td><td><span class="ok">✓ fits</span></td></tr>
+                  <tr><td>Router-side test</td><td class="mono">sysupgrade -T, after upload</td><td><span class="b neu">runs in step 2</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 22px">
+              <button class="tg" type="button" role="switch" aria-checked="{{keepStr}}" onClick="{{toggleKeep}}"><span class="track" style="{{keepTrack}}"><span class="knob" style="{{keepKnob}}"></span></span>Keep settings</button>
+              <label class="chk"><input type="checkbox" checked>Copy back the files added after flashing (list from Discovery)</label>
+            </div>
+            <sc-if value="{{keep}}" hint-placeholder-val="{{ true }}">
+              <div class="note">Settings in <span class="mono">/etc/config</span>, the SSH keys and this app's access survive. Files added after flashing outside the kept list are lost; the box above copies them back once AP2 is up.</div>
+            </sc-if>
+            <sc-if value="{{noKeep}}" hint-placeholder-val="{{ false }}">
+              <div class="note x"><strong>AP2 comes back as 192.168.1.1 with no password and no SSH key.</strong> That clashes with AP1 on this LAN, and the app can only get back in with the first-login steps. Flash without settings only with AP2 cabled alone to this PC.</div>
+            </sc-if>
+            <ol class="steps">
+              <li><span><strong>Upload</strong> over scp to <span class="mono">/tmp/fw.bin</span> (dropbear has no sftp)</span></li>
+              <li><span><strong>Test on the router</strong>: <span class="mono">sysupgrade -T</span> must pass, or nothing is flashed</span></li>
+              <li><span><strong>Flash</strong>: AP2 reboots; about 3 minutes without AP2</span></li>
+              <li><span><strong>Reconnect</strong>: {{reconnText}}</span></li>
+              <li><span><strong>Verify</strong>: board, <span class="mono">DISTRIB_REVISION</span> and image hash match the chosen image; Discovery refreshes</span></li>
+            </ol>
+            <div class="code"><sc-for list="{{fwLines}}" as="l" hint-placeholder-count="6"><div class="{{l.cls}}" style="white-space: pre">{{l.t}}</div></sc-for></div>
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px">
+              <button class="btn pri" type="button">Flash AP2</button>
+              <span style="font-size: 13px; color: var(--muted)">Bench Guard blocks this during runs. AP2 is shared with the txctl session: the app reminds you to tell it first.</span>
+            </div>
+          </section>
+
+          <section class="card" aria-labelledby="bkh" style="display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+              <h2 id="bkh" style="margin: 0; font-size: 16px; font-weight: 600">Backup</h2>
+              <span style="font-size: 13px; color: var(--muted)">kept in the app's data folder, per router</span>
+              <div class="spacer"></div>
+              <button class="btn pri" type="button">Back up now</button>
+              <button class="btn" type="button">Restore from file…</button>
+            </div>
+            <div style="overflow-x: auto">
+              <table class="tbl">
+                <thead><tr><th>Backup</th><th>Taken</th><th>Size</th><th></th></tr></thead>
+                <tbody>
+                  <tr><td class="mono">AP2-2026-11-03-1412.tar.gz</td><td>today 14:12 · before key install</td><td class="mono">18 kB</td><td style="white-space: nowrap"><button class="btn" type="button">Restore</button> <button class="btn" type="button">Show files</button></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="code"><div class="c" style="white-space: pre"># back up now</div><div style="white-space: pre">sysupgrade -b /tmp/owg-backup.tar.gz</div><div class="c" style="white-space: pre"># then copied over scp to &lt;data&gt;\backups\AP2\ and removed from /tmp</div></div>
+          </section>
+
+          <section class="card" aria-labelledby="rrh" style="display: flex; flex-direction: column; gap: 12px">
+            <h2 id="rrh" style="margin: 0; font-size: 16px; font-weight: 600">Reset and reboot</h2>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px"><button class="btn" type="button">Reboot AP2</button><button class="btn danger" type="button">Reset to defaults…</button></div>
+            <div class="note w">Reset to defaults (<span class="mono">firstboot</span>) has the same effect as flashing without settings: AP2 returns as 192.168.1.1 with no password and clashes with AP1. The app asks you to isolate AP2 first.</div>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{isStatus}}" hint-placeholder-val="{{ false }}">
+          <section class="card" style="display: flex; flex-direction: column; gap: 14px">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 600">Overview</h2>
+            <div class="tiles">
+              <div class="tile"><span class="eyebrow">Model</span><span class="v">DWR-921 C3</span><span style="font-size: 12px; color: var(--muted)">MediaTek MT7620N</span></div>
+              <div class="tile"><span class="eyebrow">Firmware</span><span class="v">25.12.5</span><span style="font-size: 12px; color: var(--muted)">dm17ryk/openwrt</span></div>
+              <div class="tile"><span class="eyebrow">Load (1, 5, 15 min)</span><span class="v">0.08 0.05 0.01</span><span style="font-size: 12px; color: var(--muted)">1 CPU core</span></div>
+              <div class="tile"><span class="eyebrow">Memory</span><span class="v">31 / 59 MB</span><span style="font-size: 12px; color: var(--muted)">used / total</span></div>
+              <div class="tile"><span class="eyebrow">Storage</span><span class="v">2.1 / 6.4 MB</span><span style="font-size: 12px; color: var(--muted)">overlay used / total</span></div>
+            </div>
+          </section>
+          <figure class="card" style="margin: 0; display: flex; flex-direction: column; gap: 8px">
+            <figcaption style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px"><strong>Bandwidth on br-lan</strong><span style="font-size: 12px; color: var(--muted)">kb/s · last 3 min · realtime</span><div class="spacer"></div>
+              <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink2)"><span style="background: var(--rx); width: 12px; height: 3px; border-radius: 2px; display: inline-block"></span>RX at router</span>
+              <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink2)"><span style="background: var(--tx); width: 12px; height: 3px; border-radius: 2px; display: inline-block"></span>TX from router</span>
+            </figcaption>
+            <svg viewBox="0 0 900 170" style="width: 100%; height: auto" role="img" aria-label="br-lan bandwidth over the last 3 minutes: RX around 40 kb/s, TX around 25 kb/s, with one burst to about 300 kb/s">
+              <sc-for list="{{bwGrid}}" as="g" hint-placeholder-count="4">
+                <line x1="48" x2="860" y1="{{g.y}}" y2="{{g.y}}" stroke="var(--grid)" stroke-width="1"></line>
+                <text x="40" y="{{g.ty}}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono">{{g.label}}</text>
+              </sc-for>
+              <path d="{{rxPath}}" fill="none" stroke="var(--rx)" stroke-width="2" stroke-linejoin="round"></path>
+              <path d="{{txPath}}" fill="none" stroke="var(--tx)" stroke-width="2" stroke-linejoin="round"></path>
+              <text x="48" y="164" font-size="11" fill="var(--muted)">−3 min</text>
+              <text x="860" y="164" text-anchor="end" font-size="11" fill="var(--muted)">now</text>
+            </svg>
+          </figure>
+          <section class="card" style="display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+              <h2 style="margin: 0; font-size: 16px; font-weight: 600">Logs</h2>
+              <div class="seg" role="group" aria-label="Log">
+                <sc-for list="{{logs}}" as="x" hint-placeholder-count="2"><button type="button" class="{{x.cls}}" aria-pressed="{{x.on}}" onClick="{{x.pick}}">{{x.label}}</button></sc-for>
+              </div>
+              <div class="spacer"></div>
+              <input class="in" type="search" placeholder="Filter" aria-label="Filter log" style="max-width: 220px">
+              <button class="btn" type="button">Follow</button>
+            </div>
+            <div class="code"><sc-for list="{{logLines}}" as="l" hint-placeholder-count="5"><div style="white-space: pre">{{l}}</div></sc-for></div>
+          </section>
+          <section class="card" style="display: flex; flex-direction: column; gap: 10px">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 600">Processes</h2>
+            <div style="overflow-x: auto">
+              <table class="tbl">
+                <thead><tr><th>PID</th><th>Command</th><th>CPU</th><th>Memory</th><th></th></tr></thead>
+                <tbody>
+                  <tr><td class="mono">1712</td><td class="mono">/usr/sbin/hostapd -s -g /var/run/hostapd/global</td><td class="mono">0.3 %</td><td class="mono">1.9 MB</td><td><button class="btn" type="button">Stop…</button></td></tr>
+                  <tr><td class="mono">1290</td><td class="mono">/sbin/netifd</td><td class="mono">0.1 %</td><td class="mono">1.6 MB</td><td><button class="btn" type="button" disabled>This app's path</button></td></tr>
+                  <tr><td class="mono">1033</td><td class="mono">/usr/sbin/dropbear -F -P /var/run/dropbear.1.pid -p 22</td><td class="mono">0.0 %</td><td class="mono">0.6 MB</td><td><button class="btn" type="button" disabled>This app's path</button></td></tr>
+                  <tr><td class="mono">2201</td><td class="mono">/usr/sbin/dnsmasq -C /var/etc/dnsmasq.conf.cfg01411c</td><td class="mono">0.0 %</td><td class="mono">1.1 MB</td><td><button class="btn" type="button">Stop…</button></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+          <section class="card" style="display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+              <h2 style="margin: 0; font-size: 16px; font-weight: 600">Diagnostics</h2>
+              <span style="font-size: 13px; color: var(--muted)">run on the router</span>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+              <div class="seg" role="group" aria-label="Diagnostic tool">
+                <sc-for list="{{tools}}" as="x" hint-placeholder-count="3"><button type="button" class="{{x.cls}}" aria-pressed="{{x.on}}" onClick="{{x.pick}}">{{x.label}}</button></sc-for>
+              </div>
+              <input class="in mono" type="text" value="{{diagTarget}}" aria-label="Target" readOnly style="max-width: 240px">
+              <button class="btn pri" type="button">Run</button>
+            </div>
+            <div class="code"><sc-for list="{{diagLines}}" as="l" hint-placeholder-count="4"><div style="white-space: pre">{{l}}</div></sc-for></div>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{isSys}}" hint-placeholder-val="{{ false }}">
+          <section class="card" style="display: flex; flex-direction: column; gap: 14px">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 600">System</h2>
+            <div class="grid">
+              <div class="field"><label for="hn">Hostname</label><input id="hn" class="in mono" type="text" value="AP2" readOnly></div>
+              <div class="field"><label for="tz">Time zone</label><input id="tz" class="in" type="text" value="Asia/Jerusalem" readOnly></div>
+              <div class="field"><span class="lbl">Router time</span><span class="in mono" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--surface2)">2026-11-03 14:31:07<span style="font-size: 12px; color: var(--ok)">PC +0 s</span></span></div>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 0 22px"><label class="chk"><input type="checkbox" checked>Get time from NTP</label><label class="chk"><input type="checkbox">Serve NTP to lan</label><button class="btn" type="button">Set time from this PC</button></div>
+            <div class="field"><label for="ntp">NTP servers</label><input id="ntp" class="in mono" type="text" value="0.openwrt.pool.ntp.org, 1.openwrt.pool.ntp.org" readOnly></div>
+            <div class="eyebrow">Logging</div>
+            <div class="grid">
+              <div class="field"><label for="lb">Log buffer</label><input id="lb" class="in mono" type="text" value="64 kB" readOnly></div>
+              <div class="field"><label for="rs">Remote syslog server</label><input id="rs" class="in mono" type="text" value="" placeholder="none, e.g. 192.168.1.10:514" readOnly></div>
+            </div>
+            <div class="note">Sending AP2's log to this PC is one click once the app runs a syslog listener (planned with the audit log).</div>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{isAccess}}" hint-placeholder-val="{{ false }}">
+          <section class="card" style="display: flex; flex-direction: column; gap: 12px">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 600">SSH keys on AP2</h2>
+            <div style="overflow-x: auto">
+              <table class="tbl">
+                <thead><tr><th>Key</th><th>Fingerprint</th><th>Whose</th><th></th></tr></thead>
+                <tbody>
+                  <tr><td class="mono">ed25519 · openwrtgui@ES-DmitryKo-LT</td><td class="mono">SHA256:[app key]</td><td><span class="b own">this app</span></td><td><button class="btn" type="button" disabled>Rotate in Settings</button></td></tr>
+                  <tr><td class="mono">ed25519 · txctl bench</td><td class="mono">SHA256:[harness key]</td><td><span class="b har">harness</span></td><td><button class="btn" type="button">Remove…</button></td></tr>
+                  <tr><td class="mono">rsa 3072 · dmitry@laptop</td><td class="mono">SHA256:[other key]</td><td><span class="b neu">other</span></td><td><button class="btn" type="button">Remove…</button></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px"><button class="btn" type="button">+ Add key</button></div>
+          </section>
+          <section class="card" style="display: flex; flex-direction: column; gap: 10px">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 600">SSH server (dropbear)</h2>
+            <div class="grid">
+              <div class="field"><label for="sp">Port</label><input id="sp" class="in mono" type="text" value="22" readOnly></div>
+              <div class="field"><label for="si">Listen on</label><input id="si" class="in mono" type="text" value="lan" readOnly></div>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 0 22px">
+              <button class="tg" type="button" role="switch" aria-checked="{{pwStr}}" onClick="{{togglePw}}"><span class="track" style="{{pwTrack}}"><span class="knob" style="{{pwKnob}}"></span></span>Password login</button>
+              <label class="chk"><input type="checkbox" checked>Root may log in</label>
+            </div>
+            <sc-if value="{{pwOff}}" hint-placeholder-val="{{ false }}">
+              <div class="note">Key login only. The app's key was tested a moment ago <span class="ok">✓</span>, so the app keeps access. Without a key, only the serial console gets in.</div>
+            </sc-if>
+          </section>
+          <section class="card" style="display: flex; flex-direction: column; gap: 10px">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 600">Router password and web access</h2>
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px"><span class="b air">root password set</span><button class="btn" type="button">Change…</button><span style="font-size: 13px; color: var(--muted)">typed here, sent once over SSH, never stored or logged</span></div>
+            <div style="display: flex; flex-wrap: wrap; gap: 0 22px"><label class="chk"><input type="checkbox" checked>LuCI web interface on</label><label class="chk"><input type="checkbox">Redirect HTTP to HTTPS</label></div>
+            <div style="font-size: 13px; color: var(--muted)">Package repository keys: 2, read-only list.</div>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{isSvc}}" hint-placeholder-val="{{ false }}">
+          <section class="card" style="display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+              <h2 style="margin: 0; font-size: 16px; font-weight: 600">Services</h2>
+              <span style="font-size: 13px; color: var(--muted)">init scripts in <span class="mono">/etc/init.d</span></span>
+              <div class="spacer"></div>
+              <button class="btn" type="button">Edit rc.local</button>
+            </div>
+            <div style="overflow-x: auto">
+              <table class="tbl">
+                <thead><tr><th>Service</th><th>At boot</th><th>Running</th><th></th></tr></thead>
+                <tbody>
+                  <sc-for list="{{svcs}}" as="v" hint-placeholder-count="8">
+                    <tr>
+                      <td><span class="mono">{{v.name}}</span> <sc-if value="{{v.yours}}" hint-placeholder-val="{{ false }}"><span class="b own">your package</span></sc-if></td>
+                      <td><span class="{{v.bootCls}}">{{v.boot}}</span></td>
+                      <td><span class="{{v.runCls}}">{{v.run}}</span></td>
+                      <td style="white-space: nowrap"><sc-if value="{{v.locked}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: var(--muted)">restart only · this app's path</span> </sc-if><button class="btn" type="button">Restart</button> <sc-if value="{{v.free}}" hint-placeholder-val="{{ true }}"><button class="btn" type="button">{{v.toggle}}</button></sc-if></td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{isCron}}" hint-placeholder-val="{{ false }}">
+          <section class="card" style="display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px"><h2 style="margin: 0; font-size: 16px; font-weight: 600">Scheduled tasks</h2><div class="spacer"></div><button class="btn pri" type="button">+ Task</button></div>
+            <div class="note">No scheduled tasks on AP2. Tasks run as root from <span class="mono">/etc/crontabs/root</span>; saving restarts cron. The app's own timers (rollback, timed faults) are one-shot jobs and show on the Faults screen, not here.</div>
+            <div class="grid">
+              <div class="field"><label>When</label><div class="in mono" style="display: flex; align-items: center; color: var(--muted)">0 4 * * *  (every day 04:00)</div></div>
+              <div class="field"><label>Command</label><div class="in mono" style="display: flex; align-items: center; color: var(--muted)">/sbin/reboot</div></div>
+            </div>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{isLeds}}" hint-placeholder-val="{{ false }}">
+          <section class="card" style="display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px"><h2 style="margin: 0; font-size: 16px; font-weight: 600">LEDs</h2><span style="font-size: 13px; color: var(--muted)">one row per LED in <span class="mono">/sys/class/leds</span> (names below are examples)</span></div>
+            <div style="overflow-x: auto">
+              <table class="tbl">
+                <thead><tr><th>LED</th><th>Trigger</th><th>Details</th><th></th></tr></thead>
+                <tbody>
+                  <tr><td class="mono">green:wlan</td><td class="mono">phy0tpt</td><td>blinks with Wi-Fi traffic</td><td><button class="btn" type="button">Edit</button></td></tr>
+                  <tr><td class="mono">green:internet</td><td class="mono">none</td><td>driven by <span class="mono">dwr921-internet-led</span> (your package)</td><td><button class="btn" type="button" disabled>Owned by service</button></td></tr>
+                  <tr><td class="mono">green:lan</td><td class="mono">netdev · eth0.1</td><td>link, TX, RX</td><td><button class="btn" type="button">Edit</button></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{isMounts}}" hint-placeholder-val="{{ false }}">
+          <section class="card" style="display: flex; flex-direction: column; gap: 10px">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 600">Mount points</h2>
+            <div style="overflow-x: auto">
+              <table class="tbl">
+                <thead><tr><th>Mounted at</th><th>Device</th><th>Type</th><th>Used</th></tr></thead>
+                <tbody>
+                  <tr><td class="mono">/</td><td class="mono">overlayfs:/overlay</td><td class="mono">overlay</td><td class="mono">2.1 / 6.4 MB</td></tr>
+                  <tr><td class="mono">/rom</td><td class="mono">/dev/root</td><td class="mono">squashfs</td><td class="mono">read-only image</td></tr>
+                  <tr><td class="mono">/overlay</td><td class="mono">/dev/mtdblock6</td><td class="mono">jffs2</td><td class="mono">2.1 / 6.4 MB</td></tr>
+                  <tr><td class="mono">/tmp</td><td class="mono">tmpfs</td><td class="mono">tmpfs</td><td class="mono">1.2 / 29.5 MB</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="note">No USB storage or extroot on AP2. <span class="mono">/overlay</span> is what the Discovery screen compares with the image.</div>
+          </section>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Look"},"$preview":{"width":1440,"height":1720}}'>
+class Component extends DCLogic {
+  state = { dark: null, sec: 'fw', keep: true, log: 'sys', tool: 'ping', pw: true };
+
+  renderVals() {
+    const s = this.state;
+    const dark = s.dark === null ? (this.props.theme ?? 'light') === 'dark' : s.dark;
+    const SECS = [['status', 'Status'], ['sys', 'System and time'], ['access', 'Access and SSH keys'], ['svc', 'Services'], ['cron', 'Scheduled tasks'], ['leds', 'LEDs'], ['mounts', 'Mount points'], ['fw', 'Backup and firmware']];
+    const sw = on => ({ track: 'background: ' + (on ? '#3FA36F' : '#8A9199'), knob: 'left: ' + (on ? '18px' : '2px') });
+
+    const fw = [];
+    const fadd = (t, c) => fw.push({ t: t, cls: c ? 'c' : '' });
+    fadd('# 1 upload', true);
+    fadd('scp -O openwrt-25.12.5-…-sysupgrade.bin root@192.168.1.2:/tmp/fw.bin');
+    fadd('# 2 test on the router', true);
+    fadd('sysupgrade -T /tmp/fw.bin && sha256sum /tmp/fw.bin   # d340a53f…');
+    fadd('# 3 flash' + (s.keep ? ', keeping settings' : ', settings erased'), true);
+    fadd(s.keep ? 'sysupgrade -v /tmp/fw.bin' : 'sysupgrade -n -v /tmp/fw.bin');
+    fadd('# 4-5 reconnect, then verify', true);
+    fadd('cat /etc/openwrt_release; ubus call system board');
+
+    const N = 90;
+    const rx = [], tx = [];
+    for (let i = 0; i < N; i++) {
+      let r = 40 + 8 * Math.sin(i * 0.5) + 5 * Math.sin(i * 1.3);
+      let t = 25 + 5 * Math.sin(i * 0.4 + 1) + 3 * Math.sin(i * 1.7);
+      if (i >= 52 && i <= 58) { r += 260 * Math.sin((i - 52) / 6 * Math.PI); t += 120 * Math.sin((i - 52) / 6 * Math.PI); }
+      rx.push(r); tx.push(t);
+    }
+    const bx = i => 48 + i * (812 / (N - 1));
+    const by = v => 10 + ((320 - v) / 320) * 136;
+    const toPath = a => a.map((v, i) => (i ? 'L' : 'M') + bx(i).toFixed(1) + ' ' + by(v).toFixed(1)).join(' ');
+
+    const LOGS = {
+      sys: ['Tue Nov  3 14:30:58 2026 daemon.info dnsmasq[2201]: read /etc/hosts - 4 names','Tue Nov  3 14:29:12 2026 authpriv.info dropbear[4410]: Pubkey auth succeeded for \'root\' with ssh-ed25519 key SHA256:[app key]', 'Tue Nov  3 14:12:40 2026 user.notice owg: backup taken by OpenWrtGUI', 'Tue Nov  3 09:02:11 2026 daemon.notice netifd: Interface \'lte\' is now up'],
+      kern: ['[527311.402] usb 1-1: USB disconnect, device number 3', '[527314.880] usb 1-1: new high-speed USB device number 4 using ehci-platform', '[527315.120] qmi_wwan 1-1:1.4 wwan0: register \'qmi_wwan\'', '[527315.131] option 1-1:1.2: GSM modem (1-port) converter detected']
+    };
+    const DIAG = {
+      ping: { target: '8.8.8.8', out: ['PING 8.8.8.8 (8.8.8.8): 56 data bytes', '64 bytes from 8.8.8.8: seq=0 ttl=115 time=38.412 ms', '64 bytes from 8.8.8.8: seq=1 ttl=115 time=36.907 ms', '--- 8.8.8.8 ping statistics --- 2 packets, 0% loss'] },
+      traceroute: { target: 'openwrt.org', out: ['traceroute to openwrt.org, 30 hops max', ' 1  10.153.22.70  21.4 ms', ' 2  * * *', ' 3  (more hops as they answer)'] },
+      nslookup: { target: 'openwrt.org', out: ['Server:  127.0.0.1', 'Name:    openwrt.org', 'Address: [answer from the router\'s resolver]'] }
+    };
+    const SVCS = [
+      ['dnsmasq', 1, 1], ['dropbear', 1, 1, 'lock'], ['firewall', 1, 1, 'lock'], ['network', 1, 1, 'lock'],
+      ['odhcpd', 1, 1], ['uhttpd', 1, 1], ['sysntpd', 1, 1], ['cron', 0, 0], ['dwr921-internet-led', 1, 1, 'yours']
+    ].map(v => ({
+      name: v[0], boot: v[1] ? 'enabled' : 'disabled', bootCls: 'b ' + (v[1] ? 'air' : 'neu'),
+      run: v[2] ? 'running' : 'stopped', runCls: 'b ' + (v[2] ? 'air' : 'neu'),
+      locked: v[3] === 'lock', free: v[3] !== 'lock', yours: v[3] === 'yours', toggle: v[1] ? 'Disable' : 'Enable'
+    }));
+    const kp = sw(s.keep), pp = sw(s.pw);
+
+    return {
+      appCls: dark ? 'app dark' : 'app', darkStr: dark ? 'true' : 'false', themeLabel: dark ? 'Dark' : 'Light',
+      toggleTheme: () => this.setState({ dark: !dark }),
+      secs: SECS.map(x => ({ label: x[1], cls: s.sec === x[0] ? 'on' : '', cur: s.sec === x[0] ? 'page' : 'false', pick: () => this.setState({ sec: x[0] }) })),
+      isFw: s.sec === 'fw', isStatus: s.sec === 'status', isSys: s.sec === 'sys', isAccess: s.sec === 'access', isSvc: s.sec === 'svc', isCron: s.sec === 'cron', isLeds: s.sec === 'leds', isMounts: s.sec === 'mounts',
+      keep: s.keep, noKeep: !s.keep, keepStr: s.keep ? 'true' : 'false', keepTrack: kp.track, keepKnob: kp.knob,
+      toggleKeep: () => this.setState({ keep: !s.keep }),
+      reconnText: s.keep ? 'same address and host key; the app logs in with its key as before' : 'the host key changes as expected; the app accepts it only after the board and revision check, then you redo the first login',
+      fwLines: fw,
+      bwGrid: [300, 200, 100, 0].map(v => ({ y: by(v).toFixed(1), ty: (by(v) + 4).toFixed(1), label: String(v) })),
+      rxPath: toPath(rx), txPath: toPath(tx),
+      logs: [['sys', 'System log'], ['kern', 'Kernel log']].map(x => ({ label: x[1], cls: s.log === x[0] ? 'on' : '', on: s.log === x[0] ? 'true' : 'false', pick: () => this.setState({ log: x[0] }) })),
+      logLines: LOGS[s.log],
+      tools: Object.keys(DIAG).map(k => ({ label: k, cls: s.tool === k ? 'on' : '', on: s.tool === k ? 'true' : 'false', pick: () => this.setState({ tool: k }) })),
+      diagTarget: DIAG[s.tool].target, diagLines: DIAG[s.tool].out,
+      svcs: SVCS,
+      pwStr: s.pw ? 'true' : 'false', pwTrack: pp.track, pwKnob: pp.knob, pwOff: !s.pw, togglePw: () => this.setState({ pw: !s.pw })
+    };
+  }
+}
+</script>
+</body>
+</html>

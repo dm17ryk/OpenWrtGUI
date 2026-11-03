@@ -153,7 +153,7 @@ docs/            manual/ (user manual, synced to the wiki) · design/ · superpo
 
 ## 7. Screens
 
-Mockups for screens 1–9 are on the canvas. Screens 10–13 are specified here and will be drawn next. Every screen works in light and dark.
+Mockups for screens 1–12 are on the canvas (`docs/design/canvas/project/`). Screen 13 (terminal and audit log) is specified here only. Every screen works in light and dark.
 
 ### 7.1 Dashboard (1)
 - Shows: routers with state; the 2.4 / 5 / 6 GHz air map (on air vs parked/staged); per-router cards (radio, RF summary, stations, network, faults, login type, ownership tags); "Needs attention" (drift with known-writer attribution, password-only login, files added after flashing).
@@ -210,8 +210,6 @@ Mockups for screens 1–9 are on the canvas. Screens 10–13 are specified here 
 
 ### 7.6 Firewall (4)
 
-The canvas mockup predates D11 and D12; it is redrawn with the next set of screens.
-
 - **Filtering model per zone and direction** (D11):
   - **Allow all, block by rules**: zone policy ACCEPT, user rules drop/reject.
   - **Block all, allow by rules**: zone policy REJECT/DROP, user rules accept.
@@ -245,7 +243,7 @@ The canvas mockup predates D11 and D12; it is redrawn with the next set of scree
 ### 7.9 Add router (7)
 The wizard described in section 5.
 
-### 7.10 LTE modem (new; LuCI `luci-proto-qmi` parity plus what the D-Link UI had)
+### 7.10 LTE modem (10; LuCI `luci-proto-qmi` parity plus what the D-Link UI had)
 - **Status**:
   - registration, radio type, roaming, operator
   - RSSI / RSRP / RSRQ / SNR, each with a quality label and history chart
@@ -261,7 +259,7 @@ The wizard described in section 5.
   - AT console with history
 - **Phase 2**: SIM PIN management, SMS, USSD (the D-Link UI had these).
 
-### 7.11 System (new; LuCI System and Status parity)
+### 7.11 System (11; LuCI System and Status parity)
 - System: hostname, time zone, NTP client/server, log buffer, remote syslog.
 - Access: root password; SSH (port, interface, password auth, root login); SSH keys (each labelled: app, harness, other); HTTP(S) (LuCI on/off, redirect to HTTPS).
 - Services: init scripts (enabled, running, start/stop/restart/enable/disable), `rc.local`.
@@ -269,11 +267,11 @@ The wizard described in section 5.
 - **Backup and firmware**:
   - backup download (`sysupgrade -b`), restore
   - reset to defaults (`firstboot`), with a warning that the LAN address returns to 192.168.1.1 and would clash with AP1
-  - **Flash firmware from an imported image**: board and hash checked, keep-settings option, upload over scp, reconnect, verify the new revision. The expected host-key change is handled.
+  - **Flash firmware from an imported image**: board and hash checked, keep-settings option, upload over scp, `sysupgrade -T` on the router, flash, reconnect, verify the new revision. Files added after flashing can be copied back afterwards (list from Discovery). Without keep settings the router returns like `firstboot` (192.168.1.1, no password, no key), so the app asks for the router to be isolated first; the expected host-key change is accepted only after the board and revision check.
   - reboot
 - Status: overview, routes, system log, kernel log, processes, realtime load/bandwidth/connections, diagnostics (ping, traceroute, nslookup run on the router).
 
-### 7.12 App settings and updates (new)
+### 7.12 App settings and updates (12)
 - Updates (section 9), theme (System / Light / Dark), data folder, known devices (name ↔ MACs: the panel's ETH and Wi-Fi MACs are unrelated).
 - Bench Guard watch list, known-writer signatures.
 - App SSH key: fingerprint, export public key, rotate (re-deploys to every router, then removes the old key).

@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Router LTE modem</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.app{--bg:#F2F3EF;--surface:#FFFFFF;--surface2:#F6F7F4;--ink:#15181C;--ink2:#3E454C;--muted:#575F67;--line:#D8DBD4;--line2:#E8EAE5;--accent:#1F5FCC;--accent-ink:#FFFFFF;--accent-soft:#EEF3FC;--ok:#16784A;--ok-soft:#E3F2EA;--warn:#9A5A00;--warn-soft:#FBEFD9;--bad:#B3361A;--bad-soft:#FBE7E1;--neu-soft:#ECEEEA;--top:#15181C;--top-ink:#F2F3EF;--code-bg:#15181C;--code-ink:#E6E8EA;--code-c:#93A8BA;--link:#1F5FCC;--series:#2a78d6;--grid:#E1E0D9;--tip:#15181C;--tip-ink:#FFFFFF}
+.app.dark{--bg:#111316;--surface:#1A1D21;--surface2:#20242A;--ink:#ECEEEF;--ink2:#C5CAD0;--muted:#9AA3AC;--line:#2F343B;--line2:#262A30;--accent:#5B92F0;--accent-ink:#0B0D10;--accent-soft:#1D2A40;--ok:#5CC98F;--ok-soft:#17301F;--warn:#E2A54A;--warn-soft:#33260F;--bad:#F08A6C;--bad-soft:#3A1E16;--neu-soft:#262A30;--top:#0B0D10;--top-ink:#ECEEEF;--code-bg:#0B0D10;--code-ink:#E6E8EA;--code-c:#8FA3B5;--link:#8DB4F5;--series:#3987e5;--grid:#2C2C2A;--tip:#ECEEEF;--tip-ink:#111316}
+.app{font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--ink);background:var(--bg);font-size:14px;line-height:1.45;min-height:100vh}
+.app a{color:var(--link)}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;padding:10px 24px;background:var(--top);color:var(--top-ink)}
+.brand{font-weight:600;font-size:15px;display:flex;align-items:center;gap:10px}
+.nav{display:flex;flex-wrap:wrap;gap:2px}
+.nav a{color:#C3C8CE;text-decoration:none;padding:10px 12px;border-radius:6px;font-size:13px}
+.nav a:hover{color:#FFFFFF;background:#262A30}
+.nav a.cur{color:#FFFFFF;background:#2E343B}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;padding:6px 12px;border-radius:999px}
+.theme,.gear{font:inherit;display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#E6E8EA;background:#2E343B;border:0;border-radius:999px;padding:0 14px;min-height:40px;cursor:pointer;text-decoration:none}
+.app .gear{color:#E6E8EA}
+.wrap{max-width:1440px;margin:0 auto;padding:24px;box-sizing:border-box;display:flex;flex-direction:column;gap:20px}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+.b{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.air{background:var(--ok-soft);color:var(--ok)}.neu{background:var(--neu-soft);color:var(--ink2)}.warnb{background:var(--warn-soft);color:var(--warn)}.badb{background:var(--bad-soft);color:var(--bad)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.btn{font:inherit;font-size:13px;font-weight:500;padding:10px 14px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;min-height:44px;box-sizing:border-box;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{background:var(--surface2)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{border-color:var(--bad);color:var(--bad)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn:focus-visible,.nav a:focus-visible,.theme:focus-visible,.gear:focus-visible,.seg button:focus-visible,.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-size:13px;font-weight:500;border:0;border-right:1px solid var(--line);background:var(--surface);color:var(--ink);padding:0 14px;min-height:44px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--ink);color:var(--surface)}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:20px;align-items:start}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.tile{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;background:var(--surface2)}
+.tile .v{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:24px;font-weight:500;letter-spacing:-0.01em}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:8px 18px;margin:0;font-size:13px}
+.kv dt{color:var(--muted)}.kv dd{margin:0}
+.field{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.field label,.field .lbl{color:var(--muted);font-size:12px;font-weight:500}
+.in{font:inherit;font-size:14px;padding:10px 12px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);min-height:44px;box-sizing:border-box;width:100%}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.code{background:var(--code-bg);color:var(--code-ink);border-radius:8px;padding:12px 14px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;line-height:1.65;overflow-x:auto}
+.code .c{color:var(--code-c)}
+.code .u{color:#7FD1A8}
+.note{font-size:13px;color:var(--ink2);padding:10px 12px;border-radius:8px;background:var(--surface2)}
+.note.w{background:var(--warn-soft)}
+.note.x{background:var(--bad-soft)}
+.chk{display:inline-flex;align-items:center;gap:8px;font-size:13px;min-height:44px}
+.chk input{width:18px;height:18px;accent-color:var(--accent)}
+.chip{font:inherit;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;padding:0 12px;min-height:36px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.chip:hover{background:var(--surface2)}
+.later{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:6px 12px;border-radius:999px;border:1px dashed var(--line);color:var(--muted)}
+</style>
+</helmet>
+<div class="{{appCls}}">
+  <header class="top">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7FD1A8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5a10 10 0 0 1 14 0"></path><path d="M8 15.5a6 6 0 0 1 8 0"></path><circle cx="12" cy="19" r="1.4" fill="#7FD1A8"></circle></svg>
+      <span>OpenWrt Bench</span>
+    </div>
+    <nav class="nav" aria-label="Screens">
+      <a href="Main.dc.html">Dashboard</a>
+      <a href="WiFi.dc.html">Wi-Fi</a>
+      <a href="RF.dc.html">RF live</a>
+      <a href="Network.dc.html">Network &amp; DHCP</a>
+      <a href="Ports.dc.html">Ports &amp; VLANs</a>
+      <a href="Firewall.dc.html">Firewall</a>
+      <a href="Faults.dc.html">Faults &amp; capture</a>
+      <a class="cur" href="LTE.dc.html">LTE modem</a>
+      <a href="System.dc.html">System</a>
+      <a href="Discovery.dc.html">Discovery</a>
+    </nav>
+    <div class="spacer"></div>
+    <span class="pill" style="background: #1E3A2B; color: #BFE8CF"><span class="dot" style="background: #6CD39B"></span>No harness running · writes allowed</span>
+    <a class="gear" href="Settings.dc.html" aria-label="App settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path></svg>Settings</a>
+    <button class="theme" type="button" aria-pressed="{{darkStr}}" onClick="{{toggleTheme}}">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>
+      {{themeLabel}}
+    </button>
+  </header>
+
+  <div class="wrap">
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 24px">
+      <div>
+        <div class="eyebrow">AP2 · <span class="mono">192.168.1.2</span> · DWR-921 C3</div>
+        <h1 style="margin: 2px 0 0; font-size: 28px; font-weight: 600; letter-spacing: -0.01em">LTE modem</h1>
+      </div>
+      <div class="spacer"></div>
+      <span class="b neu">BroadMobi BM806C</span>
+      <span class="b neu mono">QMI · /dev/cdc-wdm0</span>
+      <span class="b neu mono">AT · /dev/ttyUSB2</span>
+    </div>
+
+    <section class="card" aria-labelledby="sth" style="display: flex; flex-direction: column; gap: 16px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px">
+        <h2 id="sth" style="margin: 0; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 10px"><span class="dot" style="{{connDot}}"></span>{{connLabel}}</h2>
+        <span style="color: var(--ink2)">{{connSub}}</span>
+        <div class="spacer"></div>
+        <span class="mono" style="font-size: 13px; color: var(--muted)">{{connUp}}</span>
+      </div>
+      <div class="tiles">
+        <sc-for list="{{tiles}}" as="t" hint-placeholder-count="4">
+          <div class="tile">
+            <span class="eyebrow">{{t.name}}</span>
+            <span class="v">{{t.val}}</span>
+            <span style="display: flex; align-items: center; gap: 8px"><span class="{{t.qCls}}">{{t.q}}</span><span style="font-size: 12px; color: var(--muted)">{{t.what}}</span></span>
+          </div>
+        </sc-for>
+      </div>
+      <dl class="kv">
+        <dt>IPv4 from the carrier</dt><dd class="mono">10.153.22.71 · DNS 192.115.106.10, 192.115.106.11</dd>
+        <dt>Data this session</dt><dd class="mono">↓ 1.84 GB · ↑ 212 MB</dd>
+        <dt>Cell</dt><dd class="mono">band 3 · EARFCN 1849 · cell ID 0x1A2F03</dd>
+      </dl>
+    </section>
+
+    <figure class="card" style="margin: 0; display: flex; flex-direction: column; gap: 10px">
+      <figcaption style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+        <strong>{{chartTitle}}</strong>
+        <span style="font-size: 12px; color: var(--muted)">{{chartUnit}} · last hour · dashed lines mark the quality bands</span>
+        <div class="spacer"></div>
+        <div class="seg" role="group" aria-label="Signal metric">
+          <sc-for list="{{metrics}}" as="x" hint-placeholder-count="4"><button type="button" class="{{x.cls}}" aria-pressed="{{x.on}}" onClick="{{x.pick}}">{{x.label}}</button></sc-for>
+        </div>
+      </figcaption>
+      <svg viewBox="0 0 1340 230" style="width: 100%; height: auto" role="img" aria-label="{{chartAria}}">
+        <sc-for list="{{grid}}" as="g" hint-placeholder-count="4">
+          <line x1="56" x2="1250" y1="{{g.y}}" y2="{{g.y}}" stroke="var(--grid)" stroke-width="1" stroke-dasharray="{{g.dash}}"></line>
+          <text x="48" y="{{g.ty}}" text-anchor="end" font-size="11" fill="var(--muted)" font-family="IBM Plex Mono">{{g.label}}</text>
+          <text x="1258" y="{{g.ty}}" font-size="11" fill="var(--muted)">{{g.band}}</text>
+        </sc-for>
+        <text x="56" y="222" font-size="11" fill="var(--muted)">−60 min</text>
+        <text x="1250" y="222" text-anchor="end" font-size="11" fill="var(--muted)">now</text>
+        <path d="{{path}}" fill="none" stroke="var(--series)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"></path>
+        <line x1="{{hx}}" x2="{{hx}}" y1="12" y2="200" stroke="var(--muted)" stroke-width="1" stroke-dasharray="3 3"></line>
+        <circle cx="{{hx}}" cy="{{hy}}" r="5" fill="var(--series)" stroke="var(--surface)" stroke-width="2"></circle>
+        <rect x="{{tipX}}" y="16" width="150" height="40" rx="6" fill="var(--tip)"></rect>
+        <text x="{{tipTx}}" y="32" font-size="11" fill="var(--tip-ink)">−23 min</text>
+        <text x="{{tipTx}}" y="48" font-size="13" font-weight="600" fill="var(--tip-ink)" font-family="IBM Plex Mono">{{tipVal}}</text>
+      </svg>
+    </figure>
+
+    <div class="cols">
+      <section class="card" aria-labelledby="seh" style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px">
+          <h2 id="seh" style="margin: 0; font-size: 16px; font-weight: 600">Connection settings</h2>
+          <span class="mono" style="font-size: 12px; color: var(--muted)">network.lte · proto qmi</span>
+        </div>
+        <div class="grid">
+          <div class="field"><label for="apn">APN</label><input id="apn" class="in mono" type="text" value="uinternet" readOnly></div>
+          <div class="field"><label for="pin">SIM PIN</label><input id="pin" class="in mono" type="text" value="" placeholder="not required by this SIM" readOnly></div>
+        </div>
+        <div class="field"><span class="lbl">Authentication</span>
+          <div class="seg" role="group" aria-label="Authentication">
+            <sc-for list="{{auths}}" as="a" hint-placeholder-count="4"><button type="button" class="{{a.cls}}" aria-pressed="{{a.on}}" onClick="{{a.pick}}">{{a.label}}</button></sc-for>
+          </div>
+        </div>
+        <sc-if value="{{needCreds}}" hint-placeholder-val="{{ false }}">
+          <div class="grid">
+            <div class="field"><label for="un">User name</label><input id="un" class="in mono" type="text" value="" placeholder="from the operator" readOnly></div>
+            <div class="field"><label for="pw">Password</label><input id="pw" class="in mono" type="password" value="" placeholder="masked in previews and logs" readOnly></div>
+          </div>
+        </sc-if>
+        <div class="field"><span class="lbl">IP type</span>
+          <div class="seg" role="group" aria-label="IP type">
+            <sc-for list="{{pdps}}" as="p" hint-placeholder-count="3"><button type="button" class="{{p.cls}}" aria-pressed="{{p.on}}" onClick="{{p.pick}}">{{p.label}}</button></sc-for>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="field"><label for="mtu">MTU</label><input id="mtu" class="in mono" type="text" value="" placeholder="from the network" readOnly></div>
+          <div class="field"><label for="met">Route metric</label><input id="met" class="in mono" type="text" value="20" readOnly></div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 0 22px">
+          <label class="chk"><input type="checkbox" checked>Connect at start-up</label>
+          <label class="chk"><input type="checkbox" checked>Default route through LTE</label>
+        </div>
+        <div class="note"><strong class="mono">lte_4</strong> (IPv4 on <span class="mono">wwan0</span>) stays a DHCP client and cannot be changed here: the modem itself hands the address out on that link, so a static address there cuts the data path.</div>
+        <div class="code"><sc-for list="{{setLines}}" as="l" hint-placeholder-count="5"><div class="{{l.cls}}" style="white-space: pre">{{l.t}}</div></sc-for></div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px"><button class="btn pri" type="button">Apply and reconnect</button><button class="btn" type="button">Discard</button></div>
+      </section>
+
+      <div style="display: flex; flex-direction: column; gap: 20px">
+        <section class="card" aria-labelledby="moh" style="display: flex; flex-direction: column; gap: 12px">
+          <h2 id="moh" style="margin: 0; font-size: 16px; font-weight: 600">Modem</h2>
+          <dl class="kv">
+            <dt>Manufacturer</dt><dd>BroadMobi</dd>
+            <dt>Model</dt><dd>BM806C · USB <span class="mono">2020:2033</span></dd>
+            <dt>Firmware</dt><dd class="mono">M1.2.0_E1.0.3_A1.1.8</dd>
+            <dt>IMEI</dt><dd style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px"><span class="mono">{{imei}}</span><button class="btn" type="button" onClick="{{toggleImei}}" style="min-height: 36px; padding: 6px 12px">{{imeiBtn}}</button></dd>
+            <dt>SIM</dt><dd>ready · ICCID hidden like the IMEI</dd>
+            <dt>Network mode order</dt><dd><span class="mono">AT+BMMODODR = 17</span> <span class="b warnb">name not mapped yet</span></dd>
+          </dl>
+        </section>
+
+        <section class="card" aria-labelledby="ach" style="display: flex; flex-direction: column; gap: 12px">
+          <h2 id="ach" style="margin: 0; font-size: 16px; font-weight: 600">Actions</h2>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <sc-for list="{{acts}}" as="a" hint-placeholder-count="3"><button class="{{a.cls}}" type="button" aria-pressed="{{a.on}}" onClick="{{a.pick}}">{{a.label}}</button></sc-for>
+            <button class="btn danger" type="button" disabled>Reset modem to defaults</button>
+          </div>
+          <sc-if value="{{actOpen}}" hint-placeholder-val="{{ false }}">
+            <div style="border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+              <div style="font-size: 13px; color: var(--ink2)">{{actNote}}</div>
+              <div class="code"><sc-for list="{{actLines}}" as="l" hint-placeholder-count="2"><div class="{{l.cls}}" style="white-space: pre">{{l.t}}</div></sc-for></div>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px"><button class="btn pri" type="button" onClick="{{actDo}}">{{actGo}}</button><button class="btn" type="button" onClick="{{actClose}}">Cancel</button></div>
+            </div>
+          </sc-if>
+          <div class="note x"><strong>Reset to defaults is not available yet.</strong> D-Link's own firmware resets its other modem with <span class="mono">AT%SYSCMD=…</span>, and this BM806C answers that command with ERROR. The working command is still to be found (open item O1); the button turns on once it is known and tested on AP2.</div>
+        </section>
+      </div>
+    </div>
+
+    <section class="card" aria-labelledby="ath" style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+        <h2 id="ath" style="margin: 0; font-size: 16px; font-weight: 600">AT console</h2>
+        <div class="seg" role="group" aria-label="AT port">
+          <sc-for list="{{ports}}" as="p" hint-placeholder-count="2"><button type="button" class="{{p.cls}}" aria-pressed="{{p.on}}" onClick="{{p.pick}}">{{p.label}}</button></sc-for>
+        </div>
+        <span style="font-size: 13px; color: var(--muted)">queries (<span class="mono">?</span> and <span class="mono">=?</span>) run at once · anything else asks first and goes to the audit log · during a harness run only queries</span>
+      </div>
+      <div class="code" style="min-height: 150px"><sc-for list="{{atLines}}" as="l" hint-placeholder-count="6"><div class="{{l.cls}}" style="white-space: pre">{{l.t}}</div></sc-for></div>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+        <sc-for list="{{chips}}" as="c" hint-placeholder-count="5"><button class="chip" type="button" onClick="{{c.send}}">{{c.label}}</button></sc-for>
+        <div class="spacer"></div>
+        <button class="btn" type="button" onClick="{{clearAt}}">Clear</button>
+      </div>
+    </section>
+
+    <section class="card" style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px">
+      <strong>Later (phase 2)</strong>
+      <span class="later">SIM PIN: change, enable, unlock with PUK</span>
+      <span class="later">SMS: inbox, send</span>
+      <span class="later">USSD: balance and codes</span>
+      <span style="font-size: 13px; color: var(--muted)">the D-Link web UI had these</span>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Look"},"$preview":{"width":1440,"height":1900}}'>
+class Component extends DCLogic {
+  state = { dark: null, metric: 'rsrp', auth: 'none', pdp: 'ip', imei: false, act: null, port: 'ttyUSB2', at: null, connected: true };
+
+  renderVals() {
+    const s = this.state;
+    const dark = s.dark === null ? (this.props.theme ?? 'light') === 'dark' : s.dark;
+
+    const Q = { exc: ['Excellent', 'b air'], good: ['Good', 'b air'], fair: ['Fair', 'b warnb'], poor: ['Poor', 'b badb'] };
+    const M = {
+      rsrp: { name: 'RSRP', unit: 'dBm', now: -95, base: -94, amp: 4, dip: 9, lo: -120, hi: -70, cuts: [[-80, 'excellent'], [-90, 'good'], [-100, 'fair']], q: 'fair', what: 'reference signal power' },
+      rsrq: { name: 'RSRQ', unit: 'dB', now: -11, base: -11, amp: 1.5, dip: 4, lo: -22, hi: -4, cuts: [[-10, 'excellent'], [-15, 'good'], [-20, 'fair']], q: 'good', what: 'signal quality' },
+      snr: { name: 'SNR', unit: 'dB', now: 9, base: 10, amp: 2.5, dip: 6, lo: -5, hi: 25, cuts: [[20, 'excellent'], [13, 'good'], [0, 'fair']], q: 'fair', what: 'signal to noise' },
+      rssi: { name: 'RSSI', unit: 'dBm', now: -67, base: -66, amp: 3, dip: 8, lo: -100, hi: -50, cuts: [[-65, 'excellent'], [-75, 'good'], [-85, 'fair']], q: 'good', what: 'total received power' }
+    };
+    const tiles = ['rssi', 'rsrp', 'rsrq', 'snr'].map(k => ({ name: M[k].name, val: M[k].now + ' ' + M[k].unit, q: Q[M[k].q][0], qCls: Q[M[k].q][1], what: M[k].what }));
+
+    const cur = M[s.metric];
+    const N = 120, HI = 73;
+    const raw = [];
+    for (let i = 0; i < N; i++) {
+      let v = cur.base + cur.amp * 0.6 * Math.sin(i * 0.31) + cur.amp * 0.4 * Math.sin(i * 1.7 + 0.5);
+      if (i >= 67 && i <= 79) v -= cur.dip * Math.sin((i - 67) / 12 * Math.PI);
+      raw.push(v);
+    }
+    const shift = cur.now - raw[N - 1];
+    const pts = raw.map(v => v + shift);
+    const sx = i => 56 + i * (1194 / (N - 1));
+    const sy = v => 12 + ((cur.hi - v) / (cur.hi - cur.lo)) * 188;
+    const path = pts.map((v, i) => (i ? 'L' : 'M') + sx(i).toFixed(1) + ' ' + sy(v).toFixed(1)).join(' ');
+    const hx = sx(HI);
+    const grid = cur.cuts.map(c => ({ y: sy(c[0]).toFixed(1), ty: (sy(c[0]) + 4).toFixed(1), label: String(c[0]), band: c[1] + ' ↑', dash: '4 4' }));
+    const metrics = ['rsrp', 'rsrq', 'snr', 'rssi'].map(k => ({ label: M[k].name, cls: s.metric === k ? 'on' : '', on: s.metric === k ? 'true' : 'false', pick: () => this.setState({ metric: k }) }));
+
+    const AUTH = [['none', 'None'], ['pap', 'PAP'], ['chap', 'CHAP'], ['both', 'PAP or CHAP']];
+    const PDP = [['ip', 'IPv4'], ['ipv6', 'IPv6'], ['ipv4v6', 'IPv4 + IPv6']];
+    const seg = (list, key) => list.map(x => ({ label: x[1], cls: s[key] === x[0] ? 'on' : '', on: s[key] === x[0] ? 'true' : 'false', pick: () => this.setState({ [key]: x[0] }) }));
+    const setLines = [];
+    const sadd = (t, c) => setLines.push({ t: t, cls: c ? 'c' : '' });
+    sadd("uci set network.lte.apn='uinternet'");
+    sadd("uci set network.lte.auth='" + s.auth + "'");
+    if (s.auth !== 'none') { sadd("uci set network.lte.username='…'"); sadd("uci set network.lte.password='••••••'   # masked here and in the audit log"); }
+    sadd("uci set network.lte.pdptype='" + s.pdp + "'");
+    sadd('uci commit network');
+    sadd('ifup lte   # reconnects: LTE data drops for a few seconds', false);
+    sadd('# verify: lte up, lte_4 has an address, default route via wwan0', true);
+
+    const ACTS = {
+      conn: {
+        label: s.connected ? 'Disconnect' : 'Connect', go: s.connected ? 'Disconnect' : 'Connect',
+        note: s.connected ? 'Data over LTE stops until you connect again. AP2 stays reachable over lan.' : 'netifd starts the QMI data session, then lte_4 asks the modem for an address.',
+        lines: s.connected ? [['ifdown lte', 0]] : [['ifup lte', 0], ['# verify: lte up within 30 s', 1]]
+      },
+      reboot: {
+        label: 'Reboot modem', go: 'Reboot modem',
+        note: 'The modem restarts. LTE drops for about a minute and reconnects by itself; settings stay. Which method works on this BM806C is still to be confirmed on AP2.',
+        lines: [['uqmi -d /dev/cdc-wdm0 --set-device-operating-mode reset', 0], ['# if QMI does not answer: AT+CFUN=1,1 on /dev/ttyUSB2', 1], ['# verify: modem back on USB, lte up again', 1]]
+      }
+    };
+    const acts = ['conn', 'reboot'].map(k => ({ label: ACTS[k].label, cls: s.act === k ? 'btn pri' : 'btn', on: s.act === k ? 'true' : 'false', pick: () => this.setState({ act: s.act === k ? null : k }) }));
+    const A = ACTS[s.act];
+
+    const RESP = {
+      'ATI': ['BroadMobi', 'BM806C', 'Revision: M1.2.0_E1.0.3_A1.1.8', 'OK'],
+      'AT+CSQ': ['+CSQ: 23,99', 'OK'],
+      'AT+COPS?': ['+COPS: 0,0,"Partner",7', 'OK'],
+      'AT+CPIN?': ['+CPIN: READY', 'OK'],
+      'AT+CFUN?': ['+CFUN: 1', 'OK'],
+      'AT+BMMODODR?': ['+BMMODODR: 17', 'OK']
+    };
+    const hist = s.at || [['ttyUSB2> ATI', 'u']].concat(RESP['ATI'].map(t => [t, ''])).concat([['ttyUSB2> AT+CSQ', 'u']]).concat(RESP['AT+CSQ'].map(t => [t, '']));
+    const send = c => this.setState({ at: hist.concat([[s.port + '> ' + c, 'u']]).concat(RESP[c].map(t => [t, ''])).slice(-20) });
+
+    return {
+      appCls: dark ? 'app dark' : 'app', darkStr: dark ? 'true' : 'false', themeLabel: dark ? 'Dark' : 'Light',
+      toggleTheme: () => this.setState({ dark: !dark }),
+      connLabel: s.connected ? 'Connected' : 'Disconnected',
+      connDot: 'background: ' + (s.connected ? 'var(--ok)' : 'var(--muted)'),
+      connSub: s.connected ? 'LTE · home network · Partner (425 01)' : 'registered on Partner (425 01) · no data session',
+      connUp: s.connected ? 'up 3 d 04 h 12 m' : '—',
+      tiles: tiles,
+      chartTitle: cur.name + ' over time', chartUnit: cur.unit,
+      chartAria: cur.name + ' over the last hour, around ' + cur.now + ' ' + cur.unit + ' with one dip about 23 minutes ago',
+      metrics: metrics, grid: grid, path: path,
+      hx: hx.toFixed(1), hy: sy(pts[HI]).toFixed(1),
+      tipX: (hx - 162).toFixed(1), tipTx: (hx - 150).toFixed(1),
+      tipVal: pts[HI].toFixed(0) + ' ' + cur.unit,
+      auths: seg(AUTH, 'auth'), pdps: seg(PDP, 'pdp'), needCreds: s.auth !== 'none', setLines: setLines,
+      imei: s.imei ? '[IMEI read from the modem]' : '•••••••••••••••', imeiBtn: s.imei ? 'Hide' : 'Reveal',
+      toggleImei: () => this.setState({ imei: !s.imei }),
+      acts: acts, actOpen: !!A, actNote: A ? A.note : '', actGo: A ? A.go : '',
+      actLines: A ? A.lines.map(l => ({ t: l[0], cls: l[1] ? 'c' : '' })) : [],
+      actDo: () => this.setState(s.act === 'conn' ? { connected: !s.connected, act: null } : { act: null }),
+      actClose: () => this.setState({ act: null }),
+      ports: ['ttyUSB1', 'ttyUSB2'].map(p => ({ label: '/dev/' + p, cls: s.port === p ? 'on' : '', on: s.port === p ? 'true' : 'false', pick: () => this.setState({ port: p }) })),
+      atLines: hist.map(l => ({ t: l[0], cls: l[1] })),
+      chips: Object.keys(RESP).map(c => ({ label: c, send: () => send(c) })),
+      clearAt: () => this.setState({ at: [] })
+    };
+  }
+}
+</script>
+</body>
+</html>

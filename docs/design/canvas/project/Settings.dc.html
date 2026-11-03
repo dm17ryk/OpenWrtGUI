@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>App settings</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.app{--bg:#F2F3EF;--surface:#FFFFFF;--surface2:#F6F7F4;--ink:#15181C;--ink2:#3E454C;--muted:#575F67;--line:#D8DBD4;--line2:#E8EAE5;--accent:#1F5FCC;--accent-ink:#FFFFFF;--accent-soft:#EEF3FC;--ok:#16784A;--ok-soft:#E3F2EA;--warn:#9A5A00;--warn-soft:#FBEFD9;--bad:#B3361A;--bad-soft:#FBE7E1;--neu-soft:#ECEEEA;--har:#5A3EBF;--har-soft:#ECE7FA;--top:#15181C;--top-ink:#F2F3EF;--code-bg:#15181C;--code-ink:#E6E8EA;--code-c:#93A8BA;--link:#1F5FCC}
+.app.dark{--bg:#111316;--surface:#1A1D21;--surface2:#20242A;--ink:#ECEEEF;--ink2:#C5CAD0;--muted:#9AA3AC;--line:#2F343B;--line2:#262A30;--accent:#5B92F0;--accent-ink:#0B0D10;--accent-soft:#1D2A40;--ok:#5CC98F;--ok-soft:#17301F;--warn:#E2A54A;--warn-soft:#33260F;--bad:#F08A6C;--bad-soft:#3A1E16;--neu-soft:#262A30;--har:#B7A6F2;--har-soft:#2A2340;--top:#0B0D10;--top-ink:#ECEEEF;--code-bg:#0B0D10;--code-ink:#E6E8EA;--code-c:#8FA3B5;--link:#8DB4F5}
+.app{font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--ink);background:var(--bg);font-size:14px;line-height:1.45;min-height:100vh}
+.app a{color:var(--link)}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;padding:10px 24px;background:var(--top);color:var(--top-ink)}
+.brand{font-weight:600;font-size:15px;display:flex;align-items:center;gap:10px}
+.nav{display:flex;flex-wrap:wrap;gap:2px}
+.nav a{color:#C3C8CE;text-decoration:none;padding:10px 12px;border-radius:6px;font-size:13px}
+.nav a:hover{color:#FFFFFF;background:#262A30}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;padding:6px 12px;border-radius:999px}
+.theme,.gear{font:inherit;display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#E6E8EA;background:#2E343B;border:0;border-radius:999px;padding:0 14px;min-height:40px;cursor:pointer;text-decoration:none}
+.app .gear{color:#FFFFFF;background:#4A525C}
+.wrap{max-width:1440px;margin:0 auto;padding:24px;box-sizing:border-box;display:flex;flex-direction:column;gap:20px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:20px;align-items:start}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+.b{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.air{background:var(--ok-soft);color:var(--ok)}.neu{background:var(--neu-soft);color:var(--ink2)}.warnb{background:var(--warn-soft);color:var(--warn)}.badb{background:var(--bad-soft);color:var(--bad)}.har{background:var(--har-soft);color:var(--har)}.own{background:var(--accent-soft);color:var(--accent)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.btn{font:inherit;font-size:13px;font-weight:500;padding:10px 14px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;min-height:44px;box-sizing:border-box;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{background:var(--surface2)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn:focus-visible,.nav a:focus-visible,.theme:focus-visible,.gear:focus-visible,.seg button:focus-visible,.tg:focus-visible,.chipx:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-size:13px;font-weight:500;border:0;border-right:1px solid var(--line);background:var(--surface);color:var(--ink);padding:0 14px;min-height:44px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--ink);color:var(--surface)}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:10px;border-bottom:1px solid var(--line2);vertical-align:middle}
+.kv{display:grid;grid-template-columns:max-content 1fr;gap:8px 18px;margin:0;font-size:13px}
+.kv dt{color:var(--muted)}.kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.code{background:var(--code-bg);color:var(--code-ink);border-radius:8px;padding:12px 14px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;line-height:1.65;overflow-x:auto}
+.code .c{color:var(--code-c)}
+.note{font-size:13px;color:var(--ink2);padding:10px 12px;border-radius:8px;background:var(--surface2)}
+.note.w{background:var(--warn-soft)}
+.tg{font:inherit;display:inline-flex;align-items:center;gap:8px;background:transparent;border:0;color:var(--ink);cursor:pointer;padding:0;min-height:44px;font-size:13px}
+.track{width:36px;height:20px;border-radius:999px;position:relative;flex:none}
+.knob{position:absolute;top:2px;width:16px;height:16px;border-radius:50%;background:#FFFFFF}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chipx{font:inherit;display:inline-flex;align-items:center;gap:8px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;padding:0 6px 0 12px;min-height:36px;border-radius:999px;border:1px solid var(--line);background:var(--surface2);color:var(--ink)}
+.chipx span.x{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;color:var(--muted)}
+.mac{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;padding:2px 8px;border-radius:4px;background:var(--neu-soft);white-space:nowrap}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.steps li{display:flex;align-items:center;gap:10px;font-size:13px}
+.st{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex:none}
+.st.done{background:var(--ok-soft);color:var(--ok)}.st.now{background:var(--accent);color:var(--accent-ink)}.st.todo{background:var(--neu-soft);color:var(--muted)}
+.rel{border:1px solid var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:10px;background:var(--surface2)}
+</style>
+</helmet>
+<div class="{{appCls}}">
+  <header class="top">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7FD1A8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5a10 10 0 0 1 14 0"></path><path d="M8 15.5a6 6 0 0 1 8 0"></path><circle cx="12" cy="19" r="1.4" fill="#7FD1A8"></circle></svg>
+      <span>OpenWrt Bench</span>
+    </div>
+    <nav class="nav" aria-label="Screens">
+      <a href="Main.dc.html">Dashboard</a>
+      <a href="WiFi.dc.html">Wi-Fi</a>
+      <a href="RF.dc.html">RF live</a>
+      <a href="Network.dc.html">Network &amp; DHCP</a>
+      <a href="Ports.dc.html">Ports &amp; VLANs</a>
+      <a href="Firewall.dc.html">Firewall</a>
+      <a href="Faults.dc.html">Faults &amp; capture</a>
+      <a href="LTE.dc.html">LTE modem</a>
+      <a href="System.dc.html">System</a>
+      <a href="Discovery.dc.html">Discovery</a>
+    </nav>
+    <div class="spacer"></div>
+    <span class="pill" style="background: #1E3A2B; color: #BFE8CF"><span class="dot" style="background: #6CD39B"></span>No harness running · writes allowed</span>
+    <a class="gear" href="Settings.dc.html" aria-current="page"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path></svg>Settings</a>
+    <button class="theme" type="button" aria-pressed="{{darkStr}}" onClick="{{toggleTheme}}">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>
+      {{themeLabel}}
+    </button>
+  </header>
+
+  <div class="wrap">
+    <div>
+      <div class="eyebrow">OpenWrtGUI · this PC</div>
+      <h1 style="margin: 2px 0 0; font-size: 28px; font-weight: 600; letter-spacing: -0.01em">Settings</h1>
+    </div>
+
+    <section class="card" aria-labelledby="uph" style="display: flex; flex-direction: column; gap: 14px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+        <h2 id="uph" style="margin: 0; font-size: 16px; font-weight: 600">Updates</h2>
+        <span class="b neu mono">installed 0.4.2</span>
+        <div class="spacer"></div>
+        <div class="seg" role="group" aria-label="Update channel">
+          <button type="button" class="{{stCls}}" aria-pressed="{{stOn}}" onClick="{{setStable}}">Stable</button>
+          <button type="button" class="{{ciCls}}" aria-pressed="{{ciOn}}" onClick="{{setCi}}">Pre-release (CI builds)</button>
+        </div>
+        <button class="btn" type="button">Check now</button>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px 18px; font-size: 13px; color: var(--muted)">
+        <button class="tg" type="button" role="switch" aria-checked="{{autoStr}}" onClick="{{toggleAuto}}"><span class="track" style="{{autoTrack}}"><span class="knob" style="{{autoKnob}}"></span></span><span style="color: var(--ink)">Check at start-up and daily</span></button>
+        <span>last checked today 09:12 · GitHub Releases of <span class="mono">dm17ryk/OpenWrtGUI</span>, no account needed</span>
+      </div>
+
+      <sc-if value="{{offer}}" hint-placeholder-val="{{ true }}">
+        <div class="rel">
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px">
+            <strong style="font-size: 16px">{{relName}}</strong>
+            <span class="{{relBadge}}">{{relKind}}</span>
+            <span style="font-size: 13px; color: var(--muted)">{{relMeta}}</span>
+          </div>
+          <ul style="margin: 0; padding-left: 18px; font-size: 13px; color: var(--ink2); display: flex; flex-direction: column; gap: 4px">
+            <sc-for list="{{relNotes}}" as="n" hint-placeholder-count="3"><li>{{n}}</li></sc-for>
+          </ul>
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px">
+            <button class="btn pri" type="button" onClick="{{startUpdate}}">Update now</button>
+            <button class="btn" type="button">Skip this version</button>
+            <button class="btn" type="button">Later</button>
+            <div class="spacer"></div>
+            <a href="Settings.dc.html" style="font-size: 13px">Full release notes on GitHub</a>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{updating}}" hint-placeholder-val="{{ false }}">
+        <div class="rel">
+          <strong>Updating to {{relName}}</strong>
+          <ol class="steps">
+            <sc-for list="{{steps}}" as="x" hint-placeholder-count="5"><li><span class="{{x.cls}}">{{x.mark}}</span><span>{{x.text}}</span></li></sc-for>
+          </ol>
+          <div class="code"><sc-for list="{{updLines}}" as="l" hint-placeholder-count="5"><div class="{{l.cls}}" style="white-space: pre">{{l.t}}</div></sc-for></div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px"><button class="btn" type="button" onClick="{{cancelUpdate}}">Cancel</button></div>
+        </div>
+      </sc-if>
+      <div style="font-size: 13px; color: var(--muted)">Each download is checked against the release's <span class="mono">SHA256SUMS.txt</span> before it runs. The previous installer is kept: <a href="Settings.dc.html">Reinstall 0.4.1</a>.</div>
+    </section>
+
+    <div class="cols">
+      <section class="card" aria-labelledby="aph" style="display: flex; flex-direction: column; gap: 12px">
+        <h2 id="aph" style="margin: 0; font-size: 16px; font-weight: 600">Appearance</h2>
+        <div class="seg" role="group" aria-label="Theme">
+          <sc-for list="{{modes}}" as="x" hint-placeholder-count="3"><button type="button" class="{{x.cls}}" aria-pressed="{{x.on}}" onClick="{{x.pick}}">{{x.label}}</button></sc-for>
+        </div>
+        <div style="font-size: 13px; color: var(--muted)">System follows Windows (light or dark). RF live opens dark by default; change it there.</div>
+      </section>
+
+      <section class="card" aria-labelledby="fdh" style="display: flex; flex-direction: column; gap: 12px">
+        <h2 id="fdh" style="margin: 0; font-size: 16px; font-weight: 600">Folders</h2>
+        <dl class="kv">
+          <dt>App</dt><dd class="mono">C:\Essence_SC\apps\OpenWrtGUI</dd>
+          <dt>Data</dt><dd class="mono">C:\Essence_SC\apps\OpenWrtGUI-data</dd>
+          <dt>Captures, recordings</dt><dd class="mono">Documents\OpenWrtGUI</dd>
+        </dl>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px"><button class="btn" type="button">Open data folder</button><button class="btn" type="button">Move data…</button></div>
+        <div class="note">On this PC the app and its data stay inside <span class="mono">C:\Essence_SC</span>, where SentinelOne lets them run. Updates and uninstall leave the data folder alone.</div>
+      </section>
+    </div>
+
+    <section class="card" aria-labelledby="kdh" style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+        <h2 id="kdh" style="margin: 0; font-size: 16px; font-weight: 600">Known devices</h2>
+        <span style="font-size: 13px; color: var(--muted)">one name for every MAC a device uses; Faults, DHCP and MAC access pick devices from here</span>
+        <div class="spacer"></div>
+        <button class="btn" type="button">Learn from leases</button>
+        <button class="btn" type="button">+ Device</button>
+      </div>
+      <div style="overflow-x: auto">
+        <table class="tbl">
+          <thead><tr><th>Device</th><th>MACs</th><th>Last seen</th><th></th></tr></thead>
+          <tbody>
+            <tr><td>PC · ES-DmitryKo-LT</td><td><span class="mac">08:3a:88:5c:a8:39 · ETH</span></td><td>AP1 lan · now</td><td><span class="b own">this app runs here</span></td></tr>
+            <tr><td>Panel · CP C8000</td><td><div style="display: flex; flex-wrap: wrap; gap: 6px"><span class="mac">30:09:f9:85:1d:40 · ETH</span><span class="mac">f4:12:fa:f3:57:68 · Wi-Fi</span></div></td><td>AP1 lan, AP1 Wi-Fi · 2 min ago</td><td><button class="btn" type="button">Edit</button></td></tr>
+            <tr><td>Phone · Dmitry-s-S26-Ultra</td><td><span class="mac">b2:4f:b7:9f:ac:d6 · Wi-Fi, random</span></td><td>AP1 Wi-Fi · 1 h ago</td><td><button class="btn" type="button">Edit</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">A panel's ETH and Wi-Fi MACs are unrelated (different vendor prefixes), so the app never guesses one from the other: list both here.</div>
+    </section>
+
+    <section class="card" aria-labelledby="bgh" style="display: flex; flex-direction: column; gap: 14px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+        <h2 id="bgh" style="margin: 0; font-size: 16px; font-weight: 600">Bench Guard</h2>
+        <span class="b air">clear · no harness running</span>
+        <span style="font-size: 13px; color: var(--muted)">while anything below is live, every router is read-only</span>
+        <div class="spacer"></div>
+        <button class="btn" type="button">Check now</button>
+      </div>
+      <div class="cols" style="gap: 14px">
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <div class="eyebrow">Lock files</div>
+          <div class="chips"><span class="chipx">D:\Essence_SC\wifi_ref\iperf_txsweep\voip.lock.own<span class="x" aria-hidden="true">×</span></span></div>
+          <div class="eyebrow" style="margin-top: 6px">Processes on this PC</div>
+          <div class="chips">
+            <sc-for list="{{procs}}" as="p" hint-placeholder-count="5"><span class="chipx">{{p}}<span class="x" aria-hidden="true">×</span></span></sc-for>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <div class="eyebrow">Signs on the routers</div>
+          <div class="chips">
+            <span class="chipx">SSID OpenWrtB on air<span class="x" aria-hidden="true">×</span></span>
+            <span class="chipx">SSID OpenWrtC on air<span class="x" aria-hidden="true">×</span></span>
+            <span class="chipx">radio dead-man job armed<span class="x" aria-hidden="true">×</span></span>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px"><button class="btn" type="button">+ Lock file</button><button class="btn" type="button">+ Process</button><button class="btn" type="button">+ Router sign</button></div>
+        </div>
+      </div>
+      <div>
+        <div class="eyebrow" style="margin-bottom: 6px">Known writers · changes made by a harness are labelled with its name instead of "changed outside the app"</div>
+        <div style="overflow-x: auto">
+          <table class="tbl">
+            <thead><tr><th>Writer</th><th>What it changes</th><th>Where</th></tr></thead>
+            <tbody>
+              <tr><td><span class="b har">dima_night</span></td><td class="mono">wireless country, legacy_rates, cell_density</td><td>AP2</td></tr>
+              <tr><td><span class="b har">dima_night</span></td><td class="mono">chain BENCHSIPGUARD in inet fw4</td><td>AP1</td></tr>
+              <tr><td><span class="b har">voip_chain</span></td><td class="mono">table bridge voipdscp</td><td>AP1</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="font-size: 13px; color: var(--muted); margin-top: 8px">More signatures are collected from the harness sources (open item O10).</div>
+      </div>
+    </section>
+
+    <div class="cols">
+      <section class="card" aria-labelledby="kyh" style="display: flex; flex-direction: column; gap: 12px">
+        <h2 id="kyh" style="margin: 0; font-size: 16px; font-weight: 600">App SSH key</h2>
+        <dl class="kv">
+          <dt>Key</dt><dd class="mono">ed25519 · openwrtgui@ES-DmitryKo-LT</dd>
+          <dt>Fingerprint</dt><dd class="mono">SHA256:[app key]</dd>
+          <dt>Stored</dt><dd><span class="mono">&lt;data&gt;\keys\</span>, readable by your Windows user only</dd>
+        </dl>
+        <div style="overflow-x: auto">
+          <table class="tbl">
+            <tbody>
+              <tr><td>AP1</td><td><span class="b warnb">not installed</span></td><td style="font-size: 13px; color: var(--muted)">password login; key install waits for your go</td></tr>
+              <tr><td>AP2</td><td><span class="b air">installed</span></td><td style="font-size: 13px; color: var(--muted)">last login 14:29</td></tr>
+              <tr><td>AP3</td><td><span class="b air">installed</span></td><td style="font-size: 13px; color: var(--muted)">last login yesterday</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px"><button class="btn" type="button">Export public key</button><button class="btn" type="button" onClick="{{toggleRotate}}">Rotate key…</button></div>
+        <sc-if value="{{rotating}}" hint-placeholder-val="{{ false }}">
+          <div class="note"><strong>Rotate:</strong> make a new key, add it on every router that has the old one, log in with the new key on each, then remove the old key from each router and from this PC. A router that is offline or locked by Bench Guard keeps the old key until next time, and the old key file stays until then.</div>
+        </sc-if>
+      </section>
+
+      <section class="card" aria-labelledby="alh" style="display: flex; flex-direction: column; gap: 12px">
+        <h2 id="alh" style="margin: 0; font-size: 16px; font-weight: 600">Audit log</h2>
+        <div style="font-size: 13px; color: var(--ink2)">Every command the app sends: time, router, screen, command (secrets masked), exit code, verify result.</div>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px">
+          <span style="font-size: 13px; color: var(--muted)">Keep</span>
+          <div class="seg" role="group" aria-label="Audit log retention">
+            <sc-for list="{{keeps}}" as="x" hint-placeholder-count="4"><button type="button" class="{{x.cls}}" aria-pressed="{{x.on}}" onClick="{{x.pick}}">{{x.label}}</button></sc-for>
+          </div>
+        </div>
+        <dl class="kv"><dt>Now</dt><dd class="mono">12 480 entries · 2.4 MB · since 2026-11-03</dd></dl>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px"><button class="btn" type="button">Open viewer</button><button class="btn" type="button">Export for a bug report</button></div>
+      </section>
+    </div>
+
+    <section class="card" aria-labelledby="abh" style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px">
+      <h2 id="abh" style="margin: 0; font-size: 16px; font-weight: 600">About</h2>
+      <span class="mono" style="font-size: 13px">OpenWrtGUI 0.4.2 · GPL-3.0</span>
+      <a href="Settings.dc.html" style="font-size: 13px">github.com/dm17ryk/OpenWrtGUI</a>
+      <a href="Settings.dc.html" style="font-size: 13px">User manual (wiki)</a>
+      <div class="spacer"></div>
+      <button class="btn" type="button">Report a problem…</button>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Look"},"$preview":{"width":1440,"height":2080}}'>
+class Component extends DCLogic {
+  state = { mode: 'system', channel: 'stable', auto: true, updating: false, rotate: false, keep: '90' };
+
+  renderVals() {
+    const s = this.state;
+    const sysDark = (this.props.theme ?? 'light') === 'dark';
+    const dark = s.mode === 'system' ? sysDark : s.mode === 'dark';
+    const sw = on => ({ track: 'background: ' + (on ? '#3FA36F' : '#8A9199'), knob: 'left: ' + (on ? '18px' : '2px') });
+    const ci = s.channel === 'ci';
+    const REL = ci ? {
+      name: '0.5.1-ci.212', kind: 'CI pre-release', badge: 'b warnb', meta: 'built from master 3f9c2e1 · passed CI · 48.6 MB',
+      notes: ['Everything in 0.5.0, plus the commits merged since', 'May contain unfinished screens; the stable channel never offers these', 'Switch back to Stable at any time; the next stable release replaces it']
+    } : {
+      name: '0.5.0', kind: 'stable', badge: 'b air', meta: 'released 3 days ago · 48.2 MB',
+      notes: ['Discovery and images: import a firmware image, router profiles, what changed since flashing', 'Custom tools panel: run --help, promote a tool to a card', 'Flash firmware from an imported image']
+    };
+    const file = 'OpenWrtGUI-Setup-' + REL.name + '.exe';
+    const STEPS = [['Download ' + file + ' and SHA256SUMS.txt', 'done'], ['Check SHA-256', 'done'], ['Stop live work (nothing running now; a step-through or capture would ask first)', 'now'], ['Run the installer silently into the same folder; the app closes', 'todo'], ['Installer starts the new version', 'todo']];
+    const auto = sw(s.auto);
+    const label = { system: 'System', light: 'Light', dark: 'Dark' };
+
+    return {
+      appCls: dark ? 'app dark' : 'app', darkStr: dark ? 'true' : 'false', themeLabel: dark ? 'Dark' : 'Light',
+      toggleTheme: () => this.setState({ mode: dark ? 'light' : 'dark' }),
+      stCls: ci ? '' : 'on', stOn: ci ? 'false' : 'true', setStable: () => this.setState({ channel: 'stable', updating: false }),
+      ciCls: ci ? 'on' : '', ciOn: ci ? 'true' : 'false', setCi: () => this.setState({ channel: 'ci', updating: false }),
+      autoStr: s.auto ? 'true' : 'false', autoTrack: auto.track, autoKnob: auto.knob, toggleAuto: () => this.setState({ auto: !s.auto }),
+      offer: !s.updating, updating: s.updating,
+      relName: REL.name, relKind: REL.kind, relBadge: REL.badge, relMeta: REL.meta, relNotes: REL.notes,
+      startUpdate: () => this.setState({ updating: true }), cancelUpdate: () => this.setState({ updating: false }),
+      steps: STEPS.map(x => ({ text: x[0], cls: 'st ' + x[1], mark: x[1] === 'done' ? '✓' : (x[1] === 'now' ? '…' : '') })),
+      updLines: [
+        { t: '# into <data>\\updates\\', cls: 'c' },
+        { t: file + '   sha256 matches SHA256SUMS.txt', cls: '' },
+        { t: '# the app exits, then:', cls: 'c' },
+        { t: file + ' /VERYSILENT /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS /DIR="C:\\Essence_SC\\apps\\OpenWrtGUI"', cls: '' }
+      ],
+      modes: ['system', 'light', 'dark'].map(m => ({ label: label[m], cls: s.mode === m ? 'on' : '', on: s.mode === m ? 'true' : 'false', pick: () => this.setState({ mode: m }) })),
+      procs: ['dima_night.py', 'rh_soak.py', 'overnight_wifi', 'txlab_*.py', 'voip_chain.py'],
+      rotating: s.rotate, toggleRotate: () => this.setState({ rotate: !s.rotate }),
+      keeps: [['30', '30 days'], ['90', '90 days'], ['365', '1 year'], ['all', 'Forever']].map(x => ({ label: x[1], cls: s.keep === x[0] ? 'on' : '', on: s.keep === x[0] ? 'true' : 'false', pick: () => this.setState({ keep: x[0] }) }))
+    };
+  }
+}
+</script>
+</body>
+</html>
