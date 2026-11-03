@@ -66,9 +66,15 @@ class ReplayTransport:
 
     def _simulate(self, command: str) -> CommandResult | None:
         assert self.state is not None
+        if command == "true":
+            return CommandResult(command, "", "", 0)
         if command.startswith(INSTALL_KEY_PREFIX):
+            from openwrtgui.onboard.wizard import install_key_command
+
             tokens = shlex.split(command)
             line = tokens[tokens.index("-qxF") + 1]
+            if command != install_key_command(line):
+                return CommandResult(command, "", "sim: unexpected key install command", 1)
             if line not in self.state.authorized_keys:
                 self.state.authorized_keys.append(line)
             return CommandResult(command, "", "", 0)
