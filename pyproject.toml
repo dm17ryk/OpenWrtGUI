@@ -45,8 +45,9 @@ src = ["src", "tests", "tools"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "ASYNC"]
-# The transport contract takes a per-command timeout that the SSH layer passes to asyncssh.
-ignore = ["ASYNC109"]
+# ASYNC109: the transport contract takes a per-command timeout that the SSH layer passes to asyncssh.
+# ASYNC240: small local file writes (downloads, audit lines) run on the single-user event loop on purpose.
+ignore = ["ASYNC109", "ASYNC240"]
 
 [tool.mypy]
 strict = true
