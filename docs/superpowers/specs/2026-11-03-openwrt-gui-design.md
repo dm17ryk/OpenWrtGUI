@@ -21,7 +21,7 @@ selection, RF readings, fault injection, MAC blocking and packet capture.
 Success means:
 
 1. Any setting LuCI offers on these routers can be made in OpenWrtGUI, and so can anything else that is routinely done over SSH today.
-2. A new router family is added by importing its firmware image. No code change is needed unless it brings a new mechanism.
+2. A standard OpenWrt router works on first connect, because the app reads the same self-description LuCI uses. Importing its firmware image adds the custom tools and what changed since flashing. No code change is needed unless the router brings a new mechanism.
 3. The app never disturbs a running test harness.
 4. It installs and updates itself from GitHub Releases, with nothing preinstalled on the PC.
 
@@ -42,6 +42,7 @@ Success means:
 | Firmware image: `D:\Essence_SC\DWR_921-c3-uboot\…squashfs-sysupgrade.bin` (sha256 d340a53f…), GitHub release dm17ryk/openwrt v25.12.5 | memory, release |
 | Harness rules: while `dima_night` / `rh_soak` / `overnight_wifi` runs, every router is read-only. AP1 is the only DHCP server. Only one radio on air per SSID. BENCHSIPGUARD, `voipdscp` and `wifi-mirror` stay untouched | txctl session |
 | `dima_night` sets `country=IL`, `cell_density=0`, `legacy_rates=1` on each AP turn (`dima_night.py:265`) and restores only the mode keys | txctl session |
+| What LuCI reads on AP2: `/etc/board.json` (model; switch ports with printed labels, internal 0–3 = LAN4–LAN1, 4 = WAN, 6 = CPU `eth0`; LED `green:lan`; radio band 2G with NOHT/HT20/HT40, max width 40; default network including `lte`). ubus objects incl. `luci`, `luci-rpc`, `network.*`, `hostapd`, `iwinfo`, `uci`, `file`, `system`, `session`. Typed option lists: `network get_proto_handlers` (dhcp, dhcpv6, ppp, pppoe, qmi, static, wwan; `qmi` has 25 options) and `network.wireless get_validate` (radio 155, SSID 289, station 4, VLAN 9 options). `luci getFeatures` (SAE, OWE, WPS, 802.11r, swconfig, firewall4, apk). LuCI menu files with `depends` conditions: base, firewall, network, status, system | AP2 probe |
 | PC: Windows 11, WebView2 156 present. SentinelOne kills scripts that run outside `C:\Essence_SC` or `D:\Essence_SC` | probe, Dmitry's rule |
 
 ## 3. Decisions
@@ -53,7 +54,7 @@ Success means:
 | D3 | Installable Windows app with bundled Python; nothing needs to be installed on the PC | Dmitry |
 | D4 | Independent engine: the harness (`aps.py`, `bench_net.py`) stays untouched | Dmitry |
 | D5 | Capability model "C": typed drivers for stateful and risky operations, a generic prober, and a panel for discovered unknown tools | agreed |
-| D6 | New router families are added through their firmware image (image profiles) | Dmitry |
+| D6 | New router families: the live probe (D18) covers standard OpenWrt; importing the firmware image adds the custom tools and the difference since flashing (image profiles) | Dmitry |
 | D7 | Radio model is multi-band from day one (2.4 / 5 / 6 GHz); switch model covers swconfig and DSA | Dmitry |
 | D8 | Mode and channel selectors: Auto / All (plus None for channels) or checkboxes; ticked = auto restricted to the ticked set. A selection is either applied (router picks within it) or stepped through (one pure mode × one channel per step) | Dmitry |
 | D9 | MAC access control lives on Network & DHCP | Dmitry |
@@ -65,6 +66,7 @@ Success means:
 | D15 | Self-update from GitHub Releases; stable and pre-release (CI) channels | Dmitry |
 | D16 | Run as a professional open project: README with screenshots, user manual, wiki, issue templates, CI, release pipeline, roadmap | Dmitry |
 | D17 | Phase 2: one page per tool listed under "What this router can do" | Dmitry |
+| D18 | Discovery and control follow LuCI: on connect, read the router's self-description (board.json, ubus methods, typed option lists, feature flags, LuCI menu conditions); call ubus over SSH wherever LuCI does; typed option lists generate an "All options" section; a LuCI page with no native screen opens inside the app as a fallback | Dmitry |
 
 ## 4. Architecture
 
@@ -76,12 +78,16 @@ OpenWrtGUI.exe  (PyInstaller onedir, bundled CPython 3.13)
 ├─ Guard: Bench Guard · write lock per router · command preview · 60 s rollback · audit log
 ├─ Drivers: radio · wifi_acl · rf · network · dhcp · dns · routes · switch_swconfig · switch_dsa · mirror ·
 │           firewall · faults · capture · lte · system · services · tools
-├─ Prober + image profiles (pure-Python squashfs reader)
-└─ Transport: asyncssh, one pooled session per router, host keys pinned
+├─ Prober: router self-description (board.json, ubus, option schemas, LuCI menus) + image profiles (pure-Python squashfs reader)
+├─ Forms: typed option lists → "All options" editors
+├─ LuCI bridge: SSH tunnel to the router's web server + rpcd session (fallback pages)
+└─ Transport: asyncssh, one pooled session per router, host keys pinned; ubus calls and shell commands over it
 ```
 
-- **Nothing is installed on the routers.** The only change the app makes for itself is one line added to `/etc/dropbear/authorized_keys` (D4, and the 4.5 MB flash limit).
+- **Nothing is installed on the routers.** The only change the app makes for itself is one line added to `/etc/dropbear/authorized_keys` (D4, and the 4.5 MB flash limit). LuCI fallback sessions live in rpcd's memory only.
 - **Transport.** All routers use asyncssh, so the app depends on neither plink nor Windows OpenSSH. File transfer goes through `scp` (Dropbear has no sftp-server) or `cat >` over an exec channel. The app sends the exact command text it shows in the preview.
+- **ubus first** (D18). Drivers call `ubus call <object> <method> <json>` over the SSH exec channel and get JSON back. These are the calls LuCI makes, so the app reads and changes things the way LuCI does: `network.interface.* status`, `iwinfo`, `hostapd.*`, `luci-rpc getDHCPLeases` / `getHostHints`, `luci getRealtimeStats`, `system board`, `uci` and others. Shell commands are used only where no ubus method exists: `iw`, `tc`, `nft -j`, `swconfig`, `hostapd_cli`, `uqmi`, AT commands. The app does not use LuCI's HTTP `/ubus` endpoint for its own work: that needs a password login, while SSH with the app key already runs as root.
+- **LuCI fallback bridge** (D18, section 7.14). For a LuCI page with no native screen, the app opens an SSH port forward to the router's web server and creates an rpcd session over SSH (`ubus call session create`, `session grant` for that page's access groups, `session set` user root). The page loads in an app tab with that session, so no password is typed. The session is read-only while Bench Guard sees a run, expires after 5 minutes idle, and is destroyed when the tab closes. Still to be confirmed on AP2 (O13).
 - **Local API security.** The API listens on loopback only, on a random port, and every request needs the per-launch token. This stops other local programs and web pages from driving routers.
 - **Packaging.** Inno Setup installer, per-user, no admin. Install folder is chosen at install time. On the bench PC it must be inside `C:\Essence_SC\` (SentinelOne rule), e.g. `C:\Essence_SC\apps\OpenWrtGUI`. PyInstaller "onefile" is not used: it unpacks to `%TEMP%` on every launch.
 - **Data folder** (chosen at install, default `%LOCALAPPDATA%\OpenWrtGUI`, bench PC `C:\Essence_SC\apps\OpenWrtGUI-data`): `routers.json`, `known_hosts`, `keys/` (the app's ed25519 key, readable by the user only), `profiles/`, `baselines/`, `audit/`, `updates/`. Captures and RF recordings go to `Documents\OpenWrtGUI\`. Updates and uninstall leave the data folder alone (uninstall asks).
@@ -90,7 +96,7 @@ OpenWrtGUI.exe  (PyInstaller onedir, bundled CPython 3.13)
 Source layout:
 
 ```
-src/openwrtgui/  main.py (launcher) · app.py (FastAPI) · transport/ · probe/ · profiles/ · drivers/ · guard/ · api/ · store/ · update/
+src/openwrtgui/  main.py (launcher) · app.py (FastAPI) · transport/ · probe/ · profiles/ · drivers/ · forms/ · luci_bridge/ · guard/ · api/ · store/ · update/
 frontend/        React app (Vite)
 installer/       OpenWrtGUI.iss
 tests/           unit · contract (recorded router outputs) · e2e (Playwright) · hardware (opt-in)
@@ -106,23 +112,40 @@ docs/            manual/ (user manual, synced to the wiki) · design/ · superpo
 3. Log in once with the root password. A fresh OpenWrt has no password, and the wizard offers to set one.
 4. The app generates its own ed25519 key once per PC and appends it to `authorized_keys` only if it is not already there. Existing keys and password login stay as they are.
 5. The app reconnects with the key only and confirms it works.
-6. Identify the router and match it to a profile.
-7. Map the ports, then run the self-test.
+6. Read the router's self-description, identify it, and match it to a profile if one was imported.
+7. Confirm the port map proposed from `board.json`, then run the self-test.
+
+**Router self-description** (D18). On every connect the app reads what LuCI reads. Most of it is part of every OpenWrt image; only the `luci` / `luci-rpc` objects and the menu files need LuCI installed, and without them the app falls back to plain commands.
+
+| Source | Drives |
+|---|---|
+| `/etc/board.json` | Model; switch ports with their printed labels (`index`), CPU port and default VLAN roles; LEDs; radio bands, modes and maximum width; default network. The front panel and the port map start from here |
+| `ubus -v list` | Which services exist and their method signatures; a driver is available only when the methods it calls are there |
+| `ubus call network get_proto_handlers` | Interface protocols and each one's typed options (forms for Router addresses and LTE) |
+| `ubus call network.wireless get_validate` | Every radio, SSID, station and VLAN option with its type (forms for Wi-Fi) |
+| `ubus call luci getFeatures` | Feature flags: SAE, OWE, WPS, 802.11r, swconfig, firewall4, package manager, dnsmasq features |
+| `iwinfo` (`info`, `freqlist`, `txpowerlist`, `countrylist`) | Channels, TX power steps, modes per radio for the current country |
+| `/usr/share/luci/menu.d/*.json`, `/usr/share/rpcd/acl.d/*.json` | Which LuCI pages exist, when they apply, and which configs and ubus methods each touches: the parity check (section 8) and the fallback list (7.14) |
+
+`board.json` is written at first boot, so it is not in the image; the live read is the only source for it.
 
 **Image profile.**
+- Importing the image adds what the live read cannot see: what came with the image versus what was added later, the custom packages with their usage text, and the defaults. It also works while the router is offline.
 - Import a sysupgrade `.bin`. The app finds the squashfs and reads `lib/apk/db/installed` (packages, versions, descriptions), the kernel modules (which qdiscs, which switch framework), binaries on `PATH`, custom packages with their usage text, and the `/etc/config` defaults.
 - The profile is keyed by board name, `DISTRIB_REVISION` and image SHA-256.
 - If an image cannot be parsed, the same profile is built from a connected router's `/rom`.
 
-**On connect**, the app reads identity (`/etc/openwrt_release`, `ubus call system board`) and matches a profile. Live probing then adds:
+**On connect**, the app reads identity (`/etc/openwrt_release`, `ubus call system board`), reads the self-description above, and matches a profile. Live probing then adds:
 - **Added after flashing**: `/overlay/upper` files and packages that are not in the profile.
 - **Config changed**: `/etc/config` compared with `/rom/etc/config`.
 - **Runtime state**: nft tables, qdiscs, monitor interfaces, mirror hooks, radio state.
 - **Firmware match**: the firmware partition hash compared with the image.
 
-**Capabilities.** Each driver declares what it needs (for example swconfig, `ifb` + netem, `uqmi`). The UI shows a feature only when the router has it, and greys it out with the reason otherwise. Unknown custom executables appear on the Discovery screen with "Run `--help`" and "Promote to a card". Promotion takes a small descriptor (name, commands, arguments, read-only or write), shown as a card with the same preview, guard and audit as built-in features.
+**Capabilities.** Each feature declares what it needs in the same form as LuCI's menu `depends` (`fs`: file present or executable; `uci`: config section present), plus three kinds of its own: `ubus` (object and method), `feature` (`luci getFeatures` flag) and `board` (`board.json` key). Examples: Switch needs `fs /sbin/swconfig` and `board switch`; LTE needs protocol `qmi` among the proto handlers and `fs /sbin/uqmi`; WPA3 needs `feature hostapd.sae`. The UI shows a feature only when its conditions hold, and greys it out with the reason otherwise.
 
-**Port map and self-test.** The port map is found read-only (switch MAC table and link state), then by unplugging and replugging sockets. The app never disables the port that carries its own SSH. The self-test checks monitor mode, port-disable carrier drop (on a free port), netem effect and nft insert/readback. Radio checks run only with explicit consent. Results are saved per router model.
+**Forms from typed options.** A typed option list becomes an editor: `bool` → switch, `uinteger` / `integer` → number, `string` → text, `list(…)` → list editor, `device` → device picker. Options with a hand-made control elsewhere on the screen link to it instead of being repeated. Each option shows its current value, the image default, and the known writer that set it, if any (e.g. `cell_density` by `dima_night`). Writes go through the normal preview, guard and audit. Unknown custom executables appear on the Discovery screen with "Run `--help`" and "Promote to a card". Promotion takes a small descriptor (name, commands, arguments, read-only or write), shown as a card with the same preview, guard and audit as built-in features.
+
+**Port map and self-test.** The port map starts from `board.json` (printed label per switch port; on the DWR-921 C3 internal ports 0–3 are LAN4–LAN1). It is confirmed read-only (switch MAC table and link state), and by unplugging and replugging sockets only where that is not enough. The app never disables the port that carries its own SSH. The self-test checks monitor mode, port-disable carrier drop (on a free port), netem effect and nft insert/readback. Radio checks run only with explicit consent. Results are saved per router model.
 
 **Baselines and known writers.**
 - A baseline is a per-router snapshot of uci plus runtime state. Differences from it are shown on the dashboard.
@@ -130,7 +153,7 @@ docs/            manual/ (user manual, synced to the wiki) · design/ · superpo
 - Known-writer signatures are kept in a small registry in Settings.
 
 **Future routers.**
-- 5 and 6 GHz radios use the same uci `wireless` and `iw` model. Channel, width and power lists come from `iw phy` and the country code.
+- 5 and 6 GHz radios use the same uci `wireless` and `iw` model. Bands and widths come from `board.json`; channel and power lists from `iwinfo` / `iw phy` for the country code.
 - DFS channels show the radar-check wait (CAC: 60 s, or 10 min on channels 120–128).
 - On 6 GHz only SAE or OWE with PMF can be selected.
 - The DSA switch backend implements the same interface as swconfig. It is built when the first DSA router and its image are on the bench.
@@ -153,7 +176,7 @@ docs/            manual/ (user manual, synced to the wiki) · design/ · superpo
 
 ## 7. Screens
 
-Mockups for screens 1–12 are on the canvas (`docs/design/canvas/project/`). Screen 13 (terminal and audit log) is specified here only. Every screen works in light and dark.
+Mockups for screens 1–12 are on the canvas (`docs/design/canvas/project/`). Screens 13 (terminal and audit log) and 14 (LuCI fallback pages) are specified here only. The mockups predate D18: they do not show the "All options" sections or the LuCI entries on Discovery. Every screen works in light and dark.
 
 ### 7.1 Dashboard (1)
 - Shows: routers with state; the 2.4 / 5 / 6 GHz air map (on air vs parked/staged); per-router cards (radio, RF summary, stations, network, faults, login type, ownership tags); "Needs attention" (drift with known-writer attribution, password-only login, files added after flashing).
@@ -178,6 +201,7 @@ Mockups for screens 1–12 are on the canvas (`docs/design/canvas/project/`). Sc
 - **Step-through**: every ticked mode × ticked channel × (optional) ticked power, one pure mode per step. Each step is proven on air before its dwell. Advance on a timer, manually, or when a station re-joins. AP restored at the end or on Stop. Blocked by Bench Guard.
 - **Stations**: MAC, name/IP (leases), signal, TX/RX rate, mode, connected time; actions: RF, Block, Deauth.
 - **Who may join**: one-line summary linking to Network & DHCP.
+- **All options** (collapsed, per radio and per SSID): every option from `network.wireless get_validate`, as a typed editor (section 5, "Forms from typed options"). On AP2 that is 155 radio and 289 SSID options, so anything hostapd or the driver accepts can be set without a dedicated control. Security choices offered above follow `luci getFeatures` (e.g. SAE only when hostapd has it).
 
 ### 7.3 RF live (8)
 - **Colours**: blue = RX at AP (station → AP), orange = TX from AP (AP → station), used the same way everywhere.
@@ -191,7 +215,7 @@ Mockups for screens 1–12 are on the canvas (`docs/design/canvas/project/`). Sc
 - **Channel analysis** (LuCI parity): scan of nearby networks and channel survey per channel.
 
 ### 7.4 Network & DHCP (9)
-- **Router addresses**: every interface (lan, wan, lte, VLAN interfaces) as Static / DHCP client / No address / LTE (QMI) / PPP. Address is always written as `address/prefix` (a bare address becomes /32 on this image). Also gateway, DNS, MTU and bridge members. Changes to the app's own path apply with rollback, and the app follows a changed address.
+- **Router addresses**: every interface (lan, wan, lte, VLAN interfaces) as Static / DHCP client / No address / LTE (QMI) / PPP. Address is always written as `address/prefix` (a bare address becomes /32 on this image). Also gateway, DNS, MTU and bridge members. Changes to the app's own path apply with rollback, and the app follows a changed address. The protocol list and each protocol's fields come from `network get_proto_handlers`: the common fields are laid out by hand, the rest appear under **All options**, so a protocol added by a new package (e.g. WireGuard) is editable at once.
 - **DHCP server** per interface: on/off with conflict check; pool start/size, lease time; options by code (3, 6, 15, 42, any); IPv6 DHCPv6/RA.
 - **Fixed addresses by MAC**: name, MAC, IP, lease time, and **Gets an address** (off = `ignore=1`: the device joins but gets no IP).
 - **Active leases**, with Make fixed.
@@ -203,7 +227,7 @@ Mockups for screens 1–12 are on the canvas (`docs/design/canvas/project/`). Sc
 - **Static routes and rules** (LuCI Routing page): IPv4/IPv6 routes, policy rules, live routing table.
 
 ### 7.5 Ports, VLANs, mirroring (3)
-- **Front panel**: printed labels ↔ internal ports, link/speed, per-port enable via `dwr921-portctl` or `swconfig … enable`. The SSH port is locked. "Enable all ports" button.
+- **Front panel**: printed labels ↔ internal ports (from `board.json`), link/speed, per-port enable via `dwr921-portctl` or `swconfig … enable`. The SSH port is locked. "Enable all ports" button.
 - **VLAN matrix** (— / U / T per port, CPU included). Changes to VLAN 1 apply with rollback.
 - **Switch port mirror**: monitor port, sources with RX/TX.
 - **Wi-Fi mirror** (`wifi-mirror` where present): status, stop/restart, excluded MACs, warning before iperf.
@@ -231,6 +255,7 @@ Mockups for screens 1–12 are on the canvas (`docs/design/canvas/project/`). Sc
 - **Capture**: br-lan / Wi-Fi interface / `mon0` (created on demand) / wwan0. Filter, duration, Live in Wireshark (if installed) or save `.pcap`.
 
 ### 7.8 Discovery and tools (6)
+- **What the router says about itself** (section 5): model and board file, services found, feature flags, LuCI pages installed. LuCI pages without a native screen are listed with **Open in LuCI** (7.14) and a note that they have no native screen yet.
 - Image match and firmware hash; capability map (in image / added after flashing / missing); your custom packages (card, service, or "no card yet" with `--help` and Promote); files added after flashing (copy to another router, save as a reflash checklist); config changed vs image defaults, with diff.
 - **Phase 2** (D17): each capability chip links to its own tool page. Planned pages:
   - Throughput: iperf3 / iperf 2, router as server or client.
@@ -248,7 +273,7 @@ The wizard described in section 5.
   - registration, radio type, roaming, operator
   - RSSI / RSRP / RSRQ / SNR, each with a quality label and history chart
   - session uptime, IPv4, data counters
-- **Settings** (uci `network.lte`): APN, auth (none/PAP/CHAP/both) with user/password, PIN, PDP type, MTU, metric, autoconnect, default route. `lte_4` stays DHCP; the UI explains why.
+- **Settings** (uci `network.lte`): APN, auth (none/PAP/CHAP/both) with user/password, PIN, PDP type, MTU, metric, autoconnect, default route. `lte_4` stays DHCP; the UI explains why. The other options of the `qmi` handler (25 in all, e.g. `modes`, `plmn`, `delay`, `profile`, `v6apn`) appear under **All options**.
 - **Modem**:
   - info: manufacturer, model, firmware (ATI); IMEI hidden until revealed
   - network mode order (`AT+BMMODODR`; code names still to map)
@@ -281,6 +306,12 @@ The wizard described in section 5.
 - An xterm.js terminal per router over the same session. During a run it accepts read-only commands only.
 - Audit log viewer with filters and export.
 
+### 7.14 LuCI pages (fallback, D18)
+- For LuCI pages with no native screen yet, typically from a LuCI app that a newer image brings (e.g. SQM, WireGuard, statistics). Native screens stay the main way to work; this is the safety net for the long tail.
+- Listed on Discovery and in the router's section list as "LuCI: <page>". Opening one shows the real LuCI page in an app tab, through the bridge in section 4: no password, and the app's theme is not applied (it is LuCI's own look).
+- Access: the rpcd session gets only that page's access groups. While Bench Guard sees a run, it gets read access only, and LuCI shows its read-only view.
+- Changes made inside a LuCI page do not go through the app's preview. LuCI's own apply with rollback still works. The app records in the audit log that the page was opened, and shows what changed afterwards as a difference labelled "changed via LuCI".
+
 ## 8. LuCI parity (every LuCI page installed on the image)
 
 | LuCI page | OpenWrtGUI |
@@ -310,7 +341,7 @@ The wizard described in section 5.
 | Network › Firewall (zones, port forwards, traffic rules, NAT rules, IP sets, custom rules) | Firewall (all tabs) |
 | Services, VPN | empty on this image; an app installed later shows up under Discovery |
 
-New router images may bring more LuCI apps. The prober lists their menu entries, so missing coverage shows up as a Discovery finding.
+New router images may bring more LuCI apps. The prober compares the router's LuCI menu files with this table: a page with no native screen shows up as a Discovery finding and opens through the LuCI fallback (7.14) until it gets one. So parity holds from day one, and native screens replace fallback pages over time.
 
 ## 9. Updates from GitHub Releases
 
@@ -328,10 +359,10 @@ New router images may bring more LuCI apps. The prober lists their menu entries,
 
 ## 10. Project and repository (D16)
 
-- **README**: what it is, hero screenshot, feature tour with screenshots, install, quick start (add a router), safety model, supported routers (via image profiles), roadmap link, contributing, license. Screenshots are generated in CI by Playwright against the router simulator (section 11), so they stay current.
+- **README**: what it is, hero screenshot, feature tour with screenshots, install, quick start (add a router), safety model, supported routers (any standard OpenWrt; image profiles add custom tools), roadmap link, contributing, license. Screenshots are generated in CI by Playwright against the router simulator (section 11), so they stay current.
 - **User manual** in `docs/manual/`, published to the GitHub wiki by a workflow on every push to `master`; the repo is the single source.
   - Pages: Install, Updating, First router, each screen, Bench Guard, Adding a router family (image import), Troubleshooting, FAQ.
-- **Issues**: issue forms for Bug (version, router model and image, audit-log export, steps), Feature request, and **New router support** (image link, `ubus call system board` output, `iw phy` output). `config.yml` turns off blank issues and points questions to Discussions. Labels: `type:*`, `area:*`, `router-support`, `good first issue`, `needs-hardware`.
+- **Issues**: issue forms for Bug (version, router model and image, audit-log export, steps), Feature request, and **New router support** (image link, `ubus call system board` output, `/etc/board.json`, `iw phy` output). `config.yml` turns off blank issues and points questions to Discussions. Labels: `type:*`, `area:*`, `router-support`, `good first issue`, `needs-hardware`.
 - **Pull requests**: template with checklist (tests, screenshots for UI, docs, CHANGELOG). Conventional commits.
 - **Agents**:
   - `AGENTS.md`: repo conventions for AI coding agents (layout, commands, safety rules: never touch AP1/AP3, AP2 only with the guard), with `CLAUDE.md` pointing to it.
@@ -348,8 +379,8 @@ New router images may bring more LuCI apps. The prober lists their menu entries,
 
 ## 11. Testing
 
-- **Unit**: the command compilers (mode/channel → uci + iw; firewall model → fw4; ACL methods; DHCP), parsers (`iw`, `iwinfo`, `ubus`, `uci show`, `nft -j`, `tc`, `uqmi`, `ATI`), the profile reader, the guard and the updater. Written test-first.
-- **Contract**: real router outputs recorded from AP2 (sanitized: no keys, no IMEI) and replayed through a fake transport.
+- **Unit**: the command compilers (mode/channel → uci + iw; firewall model → fw4; ACL methods; DHCP), parsers (`iw`, `iwinfo`, `ubus`, `uci show`, `nft -j`, `tc`, `uqmi`, `ATI`), the self-description reader (`board.json`, `ubus -v list`, option lists, feature flags, LuCI menu `depends`), the typed-option form builder, the profile reader, the guard and the updater. Written test-first.
+- **Contract**: real router outputs recorded from AP2 (sanitized: no keys, no IMEI) and replayed through a fake transport. They include the self-description set: `board.json`, `ubus -v list`, `get_proto_handlers`, `get_validate`, `getFeatures` and the LuCI menu and ACL files.
 - **Router simulator**: the fake transport plus state. Serves the UI for e2e tests, screenshots and demos without hardware.
 - **E2E**: Playwright drives the built UI against the simulator, in light and dark, at 1440 and 375 px widths.
 - **Hardware** (opt-in, `pytest -m hardware --router 192.168.1.2`): runs only when Bench Guard is clear and the txctl session has been told. Restores the router afterwards and checks it matches its baseline.
@@ -359,14 +390,14 @@ New router images may bring more LuCI apps. The prober lists their menu entries,
 
 | Milestone | Content |
 |---|---|
-| v0.1 Foundation | Repo setup (README, templates, AGENTS.md, CI, pre-release and release workflows, wiki sync), installer, update check, app shell with themes, Add-router wizard (password → key), router list, read-only dashboard, Bench Guard, audit log, terminal |
-| v0.2 Wi-Fi | Wi-Fi screen (selectors, TX power, security, apply + verify on air), stations, RF live (radio and stations, charts, CSV) |
-| v0.3 Network | Router addresses with rollback, DHCP, fixed addresses, Wi-Fi access by MAC, DNS, routes; ports/VLANs/mirroring (swconfig) |
+| v0.1 Foundation | Repo setup (README, templates, AGENTS.md, CI, pre-release and release workflows, wiki sync), installer, update check, app shell with themes, Add-router wizard (password → key), router self-description probe, router list, read-only dashboard, Bench Guard, audit log, terminal |
+| v0.2 Wi-Fi and LuCI fallback | Wi-Fi screen (selectors, TX power, security, apply + verify on air, All options from the typed list), stations, RF live (radio and stations, charts, CSV); LuCI fallback pages (after O13), so every LuCI page is reachable from here on |
+| v0.3 Network | Router addresses with rollback (fields from the proto handlers), DHCP, fixed addresses, Wi-Fi access by MAC, DNS, routes; ports/VLANs/mirroring (swconfig, labels from `board.json`) |
 | v0.4 Firewall and faults | Both filtering models, zones, rules, port forwards, NAT, IP sets, custom rules, other tables with unlock; faults and capture |
 | v0.5 Discovery and images | Image import and profiles, overlay difference, custom tools panel, flash firmware from image |
 | v0.6 LTE and System | LTE screen (status, settings, actions, AT console), System screen (all LuCI System and Status pages) |
 | v0.7 Test helpers | Step-through runner, `mon0` frame analysis, channel analysis |
-| v1.0 | LuCI parity complete, manual complete, hardening |
+| v1.0 | Native screens for every LuCI page on the bench image (the fallback stays for pages that later images bring), manual complete, hardening |
 | 1.x (phase 2) | Tool pages, SIM PIN / SMS / USSD, DSA backend and 5/6 GHz checked on real hardware |
 
 Each milestone gets its own implementation plan. The first plan covers v0.1 Foundation.
@@ -387,6 +418,7 @@ Each milestone gets its own implementation plan. The first plan covers v0.1 Foun
 | O10 | Known-writer signatures for each harness | Collect from the harness sources |
 | O11 | Installing the app key on AP1 (live bench router) | Dmitry's go |
 | O12 | Claude Code GitHub Action (needs an API key secret) | Dmitry's call |
+| O13 | LuCI fallback login: LuCI accepts an rpcd session created over SSH (`session create` + `grant` + `set` user root) through its `sysauth` cookie; a read-only grant gives LuCI's read-only view; the session expires and is destroyed as planned | Test on AP2: open pages read-only, change nothing |
 
 ## 14. Out of scope
 
