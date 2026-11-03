@@ -1,4 +1,4 @@
-import type { RadioStatus, RouterItem, RouterStatus } from '../api/types'
+import type { DescriptionSummary, RadioStatus, RouterItem, RouterStatus, SessionView } from '../api/types'
 
 const NOW = '2026-11-03T12:00:00+02:00'
 
@@ -61,3 +61,35 @@ export const AP3: RouterItem = {
 }
 
 export const ROUTERS: RouterItem[] = [AP1, AP2, AP3]
+
+export const SUMMARY: DescriptionSummary = {
+  model: 'D-Link DWR-921 C3 (U-Boot)',
+  hostname: 'OpenWrt',
+  revision: 'r35692-b8bffeefdf',
+  target: 'ramips/mt7620',
+  services: 40,
+  protocols: { dhcp: 20, dhcpv6: 18, ppp: 20, pppoe: 22, qmi: 25, static: 9, wwan: 12 },
+  wireless_options: { radio0: { device: 155, interface: 289, station: 4, vlan: 9 } },
+  features_on: { sae: true, owe: true, wps: true, '11r': true, swconfig: true, firewall4: true, apk: true, wep: false },
+  luci_packages: 5,
+  luci_menu_entries: 62,
+  port_labels: { '0': 'LAN4', '1': 'LAN3', '2': 'LAN2', '3': 'LAN1', '4': 'WAN', '6': 'CPU (eth0)' },
+}
+
+export function sessionView(step: SessionView['step'], extra: Partial<SessionView> = {}): SessionView {
+  return {
+    sid: 's1',
+    step,
+    host: '192.168.1.4',
+    port: 22,
+    host_key: { type: 'ssh-ed25519', fingerprint: 'SHA256:simkey', public: 'ssh-ed25519 AAAA' },
+    known_before: false,
+    changed_from: null,
+    root_password: 'set',
+    key_installed: false,
+    summary: null,
+    proposed_port_labels: {},
+    error: null,
+    ...extra,
+  }
+}
