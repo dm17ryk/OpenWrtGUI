@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import asyncssh
+import httpx
 
+from openwrtgui.guard.bench_guard import ProcessInfo
+from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import AuthFailed, CommandResult, HostKeyInfo, Transport, Unreachable
 from openwrtgui.transport.fake import ReplayTransport, SimState, load_commands
 
@@ -33,6 +38,44 @@ def sim_commands(sim_dir: Path, router_id: str) -> dict[str, CommandResult]:
     if entry.get("overlay"):
         commands.update(load_commands(sim_dir / entry["overlay"]))
     return commands
+
+
+SIM_GUARD_ENV = "OPENWRTGUI_SIM_GUARD"
+SIM_RUN = ProcessInfo(
+    18244, ("python.exe", r"D:\Essence_SC\wifi_ref\dima_night.py"), datetime(2026, 11, 3, 21, 4)
+)
+
+
+def sim_process_lister() -> list[ProcessInfo]:
+    """With OPENWRTGUI_SIM_GUARD=live the simulator pretends dima_night.py is running."""
+    return [SIM_RUN] if os.environ.get(SIM_GUARD_ENV) == "live" else []
+
+
+def seed_routers(sim_dir: Path, store: RouterStore) -> None:
+    for entry in sim_routers(sim_dir):
+        if entry.get("wizard_only") or store.get(entry["id"]) is not None:
+            continue
+        store.upsert(
+            RouterRecord(
+                id=entry["id"],
+                name=entry["name"],
+                host=entry["host"],
+                auth=entry["auth"],
+                added_at=datetime(2026, 11, 3, 9, 0),
+            )
+        )
+
+
+def sim_http_client(sim_dir: Path) -> httpx.AsyncClient:
+    """GitHub stand-in for the updater: serves tests/fixtures/github/releases.json."""
+    releases = json.loads((sim_dir.parent / "github" / "releases.json").read_text(encoding="utf-8"))
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/releases"):
+            return httpx.Response(200, json=releases)
+        return httpx.Response(404)
+
+    return httpx.AsyncClient(transport=httpx.MockTransport(handle))
 
 
 def _public_lines(key_paths: Sequence[Path]) -> list[str]:

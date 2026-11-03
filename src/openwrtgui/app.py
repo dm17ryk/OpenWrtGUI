@@ -1,0 +1,57 @@
+"""FastAPI app factory: API, WebSockets, the built UI, and the background loops."""
+
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
+
+from openwrtgui.api import errors, misc_api, onboard_api, routers_api, update_api, ws_api
+from openwrtgui.context import AppContext
+from openwrtgui.version import APP_VERSION
+
+log = logging.getLogger(__name__)
+UPDATE_LOOP_S = 3600.0
+
+
+async def _update_loop(ctx: AppContext, stop: asyncio.Event) -> None:
+    while not stop.is_set():
+        try:
+            await ctx.updater.check()
+        except Exception:
+            log.exception("update check failed")
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(stop.wait(), UPDATE_LOOP_S)
+
+
+def create_app(ctx: AppContext) -> FastAPI:
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        stop = asyncio.Event()
+        tasks = [asyncio.create_task(ctx.poller.run(stop)), asyncio.create_task(_update_loop(ctx, stop))]
+        try:
+            yield
+        finally:
+            stop.set()
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            await ctx.pool.close_all()
+
+    app = FastAPI(title="OpenWrtGUI", version=APP_VERSION, lifespan=lifespan)
+    app.state.ctx = ctx
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
+    errors.install(app)
+    for module in (misc_api, routers_api, onboard_api, update_api):
+        app.include_router(module.router)
+    app.include_router(misc_api.public)
+    app.include_router(ws_api.router)
+    if ctx.web_dir is not None and ctx.web_dir.is_dir():
+        app.mount("/", StaticFiles(directory=ctx.web_dir, html=True), name="web")
+    return app

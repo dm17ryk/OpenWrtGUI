@@ -97,6 +97,7 @@ class BenchGuard:
     watch: GuardWatchList
     lister: ProcessLister = psutil_lister
     clock: Callable[[], datetime] = datetime.now
+    use_lock_files: bool = True
     _signs: dict[str, _RouterSigns] = field(default_factory=dict)
     _state: GuardState | None = None
 
@@ -122,7 +123,7 @@ class BenchGuard:
 
     def check_local(self) -> GuardState:
         reasons: list[GuardReason] = []
-        for lock in self.watch.lock_files:
+        for lock in self.watch.lock_files if self.use_lock_files else ():
             path = Path(lock)
             if path.exists():
                 since = datetime.fromtimestamp(path.stat().st_mtime)

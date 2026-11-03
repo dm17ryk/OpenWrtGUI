@@ -64,6 +64,7 @@ asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 markers = ["hardware: needs a real router (AP2)"]
 addopts = "-m 'not hardware'"
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`"]
 
 [tool.coverage.run]
 source = ["openwrtgui"]
