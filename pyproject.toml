@@ -45,6 +45,8 @@ src = ["src", "tests", "tools"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "SIM", "ASYNC"]
+# The transport contract takes a per-command timeout that the SSH layer passes to asyncssh.
+ignore = ["ASYNC109"]
 
 [tool.mypy]
 strict = true
