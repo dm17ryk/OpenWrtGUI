@@ -1,0 +1,67 @@
+/* Design tokens from the canvas mockups (docs/design/canvas/project/*.dc.html). */
+:root,
+:root[data-theme='light'] {
+  --bg: #f2f3ef;
+  --surface: #ffffff;
+  --surface2: #f6f7f4;
+  --ink: #15181c;
+  --ink2: #3e454c;
+  --muted: #575f67;
+  --line: #d8dbd4;
+  --line2: #e8eae5;
+  --accent: #1f5fcc;
+  --accent-ink: #ffffff;
+  --accent-soft: #eef3fc;
+  --ok: #16784a;
+  --ok-soft: #e3f2ea;
+  --warn: #9a5a00;
+  --warn-soft: #fbefd9;
+  --bad: #b3361a;
+  --bad-soft: #fbe7e1;
+  --neu-soft: #eceeea;
+  --har: #5a3ebf;
+  --har-soft: #ece7fa;
+  --top: #15181c;
+  --top-ink: #f2f3ef;
+  --code-bg: #15181c;
+  --code-ink: #e6e8ea;
+  --code-c: #93a8ba;
+  --link: #1f5fcc;
+  --rx: #2a78d6;
+  --tx: #eb6834;
+  --grid: #e1e0d9;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg: #111316;
+  --surface: #1a1d21;
+  --surface2: #20242a;
+  --ink: #eceeef;
+  --ink2: #c5cad0;
+  --muted: #9aa3ac;
+  --line: #2f343b;
+  --line2: #262a30;
+  --accent: #5b92f0;
+  --accent-ink: #0b0d10;
+  --accent-soft: #1d2a40;
+  --ok: #5cc98f;
+  --ok-soft: #17301f;
+  --warn: #e2a54a;
+  --warn-soft: #33260f;
+  --bad: #f08a6c;
+  --bad-soft: #3a1e16;
+  --neu-soft: #262a30;
+  --har: #b7a6f2;
+  --har-soft: #2a2340;
+  --top: #0b0d10;
+  --top-ink: #eceeef;
+  --code-bg: #0b0d10;
+  --code-ink: #e6e8ea;
+  --code-c: #8fa3b5;
+  --link: #8db4f5;
+  --rx: #3987e5;
+  --tx: #d95926;
+  --grid: #2c2c2a;
+  color-scheme: dark;
+}
