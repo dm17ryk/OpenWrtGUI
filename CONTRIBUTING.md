@@ -47,7 +47,7 @@ For UI work, start the backend with `--port 8765 --token dev --no-window` added,
 | Backend lint, types, unit and contract tests | `uv run ruff check src tests tools` · `uv run ruff format --check src tests tools` · `uv run mypy` · `uv run pytest` |
 | Frontend lint, types and unit tests | `cd frontend` · `npm run lint` · `npx tsc -b` · `npm test` |
 | End-to-end, light and dark, 1440 and 375 px | `cd frontend` · `npm run build` · `npm run e2e` |
-| Windows build with self-check | `pwsh -File tools/build_windows.ps1 -Version 0.1.0-dev` |
+| Windows build with self-check | `pwsh -File tools/build_windows.ps1` |
 | Hardware (opt-in) | `uv run pytest -m hardware --router 192.168.1.2 --identity <your key>` |
 
 New behaviour comes with a test that failed first. CI runs everything except the hardware tests and
@@ -74,3 +74,16 @@ The bench routers carry other people's tests. These rules are not optional:
 - One topic per pull request. Fill in the template's checklist: tests, screenshots for UI changes (light
   and dark), docs and `CHANGELOG.md` under `[Unreleased]`.
 - By contributing you agree that your contribution is licensed under GPL-3.0.
+
+## Versions and releases
+
+`BASE_VERSION` in `src/openwrtgui/version.py` is the version being worked on. Every green build of
+`master` is published as the pre-release `BASE_VERSION-ci.N`, and pushing the tag `vBASE_VERSION`
+publishes the stable release.
+
+1. Give the `[Unreleased]` section of `CHANGELOG.md` its version and date, merge that, then tag the merge
+   commit `vX.Y.Z` and push the tag.
+2. Right after a release, move to the next version so CI builds sort above it: set `BASE_VERSION` and
+   `APP_VERSION` (`X.Y.Z-dev`) in `version.py`, the `version` in `pyproject.toml` and the two defaults at
+   the top of `installer/OpenWrtGUI.iss`; run `uv lock`, and in `frontend` run
+   `npm version X.Y.Z --no-git-tag-version`. `tests/unit/test_version.py` fails if one of them is missed.

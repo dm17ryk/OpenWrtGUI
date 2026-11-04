@@ -3,15 +3,15 @@
   Build OpenWrtGUI for Windows: UI, PyInstaller onedir, self-check, and the installer when Inno Setup is present.
 
 .EXAMPLE
-  pwsh -File tools/build_windows.ps1 -Version 0.1.0-dev
+  pwsh -File tools/build_windows.ps1
 
 .NOTES
   Run it from a checkout inside C:\Essence_SC or D:\Essence_SC on the bench PC (SentinelOne).
-  -Version is written into src/openwrtgui/version.py; CI commits nothing, a local run leaves the
-  change for you to keep or revert.
+  -Version (default: BASE_VERSION-dev) is written into src/openwrtgui/version.py; CI commits
+  nothing, a local run leaves the change for you to keep or revert.
 #>
 param(
-    [string]$Version = "0.1.0-dev"
+    [string]$Version = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,6 +25,11 @@ function Invoke-Step([string]$Name, [scriptblock]$Body) {
 }
 
 # 1. Version
+if (-not $Version) {
+    $Base = uv run python -c "from openwrtgui.version import BASE_VERSION as v; print(v)"
+    if ($LASTEXITCODE -ne 0) { throw "cannot read BASE_VERSION" }
+    $Version = "$Base-dev"
+}
 $NumVersion = (uv run python tools/stamp_version.py $Version)
 if ($LASTEXITCODE -ne 0) { throw "stamp_version refused $Version" }
 Write-Host "==> Version $Version ($NumVersion)"

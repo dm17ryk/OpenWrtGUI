@@ -14,6 +14,7 @@ from openwrtgui.app import create_app
 from openwrtgui.context import AppContext
 from openwrtgui.onboard.wizard import install_key_command
 from openwrtgui.update.service import UpdateFailed, UpdateInProgress
+from openwrtgui.update.versions import Version
 from openwrtgui.version import APP_VERSION
 
 
@@ -157,7 +158,11 @@ async def test_app_key_endpoints(authed: httpx.AsyncClient, ctx: AppContext) -> 
     assert r.text.strip() == ctx.app_key.public_line and "attachment" in r.headers["content-disposition"]
 
 
-async def test_update_check_offers_fixture_release(authed: httpx.AsyncClient) -> None:
+async def test_update_check_offers_fixture_release(
+    authed: httpx.AsyncClient, ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Older than every fixture release, whatever version this build is.
+    monkeypatch.setattr(ctx.updater, "_current", Version(0, 0, 9, None))
     status = (await authed.post("/api/update/check")).json()
     assert status["available"] and status["latest"]["version"] == "0.1.0" and status["can_install"] is False
 

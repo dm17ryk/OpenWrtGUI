@@ -34,7 +34,7 @@ uv run pytest                             # unit + contract; hardware tests are 
 cd frontend && npm ci && npm run lint && npx tsc -b && npm test
 npm run build && npm run e2e              # Playwright against the simulator
 uv run python tools/dump_openapi.py && npm run gen:api   # after any API change
-pwsh -File tools/build_windows.ps1 -Version 0.1.0-dev    # PyInstaller build + self-check
+pwsh -File tools/build_windows.ps1        # PyInstaller build + self-check (version BASE_VERSION-dev)
 ```
 
 ## Conventions
