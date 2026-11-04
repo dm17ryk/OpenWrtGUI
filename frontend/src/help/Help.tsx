@@ -7,9 +7,14 @@ const CLOSE_DELAY_MS = 200
 const BUTTON_OPEN_DELAY_MS = 350
 const EDGE_PX = 8
 
+const CONTROLS = ['a', 'button', 'input', 'select', 'textarea']
+
 function useBubble(openDelayMs: number) {
   const [open, setOpen] = useState(false)
   const timer = useRef<number | undefined>(undefined)
+  // While the pointer is over the control or its bubble, losing focus does not close it (clicking
+  // the bubble's text takes the focus away).
+  const hovered = useRef(false)
   const later = (value: boolean, ms: number): void => {
     window.clearTimeout(timer.current)
     if (ms === 0) setOpen(value)
@@ -29,8 +34,17 @@ function useBubble(openDelayMs: number) {
   return {
     open,
     show: () => later(true, 0),
-    hoverShow: () => later(true, openDelayMs),
-    hide: () => later(false, CLOSE_DELAY_MS),
+    enter: () => {
+      hovered.current = true
+      later(true, openDelayMs)
+    },
+    leave: () => {
+      hovered.current = false
+      later(false, CLOSE_DELAY_MS)
+    },
+    blur: () => {
+      if (!hovered.current) later(false, CLOSE_DELAY_MS)
+    },
   }
 }
 
@@ -47,8 +61,9 @@ function Bubble({ id, entry }: { id: string; entry: HelpEntry }) {
   return (
     <span ref={ref} role="tooltip" id={id} className="help-tip" style={shift ? { transform: `translateX(${shift}px)` } : undefined}>
       <strong>{entry.title}</strong>
-      {entry.blocks.map((block) => (
-        <span key={block}>{block}</span>
+      {entry.blocks.map((block, i) => (
+        // oxlint-disable-next-line react/no-array-index-key -- fixed text from the manual, never reordered
+        <span key={i}>{block}</span>
       ))}
       <a href={entry.url} target="_blank" rel="noopener noreferrer">
         More in the manual
@@ -61,11 +76,11 @@ function Wrapper({ bubble, children }: { bubble: ReturnType<typeof useBubble>; c
   return (
     <span
       className="help"
-      onMouseEnter={bubble.hoverShow}
-      onMouseLeave={bubble.hide}
+      onMouseEnter={bubble.enter}
+      onMouseLeave={bubble.leave}
       onFocus={bubble.show}
       onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) bubble.hide()
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) bubble.blur()
       }}
     >
       {children}
@@ -96,15 +111,24 @@ export function Help({ topic }: { topic: string }) {
   )
 }
 
-/** Wraps a button or link so that resting on it, or focusing it, shows the manual's text for it. */
-export function HelpTip({ topic, children }: { topic: string; children: ReactElement<{ 'aria-describedby'?: string }> }) {
+type TipTarget = ReactElement<{ 'aria-describedby'?: string; tabIndex?: number }>
+
+/**
+ * Wraps a control (or a badge) so that resting on it, or focusing it, shows the manual's text for
+ * it. A badge or other plain element is made focusable, so keyboard users reach its help too.
+ */
+export function HelpTip({ topic, children }: { topic: string; children: TipTarget }) {
   const id = useId()
   const bubble = useBubble(BUTTON_OPEN_DELAY_MS)
   const entry = helpFor(topic)
   if (!entry) return children
+  const plain = typeof children.type === 'string' && !CONTROLS.includes(children.type)
   return (
     <Wrapper bubble={bubble}>
-      {cloneElement(children, { 'aria-describedby': bubble.open ? id : undefined })}
+      {cloneElement(children, {
+        'aria-describedby': bubble.open ? id : undefined,
+        ...(plain && children.props.tabIndex === undefined ? { tabIndex: 0 } : {}),
+      })}
       {bubble.open && <Bubble id={id} entry={entry} />}
     </Wrapper>
   )

@@ -313,10 +313,44 @@ class _RecordingConnector(SimConnector):
     def __init__(self, sim_dir: Path) -> None:
         super().__init__(sim_dir)
         self.usernames: list[str] = []
+        self.attempts: list[tuple[list[str], str | None, bool]] = []
 
     async def connect(self, host: str, port: int, **kwargs: object) -> Transport:
         self.usernames.append(str(kwargs["username"]))
+        keys = [Path(str(p)).name for p in kwargs["key_paths"]]  # type: ignore[attr-defined]
+        self.attempts.append((keys, kwargs["password"], bool(kwargs.get("prove", False))))  # type: ignore[arg-type]
         return await super().connect(host, port, **kwargs)  # type: ignore[arg-type]
+
+
+async def test_auto_login_order_and_only_the_last_try_may_get_in_without_credentials(
+    tmp_path: Path, app_key: AppKey, clock: Clock
+) -> None:
+    connector = _RecordingConnector(SIM_DIR)
+    pc = _pc_key(tmp_path / "home" / ".ssh" / "id_rsa")
+    service = _service(tmp_path, app_key, connector, clock, pc_keys=[pc])  # type: ignore[arg-type]
+    v = await service.auto_login(await _trusted(service))
+    assert v.step == Step.LOGIN
+    assert connector.attempts == [
+        (["id_ed25519"], None, True),  # the app key
+        (["id_rsa"], None, True),  # this PC's key
+        ([], "root", True),  # root / root, offered without any key
+        ([], None, False),  # nothing at all: only a router without a root password lets this in
+    ]
+
+
+async def test_a_new_login_forgets_an_earlier_key_proof(
+    tmp_path: Path, app_key: AppKey, connector: SimConnector, clock: Clock
+) -> None:
+    pc = _pc_key(tmp_path / "home" / ".ssh" / "id_rsa")
+    connector.state(NEW_HOST).authorized_keys.append(_public(pc))
+    service = _service(tmp_path, app_key, connector, clock, pc_keys=[pc])
+    v = await service.auto_login(await _trusted(service))
+    assert v.login_method == "pc_key"
+    v = await service.login(v.sid, password="sim-password")
+    assert v.step == Step.INSTALL_KEY and v.key_path is None and not v.key_installed
+    v = await service.identify(v.sid)
+    rec = await service.finish(v.sid, "AP4", v.proposed_port_labels)
+    assert rec.auth == "none" and rec.key_path is None
 
 
 async def test_login_with_another_user_is_kept(tmp_path: Path, app_key: AppKey, clock: Clock) -> None:

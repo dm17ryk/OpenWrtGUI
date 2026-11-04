@@ -21,6 +21,13 @@ class _Server(asyncssh.SSHServer):
         return username == "root" and password == TEST_PASSWORD
 
 
+class _NoLoginServer(_Server):
+    """Like dropbear with an empty root password: anyone gets in without credentials."""
+
+    def begin_auth(self, username: str) -> bool:
+        return False
+
+
 async def _handle(process: asyncssh.SSHServerProcess[str]) -> None:
     cmd = process.command
     if cmd == "echo hi":
@@ -47,11 +54,11 @@ class SshServer:
     server: asyncssh.SSHAcceptor
 
 
-async def start_server(authorized: Sequence[str] = ()) -> SshServer:
+async def start_server(authorized: Sequence[str] = (), *, no_login: bool = False) -> SshServer:
     host_key = asyncssh.generate_private_key("ssh-ed25519")
     auth_keys = asyncssh.import_authorized_keys("\n".join(authorized) + "\n") if authorized else None
     acceptor = await asyncssh.create_server(
-        _Server,
+        _NoLoginServer if no_login else _Server,
         "127.0.0.1",
         0,
         server_host_keys=[host_key],

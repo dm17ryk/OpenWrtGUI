@@ -44,10 +44,11 @@ Invoke-Step "PyInstaller" {
 }
 $Exe = Join-Path $Root "dist\OpenWrtGUI\OpenWrtGUI.exe"
 if (-not (Test-Path $Exe)) { throw "PyInstaller produced no $Exe" }
-# Dev tools and optional extras that hooks drag in (pydantic.mypy, pygments' image formatter) only
-# make the installer bigger; packaging/OpenWrtGUI.spec excludes them.
-$Leaked = @("mypy", "PIL", "pytest", "_pytest", "ruff") |
-    Where-Object { Test-Path (Join-Path $Root "dist\OpenWrtGUI\_internal\$_") }
+# Dev tools and optional extras that hooks drag in (pydantic.mypy, pygments' image formatter, anyio's
+# pytest runner) only make the installer bigger; packaging/OpenWrtGUI.spec excludes them. The
+# analysis TOC lists every collected module, also the pure-Python ones inside the PYZ archive.
+$Toc = Get-Content (Join-Path $Root "build\pyi\OpenWrtGUI\Analysis-00.toc") -Raw
+$Leaked = @("mypy", "PIL", "pytest", "_pytest", "ruff") | Where-Object { $Toc -match "\('$_[.']" }
 if ($Leaked) { throw "the bundle contains packages it must not ship: $($Leaked -join ', ')" }
 
 # 4. Self-check of the built exe. It is a windowed app, so wait for it explicitly. Its own data

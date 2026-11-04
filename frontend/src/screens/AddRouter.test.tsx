@@ -15,6 +15,7 @@ const PC_KEY = 'C:\\Essence_SC\\home\\.ssh\\id_rsa'
 const calls: Array<{ path: string; body: unknown }> = []
 let installFails = false
 let autoLogin: SessionView = sessionView('login')
+let autoLoginFails = false
 
 vi.mock('../api/client', async (orig) => {
   const actual = await orig<typeof import('../api/client')>()
@@ -22,7 +23,10 @@ vi.mock('../api/client', async (orig) => {
     calls.push({ path, body })
     if (path === '/api/onboard') return sessionView('host_key')
     if (path.endsWith('/trust')) return sessionView('login')
-    if (path.endsWith('/auto-login')) return autoLogin
+    if (path.endsWith('/auto-login')) {
+      if (autoLoginFails) throw new actual.ApiError(504, '192.168.1.4:22: timed out', {})
+      return autoLogin
+    }
     if (path.endsWith('/login')) return sessionView('install_key', { login_method: 'password' })
     if (path.endsWith('/install-key/preview')) return { commands: [INSTALL] }
     if (path.endsWith('/install-key')) {
@@ -50,6 +54,7 @@ beforeEach(() => {
   calls.length = 0
   installFails = false
   autoLogin = sessionView('login')
+  autoLoginFails = false
 })
 
 function renderWizard() {
@@ -101,6 +106,18 @@ test('after pinning it tries the logins by itself, then asks', async () => {
   expect(await screen.findByText(/None of them worked/)).toHaveTextContent('the app’s key, this PC’s keys and root / root')
   expect(calls.map((c) => c.path)).toContain('/api/onboard/s1/auto-login')
   expect(screen.getByLabelText('User')).toHaveValue('root')
+})
+
+test('when the automatic login fails it says so and can try again', async () => {
+  autoLoginFails = true
+  const user = await toLogin()
+  expect(await screen.findByRole('alert')).toHaveTextContent('192.168.1.4:22: timed out')
+  expect(screen.getByText(/The automatic login stopped/)).toBeInTheDocument()
+  expect(screen.queryByText(/None of them worked/)).toBeNull()
+  autoLoginFails = false
+  await user.click(screen.getByRole('button', { name: 'Try again' }))
+  expect(await screen.findByText(/None of them worked/)).toBeInTheDocument()
+  expect(calls.filter((c) => c.path.endsWith('/auto-login'))).toHaveLength(2)
 })
 
 test('password field is emptied after login submit and the user goes along', async () => {

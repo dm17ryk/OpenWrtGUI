@@ -122,7 +122,13 @@ class SshTransport:
         password: str | None = None,
         key_paths: Sequence[Path] = (),
         timeout: float = 10.0,
+        prove: bool = False,
     ) -> SshTransport:
+        """Log in with exactly the given password and key files, nothing from ~/.ssh.
+
+        prove=True refuses a router that lets us in without checking anything (an empty root
+        password), so a successful login proves that the key or password really works.
+        """
         pinned = host_keys.get(host, port)
         if pinned is None:
             raise HostKeyUnknown(host, await fetch_host_key(host, port, timeout))
@@ -134,9 +140,12 @@ class SshTransport:
                     port,
                     username=username,
                     password=password,
-                    client_keys=client_keys,
+                    # [] would make asyncssh load ~/.ssh/id_*, and () reads ~/.ssh/config.
+                    client_keys=client_keys or None,
+                    config=[],
                     agent_path=None,
                     known_hosts=str(host_keys.path),
+                    disable_trivial_auth=prove,
                 ),
                 timeout,
             )

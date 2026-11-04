@@ -54,8 +54,9 @@ a = Analysis(
     datas=[("../frontend/dist", "openwrtgui/web")],
     hiddenimports=hiddenimports,
     # pydantic's hook collects pydantic.mypy (which imports mypy); pygments' image formatter imports
-    # PIL. The app needs neither, and together they are ~16 MB. build_windows.ps1 checks they stay out.
-    excludes=["tkinter", "mypy", "pydantic.mypy", "PIL"],
+    # PIL; anyio's pytest runner imports _pytest. The app needs none of them, and together they are
+    # ~16 MB. build_windows.ps1 checks they stay out.
+    excludes=["tkinter", "mypy", "pydantic.mypy", "PIL", "pytest", "_pytest"],
     noarchive=False,
 )
 pyz = PYZ(a.pure)

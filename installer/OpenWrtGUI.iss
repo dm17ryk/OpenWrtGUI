@@ -98,6 +98,70 @@ begin
   Result := DataDirPage.Values[0];
 end;
 
+{ An existing OpenWrtGUI data folder: the app writes these two files at its top. }
+function IsOwnDataDir(Dir: String): Boolean;
+begin
+  Result := FileExists(AddBackslash(Dir) + 'routers.json') or FileExists(AddBackslash(Dir) + 'settings.json');
+end;
+
+function IsEmptyDir(Dir: String): Boolean;
+var
+  Rec: TFindRec;
+begin
+  Result := True;
+  if FindFirst(AddBackslash(Dir) + '*', Rec) then
+  try
+    repeat
+      if (Rec.Name <> '.') and (Rec.Name <> '..') then
+      begin
+        Result := False;
+        Exit;
+      end;
+    until not FindNext(Rec);
+  finally
+    FindClose(Rec);
+  end;
+end;
+
+{ Uninstall may delete the data folder's logs, keys, audit and updates subfolders, so the data
+  folder must be the app's own: new, empty, or an OpenWrtGUI data folder already. }
+function DataDirProblem(Dir: String): String;
+begin
+  Result := '';
+  Dir := RemoveBackslashUnlessRoot(Trim(Dir));
+  if Dir = '' then
+    Result := 'Choose a data folder.'
+  else if Length(Dir) <= 3 then
+    Result := 'Choose a folder of its own for the data, not the whole drive ' + Dir + '.'
+  else if DirExists(Dir) and not IsEmptyDir(Dir) and not IsOwnDataDir(Dir) then
+    Result := 'The data folder ' + Dir + ' already holds other files. Choose an empty or new folder ' +
+              'of its own, for example ' + AddBackslash(Dir) + 'OpenWrtGUI-data.';
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  Problem: String;
+begin
+  Result := True;
+  { Silent installs run this too; PrepareToInstall refuses them without a message box. }
+  if (CurPageID = DataDirPage.ID) and not WizardSilent then
+  begin
+    Problem := DataDirProblem(DataDirPage.Values[0]);
+    if Problem <> '' then
+    begin
+      MsgBox(Problem, mbError, MB_OK);
+      Result := False;
+    end;
+  end;
+end;
+
+{ Silent installs (/DATADIR=...) skip the wizard pages, so check again here; Setup then stops
+  with exit code 7. }
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := DataDirProblem(DataDirPage.Values[0]);
+end;
+
 { After an in-app update the silent installer starts the new version again. }
 function ShouldRelaunch: Boolean;
 begin
@@ -110,8 +174,8 @@ var
 begin
   DataDirPage := CreateInputDirPage(wpSelectDir,
     'Data folder', 'Where should OpenWrtGUI keep its routers, keys and audit log?',
-    'On a PC with SentinelOne keep it inside C:\Essence_SC or D:\Essence_SC.' + #13#10 +
-    'Updates keep this folder; uninstall asks before deleting it.',
+    'Use an empty or new folder of its own. On a PC with SentinelOne keep it inside C:\Essence_SC ' +
+    'or D:\Essence_SC.' + #13#10 + 'Updates keep this folder; uninstall asks before deleting it.',
     False, '');
   DataDirPage.Add('');
   Initial := ExpandConstant('{param:DATADIR|}');
@@ -152,7 +216,8 @@ begin
     if not RegQueryStringValue(HKCU, 'Software\OpenWrtGUI', 'DataDir', UninstallDataDir) then
       UninstallDataDir := DefaultDataDir;
   end;
-  if (CurUninstallStep = usPostUninstall) and not UninstallSilent and DirExists(UninstallDataDir) then
+  { Only a folder that holds the app's own files: never a shared folder chosen some other way. }
+  if (CurUninstallStep = usPostUninstall) and not UninstallSilent and IsOwnDataDir(UninstallDataDir) then
   begin
     if MsgBox('Also delete the data folder (routers, keys, audit log)?' + #13#10#13#10 + UninstallDataDir,
               mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from openwrtgui.store.routers import RouterRecord
-from openwrtgui.transport.base import Transport, Unreachable
+from openwrtgui.transport.base import KeyFileError, Transport, Unreachable
 from openwrtgui.transport.fake import ReplayTransport
 from openwrtgui.transport.pool import ConnectionPool
 
@@ -90,6 +90,26 @@ async def test_drop_closes_and_reconnects() -> None:
     await pool.get(_rec("ap2"))
     assert made == 2
     await pool.close_all()
+
+
+async def test_drop_forgets_the_backoff_so_a_re_added_router_connects_at_once() -> None:
+    clock = Clock()
+    attempts = 0
+
+    async def factory(rec: RouterRecord) -> Transport:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise KeyFileError(r"C:\home\.ssh\id_rsa", "No such file")
+        return ReplayTransport({})
+
+    pool = ConnectionPool(factory, clock=clock)
+    with pytest.raises(KeyFileError):
+        await pool.get(_rec("ap2"))
+    assert "id_rsa" in (pool.health("ap2").error or "")
+    await pool.drop("ap2")  # what the wizard does when the router is added again
+    await pool.get(_rec("ap2"))
+    assert attempts == 2 and pool.health("ap2").online
 
 
 def test_write_lock_is_per_router() -> None:

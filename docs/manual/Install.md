@@ -15,7 +15,9 @@
 2. Run it. It installs for your Windows user only; no admin rights are needed.
 3. **Install folder**, where the program goes.
 4. **Data folder**, where the app keeps the router list, pinned host keys, its SSH key, the audit log and
-   settings. Updates keep it; uninstalling asks before deleting it.
+   settings. It must be a folder of its own: new, empty, or the data folder of an earlier install. The
+   installer refuses a drive or a folder that already holds other files. Updates keep it; uninstalling
+   asks before deleting it.
 5. Finish. The app starts, and adds a Start-menu entry (and a desktop icon if you ticked it).
 
 The installer proposes these folders; you can change both:
@@ -43,7 +45,8 @@ OpenWrtGUI-Setup-0.1.0.exe /VERYSILENT /DIR="C:\Essence_SC\apps\OpenWrtGUI" /DAT
 ## Uninstall
 
 Windows Settings → Apps → OpenWrtGUI → Uninstall. You are asked whether to delete the data folder too;
-the default is to keep it. When you say yes, only the app's own files and folders in it are deleted.
+the default is to keep it. When you say yes, only the app's own files and folders in it are deleted,
+then the folder itself if nothing else is left. A silent uninstall never deletes the data folder.
 
 ## Running more than once
 

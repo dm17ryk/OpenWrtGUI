@@ -109,13 +109,19 @@ function clip(blocks: string[]): string[] {
 export function parseManual(pages: Record<string, string>): Map<string, HelpEntry> {
   const help = new Map<string, HelpEntry>()
   for (const [page, markdown] of Object.entries(pages)) {
-    const parts = markdown.split(/^(#{1,3}) +(.+)$/m)
+    // A "## line" inside a code block is code, not a heading (plainBlocks skips code anyway).
+    const parts = markdown.replace(/^```[\s\S]*?^```.*$/gm, '').split(/^(#{1,3}) +(.+)$/m)
     // parts: [before, hashes, heading, body, hashes, heading, body, ...]
+    const seen = new Map<string, number>()
     for (let i = 1; i < parts.length; i += 3) {
       const [hashes, heading, body] = [parts[i], parts[i + 1].trim(), parts[i + 2] ?? '']
+      // GitHub numbers repeated headings: notes, notes-1, notes-2.
+      const base = slug(heading)
+      const n = seen.get(base) ?? 0
+      seen.set(base, n + 1)
       const blocks = clip(plainBlocks(body))
       if (blocks.length === 0) continue
-      const topic = hashes === '#' ? page : `${page}#${slug(heading)}`
+      const topic = hashes === '#' ? page : `${page}#${n ? `${base}-${n}` : base}`
       help.set(topic, { title: hashes === '#' ? heading : inline(heading), blocks, url: WIKI + topic })
     }
   }

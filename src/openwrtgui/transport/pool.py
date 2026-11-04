@@ -87,7 +87,10 @@ class ConnectionPool:
         log.debug("%s unreachable (%s); next try in %s s", router_id, exc, delay)
 
     async def drop(self, router_id: str) -> None:
+        """Close the connection and forget the backoff: the next get() connects at once."""
         slot = self._slot(router_id)
+        slot.failures = 0
+        slot.retry_at = None
         transport, slot.transport = slot.transport, None
         if transport is not None:
             try:

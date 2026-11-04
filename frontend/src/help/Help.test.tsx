@@ -49,6 +49,27 @@ test('a button wrapped in HelpTip describes itself with the manual text', async 
   expect(tip).toHaveTextContent('Going back')
 })
 
+test('clicking the text inside the bubble keeps it open', async () => {
+  const user = userEvent.setup()
+  render(<Help topic="Dashboard#headline" />)
+  await user.click(screen.getByRole('button', { name: 'Help: Headline' }))
+  await user.click(screen.getByText(/The title counts the bench/))
+  await new Promise((resolve) => setTimeout(resolve, 400))
+  expect(screen.getByRole('tooltip')).toBeInTheDocument()
+})
+
+test('a tip on something that is not a control can still be reached with the keyboard', async () => {
+  const user = userEvent.setup()
+  render(
+    <HelpTip topic="Dashboard#router-cards">
+      <span className="b air">on air</span>
+    </HelpTip>,
+  )
+  await user.tab()
+  expect(screen.getByText('on air')).toHaveFocus()
+  expect(screen.getByRole('tooltip')).toHaveTextContent('One card per router')
+})
+
 test('an unknown topic renders nothing extra', () => {
   const { container } = render(<Help topic="Nope#nothing" />)
   expect(container).toBeEmptyDOMElement()

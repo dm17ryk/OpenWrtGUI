@@ -44,6 +44,15 @@ test('a page gives its intro under the page name and each section under its anch
   expect(help.get('Dashboard#headline')?.blocks).toEqual(['Counts the bench.'])
 })
 
+test('a heading inside a code block is not a section, and a repeated heading gets -1 like on GitHub', () => {
+  const help = parseManual({
+    Page: '# Page\n\n## Notes\n\nFirst.\n\n```\n## not a heading\n```\n\n## Notes\n\nSecond.\n',
+  })
+  expect([...help.keys()]).toEqual(['Page#notes', 'Page#notes-1'])
+  expect(help.get('Page#notes')?.blocks).toEqual(['First.'])
+  expect(help.get('Page#notes-1')?.blocks).toEqual(['Second.'])
+})
+
 test('long sections are cut after a few blocks', () => {
   const long = Array.from({ length: 8 }, (_, i) => `Sentence number ${i} is here to make the section long enough.`).join('\n\n')
   const blocks = parseManual({ Page: `# Page\n\n## Long\n\n${long}\n` }).get('Page#long')?.blocks ?? []

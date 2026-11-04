@@ -135,11 +135,15 @@ class SimConnector:
         password: str | None,
         key_paths: Sequence[Path],
         username: str = "root",
+        prove: bool = False,
     ) -> Transport:
         entry = self._entry(host)
         state = self.state(host)
         if state.root_password is None:
-            pass  # like dropbear with an empty root password: any login gets in
+            # Like dropbear with an empty root password: anyone gets in without being checked,
+            # which a login that must prove itself (asyncssh disable_trivial_auth) refuses.
+            if prove:
+                raise AuthFailed(f"{host} let the login in without checking it")
         elif password is not None:
             if password != state.root_password:
                 raise AuthFailed(f"{host} refused the login")

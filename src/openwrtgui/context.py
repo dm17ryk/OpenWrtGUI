@@ -99,7 +99,11 @@ def build_context(
 
         async def factory(rec: RouterRecord) -> Transport:
             return await sim.connect(
-                rec.host, rec.port, password=None, key_paths=router_key_paths(rec, app_key.private_path)
+                rec.host,
+                rec.port,
+                password=None,
+                key_paths=router_key_paths(rec, app_key.private_path),
+                username=rec.username,
             )
 
         def client_factory() -> httpx.AsyncClient:

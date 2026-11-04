@@ -69,6 +69,7 @@ class Connector(Protocol):
         password: str | None,
         key_paths: Sequence[Path],
         username: str = DEFAULT_USER,
+        prove: bool = False,
     ) -> Transport: ...
 
 
@@ -87,9 +88,16 @@ class SshConnector:
         password: str | None,
         key_paths: Sequence[Path],
         username: str = DEFAULT_USER,
+        prove: bool = False,
     ) -> Transport:
         return await SshTransport.connect(
-            host, port, username, host_keys=self._host_keys, password=password, key_paths=key_paths
+            host,
+            port,
+            username,
+            host_keys=self._host_keys,
+            password=password,
+            key_paths=key_paths,
+            prove=prove,
         )
 
 
@@ -216,6 +224,10 @@ class OnboardService:
         if s.transport is not None:
             await s.transport.close()
         s.transport = transport
+        # A new login replaces whatever an earlier one proved.
+        s.key_verified = False
+        s.key_installed = False
+        s.key_path = None
         state = (await transport.run(ROOT_PASSWORD_STATE)).stdout.strip()
         s.root_password = state if state in ("none", "set") else "unknown"
         s.login_method = method
@@ -253,10 +265,13 @@ class OnboardService:
         return self._view(s)
 
     async def auto_login(self, sid: str) -> SessionView:
-        """Log in with nothing typed: the app key, then this PC's own keys, then root/root.
+        """Log in with nothing typed: the app key, this PC's own keys, root/root, then nothing.
 
-        A key that already works means nothing gets installed. If none of them work the session
-        stays at LOGIN for the user to type. A router that stops answering is raised, not hidden.
+        The key and password tries must prove themselves (a router with an empty root password
+        lets anything in, which proves nothing); only the last try may get in without
+        credentials, and that is reported as "no_password". A key that works means nothing
+        gets installed. If nothing works the session stays at LOGIN for the user to type.
+        A router that stops answering is raised, not hidden.
         """
         s = await self._get(sid)
         self._require_trusted(s)
@@ -264,6 +279,7 @@ class OnboardService:
         tries: list[tuple[LoginMethod, str | None, Path | None]] = [("app_key", None, app_key)]
         tries += [("pc_key", None, p) for p in self._pc_keys() if p != app_key]
         tries.append(("default_password", DEFAULT_PASSWORD, None))
+        tries.append(("no_password", None, None))
         for method, password, key in tries:
             try:
                 transport = await self._connector.connect(
@@ -272,6 +288,7 @@ class OnboardService:
                     username=s.username,
                     password=password,
                     key_paths=[key] if key else [],
+                    prove=method != "no_password",
                 )
             except AuthFailed:
                 continue
@@ -279,14 +296,13 @@ class OnboardService:
                 log.info("auto-login skipped: %s", exc)
                 continue
             await self._logged_in(s, transport, method)
-            if s.root_password == "none":
-                # Without a root password the router lets any login in, so no key was proven.
-                s.login_method = "no_password"
-            elif key is not None:
+            if key is not None and s.root_password != "none":
                 s.key_verified = True
                 s.key_installed = method == "app_key"
                 s.key_path = key if method == "pc_key" else None
                 s.step = Step.IDENTIFY
+            elif s.root_password == "none":
+                s.login_method = "no_password"
             return self._view(s)
         return self._view(s)
 

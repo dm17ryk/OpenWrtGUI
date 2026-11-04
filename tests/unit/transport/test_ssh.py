@@ -125,40 +125,104 @@ async def test_a_key_with_a_passphrase_is_a_key_file_error(ssh_server: SshServer
         await SshTransport.connect("127.0.0.1", ssh_server.port, "root", host_keys=store, key_paths=[locked])
 
 
-async def test_wizard_auto_login_finds_a_pc_key_over_ssh(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+async def test_no_key_paths_offers_no_default_keys_and_ignores_ssh_config(
+    ssh_server: SshServer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(keys_module, "restrict_to_user", lambda path: None)
-    app_key = load_or_create_app_key(tmp_path / "keys", comment="openwrtgui@TEST")
+    # asyncssh turns client_keys=[] into "load ~/.ssh/id_*" and config=() into "read ~/.ssh/config".
+    store = await _pinned(ssh_server, tmp_path)
+    seen: dict[str, object] = {}
+
+    async def fake_connect(*args: object, **kwargs: object) -> object:
+        seen.update(kwargs)
+        raise asyncssh.PermissionDenied("stop here")
+
+    monkeypatch.setattr(asyncssh, "connect", fake_connect)
+    with pytest.raises(AuthFailed):
+        await SshTransport.connect("127.0.0.1", ssh_server.port, "root", host_keys=store, password="x")
+    assert seen["client_keys"] is None and seen["config"] == [] and seen["agent_path"] is None
+    assert seen["disable_trivial_auth"] is False
+
+
+async def test_proving_a_login_refuses_a_router_that_asks_for_nothing(tmp_path: Path) -> None:
+    srv = await start_server(no_login=True)
+    try:
+        store = await _pinned(srv, tmp_path)
+        with pytest.raises(AuthFailed):
+            await SshTransport.connect(
+                "127.0.0.1", srv.port, "root", host_keys=store, password="root", prove=True
+            )
+        t = await SshTransport.connect("127.0.0.1", srv.port, "root", host_keys=store)
+        await t.close()
+    finally:
+        srv.server.close()
+        await srv.server.wait_closed()
+
+
+def _pc_key(tmp_path: Path) -> tuple[Path, str]:
     pc = asyncssh.generate_private_key("ssh-ed25519")
     pc_path = tmp_path / "home" / ".ssh" / "id_rsa"
     pc_path.parent.mkdir(parents=True)
     pc.write_private_key(str(pc_path))
-    srv = await start_server(authorized=[pc.export_public_key("openssh").decode().strip()])
+    return pc_path, pc.export_public_key("openssh").decode().strip()
+
+
+def _wizard(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, pc_keys: list[Path]) -> OnboardService:
+    monkeypatch.setattr(keys_module, "restrict_to_user", lambda path: None)
     host_keys = HostKeyStore(tmp_path / "known_hosts")
 
     async def no_pool(rec: object) -> object:
         raise AssertionError("pool not used by the wizard")
 
-    service = OnboardService(
+    return OnboardService(
         connector=SshConnector(host_keys),
         host_keys=host_keys,
-        app_key=app_key,
+        app_key=load_or_create_app_key(tmp_path / "keys", comment="openwrtgui@TEST"),
         routers=RouterStore(tmp_path / "routers.json"),
         guard=BenchGuard(GuardWatchList(lock_files=[], processes=[]), lister=list),
         audit=AuditLog(tmp_path / "audit"),
         pool=ConnectionPool(no_pool),  # type: ignore[arg-type]
-        pc_keys=lambda: [tmp_path / "home" / ".ssh" / "id_ed25519", pc_path],
+        pc_keys=lambda: pc_keys,
     )
+
+
+async def _stop(service: OnboardService, srv: SshServer) -> None:
+    """Close the wizard's connections first: wait_closed() waits for every open one."""
+    for sid in list(service._sessions):
+        await service.cancel(sid)
+    srv.server.close()
+    await srv.server.wait_closed()
+
+
+async def test_wizard_auto_login_finds_a_pc_key_over_ssh(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pc_path, pc_public = _pc_key(tmp_path)
+    srv = await start_server(authorized=[pc_public])
+    service = _wizard(tmp_path, monkeypatch, [tmp_path / "home" / ".ssh" / "id_ed25519", pc_path])
     try:
         v = await service.start("127.0.0.1", srv.port)
         v = await service.trust(v.sid, v.host_key.fingerprint)  # type: ignore[union-attr]
         v = await service.auto_login(v.sid)
         assert v.step == Step.IDENTIFY and v.login_method == "pc_key" and v.key_path == str(pc_path)
-        await service.cancel(v.sid)
     finally:
-        srv.server.close()
-        await srv.server.wait_closed()
+        await _stop(service, srv)
+
+
+async def test_wizard_auto_login_on_a_router_that_asks_for_no_login(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Such a router lets every key "work"; none of them is proven, and nothing may be recorded as one.
+    pc_path, pc_public = _pc_key(tmp_path)
+    srv = await start_server(authorized=[pc_public], no_login=True)
+    service = _wizard(tmp_path, monkeypatch, [pc_path])
+    try:
+        v = await service.start("127.0.0.1", srv.port)
+        v = await service.trust(v.sid, v.host_key.fingerprint)  # type: ignore[union-attr]
+        v = await service.auto_login(v.sid)
+        assert v.step == Step.INSTALL_KEY and v.login_method == "no_password"
+        assert v.key_path is None and not v.key_installed
+    finally:
+        await _stop(service, srv)
 
 
 async def test_shell_channel(ssh_server: SshServer, tmp_path: Path) -> None:

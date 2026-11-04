@@ -44,6 +44,7 @@ export function AddRouter() {
   const [port, setPort] = useState('22')
   const [view, setView] = useState<SessionView | null>(null)
   const [trying, setTrying] = useState(false)
+  const [autoFailed, setAutoFailed] = useState(false)
   const [username, setUsername] = useState('root')
   const [password, setPassword] = useState('')
   const [useKeyFile, setUseKeyFile] = useState(false)
@@ -95,16 +96,24 @@ export function AddRouter() {
     }
   }
 
+  const autoLogin = async (): Promise<void> => {
+    setTrying(true)
+    setAutoFailed(false)
+    try {
+      await loggedIn(await postJson<SessionView>(`/api/onboard/${sid}/auto-login`))
+    } catch (err) {
+      setAutoFailed(true)
+      throw err
+    } finally {
+      setTrying(false)
+    }
+  }
+
   const trust = (): void =>
     void run(async () => {
       setView(await postJson<SessionView>(`/api/onboard/${sid}/trust`, { fingerprint: view?.host_key?.fingerprint }))
       setStep(2)
-      setTrying(true)
-      try {
-        await loggedIn(await postJson<SessionView>(`/api/onboard/${sid}/auto-login`))
-      } finally {
-        setTrying(false)
-      }
+      await autoLogin()
     })
 
   const login = (e: FormEvent): void => {
@@ -196,7 +205,16 @@ export function AddRouter() {
   } else if (step === 2) {
     body = (
       <form className="stack" onSubmit={login}>
-        <div className="muted">None of them worked: the app tried the app’s key, this PC’s keys and root / root. Log in once yourself.</div>
+        {autoFailed ? (
+          <div className="row" style={{ gap: 8 }}>
+            <span className="muted">The automatic login stopped (the reason is above). Log in once yourself, or</span>
+            <button className="btn" type="button" onClick={() => void run(autoLogin)} disabled={busy}>
+              Try again
+            </button>
+          </div>
+        ) : (
+          <div className="muted">None of them worked: the app tried the app’s key, this PC’s keys and root / root. Log in once yourself.</div>
+        )}
         <div className="seg" role="group" aria-label="How to log in">
           <button type="button" className={useKeyFile ? '' : 'on'} aria-pressed={!useKeyFile} onClick={() => setUseKeyFile(false)}>
             Password
