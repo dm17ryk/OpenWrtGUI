@@ -42,8 +42,9 @@ class StatusPoller:
         self._last_guard: tuple[bool, tuple[str, ...]] | None = None
 
     def _offline(self, rec: RouterRecord) -> None:
+        # The router's last-known guard signs stay: a run SSID must not unlock the bench just because
+        # the router stopped answering (busy under load, rebooting). Removing the router clears them.
         self.statuses.pop(rec.id, None)
-        self.guard.set_router_signs(rec.id, [])
         health = self.pool.health(rec.id)
         self.hub.publish(
             {

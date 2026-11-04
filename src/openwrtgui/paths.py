@@ -64,18 +64,34 @@ def _default_root(env: Mapping[str, str]) -> Path:
     return Path.home() / ".local" / "share" / "openwrtgui"
 
 
+def resolve_data_root(
+    env: Mapping[str, str] = os.environ,
+    read_registry: Callable[[], str | None] = read_registry_data_dir,
+) -> Path:
+    """Env OPENWRTGUI_DATA, then the installer's registry value, then the per-user default."""
+    explicit = env.get(ENV_DATA)
+    if explicit:
+        return Path(explicit)
+    from_registry = read_registry()
+    if from_registry:
+        return Path(from_registry)
+    return _default_root(env)
+
+
 def resolve_data_dir(
     env: Mapping[str, str] = os.environ,
     read_registry: Callable[[], str | None] = read_registry_data_dir,
 ) -> DataDir:
-    """Env OPENWRTGUI_DATA, then the installer's registry value, then the per-user default."""
-    explicit = env.get(ENV_DATA)
-    if explicit:
-        return DataDir.at(Path(explicit))
-    from_registry = read_registry()
-    if from_registry:
-        return DataDir.at(Path(from_registry))
-    return DataDir.at(_default_root(env))
+    return DataDir.at(resolve_data_root(env, read_registry))
+
+
+def simulator_data_dir(
+    env: Mapping[str, str] = os.environ,
+    read_registry: Callable[[], str | None] = read_registry_data_dir,
+) -> DataDir:
+    """A sibling of the real data folder (<data>-simulator), so simulated routers and keys stay out of it."""
+    root = resolve_data_root(env, read_registry)
+    return DataDir.at(root.with_name(f"{root.name}-simulator"))
 
 
 def web_dir(explicit: Path | None) -> Path | None:

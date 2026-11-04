@@ -90,6 +90,16 @@ def test_router_ssid_sign_and_clear() -> None:
     assert not g.check_local().live
 
 
+def test_forgetting_a_router_clears_its_signs() -> None:
+    g = BenchGuard(watch(router_ssids=["OpenWrtB"]), lister=no_processes)
+    g.set_router_signs("ap2", ["OpenWrtB"])
+    g.set_router_signs("ap3", ["OpenWrt"])
+    assert g.check_local().live
+    g.forget_router("ap2")
+    assert not g.check_local().live
+    g.forget_router("ap9")  # unknown ids are fine
+
+
 def test_require_clear_raises_guard_locked() -> None:
     g = BenchGuard(
         watch(processes=["dima_night.py"]),

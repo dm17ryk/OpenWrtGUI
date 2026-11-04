@@ -110,6 +110,42 @@ async def test_run_ssid_on_air_makes_guard_live(tmp_path: Path) -> None:
     assert state.live and state.reasons[0].kind == "router_ssid" and state.reasons[0].router == "ap1"
 
 
+async def test_router_going_offline_keeps_its_run_marker(tmp_path: Path) -> None:
+    """Fail closed: a router that stops answering mid-run (ubus slow under iperf) keeps the guard live."""
+    commands = sim_commands(SIM_DIR, "ap1")
+    status = commands[WIRELESS_STATUS]
+    commands[WIRELESS_STATUS] = CommandResult(
+        WIRELESS_STATUS, status.stdout.replace('"OpenWrt"', '"OpenWrtB"'), "", 0
+    )
+    down = False
+
+    class Flaky(ReplayTransport):
+        async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
+            if down:
+                raise Unreachable("timed out")
+            return await super().run(command, timeout=timeout)
+
+    async def factory(rec: RouterRecord) -> Transport:
+        if down:
+            raise Unreachable("timed out")
+        return Flaky(commands)
+
+    guard = BenchGuard(
+        GuardWatchList(lock_files=[], processes=[], router_ssids=["OpenWrtB"]), lister=lambda: []
+    )
+    poller, _, statuses, store, _ = _poller(tmp_path, factory, guard=guard)
+    rec = store.get("ap1")
+    assert rec is not None
+    await poller.poll_router(rec)
+    assert guard.check_local().live
+    down = True
+    await poller.poll_router(rec)
+    await poller.poll_router(rec)
+    assert "ap1" not in statuses
+    state = guard.check_local()
+    assert state.live and state.reasons[0].router == "ap1"
+
+
 async def test_poll_marks_offline_and_keeps_others(tmp_path: Path) -> None:
     async def factory(rec: RouterRecord) -> Transport:
         if rec.id == "ap2":

@@ -13,6 +13,7 @@ from starlette.websockets import WebSocketDisconnect
 from openwrtgui.app import create_app
 from openwrtgui.context import AppContext
 from openwrtgui.onboard.wizard import install_key_command
+from openwrtgui.update.service import UpdateFailed, UpdateInProgress
 from openwrtgui.version import APP_VERSION
 
 
@@ -74,6 +75,33 @@ async def test_onboard_flow_over_api(authed: httpx.AsyncClient, ctx: AppContext)
     assert rec["id"] == "ap4-test" and rec["auth"] == "key"
     assert len((await authed.get("/api/routers")).json()) == 4
     assert (await authed.post(f"/api/onboard/{sid}/verify")).status_code == 404
+
+
+async def test_removing_a_router_clears_its_guard_marker(authed: httpx.AsyncClient, ctx: AppContext) -> None:
+    ctx.guard.update_watch(ctx.guard.watch.model_copy(update={"router_ssids": ["OpenWrtB"]}))
+    ctx.guard.set_router_signs("ap1", ["OpenWrtB"])
+    assert ctx.guard.check_local().live
+    assert (await authed.delete("/api/routers/ap1")).status_code == 200
+    assert not ctx.guard.check_local().live
+
+
+async def test_update_install_failures_reach_the_ui(
+    authed: httpx.AsyncClient, ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def failed(version: str) -> list[str]:
+        raise UpdateFailed("Couldn't download the update: connection reset")
+
+    monkeypatch.setattr(ctx.updater, "install", failed)
+    r = await authed.post("/api/update/install", json={"version": "0.1.0"})
+    assert r.status_code == 502 and r.json()["detail"] == "Couldn't download the update: connection reset"
+
+    async def busy(version: str) -> list[str]:
+        raise UpdateInProgress("An update is already downloading.")
+
+    monkeypatch.setattr(ctx.updater, "install", busy)
+    r = await authed.post("/api/update/install", json={"version": "0.1.0"})
+    assert r.status_code == 409 and r.json()["detail"] == "An update is already downloading."
+    assert not ctx.quit_event.is_set()
 
 
 async def test_install_key_423_during_run(authed_guard_live: httpx.AsyncClient) -> None:

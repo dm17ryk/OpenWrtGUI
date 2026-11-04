@@ -31,5 +31,6 @@ reads are light (a few commands every 5 seconds per router).
 
 **Is there a demo without routers?**
 Yes, for developers: run it with `--simulator tests/fixtures/sim` from a source checkout (see
-[CONTRIBUTING](https://github.com/dm17ryk/OpenWrtGUI/blob/master/CONTRIBUTING.md)). The screenshots in
-this manual come from that simulator.
+[CONTRIBUTING](https://github.com/dm17ryk/OpenWrtGUI/blob/master/CONTRIBUTING.md)). Unless you pass
+`--data-dir`, the simulator keeps its data in a separate `<data folder>-simulator` folder, so its fake
+routers and host keys never mix with your real ones. The screenshots in this manual come from it.

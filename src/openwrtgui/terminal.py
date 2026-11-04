@@ -10,7 +10,7 @@ from collections.abc import Awaitable, Callable
 from enum import StrEnum
 from typing import Any
 
-from openwrtgui.guard.audit import AuditLog
+from openwrtgui.guard.audit import HIDDEN, AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard, GuardState
 from openwrtgui.guard.readonly import is_read_only_command
 from openwrtgui.store.routers import RouterRecord
@@ -23,6 +23,11 @@ SCREEN = "Terminal"
 SWITCH_NOTICE = "\r\n[Harness run started: terminal switched to read-only line mode]\r\n"
 _ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b[@-Z\\-_]")
 _BACKSPACE = ("\x7f", "\x08")
+# Lines typed at a prompt like this are secrets (input not echoed): audit them as <hidden>.
+_SECRET_PROMPT = re.compile(r"(?i)(password|passphrase|\bpin\b|secret)[^\n]*:\s*$")
+# Commands that ask for a secret: lines pasted after one in the same chunk are hidden too.
+_ASKS_SECRET = re.compile(r"^(?:\S*/)?(?:passwd|chpasswd|su|ssh|dbclient|scp|sudo|htpasswd|login)\b")
+_TAIL = 256
 
 Emit = Callable[[dict[str, Any]], Awaitable[None]]
 
@@ -68,6 +73,7 @@ class TerminalSession:
         self._shell = shell
         self._pty_possible = pty_possible
         self._buffer = ""
+        self._tail = ""
         self._reader: asyncio.Task[None] | None = None
 
     @property
@@ -108,6 +114,7 @@ class TerminalSession:
                 data = await shell.read()
                 if not data:
                     break
+                self._tail = (self._tail + data)[-_TAIL:]
                 await self._emit({"type": "output", "data": data})
         except (TransportError, OSError):
             log.debug("terminal shell on %s ended", self.router.id, exc_info=True)
@@ -118,15 +125,24 @@ class TerminalSession:
         )
 
     async def input(self, data: str) -> None:
+        state = self._guard.state()
+        if state.live and self._shell is not None:
+            # Checked on every keystroke, so a missed guard message cannot keep a shell open in a run.
+            await self.on_guard(state)
         if self._shell is None:
-            raise ValueError("The terminal is in line mode")
+            log.debug("terminal on %s is in line mode; dropped %d chars of input", self.router.id, len(data))
+            return
         await self._shell.write(data)
         self._buffer += data
+        hide_rest = False
         while "\r" in self._buffer or "\n" in self._buffer:
             cut = min(i for i in (self._buffer.find("\r"), self._buffer.find("\n")) if i >= 0)
             line, self._buffer = _clean_line(self._buffer[:cut]), self._buffer[cut + 1 :]
-            if line:
-                self._record(line, None)
+            if not line:
+                continue
+            at_prompt = _SECRET_PROMPT.search(_ANSI.sub("", self._tail)) is not None
+            self._record(HIDDEN if hide_rest or at_prompt else line, None)
+            hide_rest = hide_rest or at_prompt or _ASKS_SECRET.match(line) is not None
 
     async def run_line(self, line: str) -> None:
         if self._shell is not None:

@@ -124,6 +124,20 @@ async def test_guard_going_live_closes_pty_and_switches_to_line_mode(tmp_path: P
     await session.close()
 
 
+async def test_pty_input_checks_the_guard_itself(tmp_path: Path) -> None:
+    """A missed guard message must not leave a full shell open during a run."""
+    g = Guard()
+    shell = FakeShell()
+    session, sent = await _open(ShellTransport(shell), g.guard, AuditLog(tmp_path))
+    g.go_live()  # live, but on_guard was never called
+    await session.input("reboot\r")
+    assert shell.written == []
+    assert shell.closed and session.mode == TerminalMode.LINE
+    assert [m for m in sent if m["type"] == "mode"][-1]["mode"] == "line"
+    await session.input("x")  # stray keystrokes after the switch are ignored, not an error
+    await session.close()
+
+
 async def test_guard_clear_offers_pty_again(tmp_path: Path) -> None:
     g = Guard()
     shell = FakeShell()
@@ -144,6 +158,49 @@ async def test_pty_input_lines_audited_without_control_chars(tmp_path: Path) -> 
     await session.input("lx\x7fs\x1b[A\r")
     assert shell.written == ["lx\x7fs\x1b[A\r"]
     assert [e.command for e in audit.query()] == ["ls"]
+    await session.close()
+
+
+async def _until_output(sent: list[dict[str, Any]], text: str) -> None:
+    for _ in range(50):
+        if any(text in m.get("data", "") for m in sent):
+            return
+        await asyncio.sleep(0.01)
+    raise AssertionError(f"no output containing {text!r}")
+
+
+def _audit_text(tmp_path: Path) -> str:
+    return "".join(p.read_text(encoding="utf-8") for p in tmp_path.glob("*.jsonl"))
+
+
+async def test_pty_input_at_a_password_prompt_is_not_audited(tmp_path: Path) -> None:
+    g = Guard()
+    shell = FakeShell()
+    audit = AuditLog(tmp_path)
+    session, sent = await _open(ShellTransport(shell), g.guard, audit)
+    await session.input("passwd\r")
+    shell._out.put_nowait("passwd\r\nChanging password for root\r\nNew password: ")
+    await _until_output(sent, "New password: ")
+    await session.input("s3cret!\r")
+    shell._out.put_nowait("\r\nRetype password: ")
+    await _until_output(sent, "Retype password: ")
+    await session.input("s3cret!\r")
+    shell._out.put_nowait("\r\npasswd: password for root changed by root\r\nroot@AP2:~# ")
+    await _until_output(sent, "root@AP2:~# ")
+    await session.input("uptime\r")
+    assert [e.command for e in audit.query()] == ["uptime", "<hidden>", "<hidden>", "passwd"]
+    assert "s3cret!" not in _audit_text(tmp_path)
+    await session.close()
+
+
+async def test_pty_paste_ahead_after_passwd_is_not_audited(tmp_path: Path) -> None:
+    g = Guard()
+    shell = FakeShell()
+    audit = AuditLog(tmp_path)
+    session, _ = await _open(ShellTransport(shell), g.guard, audit)
+    await session.input("passwd root\rs3cret!\rs3cret!\r")
+    assert [e.command for e in audit.query()] == ["<hidden>", "<hidden>", "passwd root"]
+    assert "s3cret!" not in _audit_text(tmp_path)
     await session.close()
 
 

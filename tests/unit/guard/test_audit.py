@@ -38,6 +38,26 @@ def test_uci_key_masked() -> None:
     )
 
 
+def test_uci_secrets_masked_in_every_quoting() -> None:
+    assert (
+        mask("uci set wireless.default_radio0.key=s3cret", [])
+        == "uci set wireless.default_radio0.key=<hidden>"
+    )
+    assert mask('uci set wireless.default_radio0.key="s3cret"', []) == (
+        'uci set wireless.default_radio0.key="<hidden>"'
+    )
+    assert mask(
+        "uci set wireless.wifinet1.sae_password=pw | x; uci set wireless.r.auth_secret='a b'", []
+    ) == ("uci set wireless.wifinet1.sae_password=<hidden> | x; uci set wireless.r.auth_secret='<hidden>'")
+
+
+def test_json_secrets_masked() -> None:
+    command = 'ubus call uci set \'{"config":"wireless","values":{"key":"s3cret","ssid":"OpenWrt"}}\''
+    assert mask(command, []) == (
+        'ubus call uci set \'{"config":"wireless","values":{"key":"<hidden>","ssid":"OpenWrt"}}\''
+    )
+
+
 def test_empty_secret_ignored() -> None:
     assert mask("uname -a", ["", "x"]) == "uname -a"
 

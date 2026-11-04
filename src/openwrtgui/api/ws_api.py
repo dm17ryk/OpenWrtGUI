@@ -53,16 +53,19 @@ async def terminal(ws: WebSocket, router_id: str) -> None:
 
     cols = int(ws.query_params.get("cols", "120"))
     rows = int(ws.query_params.get("rows", "32"))
+    # Subscribe before opening, then re-sync: a guard change during open() is not missed.
+    queue = ctx.hub.subscribe()
     try:
         session = await TerminalSession.open(
             rec, pool=ctx.pool, guard=ctx.guard, audit=ctx.audit, emit=emit, cols=cols, rows=rows
         )
     except TransportError as exc:
+        ctx.hub.unsubscribe(queue)
         await ws.send_json({"type": "error", "detail": str(exc)})
         await ws.close()
         return
     ctx.terminals.add(session)
-    queue = ctx.hub.subscribe()
+    await session.on_guard(ctx.guard.state())
 
     async def follow_guard() -> None:
         while True:

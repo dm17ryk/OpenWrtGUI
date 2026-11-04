@@ -15,7 +15,18 @@ from typing import Literal
 log = logging.getLogger(__name__)
 
 HIDDEN = "<hidden>"
-_UCI_SECRET = re.compile(r"(\.(?:key|password|pincode)=)'[^']*'")
+_SECRET_OPTIONS = r"key|password|pincode|psk|sae_password|auth_secret|acct_secret|priv_key_pwd|priv_key2_pwd"
+# uci set <cfg>.<section>.<option>=value, with the value quoted '…', "…" or bare.
+_UCI_SECRET = re.compile(rf"(\.(?:{_SECRET_OPTIONS})=)('[^']*'|\"[^\"]*\"|[^\s;&|'\"]+)")
+# The same options in JSON (ubus call uci set / ubus call network …).
+_JSON_SECRET = re.compile(rf"(\"(?:{_SECRET_OPTIONS})\"\s*:\s*)\"[^\"]*\"")
+
+
+def _hide_value(match: re.Match[str]) -> str:
+    value = match.group(2)
+    quote = value[0] if value[0] in "'\"" else ""
+    return f"{match.group(1)}{quote}{HIDDEN}{quote}"
+
 
 Source = Literal["user", "wizard", "terminal", "app"]
 
@@ -35,7 +46,8 @@ def mask(command: str, secrets: Sequence[str]) -> str:
     for secret in secrets:
         if secret:
             command = command.replace(secret, HIDDEN)
-    return _UCI_SECRET.sub(rf"\1'{HIDDEN}'", command)
+    command = _UCI_SECRET.sub(_hide_value, command)
+    return _JSON_SECRET.sub(rf'\1"{HIDDEN}"', command)
 
 
 class AuditLog:

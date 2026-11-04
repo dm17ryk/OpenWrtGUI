@@ -55,15 +55,19 @@ async def download_release(
     part = target.with_name(target.name + ".part")
     digest = hashlib.sha256()
     done = 0
-    async with client.stream("GET", release.installer_url, timeout=60.0) as response:
-        response.raise_for_status()
-        total = int(response.headers.get("content-length", release.installer_size or 0))
-        with part.open("wb") as f:
-            async for chunk in response.aiter_bytes():
-                f.write(chunk)
-                digest.update(chunk)
-                done += len(chunk)
-                on_progress(done, total)
+    try:
+        async with client.stream("GET", release.installer_url, timeout=60.0) as response:
+            response.raise_for_status()
+            total = int(response.headers.get("content-length", release.installer_size or 0))
+            with part.open("wb") as f:
+                async for chunk in response.aiter_bytes():
+                    f.write(chunk)
+                    digest.update(chunk)
+                    done += len(chunk)
+                    on_progress(done, total)
+    except BaseException:
+        part.unlink(missing_ok=True)  # a cut download never lingers, let alone runs
+        raise
     if expected is None or digest.hexdigest() != expected:
         part.unlink(missing_ok=True)
         raise ChecksumMismatch(f"{release.installer_name} does not match {release.sums_url}")

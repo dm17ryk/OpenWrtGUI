@@ -61,6 +61,18 @@ def test_self_check_passes_without_console_streams(tmp_path: Path, monkeypatch: 
     assert run(args) == 0
 
 
+def test_simulator_never_uses_the_real_data_folder(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """--simulator without --data-dir must not seed AP1/AP2 or fake host keys into the real data."""
+    web = tmp_path / "web"
+    web.mkdir()
+    (web / "index.html").write_text('<div id="root"></div>', encoding="utf-8")
+    real = tmp_path / "OpenWrtGUI data"
+    monkeypatch.setenv("OPENWRTGUI_DATA", str(real))
+    assert run(["--self-check", "--simulator", str(SIM_DIR), "--web-dir", str(web)]) == 0
+    assert not (real / "routers.json").exists()
+    assert (tmp_path / "OpenWrtGUI data-simulator" / "routers.json").is_file()
+
+
 def test_self_check_fails_without_ui(tmp_path: Path) -> None:
     empty = tmp_path / "empty"
     empty.mkdir()

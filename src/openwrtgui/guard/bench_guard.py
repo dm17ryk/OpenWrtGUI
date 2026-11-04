@@ -109,6 +109,10 @@ class BenchGuard:
     ) -> None:
         self._signs[router_id] = _RouterSigns(tuple(ssids_on_air), tuple(process_lines))
 
+    def forget_router(self, router_id: str) -> None:
+        """Drop a removed router's signs (an unreachable router keeps its last ones: fail closed)."""
+        self._signs.pop(router_id, None)
+
     def _router_reasons(self) -> list[GuardReason]:
         reasons: list[GuardReason] = []
         for router_id, signs in sorted(self._signs.items()):

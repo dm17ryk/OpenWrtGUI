@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -13,13 +14,22 @@ import httpx
 from openwrtgui.live import LiveHub
 from openwrtgui.store.settings import SettingsStore
 from openwrtgui.update.github import Release, fetch_releases, pick_release
-from openwrtgui.update.installer import download_release, installer_command, installers
+from openwrtgui.update.installer import ChecksumMismatch, download_release, installer_command, installers
 from openwrtgui.update.versions import Version
 
 log = logging.getLogger(__name__)
 
 CHECK_EVERY = timedelta(hours=24)
 DEV_ONLY = "Updates install only in the installed app."
+IN_PROGRESS = "An update is already downloading."
+
+
+class UpdateFailed(Exception):
+    """Downloading or verifying the installer failed; nothing was run."""
+
+
+class UpdateInProgress(Exception):
+    """Another install request is still downloading."""
 
 
 @dataclass(frozen=True)
@@ -58,6 +68,7 @@ class Updater:
         self._current = current
         self._client_factory = client_factory
         self._install_dir = install_dir
+        self._installing = asyncio.Lock()
         self._hub = hub
         self._releases: list[Release] = []
         self._error: str | None = None
@@ -102,8 +113,15 @@ class Updater:
         def progress(done: int, total: int) -> None:
             self._hub.publish({"type": "update-progress", "version": version, "done": done, "total": total})
 
-        async with self._client_factory() as client:
-            path = await download_release(client, release, self._updates_dir, progress)
+        if self._installing.locked():
+            raise UpdateInProgress(IN_PROGRESS)
+        async with self._installing:
+            try:
+                async with self._client_factory() as client:
+                    path = await download_release(client, release, self._updates_dir, progress)
+            except (ChecksumMismatch, httpx.HTTPError, OSError) as exc:
+                log.warning("update %s failed: %s", version, exc)
+                raise UpdateFailed(f"Couldn't download the update: {_reason(exc)}") from exc
         return installer_command(path, self._install_dir)
 
     def previous_installer(self) -> Path | None:

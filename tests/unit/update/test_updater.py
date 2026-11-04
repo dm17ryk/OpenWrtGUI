@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
+from collections.abc import AsyncIterator
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -12,7 +14,7 @@ from openwrtgui.live import LiveHub
 from openwrtgui.store.settings import SettingsStore
 from openwrtgui.update.github import RELEASES_URL, fetch_releases, pick_release
 from openwrtgui.update.installer import ChecksumMismatch, download_release, installer_command
-from openwrtgui.update.service import Updater
+from openwrtgui.update.service import UpdateFailed, UpdateInProgress, Updater
 from openwrtgui.update.versions import Version, parse_version
 
 RELEASES = json.loads(
@@ -153,6 +155,65 @@ async def test_install_returns_command_and_previous_installer(tmp_path: Path) ->
     ]
     previous = updater.previous_installer()
     assert previous is not None and previous.name == "OpenWrtGUI-Setup-0.0.8.exe"
+
+
+def _failing_download(after: bytes, error: Exception) -> httpx.MockTransport:
+    inner = _handler()
+
+    async def body() -> AsyncIterator[bytes]:
+        yield after
+        raise error
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if str(request.url).endswith(".exe"):
+            return httpx.Response(200, content=body())
+        return inner.handle_request(request)
+
+    return httpx.MockTransport(handle)
+
+
+async def test_download_cut_midway_is_reported_and_leaves_nothing(tmp_path: Path) -> None:
+    updater = _updater(
+        tmp_path,
+        _failing_download(b"MZ half", httpx.ReadError("connection reset")),
+        install_dir=tmp_path / "app",
+    )
+    await updater.check(force=True)
+    with pytest.raises(UpdateFailed, match="Couldn't download the update: .*connection reset"):
+        await updater.install("0.1.0")
+    assert list((tmp_path / "updates").iterdir()) == []
+
+
+async def test_checksum_mismatch_on_install_is_an_update_failure(tmp_path: Path) -> None:
+    updater = _updater(tmp_path, _handler(sums_ok=False), install_dir=tmp_path / "app")
+    await updater.check(force=True)
+    with pytest.raises(UpdateFailed, match="does not match"):
+        await updater.install("0.1.0")
+
+
+async def test_second_install_while_downloading_is_refused(tmp_path: Path) -> None:
+    gate = asyncio.Event()
+    started = asyncio.Event()
+    inner = _handler()
+
+    async def slow() -> AsyncIterator[bytes]:
+        started.set()
+        await gate.wait()
+        yield PAYLOAD
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if str(request.url).endswith(".exe"):
+            return httpx.Response(200, content=slow())
+        return inner.handle_request(request)
+
+    updater = _updater(tmp_path, httpx.MockTransport(handle), install_dir=tmp_path / "app")
+    await updater.check(force=True)
+    first = asyncio.create_task(updater.install("0.1.0"))
+    await asyncio.wait_for(started.wait(), 5)
+    with pytest.raises(UpdateInProgress):
+        await updater.install("0.1.0")
+    gate.set()
+    assert (await first)[0].endswith("OpenWrtGUI-Setup-0.1.0.exe")
 
 
 async def test_install_refused_in_dev_build(tmp_path: Path) -> None:

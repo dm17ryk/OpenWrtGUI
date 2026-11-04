@@ -22,7 +22,7 @@ import uvicorn
 
 from openwrtgui.app import create_app
 from openwrtgui.context import AppContext, build_context
-from openwrtgui.paths import DataDir, resolve_data_dir, web_dir
+from openwrtgui.paths import DataDir, resolve_data_dir, simulator_data_dir, web_dir
 from openwrtgui.update.installer import launch_installer
 from openwrtgui.version import APP_VERSION
 
@@ -188,7 +188,10 @@ def _show_window(ctx: AppContext, url: str, thread: threading.Thread) -> None:
 
 def run(argv: Sequence[str] | None = None) -> int:
     opts = parse_args(sys.argv[1:] if argv is None else argv)
-    data = DataDir.at(opts.data_dir) if opts.data_dir else resolve_data_dir()
+    if opts.data_dir:
+        data = DataDir.at(opts.data_dir)
+    else:
+        data = simulator_data_dir() if opts.simulator else resolve_data_dir()
     with InstanceLock(data.root / "app.lock") as held:
         if not held:
             if not opts.no_window and not opts.self_check:

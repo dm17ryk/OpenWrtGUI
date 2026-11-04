@@ -67,4 +67,5 @@ async def remove_router(router_id: str, ctx: Ctx) -> Ok:
     await ctx.pool.drop(router_id)
     ctx.statuses.pop(router_id, None)
     ctx.descriptions.pop(router_id, None)
+    ctx.guard.forget_router(router_id)
     return Ok()
