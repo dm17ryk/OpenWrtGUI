@@ -1,0 +1,39 @@
+name: Feature request
+description: Suggest something OpenWrtGUI should do.
+labels: ["type:feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the [roadmap](https://github.com/dm17ryk/OpenWrtGUI/blob/master/ROADMAP.md) first: many
+        router settings are already planned for a milestone.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The task, and how you do it today (SSH command, LuCI page, harness script).
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would help
+      description: The screen or control you have in mind.
+    validations:
+      required: true
+  - type: textarea
+    id: commands
+    attributes:
+      label: Router commands involved (optional)
+      description: The uci / ubus / iw commands you run today for this, if any.
+      render: shell
+  - type: dropdown
+    id: safety
+    attributes:
+      label: Does it change the router?
+      options:
+        - "No, it only reads"
+        - "Yes, it changes settings"
+        - "Yes, and it can cut the connection (addresses, VLANs, firewall)"
+    validations:
+      required: true

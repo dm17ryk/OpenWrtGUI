@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Router faults and capture</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F2F3EF}
+a{color:#1F5FCC}a:hover{color:#174A9F}
+.app{font-family:'IBM Plex Sans',system-ui,sans-serif;color:#15181C;background:#F2F3EF;font-size:14px;line-height:1.45}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;padding:10px 24px;background:#15181C;color:#F2F3EF}
+.brand{font-weight:600;font-size:15px;display:flex;align-items:center;gap:10px}
+.nav{display:flex;flex-wrap:wrap;gap:2px}
+.nav a{color:#C3C8CE;text-decoration:none;padding:10px 12px;border-radius:6px;font-size:13px}
+.nav a:hover{color:#FFFFFF;background:#262A30}
+.nav a.cur{color:#FFFFFF;background:#2E343B}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;padding:6px 12px;border-radius:999px}
+.shell{display:flex;flex-wrap:wrap;gap:24px;padding:24px;max-width:1440px;margin:0 auto;box-sizing:border-box}
+.rail{flex:1 1 230px;display:flex;flex-direction:column;gap:6px}
+.main{flex:999 1 560px;min-width:0;display:flex;flex-direction:column;gap:20px}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#575F67;font-weight:600}
+.rt{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:8px;text-decoration:none;color:#15181C;border:1px solid transparent}
+.rt:hover{background:#FFFFFF;border-color:#D8DBD4;color:#15181C}
+.rt.cur{background:#FFFFFF;border-color:#15181C}
+.card{background:#FFFFFF;border:1px solid #D8DBD4;border-radius:10px;padding:18px 20px}
+.b{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.air{background:#E3F2EA;color:#16784A}.park{background:#FBEFD9;color:#9A5A00}.flt{background:#FBE7E1;color:#B3361A}.har{background:#ECE7FA;color:#5A3EBF}.neu{background:#ECEEEA;color:#3E454C}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.btn{font:inherit;font-size:13px;font-weight:500;padding:10px 14px;border-radius:6px;border:1px solid #C9CDC5;background:#FFFFFF;color:#15181C;cursor:pointer;min-height:44px;box-sizing:border-box;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{background:#F2F3EF;color:#15181C}
+.btn:focus-visible,.rt:focus-visible,.nav a:focus-visible,.chip:focus-visible,.seg button:focus-visible{outline:2px solid #1F5FCC;outline-offset:2px}
+.btn.pri{background:#1F5FCC;border-color:#1F5FCC;color:#FFFFFF}.btn.pri:hover{background:#174A9F;color:#FFFFFF}
+.btn.arm{background:#B3361A;border-color:#B3361A;color:#FFFFFF}.btn.arm:hover{background:#8F2A13;color:#FFFFFF}
+.btn:disabled{color:#8A9199;background:#F2F3EF;border-color:#D8DBD4;cursor:not-allowed}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid #C9CDC5;border-radius:8px;overflow:hidden;background:#FFFFFF}
+.seg button{font:inherit;font-size:13px;font-weight:500;border:0;border-right:1px solid #C9CDC5;background:#FFFFFF;color:#15181C;padding:0 14px;min-height:44px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button.on{background:#15181C;color:#FFFFFF}
+.chip{font:inherit;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;padding:0 12px;min-height:40px;border-radius:999px;border:1.5px solid #D8DBD4;background:#FFFFFF;color:#15181C;cursor:pointer}
+.chip.on{border-color:#B3361A;background:#FBE7E1;color:#B3361A}
+.layer{border:1px solid #D8DBD4;border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;background:#FFFFFF}
+.layer.off{background:#F6F7F4;color:#6B737B}
+.tag{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:11px;font-weight:500;padding:2px 7px;border-radius:4px;background:#15181C;color:#FFFFFF}
+.field{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.field label,.field .lbl{color:#575F67;font-size:12px;font-weight:500}
+.in{font:inherit;font-size:14px;padding:10px 12px;border-radius:6px;border:1px solid #C9CDC5;background:#FFFFFF;color:#15181C;min-height:44px;box-sizing:border-box;width:100%}
+.code{background:#15181C;color:#E6E8EA;border-radius:8px;padding:12px 14px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;line-height:1.65;overflow-x:auto;white-space:pre}
+.code .c{color:#93A8BA}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#575F67;padding:8px 10px;border-bottom:1px solid #D8DBD4;white-space:nowrap}
+.tbl td{padding:10px;border-bottom:1px solid #E8EAE5;vertical-align:middle;white-space:nowrap}
+</style>
+</helmet>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7FD1A8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5a10 10 0 0 1 14 0"></path><path d="M8 15.5a6 6 0 0 1 8 0"></path><circle cx="12" cy="19" r="1.4" fill="#7FD1A8"></circle></svg>
+      <span>OpenWrt Bench</span>
+    </div>
+    <nav class="nav" aria-label="Screens">
+      <a href="Main.dc.html">Dashboard</a>
+      <a href="WiFi.dc.html">Wi-Fi</a>
+      <a href="RF.dc.html">RF live</a>
+      <a href="Network.dc.html">Network &amp; DHCP</a>
+      <a href="Ports.dc.html">Ports &amp; VLANs</a>
+      <a href="Firewall.dc.html">Firewall</a>
+      <a class="cur" href="Faults.dc.html">Faults &amp; capture</a>
+      <a href="LTE.dc.html">LTE modem</a>
+      <a href="System.dc.html">System</a>
+      <a href="Discovery.dc.html">Discovery</a>
+    </nav>
+    <div class="spacer"></div>
+    <span class="pill" style="background: #1E3A2B; color: #BFE8CF"><span class="dot" style="background: #6CD39B"></span>No harness running · writes allowed</span>
+    <a href="Settings.dc.html" aria-label="App settings" style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #E6E8EA; background: #2E343B; border-radius: 999px; padding: 0 14px; min-height: 40px; text-decoration: none"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path></svg>Settings</a>
+  </header>
+
+  <div class="shell">
+    <aside class="rail" aria-label="Routers">
+      <div class="eyebrow" style="padding: 0 12px 4px">Routers</div>
+      <a class="rt cur" href="Faults.dc.html">
+        <span style="display: flex; align-items: center; gap: 8px; font-weight: 600"><span class="dot" style="background: #16784A"></span>AP1 · bench</span>
+        <span class="mono" style="font-size: 12px; color: #575F67">192.168.1.1</span>
+      </a>
+      <a class="rt" href="Faults.dc.html">
+        <span style="display: flex; align-items: center; gap: 8px; font-weight: 600"><span class="dot" style="background: #9A5A00"></span>AP2 · office</span>
+        <span class="mono" style="font-size: 12px; color: #575F67">192.168.1.2</span>
+      </a>
+      <a class="rt" href="Faults.dc.html">
+        <span style="display: flex; align-items: center; gap: 8px; font-weight: 600"><span class="dot" style="background: #9A5A00"></span>AP3 · QA stands</span>
+        <span class="mono" style="font-size: 12px; color: #575F67">192.168.1.3</span>
+      </a>
+      <div class="eyebrow" style="padding: 20px 12px 4px">AP1 sections</div>
+      <a class="rt" href="WiFi.dc.html">Wi-Fi</a>
+      <a class="rt" href="Ports.dc.html">Ports, VLANs, mirroring</a>
+      <a class="rt" href="Firewall.dc.html">Firewall</a>
+      <a class="rt" href="Faults.dc.html" style="font-weight: 600">Faults and capture</a>
+      <a class="rt" href="Discovery.dc.html">Discovery and tools</a>
+    </aside>
+
+    <main class="main">
+      <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 24px">
+        <div>
+          <div class="eyebrow">AP1 · <span class="mono">192.168.1.1</span> · DWR-921 C3</div>
+          <h1 style="margin: 2px 0 0; font-size: 28px; font-weight: 600; letter-spacing: -0.01em">Faults and capture</h1>
+        </div>
+        <div class="spacer"></div>
+        <span class="b air">nothing armed</span>
+        <button class="btn" type="button">Clear everything</button>
+      </div>
+
+      <section class="card" aria-labelledby="tg" style="display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+          <h2 id="tg" style="margin: 0; font-size: 16px; font-weight: 600">Target</h2>
+          <div class="seg" role="group" aria-label="Fault target">
+            <sc-for list="{{targets}}" as="t" hint-placeholder-count="3">
+              <button type="button" class="{{t.cls}}" aria-pressed="{{t.pressed}}" onClick="{{t.pick}}">{{t.label}}</button>
+            </sc-for>
+          </div>
+        </div>
+        <div style="font-size: 13px; color: #575F67">Found from AP1's DHCP leases and remembered MACs. The panel's Ethernet and Wi-Fi MACs are unrelated (W5500 vs ESP32 efuse), so matching by vendor prefix would miss one of them.</div>
+      </section>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px">
+        <article class="{{l1Cls}}">
+          <div style="display: flex; align-items: center; gap: 8px"><span class="tag">L1</span><strong>Link down</strong><div class="spacer"></div><span class="b neu">Ethernet only</span></div>
+          <div style="font-size: 13px">Real carrier loss on the panel's switch port. The panel's network interface goes down.</div>
+          <sc-if value="{{isWifi}}" hint-placeholder-val="{{ true }}">
+            <div style="font-size: 13px; padding: 8px 10px; border-radius: 6px; background: #ECEEEA">A switch port cannot disconnect a Wi-Fi station. For Wi-Fi use <strong>Deauth</strong> or <strong>AP down</strong> below.</div>
+          </sc-if>
+          <button class="btn arm" type="button" disabled="{{isWifi}}" style="align-self: flex-start">Take LAN4 down</button>
+        </article>
+
+        <article class="layer">
+          <div style="display: flex; align-items: center; gap: 8px"><span class="tag">L2</span><strong>Isolate</strong></div>
+          <div style="font-size: 13px">Link and carrier stay up; everything else dies, ARP included.</div>
+          <button class="btn arm" type="button" style="align-self: flex-start">Isolate target</button>
+        </article>
+
+        <article class="layer">
+          <div style="display: flex; align-items: center; gap: 8px"><span class="tag">L3</span><strong>Block flows</strong></div>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px">
+            <sc-for list="{{flows}}" as="f" hint-placeholder-count="6">
+              <button type="button" class="{{f.cls}}" aria-pressed="{{f.pressed}}" onClick="{{f.pick}}">{{f.id}}</button>
+            </sc-for>
+          </div>
+          <div class="field"><label for="ls">Loss · <span class="mono">{{loss}} %</span> (100 = block)</label><input id="ls" type="range" min="1" max="100" value="{{loss}}" onChange="{{setLoss}}" style="accent-color: #B3361A"></div>
+          <div style="font-size: 12px; color: #575F67">Installed ahead of <span class="mono">ct state established accept</span>, so it also hits a call already in progress. Success is reported only after the rule is proven in place.</div>
+        </article>
+
+        <article class="layer">
+          <div style="display: flex; align-items: center; gap: 8px"><span class="tag">netem</span><strong>Impair</strong><div class="spacer"></div><span class="b neu">scoped to the target</span></div>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+            <div class="field"><label for="dl">Delay ms</label><input id="dl" class="in mono" type="text" value="120" readOnly></div>
+            <div class="field"><label for="jt">Jitter ms</label><input id="jt" class="in mono" type="text" value="30" readOnly></div>
+            <div class="field"><label for="ds">Distribution</label><select id="ds" class="in"><option>uniform</option><option>normal</option><option>pareto</option><option>paretonormal</option></select></div>
+            <div class="field"><label for="dr">Direction</label><select id="dr" class="in"><option>to target</option><option>from target</option><option>both</option></select></div>
+            <div class="field"><label for="lo">Loss %</label><input id="lo" class="in mono" type="text" value="0" readOnly></div>
+            <div class="field"><label for="ro">Reorder / duplicate %</label><input id="ro" class="in mono" type="text" value="0 / 0" readOnly></div>
+          </div>
+          <div style="font-size: 12px; color: #575F67">normal / pareto need the distribution tables, which only AP1 has (added after flashing). On AP2 and AP3 these choices are greyed out.</div>
+        </article>
+
+        <article class="layer">
+          <div style="display: flex; align-items: center; gap: 8px"><span class="tag">Wi-Fi</span><strong>Station and AP</strong></div>
+          <div style="font-size: 13px">Deauth kicks one station, which then re-joins: the Wi-Fi equivalent of pulling a cable. AP down drops every station.</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px">
+            <button class="btn arm" type="button">Deauth f4:12:fa:f3:57:68</button>
+            <button class="btn arm" type="button">Block 60 s</button>
+            <button class="btn arm" type="button">AP down</button>
+          </div>
+        </article>
+
+        <article class="layer">
+          <div style="display: flex; align-items: center; gap: 8px"><strong>Duration</strong></div>
+          <div class="seg" role="group" aria-label="Duration">
+            <button type="button" class="on" aria-pressed="true">Until cleared</button>
+            <button type="button" aria-pressed="false">Hold, then clear</button>
+          </div>
+          <div class="field"><label for="hd">Hold for (s)</label><input id="hd" class="in mono" type="text" value="20" readOnly></div>
+          <div style="font-size: 12px; color: #575F67">A timed fault is cleared by a timer on the router itself, so it ends on time even if this PC or the app goes away.</div>
+        </article>
+      </div>
+
+      <section class="card" aria-labelledby="pv" style="display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+          <h2 id="pv" style="margin: 0; font-size: 16px; font-weight: 600">Will run on AP1</h2>
+          <div class="spacer"></div>
+          <button class="btn arm" type="button">Arm</button>
+        </div>
+        <div class="code"><span class="c"># L3 {{flowSel}} · {{loss}} % · target {{targetIp}}</span>
+nft add table inet benchfault
+nft add chain inet benchfault fwd '{ type filter hook forward priority -10; }'
+{{nftLine}}
+<span class="c"># verify: rule present, ahead of 'ct state established accept', counter readable</span></div>
+      </section>
+
+      <section class="card" aria-labelledby="cp" style="display: flex; flex-direction: column; gap: 14px">
+        <h2 id="cp" style="margin: 0; font-size: 16px; font-weight: 600">Capture</h2>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+          <span class="lbl" style="font-size: 12px; color: #575F67; font-weight: 500">Interface</span>
+          <div class="seg" role="group" aria-label="Capture interface">
+            <button type="button" aria-pressed="false">br-lan · LAN + Wi-Fi</button>
+            <button type="button" class="on" aria-pressed="true">phy0-ap0 · Wi-Fi</button>
+            <button type="button" aria-pressed="false">mon0 · raw 802.11</button>
+            <button type="button" aria-pressed="false">wwan0 · LTE</button>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px">
+          <div class="field" style="grid-column: span 2"><label for="flt">Filter</label><input id="flt" class="in mono" type="text" value="host 192.168.1.30 and udp" readOnly></div>
+          <div class="field"><label for="du">Duration</label><input id="du" class="in mono" type="text" value="60 s" readOnly></div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <button class="btn pri" type="button">Live in Wireshark</button>
+          <button class="btn" type="button">Save .pcap</button>
+        </div>
+        <div style="font-size: 12px; color: #575F67">mon0 is created on demand and removed afterwards. Files go to <span class="mono">Documents\OpenWrtGUI\captures</span>. "Live in Wireshark" appears only when Wireshark is installed.</div>
+      </section>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1260}}'>
+class Component extends DCLogic {
+  state = { target: 'wifi', flow: 'rtp_in', loss: 30 };
+
+  renderVals() {
+    const s = this.state;
+    const T = [
+      { id: 'wifi', label: 'panel · Wi-Fi · 192.168.1.30', ip: '192.168.1.30' },
+      { id: 'eth', label: 'panel · ETH · 192.168.1.20', ip: '192.168.1.20' },
+      { id: 'other', label: 'other IP / MAC…', ip: '<ip>' }
+    ];
+    const cur = T.find(t => t.id === s.target) || T[0];
+    const targets = T.map(t => ({
+      label: t.label, cls: t.id === s.target ? 'on' : '', pressed: t.id === s.target ? 'true' : 'false',
+      pick: () => this.setState({ target: t.id })
+    }));
+    const FLOWS = ['rtp_in', 'sip_in', 'rtp_out', 'all_in', 'all_out', 'blackout'];
+    const flows = FLOWS.map(f => ({
+      id: f, cls: 'chip' + (f === s.flow ? ' on' : ''), pressed: f === s.flow ? 'true' : 'false',
+      pick: () => this.setState({ flow: f })
+    }));
+    const dirIn = s.flow.indexOf('_out') < 0;
+    const match = (dirIn ? 'ip daddr ' : 'ip saddr ') + cur.ip
+      + (s.flow.indexOf('rtp') === 0 ? ' udp dport @media   # live RTP ports, read from conntrack' : (s.flow.indexOf('sip') === 0 ? ' udp dport 5060' : ''));
+    const lossPart = s.loss >= 100 ? '' : ' numgen random mod 100 < ' + s.loss;
+    return {
+      targets: targets, flows: flows,
+      isWifi: s.target === 'wifi',
+      l1Cls: s.target === 'wifi' ? 'layer off' : 'layer',
+      loss: s.loss, flowSel: s.flow, targetIp: cur.ip,
+      nftLine: "nft insert rule inet benchfault fwd " + match + lossPart + " counter drop comment 'bench:" + s.flow + "'",
+      setLoss: e => this.setState({ loss: Number(e.target.value) })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+# OpenWrtGUI
+
+**Operate the OpenWrt routers of a Wi-Fi test bench from one Windows window, without SSH.**
+
+[![CI](https://github.com/dm17ryk/OpenWrtGUI/actions/workflows/ci.yml/badge.svg)](https://github.com/dm17ryk/OpenWrtGUI/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/dm17ryk/OpenWrtGUI)](https://github.com/dm17ryk/OpenWrtGUI/releases/latest)
+[![User manual](https://img.shields.io/badge/manual-wiki-informational)](https://github.com/dm17ryk/OpenWrtGUI/wiki)
+[![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
+
+A Wi-Fi test bench uses OpenWrt routers as access points. Until now every change on them meant an SSH
+session or a harness script, and the routers' own web UI (LuCI) is slow to use and knows nothing about
+the bench's custom tools. OpenWrtGUI shows every bench router in one desktop app: what is on air, who
+is connected, and how each router describes itself. It never disturbs a test run that is in progress.
+
+![Dashboard: three routers, the 2.4 GHz air map and one station](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/dashboard.png)
+
+> v0.1 is the foundation: install, update, add routers, a read-only dashboard, Bench Guard, the
+> terminal and the audit log. Wi-Fi, network, firewall and LTE screens follow; see the [roadmap](ROADMAP.md).
+
+## What v0.1 does
+
+| Screen | What you get |
+|---|---|
+| **Dashboard** | Every router at a glance: radio channel, width and power, stations with signal and rates, LAN and DHCP state, login state. An air map shows which channels each radio occupies (on air, or parked on a staged channel). Refreshed every 5 s over SSH. |
+| **Add router** | A wizard: check and pin the host key, then log in. It tries by itself first: the app's key, this PC's own SSH keys (`id_ed25519`, `id_ecdsa`, `id_rsa`), the default `root` / `root`. A key the router already trusts is simply used. Otherwise it installs the app's own SSH key (one line in `authorized_keys`). Then it reads what the router says about itself and labels its sockets. |
+| **Router overview** | The router's self-description, read the way LuCI reads it: board file, ubus services, typed option lists, feature flags, LuCI pages, and the port map. |
+| **Terminal** | A real shell on any router that has the app key. During a harness run it accepts read-only commands only. |
+| **Audit log** | Every command the app sent: time, router, screen, command with secrets masked, exit code. Filter it, and export it for a bug report. |
+| **Settings** | Updates (stable or CI pre-release channel), light / dark / system theme, data folder, the Bench Guard watch list, the app's SSH key, audit-log retention. |
+| **Help everywhere** | A **?** next to each page title and section, and a tooltip on the main buttons, shows that part of the user manual. It is built in, so it works offline; **More in the manual** opens the full wiki page. |
+
+| Add router | Terminal | Settings |
+|---|---|---|
+| ![Add router](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/add-router.png) | ![Terminal](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/terminal.png) | ![Settings](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/settings.png) |
+
+The screenshots are produced in CI by Playwright against the built-in router simulator, so they show
+the current build.
+
+## Install
+
+1. Download `OpenWrtGUI-Setup-<version>.exe` from [Releases](https://github.com/dm17ryk/OpenWrtGUI/releases).
+2. Run it. It installs for your user only and needs no admin rights. Python and everything else is
+   bundled; the window uses Microsoft Edge WebView2, which Windows 11 already has.
+3. Check the two folders it proposes: the app, and its data folder (the router list, the pinned host
+   keys, the app's SSH key and the audit log).
+
+| On a PC that has | App folder | Data folder |
+|---|---|---|
+| `C:\Essence_SC` | `C:\Essence_SC\apps\OpenWrtGUI` | `C:\Essence_SC\apps\OpenWrtGUI-data` |
+| only `D:\Essence_SC` | `D:\Essence_SC\apps\OpenWrtGUI` | `D:\Essence_SC\apps\OpenWrtGUI-data` |
+| neither | `%LOCALAPPDATA%\Programs\OpenWrtGUI` | `%LOCALAPPDATA%\OpenWrtGUI` |
+
+On PCs with SentinelOne (the Essence bench PCs) keep both inside `C:\Essence_SC\` or `D:\Essence_SC\`:
+programs started from elsewhere are stopped without a message. The installer's defaults already do
+that.
+
+The app checks GitHub for a new version at start-up and once a day and offers it in Settings. Each
+download is checked against the release's `SHA256SUMS.txt` before it runs.
+
+## Quick start: add a router
+
+1. **Add router** → type the router's address (for example `192.168.1.2`) → **Connect**.
+2. Compare the host key fingerprint with the router, then **Accept and pin**.
+3. The wizard logs in by itself if it can: with a key the router already trusts it skips straight to
+   step 5 and installs nothing; with `root` / `root` it goes on to step 4. Otherwise type the user and
+   password once → **Log in**. The app does not store the password.
+4. Read the exact command that installs the app key → **Install key**. The app checks that the key works.
+5. Check the model and services the router reported, name it, confirm the socket labels → **Save port map**.
+
+The router now appears on the dashboard. The [user manual](https://github.com/dm17ryk/OpenWrtGUI/wiki)
+walks through each screen.
+
+## How it works
+
+```mermaid
+flowchart LR
+  subgraph PC["This PC"]
+    UI["OpenWrtGUI window<br/>(WebView2)"] -- "per-launch token,<br/>127.0.0.1 only" --> S["Local server<br/>(Python)"]
+  end
+  S -- "SSH, host key pinned" --> R["Each router<br/>OpenWrt: ubus, uci, files"]
+```
+
+- The app is a small local server plus a window. Nothing listens on the network, and nothing is
+  installed on the routers except, if you agree, one line in `/etc/dropbear/authorized_keys`.
+- It talks to each router over SSH the way LuCI does (ubus first), with the router's host key pinned.
+- Its data (router list, pinned host keys, its own SSH key, the audit log) stays in the data folder.
+
+## Safety model
+
+The app was built for a bench where test harnesses run for hours. It must never break one.
+
+- **Bench Guard.** The app watches for a live run: lock files, harness processes on this PC (for example
+  `dima_night.py`, `rh_soak.py`, `txlab_*.py`), and run SSIDs on air. While one is live, every router is
+  read-only. A banner names the run, and any write is refused with that reason. The watch list is
+  editable in Settings.
+- **Write lock.** One write at a time per router; reads run in parallel.
+- **Preview.** A write shows the exact commands before it runs (for example the key-install command).
+- **Audit log.** Every command is recorded with secrets masked.
+- **Host key pinning.** A router's SSH host key is pinned when you add it. If the key changes (for
+  example after a reflash), the app refuses to connect. You re-pin it through Add router, which shows
+  the key that was pinned before.
+- **Local only.** The UI talks to a server on `127.0.0.1` with a per-launch token. Nothing listens on
+  the network.
+
+## Supported routers
+
+Any standard OpenWrt router that you can reach over SSH. On first connect the app reads the router's
+self-description (the same files and ubus methods LuCI uses), so a new model needs no code change.
+Firmware image profiles, which add a bench image's custom tools, arrive in v0.5.
+
+Developed and tested on the D-Link DWR-921 C3 with OpenWrt SNAPSHOT r35692.
+
+## Getting help
+
+- **In the app:** the **?** next to each title and section.
+- **User manual:** the [wiki](https://github.com/dm17ryk/OpenWrtGUI/wiki), with
+  [Troubleshooting](https://github.com/dm17ryk/OpenWrtGUI/wiki/Troubleshooting) and an
+  [FAQ](https://github.com/dm17ryk/OpenWrtGUI/wiki/FAQ).
+- **Questions and ideas:** [Discussions](https://github.com/dm17ryk/OpenWrtGUI/discussions).
+- **Bugs, feature requests, a router that is not recognized:**
+  [open an issue](https://github.com/dm17ryk/OpenWrtGUI/issues/new/choose); each kind has a short form.
+
+## Contributing, roadmap, license
+
+- [ROADMAP.md](ROADMAP.md): what comes after v0.1.
+- [CONTRIBUTING.md](CONTRIBUTING.md): development setup, tests, and the rules for hardware tests.
+- [SECURITY.md](SECURITY.md): how to report a vulnerability and what the app stores.
+- [CHANGELOG.md](CHANGELOG.md): what changed in each release.
+
+OpenWrtGUI is free software under the GNU General Public License v3.0; see [LICENSE](LICENSE).

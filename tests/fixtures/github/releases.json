@@ -1,0 +1,56 @@
+[
+  {
+    "tag_name": "v0.1.1-ci.7",
+    "name": "OpenWrtGUI 0.1.1-ci.7",
+    "body": "CI build of 3f9c2e1",
+    "prerelease": true,
+    "published_at": "2026-11-20T10:00:00Z",
+    "assets": [
+      {
+        "name": "OpenWrtGUI-Setup-0.1.1-ci.7.exe",
+        "size": 48600000,
+        "browser_download_url": "https://github.com/dm17ryk/OpenWrtGUI/releases/download/v0.1.1-ci.7/OpenWrtGUI-Setup-0.1.1-ci.7.exe"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "size": 98,
+        "browser_download_url": "https://github.com/dm17ryk/OpenWrtGUI/releases/download/v0.1.1-ci.7/SHA256SUMS.txt"
+      }
+    ]
+  },
+  {
+    "tag_name": "v0.1.0",
+    "name": "OpenWrtGUI 0.1.0",
+    "body": "First release.",
+    "prerelease": false,
+    "published_at": "2026-11-17T09:00:00Z",
+    "assets": [
+      {
+        "name": "OpenWrtGUI-Setup-0.1.0.exe",
+        "size": 48200000,
+        "browser_download_url": "https://github.com/dm17ryk/OpenWrtGUI/releases/download/v0.1.0/OpenWrtGUI-Setup-0.1.0.exe"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "size": 92,
+        "browser_download_url": "https://github.com/dm17ryk/OpenWrtGUI/releases/download/v0.1.0/SHA256SUMS.txt"
+      }
+    ]
+  },
+  {
+    "tag_name": "v0.0.9",
+    "name": "no assets yet",
+    "body": "",
+    "prerelease": false,
+    "published_at": "2026-11-10T09:00:00Z",
+    "assets": []
+  },
+  {
+    "tag_name": "nightly",
+    "name": "not a version",
+    "body": "",
+    "prerelease": true,
+    "published_at": "2026-11-09T09:00:00Z",
+    "assets": []
+  }
+]

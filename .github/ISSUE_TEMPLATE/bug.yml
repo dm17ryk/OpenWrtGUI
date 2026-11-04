@@ -1,0 +1,58 @@
+name: Bug report
+description: Something in OpenWrtGUI does not work as it should.
+labels: ["type:bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. The audit-log export (Audit log → **Export for a bug report**) helps most:
+        it shows every command the app sent, with secrets masked.
+  - type: input
+    id: version
+    attributes:
+      label: OpenWrtGUI version
+      description: Settings → About.
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: router
+    attributes:
+      label: Router model and firmware image
+      description: Model, and the OpenWrt version or image name (Router overview shows both).
+      placeholder: D-Link DWR-921 C3, OpenWrt SNAPSHOT r35692-b8bffeefdf
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open …
+        2. Click …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead
+      description: Error text, and a screenshot if it helps.
+    validations:
+      required: true
+  - type: textarea
+    id: audit
+    attributes:
+      label: Audit-log export
+      description: Drag the `openwrtgui-audit.zip` file here. Check it first if your router names or addresses are private.
+  - type: textarea
+    id: log
+    attributes:
+      label: App log (optional)
+      description: The end of `logs\app.log` in the data folder (Settings → Open data folder).
+      render: text

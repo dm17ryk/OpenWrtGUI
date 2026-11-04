@@ -1,0 +1,58 @@
+name: Wiki
+
+# Publishes docs/manual/* and fresh desktop screenshots to the GitHub wiki.
+# The wiki must exist first: create its Home page once in the GitHub UI.
+
+on:
+  push:
+    branches: [master]
+    paths: ["docs/manual/**", "frontend/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wiki
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - run: uv python install 3.13
+      - run: uv sync --frozen --extra dev
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Screenshots
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          npm run build
+          npx playwright test e2e/screenshots.spec.ts --project=desktop-light --project=desktop-dark
+      - name: Push to the wiki
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          git clone "https://x-access-token:${TOKEN}@github.com/${REPO}.wiki.git" wiki
+          cp docs/manual/*.md wiki/
+          mkdir -p wiki/screenshots/dark
+          cp frontend/e2e-screenshots/desktop-light/*.png wiki/screenshots/
+          cp frontend/e2e-screenshots/desktop-dark/*.png wiki/screenshots/dark/
+          cd wiki || exit 1
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "wiki already up to date"
+          else
+            git commit -m "Sync manual from ${GITHUB_SHA::7}"
+            git push
+          fi

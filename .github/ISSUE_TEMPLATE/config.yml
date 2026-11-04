@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/dm17ryk/OpenWrtGUI/discussions
+    about: Ask how to do something, or discuss an idea before it becomes a feature request.
+  - name: Security problem
+    url: https://github.com/dm17ryk/OpenWrtGUI/security/advisories/new
+    about: Report vulnerabilities privately, not as an issue.

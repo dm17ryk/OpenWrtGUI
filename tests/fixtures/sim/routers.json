@@ -1,0 +1,46 @@
+[
+  {
+    "id": "ap1",
+    "name": "AP1 · bench",
+    "host": "192.168.1.1",
+    "base": "ap2",
+    "overlay": "ap1.overlay.json",
+    "auth": "key"
+  },
+  {
+    "id": "ap2",
+    "name": "AP2 · office",
+    "host": "192.168.1.2",
+    "base": "ap2",
+    "overlay": null,
+    "auth": "key"
+  },
+  {
+    "id": "ap3",
+    "name": "AP3 · QA stands",
+    "host": "192.168.1.3",
+    "base": "ap2",
+    "overlay": "ap3.overlay.json",
+    "auth": "none"
+  },
+  {
+    "id": "new",
+    "name": "",
+    "host": "192.168.1.4",
+    "base": "ap2",
+    "overlay": "new.json",
+    "auth": "none",
+    "password": "sim-password",
+    "wizard_only": true
+  },
+  {
+    "id": "factory",
+    "name": "",
+    "host": "192.168.1.5",
+    "base": "ap2",
+    "overlay": "new.json",
+    "auth": "none",
+    "password": "root",
+    "wizard_only": true
+  }
+]

@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Router firewall</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.app{--bg:#F2F3EF;--surface:#FFFFFF;--surface2:#F6F7F4;--ink:#15181C;--ink2:#3E454C;--muted:#575F67;--line:#D8DBD4;--line2:#E8EAE5;--accent:#1F5FCC;--accent-ink:#FFFFFF;--accent-soft:#EEF3FC;--ok:#16784A;--ok-soft:#E3F2EA;--warn:#9A5A00;--warn-soft:#FBEFD9;--bad:#B3361A;--bad-soft:#FBE7E1;--neu-soft:#ECEEEA;--har:#5A3EBF;--har-soft:#ECE7FA;--top:#15181C;--top-ink:#F2F3EF;--code-bg:#15181C;--code-ink:#E6E8EA;--code-c:#93A8BA;--link:#1F5FCC}
+.app.dark{--bg:#111316;--surface:#1A1D21;--surface2:#20242A;--ink:#ECEEEF;--ink2:#C5CAD0;--muted:#9AA3AC;--line:#2F343B;--line2:#262A30;--accent:#5B92F0;--accent-ink:#0B0D10;--accent-soft:#1D2A40;--ok:#5CC98F;--ok-soft:#17301F;--warn:#E2A54A;--warn-soft:#33260F;--bad:#F08A6C;--bad-soft:#3A1E16;--neu-soft:#262A30;--har:#B7A6F2;--har-soft:#2A2340;--top:#0B0D10;--top-ink:#ECEEEF;--code-bg:#0B0D10;--code-ink:#E6E8EA;--code-c:#8FA3B5;--link:#8DB4F5}
+.app{font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--ink);background:var(--bg);font-size:14px;line-height:1.45;min-height:100vh}
+.app a{color:var(--link)}
+.mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 20px;padding:10px 24px;background:var(--top);color:var(--top-ink)}
+.brand{font-weight:600;font-size:15px;display:flex;align-items:center;gap:10px}
+.nav{display:flex;flex-wrap:wrap;gap:2px}
+.nav a{color:#C3C8CE;text-decoration:none;padding:10px 12px;border-radius:6px;font-size:13px}
+.nav a:hover{color:#FFFFFF;background:#262A30}
+.nav a.cur{color:#FFFFFF;background:#2E343B}
+.spacer{flex:1}
+.pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;padding:6px 12px;border-radius:999px}
+.theme,.gear{font:inherit;display:inline-flex;align-items:center;gap:8px;font-size:13px;color:#E6E8EA;background:#2E343B;border:0;border-radius:999px;padding:0 14px;min-height:40px;cursor:pointer;text-decoration:none}
+.app .gear{color:#E6E8EA}
+.wrap{max-width:1440px;margin:0 auto;padding:24px;box-sizing:border-box;display:flex;flex-direction:column;gap:20px}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+.b{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.air{background:var(--ok-soft);color:var(--ok)}.neu{background:var(--neu-soft);color:var(--ink2)}.warnb{background:var(--warn-soft);color:var(--warn)}.badb{background:var(--bad-soft);color:var(--bad)}.har{background:var(--har-soft);color:var(--har)}.own{background:var(--accent-soft);color:var(--accent)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.btn{font:inherit;font-size:13px;font-weight:500;padding:10px 14px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;min-height:44px;box-sizing:border-box;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+.btn:hover{background:var(--surface2)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{border-color:var(--bad);color:var(--bad)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.btn:focus-visible,.nav a:focus-visible,.theme:focus-visible,.gear:focus-visible,.seg button:focus-visible,.tab:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{font:inherit;font-size:13px;font-weight:500;border:0;border-right:1px solid var(--line);background:var(--surface);color:var(--ink);padding:0 14px;min-height:44px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--ink);color:var(--surface)}
+.seg button.onblock{background:var(--bad);color:#FFFFFF}
+.seg button:disabled{cursor:not-allowed}
+.tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line)}
+.tab{font:inherit;font-size:13px;font-weight:500;padding:0 14px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted);min-height:44px;cursor:pointer}
+.tab.on{color:var(--ink);border-bottom-color:var(--ink)}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{text-align:left;font-weight:600;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+.tbl td{padding:10px;border-bottom:1px solid var(--line2);vertical-align:middle}
+.tbl tr.flag td{background:var(--warn-soft)}
+.pol{font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12px;padding:3px 8px;border-radius:4px;white-space:nowrap}
+.acc{background:var(--ok-soft);color:var(--ok)}.rej{background:var(--bad-soft);color:var(--bad)}
+.code{background:var(--code-bg);color:var(--code-ink);border-radius:8px;padding:12px 14px;font-family:'IBM Plex Mono',ui-monospace,monospace;font-size:12.5px;line-height:1.65;overflow-x:auto}
+.code .c{color:var(--code-c)}
+.note{font-size:13px;color:var(--ink2);padding:10px 12px;border-radius:8px;background:var(--surface2)}
+.note.w{background:var(--warn-soft)}
+.note.h{background:var(--har-soft)}
+.pin{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:10px 14px;border:1px solid var(--line);border-radius:8px;background:var(--surface2)}
+.field{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.field label{color:var(--muted);font-size:12px;font-weight:500}
+.in{font:inherit;font-size:14px;padding:10px 12px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);min-height:44px;box-sizing:border-box;width:100%}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.guard{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:12px 16px;border-radius:10px;background:var(--har-soft);color:var(--ink);border:1px solid var(--har)}
+</style>
+</helmet>
+<div class="{{appCls}}">
+  <header class="top">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7FD1A8" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5a10 10 0 0 1 14 0"></path><path d="M8 15.5a6 6 0 0 1 8 0"></path><circle cx="12" cy="19" r="1.4" fill="#7FD1A8"></circle></svg>
+      <span>OpenWrt Bench</span>
+    </div>
+    <nav class="nav" aria-label="Screens">
+      <a href="Main.dc.html">Dashboard</a>
+      <a href="WiFi.dc.html">Wi-Fi</a>
+      <a href="RF.dc.html">RF live</a>
+      <a href="Network.dc.html">Network &amp; DHCP</a>
+      <a href="Ports.dc.html">Ports &amp; VLANs</a>
+      <a class="cur" href="Firewall.dc.html">Firewall</a>
+      <a href="Faults.dc.html">Faults &amp; capture</a>
+      <a href="LTE.dc.html">LTE modem</a>
+      <a href="System.dc.html">System</a>
+      <a href="Discovery.dc.html">Discovery</a>
+    </nav>
+    <div class="spacer"></div>
+    <span class="pill" style="{{guardPillStyle}}"><span class="dot" style="{{guardDotStyle}}"></span>{{guardPill}}</span>
+    <a class="gear" href="Settings.dc.html" aria-label="App settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg>Settings</a>
+    <button class="theme" type="button" aria-pressed="{{darkStr}}" onClick="{{toggleTheme}}">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>
+      {{themeLabel}}
+    </button>
+  </header>
+
+  <div class="wrap">
+    <sc-if value="{{locked}}" hint-placeholder-val="{{ false }}">
+      <div class="guard" role="status"><strong>dima_night is running</strong><span style="font-size: 13px; color: var(--ink2)">Every router is read-only until it ends. Reading, counters and the raw ruleset keep working; Apply and Unlock are off.</span></div>
+    </sc-if>
+
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 24px">
+      <div>
+        <div class="eyebrow">AP1 · <span class="mono">192.168.1.1</span> · DWR-921 C3</div>
+        <h1 style="margin: 2px 0 0; font-size: 28px; font-weight: 600; letter-spacing: -0.01em">Firewall</h1>
+      </div>
+      <div class="spacer"></div>
+      <span class="b neu mono">nftables · fw4</span>
+    </div>
+
+    <div class="tabs" role="tablist" aria-label="Firewall views">
+      <sc-for list="{{tabs}}" as="t" hint-placeholder-count="8">
+        <button class="{{t.cls}}" type="button" role="tab" aria-selected="{{t.sel}}" onClick="{{t.pick}}">{{t.label}}</button>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{tabZones}}" hint-placeholder-val="{{ true }}">
+      <section class="card" aria-labelledby="mdh" style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px">
+          <h2 id="mdh" style="margin: 0; font-size: 16px; font-weight: 600">Filtering model</h2>
+          <span style="font-size: 13px; color: var(--muted)">per zone and direction · <strong style="color: var(--ink2)">Allow all</strong>: everything passes, your rules block · <strong style="color: var(--ink2)">Block all</strong>: nothing passes, your rules allow</span>
+        </div>
+        <div style="overflow-x: auto">
+          <table class="tbl">
+            <thead><tr><th>Zone</th><th>To this router</th><th>Through the router</th><th>From this router</th></tr></thead>
+            <tbody>
+              <sc-for list="{{zoneRows}}" as="z" hint-placeholder-count="2">
+                <tr>
+                  <td style="white-space: nowrap"><strong>{{z.name}}</strong> <span class="mono" style="font-size: 12px; color: var(--muted)">{{z.nets}}</span><div style="margin-top: 4px"><sc-if value="{{z.appPath}}" hint-placeholder-val="{{ false }}"><span class="b own">carries this app's SSH</span></sc-if></div></td>
+                  <sc-for list="{{z.cells}}" as="c" hint-placeholder-count="3">
+                    <td>
+                      <div class="seg" role="group" aria-label="{{c.aria}}">
+                        <button type="button" class="{{c.allowCls}}" aria-pressed="{{c.allowOn}}" onClick="{{c.setAllow}}" disabled="{{c.dis}}">Allow all</button>
+                        <button type="button" class="{{c.blockCls}}" aria-pressed="{{c.blockOn}}" onClick="{{c.setBlock}}" disabled="{{c.dis}}">Block all</button>
+                      </div>
+                      <div style="font-size: 12px; color: var(--muted); margin-top: 6px">{{c.hint}}</div>
+                    </td>
+                  </sc-for>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+          <span style="font-size: 13px; color: var(--ink2)">Blocked traffic is</span>
+          <div class="seg" role="group" aria-label="How blocked traffic is handled">
+            <button type="button" class="{{rejCls}}" aria-pressed="{{rejOn}}" onClick="{{setReject}}">Rejected · sender is told</button>
+            <button type="button" class="{{dropCls}}" aria-pressed="{{dropOn}}" onClick="{{setDrop}}">Dropped · silent</button>
+          </div>
+        </div>
+
+        <sc-if value="{{needPins}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <div class="eyebrow">Kept open by the app on lan, so it cannot lock itself out</div>
+            <sc-for list="{{pins}}" as="p" hint-placeholder-count="2">
+              <div class="pin">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 17v5"></path><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3z"></path></svg>
+                <strong>{{p.name}}</strong>
+                <span class="mono" style="font-size: 12px; color: var(--muted)">{{p.match}}</span>
+                <span style="font-size: 12px; color: var(--muted)">{{p.why}}</span>
+                <div class="spacer"></div>
+                <sc-if value="{{p.kept}}" hint-placeholder-val="{{ true }}"><button class="btn" type="button" onClick="{{p.ask}}">Remove…</button></sc-if>
+                <sc-if value="{{p.gone}}" hint-placeholder-val="{{ false }}"><span class="b badb">removed</span><button class="btn" type="button" onClick="{{p.restore}}">Put back</button></sc-if>
+              </div>
+              <sc-if value="{{p.asking}}" hint-placeholder-val="{{ false }}">
+                <div class="note w" style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px"><span style="flex: 1 1 380px">{{p.warn}}</span><button class="btn danger" type="button" onClick="{{p.remove}}">Remove anyway</button><button class="btn" type="button" onClick="{{p.keep}}">Keep it</button></div>
+              </sc-if>
+            </sc-for>
+          </div>
+        </sc-if>
+      </section>
+
+      <section class="card" aria-labelledby="efh" style="display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px">
+          <h2 id="efh" style="margin: 0; font-size: 16px; font-weight: 600">Your rules in this model</h2>
+          <span style="font-size: 13px; color: var(--muted)">switching keeps every rule; rules that stop doing anything are flagged</span>
+        </div>
+        <div style="overflow-x: auto">
+          <table class="tbl">
+            <thead><tr><th>Rule</th><th>Where</th><th>Match</th><th>Action</th><th>Packets</th><th>Effect</th></tr></thead>
+            <tbody>
+              <sc-for list="{{ruleRows}}" as="r" hint-placeholder-count="4">
+                <tr class="{{r.rowCls}}">
+                  <td>{{r.name}}</td>
+                  <td class="mono" style="white-space: nowrap">{{r.where}}</td>
+                  <td class="mono">{{r.match}}</td>
+                  <td><span class="{{r.actCls}}">{{r.act}}</span></td>
+                  <td class="mono">{{r.pk}}</td>
+                  <td><span class="{{r.effCls}}">{{r.eff}}</span></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+        <sc-if value="{{hasFlags}}" hint-placeholder-val="{{ false }}">
+          <div class="note w">{{flagText}}</div>
+        </sc-if>
+      </section>
+
+      <section class="card" aria-labelledby="zoh">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 10px">
+          <h2 id="zoh" style="margin: 0; font-size: 16px; font-weight: 600">Zones</h2>
+          <span style="font-size: 13px; color: var(--muted)">policies follow the model above</span>
+          <div class="spacer"></div>
+          <button class="btn" type="button">+ Zone</button>
+        </div>
+        <div style="overflow-x: auto">
+          <table class="tbl">
+            <thead><tr><th>Zone</th><th>Networks</th><th>Input</th><th>Forward</th><th>Output</th><th>Masquerade</th><th>MSS clamp</th><th>Forwards to</th><th></th></tr></thead>
+            <tbody>
+              <sc-for list="{{zoneTbl}}" as="z" hint-placeholder-count="2">
+                <tr><td><strong>{{z.name}}</strong></td><td class="mono">{{z.nets}}</td><td><span class="{{z.inCls}}">{{z.inp}}</span></td><td><span class="{{z.fwCls}}">{{z.fw}}</span></td><td><span class="{{z.outCls}}">{{z.out}}</span></td><td>{{z.masq}}</td><td>{{z.mss}}</td><td class="mono">{{z.to}}</td><td><button class="btn" type="button">Edit</button></td></tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="pvh" style="display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+          <h2 id="pvh" style="margin: 0; font-size: 16px; font-weight: 600">Pending change</h2>
+          <sc-if value="{{touchesPath}}" hint-placeholder-val="{{ false }}"><span class="b warnb">touches this app's path · 60 s rollback</span></sc-if>
+        </div>
+        <div class="code"><sc-for list="{{cmdLines}}" as="l" hint-placeholder-count="6"><div class="{{l.cls}}" style="white-space: pre">{{l.t}}</div></sc-for></div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <button class="btn pri" type="button" disabled="{{applyDis}}">{{applyLabel}}</button>
+          <button class="btn" type="button" onClick="{{reset}}">Discard</button>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="osh" style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+        <h2 id="osh" style="margin: 0; font-size: 16px; font-weight: 600">Other nftables tables</h2>
+        <span class="b har">BENCHSIPGUARD · harness · locked</span>
+        <span class="b har">voipdscp · harness · locked</span>
+        <span class="b own">benchfault · this app</span>
+        <span class="b warnb">lab_scratch · unknown · locked</span>
+        <div class="spacer"></div>
+        <button class="btn" type="button" onClick="{{openTables}}">Open, unlock, edit</button>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{tabRules}}" hint-placeholder-val="{{ false }}">
+      <section class="card" aria-labelledby="trh">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 10px">
+          <h2 id="trh" style="margin: 0; font-size: 16px; font-weight: 600">Traffic rules</h2>
+          <span style="font-size: 13px; color: var(--muted)">from <span class="mono">/etc/config/firewall</span>, live packet counters, in the order fw4 applies them</span>
+          <div class="spacer"></div>
+          <button class="btn" type="button">+ Rule</button>
+        </div>
+        <div style="overflow-x: auto">
+          <table class="tbl">
+            <thead><tr><th>Rule</th><th>Where</th><th>Match</th><th>Action</th><th>Packets</th><th>Effect</th><th>On</th><th></th></tr></thead>
+            <tbody>
+              <sc-for list="{{ruleRows}}" as="r" hint-placeholder-count="4">
+                <tr class="{{r.rowCls}}">
+                  <td>{{r.name}}</td>
+                  <td class="mono" style="white-space: nowrap">{{r.where}}</td>
+                  <td class="mono">{{r.match}}</td>
+                  <td><span class="{{r.actCls}}">{{r.act}}</span></td>
+                  <td class="mono">{{r.pk}}</td>
+                  <td><span class="{{r.effCls}}">{{r.eff}}</span></td>
+                  <td><input type="checkbox" checked aria-label="Rule enabled" style="width: 18px; height: 18px; accent-color: var(--accent)"></td>
+                  <td><button class="btn" type="button">Edit</button></td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{tabEmpty}}" hint-placeholder-val="{{ false }}">
+      <section class="card" style="display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+          <h2 style="margin: 0; font-size: 16px; font-weight: 600">{{emptyTitle}}</h2>
+          <div class="spacer"></div>
+          <button class="btn pri" type="button">{{emptyAdd}}</button>
+        </div>
+        <div class="note">{{emptyText}}</div>
+        <div class="eyebrow">A new entry asks for</div>
+        <div class="grid">
+          <sc-for list="{{emptyFields}}" as="f" hint-placeholder-count="5">
+            <div class="field"><label>{{f.label}}</label><div class="in mono" style="display: flex; align-items: center; color: var(--muted)">{{f.ph}}</div></div>
+          </sc-for>
+        </div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{tabCustom}}" hint-placeholder-val="{{ false }}">
+      <section class="card" aria-labelledby="cuh" style="display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+          <h2 id="cuh" style="margin: 0; font-size: 16px; font-weight: 600">Custom rules</h2>
+          <span style="font-size: 13px; color: var(--muted)">nftables snippets fw4 loads on every start</span>
+          <div class="spacer"></div>
+          <button class="btn" type="button">+ Include</button>
+        </div>
+        <div style="overflow-x: auto">
+          <table class="tbl">
+            <thead><tr><th>File</th><th>Loaded at</th><th>Owner</th><th>Lines</th><th></th></tr></thead>
+            <tbody>
+              <tr><td class="mono">/etc/nftables.d/10-custom-filter-chains.nft</td><td class="mono">inside table inet fw4</td><td><span class="b neu">from the image</span></td><td class="mono">12 · comments only</td><td><button class="btn" type="button">Edit</button></td></tr>
+              <tr><td class="mono">/etc/owg/nft/*.nft</td><td class="mono">ruleset-post</td><td><span class="b own">this app</span></td><td class="mono">none yet</td><td><span style="font-size: 12px; color: var(--muted)">created when a table is persisted</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note">Edits are checked with <span class="mono">nft -c</span> before fw4 restarts, and the restart runs with the 60 s rollback.</div>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{tabTables}}" hint-placeholder-val="{{ false }}">
+      <section class="card" aria-labelledby="ath" style="display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+          <h2 id="ath" style="margin: 0; font-size: 16px; font-weight: 600">All nftables tables on AP1</h2>
+          <span style="font-size: 13px; color: var(--muted)">every table and hook has an owner. Tables owned by someone else are locked until you unlock them.</span>
+          <div class="spacer"></div>
+          <button class="btn" type="button" onClick="{{toggleAdd}}" disabled="{{locked}}">+ Add table</button>
+        </div>
+        <div style="overflow-x: auto">
+          <table class="tbl">
+            <thead><tr><th>Table</th><th>Owner</th><th>What it does</th><th>Rules</th><th></th></tr></thead>
+            <tbody>
+              <sc-for list="{{tblRows}}" as="t" hint-placeholder-count="5">
+                <tr>
+                  <td class="mono" style="white-space: nowrap">{{t.name}}</td>
+                  <td><span class="{{t.ownCls}}">{{t.owner}}</span></td>
+                  <td>{{t.what}}</td>
+                  <td class="mono">{{t.rules}}</td>
+                  <td style="white-space: nowrap">
+                    <sc-if value="{{t.isFw4}}" hint-placeholder-val="{{ false }}"><button class="btn" type="button" onClick="{{t.zones}}">Zones and rules</button></sc-if>
+                    <sc-if value="{{t.isApp}}" hint-placeholder-val="{{ false }}"><a class="btn" href="Faults.dc.html">Open faults</a></sc-if>
+                    <sc-if value="{{t.canUnlock}}" hint-placeholder-val="{{ true }}"><button class="btn" type="button" onClick="{{t.ask}}" disabled="{{t.dis}}">{{t.unlockLabel}}</button></sc-if>
+                    <sc-if value="{{t.isOpen}}" hint-placeholder-val="{{ false }}"><span class="b warnb">unlocked</span> <button class="btn" type="button" onClick="{{t.lock}}">Lock</button></sc-if>
+                  </td>
+                </tr>
+              </sc-for>
+            </tbody>
+          </table>
+        </div>
+
+        <sc-if value="{{asking}}" hint-placeholder-val="{{ false }}">
+          <div style="border: 1px solid var(--har); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 10px; background: var(--har-soft)">
+            <strong>Unlock <span class="mono">{{askName}}</span>?</strong>
+            <dl style="display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; font-size: 13px">
+              <dt style="color: var(--muted)">Owner</dt><dd style="margin: 0">{{askOwner}}</dd>
+              <dt style="color: var(--muted)">What depends on it</dt><dd style="margin: 0">{{askDep}}</dd>
+              <dt style="color: var(--muted)">Running now</dt><dd style="margin: 0">no harness run (Bench Guard clear)</dd>
+            </dl>
+            <div style="font-size: 13px; color: var(--ink2)">The override is written to the audit log. The table locks again when you close this router, or with Lock.</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px"><button class="btn pri" type="button" onClick="{{confirmUnlock}}">Unlock</button><button class="btn" type="button" onClick="{{cancelUnlock}}">Cancel</button></div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{editing}}" hint-placeholder-val="{{ false }}">
+          <div style="border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px"><strong class="mono">{{editName}}</strong><span class="b warnb">unlocked · edits allowed</span><div class="spacer"></div><button class="btn" type="button">+ Rule</button><button class="btn danger" type="button">Delete table</button></div>
+            <div style="overflow-x: auto">
+              <table class="tbl">
+                <thead><tr><th>Chain</th><th>Rule</th><th>Packets</th><th></th></tr></thead>
+                <tbody>
+                  <sc-for list="{{editRules}}" as="r" hint-placeholder-count="2">
+                    <tr><td class="mono">{{r.chain}}</td><td class="mono">{{r.rule}}</td><td class="mono">{{r.pk}}</td><td style="white-space: nowrap"><button class="btn" type="button">Edit</button> <button class="btn" type="button">Delete</button></td></tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+              <span style="font-size: 13px; color: var(--ink2)">Keep the change</span>
+              <div class="seg" role="group" aria-label="Keep the change">
+                <button type="button" class="{{rtCls}}" aria-pressed="{{rtOn}}" onClick="{{setRuntime}}">Runtime only</button>
+                <button type="button" class="{{psCls}}" aria-pressed="{{psOn}}" onClick="{{setPersist}}">Saved as fw4 include</button>
+              </div>
+              <span style="font-size: 12px; color: var(--muted)">{{keepHint}}</span>
+            </div>
+            <div class="code"><sc-for list="{{editLines}}" as="l" hint-placeholder-count="6"><div class="{{l.cls}}" style="white-space: pre">{{l.t}}</div></sc-for></div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px"><button class="btn pri" type="button">Apply</button><button class="btn" type="button">Discard</button></div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{adding}}" hint-placeholder-val="{{ false }}">
+          <div style="border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+            <strong>New table</strong>
+            <div style="display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px">
+              <div class="field"><label>Family</label>
+                <div class="seg" role="group" aria-label="Table family">
+                  <sc-for list="{{fams}}" as="f" hint-placeholder-count="5"><button type="button" class="{{f.cls}}" aria-pressed="{{f.on}}" onClick="{{f.pick}}">{{f.label}}</button></sc-for>
+                </div>
+              </div>
+              <div class="field" style="flex: 1 1 200px"><label for="tn">Name</label><input id="tn" class="in mono" type="text" value="owg_test" readOnly></div>
+            </div>
+            <div class="code"><div class="c" style="white-space: pre"># owner: this app · runtime only until saved as an include</div><div style="white-space: pre">{{addCmd}}</div></div>
+          </div>
+        </sc-if>
+      </section>
+    </sc-if>
+
+    <sc-if value="{{tabRaw}}" hint-placeholder-val="{{ false }}">
+      <section class="card" aria-labelledby="rwh" style="display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px">
+          <h2 id="rwh" style="margin: 0; font-size: 16px; font-weight: 600">Raw ruleset</h2>
+          <span style="font-size: 13px; color: var(--muted)"><span class="mono">nft list ruleset</span> · read-only · refreshed every 5 s</span>
+          <div class="spacer"></div>
+          <input class="in" type="search" placeholder="Find in ruleset" aria-label="Find in ruleset" style="max-width: 260px">
+          <button class="btn" type="button">Copy</button>
+        </div>
+        <div class="code" style="white-space: pre"><span class="c"># table inet fw4 · 87 rules (excerpt)</span>
+table inet fw4 {
+	chain input {
+		type filter hook input priority filter; policy accept;
+		iif "lo" accept comment "!fw4: Accept traffic from loopback"
+		ct state vmap { established : accept, related : accept, invalid : drop }
+		tcp flags syn / fin,syn,rst,ack jump syn_flood
+		iifname "br-lan" jump input_lan
+		iifname { "eth0.2", "wwan0" } jump input_wan
+	}
+	chain input_wan {
+		meta nfproto ipv4 udp dport 68 counter packets 0 bytes 0 accept comment "!fw4: Allow-DHCP-Renew"
+		icmp type echo-request counter packets 12 bytes 1008 accept comment "!fw4: Allow-Ping"
+		jump reject_from_wan
+	}
+}
+<span class="c"># table bridge voipdscp · owner: harness</span>
+<span class="c"># table inet benchfault · owner: this app</span></div>
+      </section>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"harnessRunning":{"editor":"boolean","default":false,"section":"Bench Guard"},"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Look"},"$preview":{"width":1440,"height":1640}}'>
+class Component extends DCLogic {
+  state = { dark: null, tab: 'zones', m: null, block: 'reject', removed: {}, pinAsk: null, ask: null, open: {}, edit: null, persist: false, adding: false, fam: 'inet' };
+
+  renderVals() {
+    const s = this.state;
+    const dark = s.dark === null ? (this.props.theme ?? 'light') === 'dark' : s.dark;
+    const locked = !!this.props.harnessRunning;
+    const M0 = { 'lan.input': 'allow', 'lan.forward': 'allow', 'lan.output': 'allow', 'wan.input': 'block', 'wan.forward': 'block', 'wan.output': 'allow' };
+    const m = s.m || M0;
+    const DIRS = [{ id: 'input', label: 'To this router', short: 'to this router' }, { id: 'forward', label: 'Through the router', short: 'through' }, { id: 'output', label: 'From this router', short: 'from this router' }];
+    const ZONES = [{ id: 'lan', idx: 0, nets: 'lan', masq: '—', mss: '—', to: 'wan' }, { id: 'wan', idx: 1, nets: 'wan, wan6, lte', masq: 'yes', mss: 'yes', to: '—' }];
+    const setCell = (k, v) => { const n = Object.assign({}, m); n[k] = v; this.setState({ m: n, pinAsk: null }); };
+
+    const zoneRows = ZONES.map(z => ({
+      name: z.id, nets: z.nets, appPath: z.id === 'lan',
+      cells: DIRS.map(d => {
+        const k = z.id + '.' + d.id, allow = m[k] === 'allow';
+        return {
+          aria: z.id + ' ' + d.label,
+          allowCls: allow ? 'on' : '', blockCls: allow ? '' : 'onblock',
+          allowOn: allow ? 'true' : 'false', blockOn: allow ? 'false' : 'true',
+          setAllow: () => setCell(k, 'allow'), setBlock: () => setCell(k, 'block'), dis: locked,
+          hint: allow ? 'rules block' : (s.block === 'drop' ? 'rules allow · rest dropped' : 'rules allow · rest rejected')
+        };
+      })
+    }));
+
+    const needPins = m['lan.input'] === 'block';
+    const PINS = [
+      { id: 'ssh', name: 'Allow SSH from this PC', match: 'lan → this router · 192.168.1.10 · tcp 22', why: 'how this app reaches AP1', warn: 'Without this rule the app loses AP1 as soon as the change applies. The 60 s rollback then restores the old firewall by itself.' },
+      { id: 'dhcp', name: 'Allow DHCP and DNS', match: 'lan → this router · udp 67-68, udp/tcp 53', why: 'AP1 serves DHCP and DNS on lan', warn: 'Without this rule devices on lan stop getting addresses and names from AP1, including the panels under test.' }
+    ];
+    const pins = PINS.map(p => {
+      const gone = !!s.removed[p.id];
+      const setRemoved = v => { const r = Object.assign({}, s.removed); r[p.id] = v; this.setState({ removed: r, pinAsk: null }); };
+      return {
+        name: p.name, match: p.match, why: p.why, warn: p.warn, kept: !gone, gone: gone, asking: s.pinAsk === p.id && !gone,
+        ask: () => this.setState({ pinAsk: p.id }), keep: () => this.setState({ pinAsk: null }),
+        remove: () => setRemoved(true), restore: () => setRemoved(false)
+      };
+    });
+
+    const RULES = [
+      { name: 'Allow-DHCP-Renew', z: 'wan', d: 'input', match: 'udp 68', act: 'accept', pk: '0' },
+      { name: 'Allow-Ping', z: 'wan', d: 'input', match: 'icmp echo-request', act: 'accept', pk: '12' },
+      { name: 'Allow-IGMP', z: 'wan', d: 'input', match: 'igmp', act: 'accept', pk: '0' },
+      { name: 'Block-panel-ping', z: 'lan', d: 'input', match: 'from 192.168.1.20 · icmp echo-request', act: 'drop', pk: '318' }
+    ];
+    let flags = 0;
+    const ruleRows = RULES.map(r => {
+      const allow = m[r.z + '.' + r.d] === 'allow';
+      const accepts = r.act === 'accept';
+      const dead = allow === accepts;
+      if (dead) flags++;
+      return {
+        name: r.name, where: r.z + ' → ' + (DIRS.find(d => d.id === r.d) || DIRS[0]).short, match: r.match, pk: r.pk,
+        act: r.act, actCls: 'pol ' + (accepts ? 'acc' : 'rej'),
+        eff: dead ? (accepts ? 'no effect · zone already allows this' : 'no effect · zone already blocks this') : (accepts ? 'allows' : 'blocks'),
+        effCls: 'b ' + (dead ? 'warnb' : 'neu'), rowCls: dead ? 'flag' : ''
+      };
+    });
+
+    const pol = k => m[k] === 'allow' ? 'ACCEPT' : (s.block === 'drop' ? 'DROP' : 'REJECT');
+    const polCls = k => 'pol ' + (m[k] === 'allow' ? 'acc' : 'rej');
+    const zoneTbl = ZONES.map(z => ({
+      name: z.id, nets: z.nets, masq: z.masq, mss: z.mss, to: z.to,
+      inp: pol(z.id + '.input').toLowerCase(), inCls: polCls(z.id + '.input'),
+      fw: pol(z.id + '.forward').toLowerCase(), fwCls: polCls(z.id + '.forward'),
+      out: pol(z.id + '.output').toLowerCase(), outCls: polCls(z.id + '.output')
+    }));
+
+    const cmd = [];
+    const add = (t, c) => cmd.push({ t: t, cls: c ? 'c' : '' });
+    let touchesPath = false;
+    ZONES.forEach(z => DIRS.forEach(d => {
+      const k = z.id + '.' + d.id;
+      const changed = m[k] !== M0[k] || (m[k] === 'block' && s.block === 'drop');
+      if (!changed) return;
+      if (z.id === 'lan') touchesPath = true;
+      add('# ' + z.id + ' · ' + d.label.toLowerCase() + ': ' + (m[k] === 'allow' ? 'Allow all' : 'Block all'), true);
+      add('uci set firewall.@zone[' + z.idx + '].' + d.id + "='" + pol(k) + "'   # zone " + z.id);
+    }));
+    if (needPins) {
+      const PU = {
+        ssh: { sec: 'owg_pin_ssh', opts: ["src_ip='192.168.1.10'", "proto='tcp'", "dest_port='22'"] },
+        dhcp: { sec: 'owg_pin_dhcpdns', opts: ["proto='udp tcp'", "dest_port='53 67 68'"] }
+      };
+      PINS.forEach(p => {
+        const sec = PU[p.id].sec;
+        if (s.removed[p.id]) { add('# pin removed by you: ' + p.name, true); return; }
+        add('# kept open by the app: ' + p.name, true);
+        add('uci set firewall.' + sec + '=rule');
+        PU[p.id].opts.concat(["src='lan'", "target='ACCEPT'"]).forEach(kv => add('uci set firewall.' + sec + '.' + kv));
+      });
+    }
+    const hasChange = cmd.length > 0;
+    if (!hasChange) add('# no changes yet: switch a cell above to see the commands', true);
+    else {
+      add('uci commit firewall');
+      if (touchesPath) add('# arm the 60 s rollback on the router first, then:', true);
+      add('fw4 reload');
+      add(touchesPath ? '# verify: reconnect over SSH, then cancel the rollback timer' : '# verify: zone chains show the new policy in nft -j list ruleset', true);
+    }
+
+    const TABLES = [
+      { id: 'fw4', name: 'inet fw4', owner: 'fw4', ownCls: 'b neu', what: 'Zones and rules from /etc/config/firewall', rules: '87', kind: 'fw4' },
+      { id: 'sip', name: 'chain BENCHSIPGUARD · inet fw4', owner: 'harness · dima_night', ownCls: 'b har', what: 'SIP egress guard used by the VoIP soak runs', rules: '2', kind: 'locked', pos: 'table-post',
+        dep: 'dima_night expects BENCHSIPGUARD. Without it, SIP from the panels leaves the bench during soak runs.',
+        rl: [{ chain: 'BENCHSIPGUARD', rule: 'oifname { "eth0.2", "wwan0" } udp dport { 5060, 5061 } counter reject', pk: '0' }, { chain: 'BENCHSIPGUARD', rule: 'oifname { "eth0.2", "wwan0" } tcp dport { 5060, 5061 } counter reject', pk: '0' }] },
+      { id: 'dscp', name: 'bridge voipdscp', owner: 'harness · voip_chain', ownCls: 'b har', what: 'Marks RTP 5004 and SIP 5060, 5061 as DSCP EF on the bridge', rules: '2', kind: 'locked', pos: 'ruleset-post',
+        dep: 'VoIP chain runs expect RTP and SIP marked EF. Changing it changes their results.',
+        rl: [{ chain: 'post', rule: 'udp dport 5004 ip dscp set ef counter', pk: '48 112' }, { chain: 'post', rule: 'udp dport { 5060, 5061 } ip dscp set ef counter', pk: '1 904' }] },
+      { id: 'fault', name: 'inet benchfault', owner: 'this app', ownCls: 'b own', what: 'Fault scenarios armed from the Faults screen', rules: '0', kind: 'app' },
+      { id: 'unk', name: 'ip lab_scratch', owner: 'unknown', ownCls: 'b warnb', what: 'Not created by fw4, this app or a known harness', rules: '3', kind: 'locked', pos: 'ruleset-post',
+        dep: 'No known writer: made by hand or by a tool this app does not know. Name its writer in Settings › Bench Guard and it shows here.',
+        rl: [{ chain: 'pre', rule: 'ip saddr 192.168.1.30 counter', pk: '2 210' }, { chain: 'pre', rule: 'ip daddr 192.168.1.30 counter', pk: '2 047' }, { chain: 'pre', rule: 'udp dport 5004 counter', pk: '0' }] }
+    ];
+    const tblRows = TABLES.map(t => {
+      const isOpen = !!s.open[t.id];
+      return {
+        name: t.name, owner: t.owner, ownCls: t.ownCls, what: t.what, rules: t.rules,
+        isFw4: t.kind === 'fw4', isApp: t.kind === 'app', canUnlock: t.kind === 'locked' && !isOpen, isOpen: isOpen,
+        unlockLabel: locked ? 'Locked during run' : 'Unlock…', dis: locked,
+        zones: () => this.setState({ tab: 'zones' }),
+        ask: () => this.setState({ ask: t.id }),
+        lock: () => { const o = Object.assign({}, s.open); delete o[t.id]; this.setState({ open: o, edit: s.edit === t.id ? null : s.edit }); }
+      };
+    });
+    const askT = TABLES.find(t => t.id === s.ask);
+    const editT = TABLES.find(t => t.id === s.edit);
+    const el = [];
+    const eadd = (t, c) => el.push({ t: t, cls: c ? 'c' : '' });
+    if (editT) {
+      const f = '/tmp/owg/' + editT.id + '.nft';
+      eadd('# ' + editT.name + ': rules replaced in one nft transaction', true);
+      eadd('nft -c -f ' + f + '   # check first');
+      eadd('nft -f ' + f);
+      if (s.persist) {
+        const sec = 'owg_' + editT.id;
+        eadd('# saved: fw4 loads it on every start', true);
+        eadd('cp ' + f + ' /etc/owg/nft/' + editT.id + '.nft');
+        eadd('uci set firewall.' + sec + '=include');
+        eadd('uci set firewall.' + sec + ".type='nftables'");
+        eadd('uci set firewall.' + sec + ".path='/etc/owg/nft/" + editT.id + ".nft'");
+        eadd('uci set firewall.' + sec + ".position='" + editT.pos + "'");
+        eadd('uci commit firewall');
+      }
+      eadd('# audit: override by user on ' + editT.name, true);
+    }
+    const FAMS = ['inet', 'ip', 'ip6', 'bridge', 'netdev'];
+
+    const TABS = [['zones', 'Zones and model'], ['rules', 'Traffic rules'], ['fwd', 'Port forwards'], ['nat', 'NAT rules'], ['sets', 'IP sets'], ['custom', 'Custom rules'], ['tables', 'All nftables tables'], ['raw', 'Raw ruleset']];
+    const EMPTY = {
+      fwd: { title: 'Port forwards', add: '+ Port forward', text: 'No port forwards on AP1. A port forward sends traffic arriving on wan to a device on lan.', f: [['Name', 'panel-web'], ['Protocol', 'tcp'], ['External port', '8080'], ['To device', '192.168.1.20'], ['Internal port', '80'], ['From zone', 'wan']] },
+      nat: { title: 'NAT rules', add: '+ NAT rule', text: 'No NAT rules on AP1 beyond wan masquerading (set on the zone). Use these for SNAT to a fixed address or to skip NAT for a subnet.', f: [['Name', 'snat-lab'], ['Source', '192.168.3.0/24'], ['Destination', 'any'], ['Action', 'SNAT / MASQUERADE / ACCEPT'], ['Rewrite to', '10.0.0.18']] },
+      sets: { title: 'IP sets', add: '+ IP set', text: 'No IP sets on AP1. A set is a named list of addresses, MACs or ports that rules can match in one go, for example all panel MACs.', f: [['Name', 'panels'], ['Family', 'ipv4'], ['Match', 'src_mac'], ['Entries', 'one per line'], ['Used by rules', 'none yet']] }
+    };
+    const em = EMPTY[s.tab] || EMPTY.fwd;
+    const guardOn = locked;
+
+    return {
+      appCls: dark ? 'app dark' : 'app', darkStr: dark ? 'true' : 'false', themeLabel: dark ? 'Dark' : 'Light',
+      toggleTheme: () => this.setState({ dark: !dark }),
+      locked: locked,
+      guardPill: guardOn ? 'dima_night running · read-only' : 'No harness running · writes allowed',
+      guardPillStyle: guardOn ? 'background: #3A2F5C; color: #DCD3FA' : 'background: #1E3A2B; color: #BFE8CF',
+      guardDotStyle: 'background: ' + (guardOn ? '#B7A6F2' : '#6CD39B'),
+      tabs: TABS.map(t => ({ label: t[1], cls: s.tab === t[0] ? 'tab on' : 'tab', sel: s.tab === t[0] ? 'true' : 'false', pick: () => this.setState({ tab: t[0] }) })),
+      tabZones: s.tab === 'zones', tabRules: s.tab === 'rules', tabEmpty: !!EMPTY[s.tab], tabCustom: s.tab === 'custom', tabTables: s.tab === 'tables', tabRaw: s.tab === 'raw',
+      zoneRows: zoneRows,
+      rejCls: s.block === 'reject' ? 'on' : '', rejOn: s.block === 'reject' ? 'true' : 'false', setReject: () => this.setState({ block: 'reject' }),
+      dropCls: s.block === 'drop' ? 'on' : '', dropOn: s.block === 'drop' ? 'true' : 'false', setDrop: () => this.setState({ block: 'drop' }),
+      needPins: needPins, pins: pins,
+      ruleRows: ruleRows, hasFlags: flags > 0,
+      flagText: flags + (flags === 1 ? ' rule no longer does anything' : ' rules no longer do anything') + ' in this model. They stay in the config, so switching back restores them; delete them here if you no longer need them.',
+      zoneTbl: zoneTbl, cmdLines: cmd, touchesPath: touchesPath && hasChange,
+      applyLabel: touchesPath ? 'Apply with 60 s rollback' : 'Apply', applyDis: locked || !hasChange,
+      reset: () => this.setState({ m: null, block: 'reject', removed: {}, pinAsk: null }),
+      openTables: () => this.setState({ tab: 'tables' }), openZones: () => this.setState({ tab: 'zones' }),
+      emptyTitle: em.title, emptyAdd: em.add, emptyText: em.text, emptyFields: em.f.map(x => ({ label: x[0], ph: x[1] })),
+      tblRows: tblRows,
+      asking: !!askT, askName: askT ? askT.name : '', askOwner: askT ? askT.owner : '', askDep: askT ? askT.dep : '',
+      confirmUnlock: () => { const o = Object.assign({}, s.open); o[s.ask] = true; this.setState({ open: o, edit: s.ask, ask: null, adding: false }); },
+      cancelUnlock: () => this.setState({ ask: null }),
+      editing: !!editT, editName: editT ? editT.name : '', editRules: editT ? editT.rl : [],
+      rtCls: s.persist ? '' : 'on', rtOn: s.persist ? 'false' : 'true', setRuntime: () => this.setState({ persist: false }),
+      psCls: s.persist ? 'on' : '', psOn: s.persist ? 'true' : 'false', setPersist: () => this.setState({ persist: true }),
+      keepHint: s.persist ? 'survives reboot; fw4 loads it at ' + (editT ? editT.pos : 'ruleset-post') : (editT && editT.id === 'sip' ? 'gone at the next fw4 reload or reboot' : 'gone at the next reboot'),
+      editLines: el,
+      adding: s.adding, toggleAdd: () => this.setState({ adding: !s.adding, edit: null }),
+      fams: FAMS.map(f => ({ label: f, cls: s.fam === f ? 'on' : '', on: s.fam === f ? 'true' : 'false', pick: () => this.setState({ fam: f }) })),
+      addCmd: 'nft add table ' + s.fam + ' owg_test'
+    };
+  }
+}
+</script>
+</body>
+</html>

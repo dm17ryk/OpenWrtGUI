@@ -1,0 +1,151 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv python install 3.13
+      - run: uv sync --frozen --extra dev
+      - name: Lint
+        run: |
+          uv run ruff check src tests tools packaging/make_icon.py
+          uv run ruff format --check src tests tools packaging/make_icon.py
+      - name: Types
+        run: uv run mypy
+      - name: Tests
+        run: uv run pytest --cov=openwrtgui --cov-report=term --cov-fail-under=80
+      - name: OpenAPI schema
+        run: uv run python tools/dump_openapi.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openapi
+          path: build/openapi.json
+          if-no-files-found: error
+
+  frontend:
+    needs: python
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - uses: actions/download-artifact@v5
+        with:
+          name: openapi
+          path: build
+      - name: API types match the backend
+        run: |
+          npm run gen:api
+          git diff --exit-code src/api/schema.ts
+      - run: npm run lint
+      - run: npx tsc -b
+      - run: npm test
+      - run: npm run build
+
+  e2e:
+    needs: [python, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv python install 3.13
+      - run: uv sync --frozen --extra dev
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build the UI and install Chromium
+        working-directory: frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          npm run build
+      - name: Playwright against the simulator
+        working-directory: frontend
+        run: npm run e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-screenshots
+          path: frontend/e2e-screenshots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report
+
+  windows:
+    needs: [python, frontend]
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv python install 3.13
+      - run: uv sync --frozen --extra build
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Inno Setup
+        run: |
+          if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --no-progress -y
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: Version
+        id: base
+        run: |
+          $base = uv run python -c "from openwrtgui.version import BASE_VERSION as v; print(v)"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "base=$base" >> $env:GITHUB_OUTPUT
+      - name: Build
+        run: ./tools/build_windows.ps1 -Version "${{ steps.base.outputs.base }}-ci.${{ github.run_number }}"
+      - name: Install, check and uninstall
+        run: ./tools/test_installer.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer
+          path: dist/OpenWrtGUI-Setup-*.exe
+          if-no-files-found: error
+
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: actionlint
+        uses: docker://rhysd/actionlint:1.7.7
+        with:
+          args: -color
