@@ -199,6 +199,8 @@ class SimWifi:
     def _ubus(self, obj: str, method: str, args: dict[str, Any]) -> CommandResult | None:
         if (obj, method) == ("network.wireless", "status"):
             return _ok(json.dumps(self._status(), indent="\t") + "\n")
+        if (obj, method) == ("iwinfo", "phyname"):
+            return _ok(json.dumps({"phyname": self._phy}))
         if obj == "iwinfo":
             return self._iwinfo(method, str(args.get("device", "")))
         if (obj, method) == ("luci-rpc", "getHostHints"):

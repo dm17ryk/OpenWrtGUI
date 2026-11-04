@@ -58,6 +58,14 @@ def test_json_secrets_masked() -> None:
     )
 
 
+def test_shell_escaped_quote_inside_a_secret_is_masked_whole() -> None:
+    # shell_quote("it's $x `y` z") writes the inner ' as '\'' ; the whole value must go.
+    line = "uci set wireless.default_radio0.key='it'\\''s $x `y` z'"
+    assert mask(line, ()) == "uci set wireless.default_radio0.key='<hidden>'"
+    json_line = 'ubus call uci set \'{"values":{"key":"a\\"b c"}}\''
+    assert mask(json_line, ()) == 'ubus call uci set \'{"values":{"key":"<hidden>"}}\''
+
+
 def test_empty_secret_ignored() -> None:
     assert mask("uname -a", ["", "x"]) == "uname -a"
 

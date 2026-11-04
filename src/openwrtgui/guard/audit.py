@@ -16,10 +16,13 @@ log = logging.getLogger(__name__)
 
 HIDDEN = "<hidden>"
 _SECRET_OPTIONS = r"key|password|pincode|psk|sae_password|auth_secret|acct_secret|priv_key_pwd|priv_key2_pwd"
-# uci set <cfg>.<section>.<option>=value, with the value quoted '…', "…" or bare.
-_UCI_SECRET = re.compile(rf"(\.(?:{_SECRET_OPTIONS})=)('[^']*'|\"[^\"]*\"|[^\s;&|'\"]+)")
+# uci set <cfg>.<section>.<option>=value, with the value quoted '…' (a ' inside written as '\''),
+# "…" or bare.
+_UCI_SECRET = re.compile(
+    rf"(\.(?:{_SECRET_OPTIONS})=)('(?:[^']*'\\'')*[^']*'|\"(?:[^\"\\]|\\.)*\"|[^\s;&|'\"]+)"
+)
 # The same options in JSON (ubus call uci set / ubus call network …).
-_JSON_SECRET = re.compile(rf"(\"(?:{_SECRET_OPTIONS})\"\s*:\s*)\"[^\"]*\"")
+_JSON_SECRET = re.compile(rf"(\"(?:{_SECRET_OPTIONS})\"\s*:\s*)\"(?:[^\"\\]|\\.)*\"")
 
 
 def _hide_value(match: re.Match[str]) -> str:
