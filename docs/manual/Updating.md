@@ -14,8 +14,9 @@ or "Not checked yet."
 ## Channels
 
 - **Stable**: releases such as `0.1.0`.
-- **Pre-release (CI builds)**: also every green build of `master`, named like `0.1.0-ci.42`. Useful for
-  trying a fix before it is released. Only the newest ten CI builds are kept on GitHub.
+- **Pre-release (CI builds)**: also every green build of `master`. A CI build carries the version being
+  worked on and a build number, for example `0.2.0-ci.42`: newer than `0.1.0`, older than the `0.2.0`
+  release. Useful for trying a fix before it is released. Only the newest ten CI builds are kept on GitHub.
 
 ## Installing an update
 
