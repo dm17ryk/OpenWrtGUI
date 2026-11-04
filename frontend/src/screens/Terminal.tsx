@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from 'react'
 import { NavLink, useParams } from 'react-router'
 import { apiFetch, openSocket } from '../api/client'
 import type { RouterItem, TerminalMessage } from '../api/types'
+import { Help } from '../help/Help'
+import { HELP } from '../help/topics'
 import { LineConsole } from './LineConsole'
 import { commandLine, reduceLines, type ConsoleLine } from './lineConsoleState'
 
@@ -112,7 +114,10 @@ export function Terminal() {
     <main className="wrap">
       <div>
         <div className="eyebrow">Terminal · commands are written to the audit log</div>
-        <h1>{current ? current.record.name : 'Terminal'}</h1>
+        <div className="hrow">
+          <h1>{current ? current.record.name : 'Terminal'}</h1>
+          <Help topic={HELP.terminal} />
+        </div>
       </div>
       <nav className="row" aria-label="Routers" style={{ gap: 6 }}>
         {usable.map((r) => (

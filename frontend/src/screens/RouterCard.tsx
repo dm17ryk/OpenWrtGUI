@@ -1,5 +1,7 @@
 import { Link } from 'react-router'
 import type { RouterItem } from '../api/types'
+import { HelpTip } from '../help/Help'
+import { HELP } from '../help/topics'
 import { dbm, plural, radioText, routerState, stationCount, type RouterState } from './routerState'
 
 const BADGE: Record<RouterState, string> = {
@@ -26,7 +28,9 @@ export function RouterCard({ item }: { item: RouterItem }) {
         </h3>
         <span className="mono muted">{record.host}</span>
         <div className="spacer" />
-        <span className={BADGE[state]}>{state}</span>
+        <HelpTip topic={HELP.routerCards}>
+          <span className={BADGE[state]}>{state}</span>
+        </HelpTip>
       </div>
       {summary && (
         <div style={{ fontSize: 13, color: 'var(--ink2)' }}>

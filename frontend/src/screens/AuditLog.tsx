@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { apiFetch, downloadFile } from '../api/client'
 import type { AuditEntry, RouterItem } from '../api/types'
+import { Help, HelpTip } from '../help/Help'
+import { HELP } from '../help/topics'
 
 function query(router: string, text: string, since: string): string {
   const params = new URLSearchParams()
@@ -34,12 +36,17 @@ export function AuditLog() {
       <div className="row" style={{ alignItems: 'flex-end' }}>
         <div>
           <div className="eyebrow">Every command sent on your behalf · secrets masked</div>
-          <h1>Audit log</h1>
+          <div className="hrow">
+            <h1>Audit log</h1>
+            <Help topic={HELP.auditLog} />
+          </div>
         </div>
         <div className="spacer" />
-        <button className="btn" type="button" onClick={() => void exportAll()}>
-          Export for a bug report
-        </button>
+        <HelpTip topic={HELP.auditLog}>
+          <button className="btn" type="button" onClick={() => void exportAll()}>
+            Export for a bug report
+          </button>
+        </HelpTip>
       </div>
       {exportError && <div className="note x">{exportError}</div>}
       <section className="card stack">

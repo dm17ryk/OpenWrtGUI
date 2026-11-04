@@ -1,5 +1,7 @@
 import { NavLink } from 'react-router'
 import type { GuardOut } from '../api/types'
+import { HelpTip } from '../help/Help'
+import { HELP } from '../help/topics'
 import type { Resolved } from '../theme'
 import { guardPillText } from './guardText'
 
@@ -43,10 +45,12 @@ export function Header({ guard, theme, onToggleTheme, updateAvailable }: Props) 
           Update available
         </NavLink>
       )}
-      <span className={live ? 'pill live' : 'pill'}>
-        <span className="dot" style={{ background: live ? '#B7A6F2' : '#6CD39B' }} />
-        {guardPillText(guard)}
-      </span>
+      <HelpTip topic={HELP.guardBanner}>
+        <span className={live ? 'pill live' : 'pill'}>
+          <span className="dot" style={{ background: live ? '#B7A6F2' : '#6CD39B' }} />
+          {guardPillText(guard)}
+        </span>
+      </HelpTip>
       <button className="theme" type="button" aria-pressed={theme === 'dark'} onClick={onToggleTheme}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />

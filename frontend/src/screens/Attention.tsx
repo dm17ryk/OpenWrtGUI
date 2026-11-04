@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
 import type { RouterItem } from '../api/types'
+import { Help } from '../help/Help'
+import { HELP } from '../help/topics'
 import { hhmm, routerState } from './routerState'
 
 type Row = { key: string; tag: string; tagClass: string; text: ReactNode; action?: ReactNode }
@@ -51,9 +53,10 @@ export function Attention({ items }: { items: RouterItem[] }) {
   if (list.length === 0) return null
   return (
     <section className="card" aria-labelledby="attention-h">
-      <h2 id="attention-h" style={{ marginBottom: 12 }}>
-        Needs attention
-      </h2>
+      <div className="hrow" style={{ marginBottom: 12 }}>
+        <h2 id="attention-h">Needs attention</h2>
+        <Help topic={HELP.attention} />
+      </div>
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         {list.map((row) => (
           <div key={row.key} className="row" style={{ padding: '12px 0', borderTop: '1px solid var(--line2)' }}>

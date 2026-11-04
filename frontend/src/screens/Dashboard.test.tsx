@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, expect, test, vi } from 'vitest'
 import type { RouterItem } from '../api/types'
@@ -41,6 +42,17 @@ test('a lost connection shows the plain message, not an error class name', async
       'Could not load the routers: Lost the connection to OpenWrtGUI. The app may have closed. Start it again.',
     ),
   ).toBeInTheDocument()
+})
+
+test('headline, air map, cards, attention and the router list offer help from the manual', async () => {
+  renderWith(ROUTERS)
+  for (const name of ['Help: Headline', 'Help: Needs attention', 'Help: Router list']) {
+    expect(screen.getByRole('button', { name })).toBeInTheDocument()
+  }
+  expect(screen.getAllByRole('button', { name: 'Help: Air map' }).length).toBeGreaterThan(0)
+  const card = screen.getByRole('article', { name: 'AP2 · office' })
+  await userEvent.setup().hover(within(card).getByText('parked'))
+  expect(await screen.findByRole('tooltip')).toHaveTextContent('One card per router, with a state badge')
 })
 
 test('heading counts routers, radios on air and stations', () => {

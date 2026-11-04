@@ -81,8 +81,19 @@ async function toInstall() {
 test('address comes from the link and the host key is shown before pinning', async () => {
   renderWizard()
   expect(screen.getByLabelText('Router address')).toHaveValue('192.168.1.4')
+  expect(screen.getByRole('button', { name: 'Help: 1. Where is the router?' })).toBeInTheDocument()
   await userEvent.setup().click(screen.getByRole('button', { name: 'Connect' }))
   expect(await screen.findByText('SHA256:simkey')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Help: 2. Check the router is the one you mean' })).toBeInTheDocument()
+})
+
+test('the install and skip buttons explain themselves from the manual', async () => {
+  const user = await toInstall()
+  await user.hover(screen.getByRole('button', { name: 'Install key' }))
+  expect(await screen.findByRole('tooltip')).toHaveTextContent('The wizard shows the exact command it will run')
+  await user.unhover(screen.getByRole('button', { name: 'Install key' }))
+  await user.hover(screen.getByRole('button', { name: 'Skip for now' }))
+  expect(await screen.findByText(/shows needs app key on the dashboard/)).toBeInTheDocument()
 })
 
 test('after pinning it tries the logins by itself, then asks', async () => {

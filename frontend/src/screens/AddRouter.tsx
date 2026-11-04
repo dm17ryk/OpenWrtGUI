@@ -3,6 +3,8 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { ApiError, apiFetch, postJson } from '../api/client'
 import type { Preview, RouterRecord, SessionView } from '../api/types'
+import { Help, HelpTip } from '../help/Help'
+import { HELP } from '../help/topics'
 
 const LABELS = ['Address', 'Host key', 'First login', 'Install key', 'Identify', 'Port map'] as const
 const TITLES = [
@@ -13,6 +15,7 @@ const TITLES = [
   'What is this router?',
   'Map the sockets',
 ] as const
+const STEP_HELP = [HELP.stepAddress, HELP.stepHostKey, HELP.stepLogin, HELP.stepInstallKey, HELP.stepIdentify, HELP.stepIdentify] as const
 
 function loginText(v: SessionView): string {
   if (v.key_path) return `this PC’s key ${v.key_path} already works; the app uses it and installed nothing`
@@ -176,9 +179,11 @@ export function AddRouter() {
         )}
         {view.known_before && <div className="note">This key is already pinned for this address.</div>}
         <div>
-          <button className="btn pri" type="button" onClick={trust} disabled={busy}>
-            Accept and pin
-          </button>
+          <HelpTip topic={HELP.stepHostKey}>
+            <button className="btn pri" type="button" onClick={trust} disabled={busy}>
+              Accept and pin
+            </button>
+          </HelpTip>
         </div>
       </div>
     )
@@ -246,12 +251,16 @@ export function AddRouter() {
         <div className="muted">The app adds its own key to the router. Existing keys and password login stay as they are. This is the exact command:</div>
         <div className="code">{preview.join('\n')}</div>
         <div className="row" style={{ gap: 8 }}>
-          <button className="btn pri" type="button" onClick={installKey} disabled={busy}>
-            Install key
-          </button>
-          <button className="btn" type="button" onClick={skipKey} disabled={busy}>
-            Skip for now
-          </button>
+          <HelpTip topic={HELP.stepInstallKey}>
+            <button className="btn pri" type="button" onClick={installKey} disabled={busy}>
+              Install key
+            </button>
+          </HelpTip>
+          <HelpTip topic={HELP.skipKey}>
+            <button className="btn" type="button" onClick={skipKey} disabled={busy}>
+              Skip for now
+            </button>
+          </HelpTip>
         </div>
       </div>
     )
@@ -341,7 +350,10 @@ export function AddRouter() {
     <main className="wrap">
       <div>
         <div className="eyebrow">Add router · step {step + 1} of {LABELS.length}</div>
-        <h1>{TITLES[step]}</h1>
+        <div className="hrow">
+          <h1>{TITLES[step]}</h1>
+          <Help topic={STEP_HELP[step]} />
+        </div>
       </div>
       <ol className="row" aria-label="Steps" style={{ listStyle: 'none', padding: 0, margin: 0, gap: 6 }}>
         {LABELS.map((label, i) => (

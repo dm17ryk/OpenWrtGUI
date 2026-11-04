@@ -48,6 +48,9 @@ pwsh -File tools/build_windows.ps1 -Version 0.1.0-dev    # PyInstaller build + s
 - Reads must pass `is_read_only_command` when they come from a user (terminal during a run).
 - Never auto-accept an SSH host key.
 - Keep the UI working at 375 px and in both themes; e2e checks for horizontal scroll.
+- In-app help comes from the manual: `frontend/src/help/topics.ts` maps each `?` and button tooltip to a
+  `docs/manual` section (`Page#anchor`, as the wiki names it). Renaming a manual heading means updating
+  that file; `manual.test.ts` fails otherwise. New screens get help the same way.
 
 ## Safety rules (the bench is shared and runs long tests)
 

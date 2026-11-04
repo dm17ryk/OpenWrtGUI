@@ -48,4 +48,5 @@ test('banner names the run and only shows while live', () => {
   expect(screen.getByRole('status')).toHaveTextContent(
     'Bench Guard: every router is read-only. dima_night.py started 21:04 (PID 18244). Status, stations and read-only commands still work. Writes come back when it ends.',
   )
+  expect(screen.getByRole('button', { name: 'Help: What still works during a run' })).toBeInTheDocument()
 })

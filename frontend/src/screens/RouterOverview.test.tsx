@@ -20,6 +20,13 @@ function renderOverview(detail: RouterDetail) {
   )
 }
 
+test('the overview and its sections offer help from the manual', () => {
+  renderOverview({ ...AP2, summary: SUMMARY })
+  expect(screen.getByRole('button', { name: 'Help: Router overview' })).toBeInTheDocument()
+  expect(screen.getByRole('region', { name: 'What AP2 says about itself' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Help: 5. What is this router, and its sockets' })).toBeInTheDocument()
+})
+
 test('overview shows 155 radio and 289 SSID options', () => {
   renderOverview({ ...AP2, summary: SUMMARY })
   const wifi = screen.getByRole('article', { name: 'network.wireless get_validate' })

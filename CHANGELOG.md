@@ -25,6 +25,8 @@ The foundation: install, update, add routers, see them, and stay out of a runnin
 - Router self-description probe, read the way LuCI reads it: `board.json`, ubus services, typed option lists,
   feature flags and LuCI menu entries.
 - Dashboard: router cards (radio, stations, network, login), an air map per band, and a "Needs attention" list.
+- In-app help: a "?" next to page titles and sections, and tooltips on the main buttons, with the matching
+  section of the user manual (built in, so it works offline) and a link to the full page in the wiki.
 - Bench Guard: while a harness run is live (lock files, processes on this PC, run SSIDs on air), every router
   is read-only and a banner names the run. The watch list is editable in Settings.
 - Terminal per router: a full shell, or a read-only command line during a harness run.

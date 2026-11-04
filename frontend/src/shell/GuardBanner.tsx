@@ -1,4 +1,6 @@
 import type { GuardOut } from '../api/types'
+import { Help } from '../help/Help'
+import { HELP } from '../help/topics'
 import { guardReasonText } from './guardText'
 
 export function GuardBanner({ guard }: { guard: GuardOut | undefined }) {
@@ -8,7 +10,8 @@ export function GuardBanner({ guard }: { guard: GuardOut | undefined }) {
       <strong>Bench Guard: every router is read-only.</strong>{' '}
       <span>
         {guardReasonText(guard)}. Status, stations and read-only commands still work. Writes come back when it ends.
-      </span>
+      </span>{' '}
+      <Help topic={HELP.readOnlyRun} />
     </div>
   )
 }

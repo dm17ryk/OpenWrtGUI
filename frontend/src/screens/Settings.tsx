@@ -2,6 +2,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { ApiError, apiFetch, downloadFile, postJson, putJson } from '../api/client'
 import type { AppInfo, AppKeyOut, GuardWatchList, Settings, UpdateOut } from '../api/types'
+import { Help, HelpTip } from '../help/Help'
+import { HELP } from '../help/topics'
 
 type Progress = { version: string; done: number; total: number }
 type WatchKey = 'lock_files' | 'processes' | 'router_ssids'
@@ -112,13 +114,19 @@ export function SettingsScreen() {
     <main className="wrap">
       <div>
         <div className="eyebrow">OpenWrtGUI · this PC</div>
-        <h1>Settings</h1>
+        <div className="hrow">
+          <h1>Settings</h1>
+          <Help topic={HELP.settings} />
+        </div>
       </div>
       {message && <div className="note w">{message}</div>}
 
       <section className="card stack" aria-labelledby="up-h">
         <div className="row">
-          <h2 id="up-h">Updates</h2>
+          <div className="hrow">
+            <h2 id="up-h">Updates</h2>
+            <Help topic={HELP.updates} />
+          </div>
           {u && <span className="b neu mono">installed {u.current}</span>}
           <div className="spacer" />
           <div className="seg" role="group" aria-label="Update channel">
@@ -129,9 +137,11 @@ export function SettingsScreen() {
               Pre-release (CI builds)
             </button>
           </div>
-          <button className="btn" type="button" onClick={() => void check()}>
-            Check now
-          </button>
+          <HelpTip topic={HELP.checkUpdates}>
+            <button className="btn" type="button" onClick={() => void check()}>
+              Check now
+            </button>
+          </HelpTip>
         </div>
         <button className="tg" type="button" role="switch" aria-checked={s?.auto_check ?? false} onClick={() => void save({ auto_check: !(s?.auto_check ?? true) })}>
           <span className={s?.auto_check ? 'track on' : 'track'}>
@@ -152,9 +162,11 @@ export function SettingsScreen() {
             </div>
             {u.latest.notes && <div style={{ whiteSpace: 'pre-wrap', fontSize: 13 }}>{u.latest.notes}</div>}
             <div className="row" style={{ gap: 8 }}>
-              <button className="btn pri" type="button" disabled={!u.can_install} onClick={() => void install(u.latest?.version ?? '')}>
-                Update now
-              </button>
+              <HelpTip topic={HELP.installUpdate}>
+                <button className="btn pri" type="button" disabled={!u.can_install} onClick={() => void install(u.latest?.version ?? '')}>
+                  Update now
+                </button>
+              </HelpTip>
               <button className="btn" type="button" onClick={() => void act(async () => { client.setQueryData(['update'], await postJson<UpdateOut>('/api/update/skip', { version: u.latest?.version })) })}>
                 Skip this version
               </button>
@@ -175,9 +187,11 @@ export function SettingsScreen() {
           {u?.has_previous && (
             <>
               {' '}
-              <button className="btn" type="button" onClick={() => void act(async () => { await postJson('/api/update/reinstall-previous') })}>
-                Reinstall previous version
-              </button>
+              <HelpTip topic={HELP.reinstallPrevious}>
+                <button className="btn" type="button" onClick={() => void act(async () => { await postJson('/api/update/reinstall-previous') })}>
+                  Reinstall previous version
+                </button>
+              </HelpTip>
             </>
           )}
         </div>
@@ -185,7 +199,10 @@ export function SettingsScreen() {
 
       <div className="cards">
         <section className="card stack" aria-labelledby="ap-h">
-          <h2 id="ap-h">Appearance</h2>
+          <div className="hrow">
+            <h2 id="ap-h">Appearance</h2>
+            <Help topic={HELP.appearance} />
+          </div>
           <div className="seg" role="group" aria-label="Theme">
             {(['system', 'light', 'dark'] as const).map((t) => (
               <button key={t} type="button" className={s?.theme === t ? 'on' : ''} aria-pressed={s?.theme === t} onClick={() => void save({ theme: t })}>
@@ -196,7 +213,10 @@ export function SettingsScreen() {
           <div className="muted">System follows Windows (light or dark).</div>
         </section>
         <section className="card stack" aria-labelledby="fd-h">
-          <h2 id="fd-h">Folders</h2>
+          <div className="hrow">
+            <h2 id="fd-h">Folders</h2>
+            <Help topic={HELP.folders} />
+          </div>
           <dl className="kv">
             <dt>Data</dt>
             <dd className="mono">{info.data?.data_dir}</dd>
@@ -212,7 +232,10 @@ export function SettingsScreen() {
 
       <section className="card stack" aria-labelledby="bg-h">
         <div className="row">
-          <h2 id="bg-h">Bench Guard</h2>
+          <div className="hrow">
+            <h2 id="bg-h">Bench Guard</h2>
+            <Help topic={HELP.watchList} />
+          </div>
           <span className="muted">while anything below is live, every router is read-only</span>
         </div>
         {s && (
@@ -226,7 +249,10 @@ export function SettingsScreen() {
 
       <div className="cards">
         <section className="card stack" aria-labelledby="key-h">
-          <h2 id="key-h">App SSH key</h2>
+          <div className="hrow">
+            <h2 id="key-h">App SSH key</h2>
+            <Help topic={HELP.appKey} />
+          </div>
           <dl className="kv">
             <dt>Fingerprint</dt>
             <dd className="mono">{key.data?.fingerprint}</dd>
@@ -242,7 +268,10 @@ export function SettingsScreen() {
           </div>
         </section>
         <section className="card stack" aria-labelledby="al-h">
-          <h2 id="al-h">Audit log</h2>
+          <div className="hrow">
+            <h2 id="al-h">Audit log</h2>
+            <Help topic={HELP.retention} />
+          </div>
           <div className="row">
             <span className="muted">Keep</span>
             <div className="seg" role="group" aria-label="Audit log retention">
@@ -257,7 +286,10 @@ export function SettingsScreen() {
       </div>
 
       <section className="card row" aria-labelledby="ab-h">
-        <h2 id="ab-h">About</h2>
+        <div className="hrow">
+          <h2 id="ab-h">About</h2>
+          <Help topic={HELP.about} />
+        </div>
         <span className="mono">OpenWrtGUI {info.data?.version} · GPL-3.0</span>
         <a href="https://github.com/dm17ryk/OpenWrtGUI" target="_blank" rel="noopener noreferrer">
           github.com/dm17ryk/OpenWrtGUI

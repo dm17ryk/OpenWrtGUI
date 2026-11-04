@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import { ApiError, apiFetch } from '../api/client'
 import type { RouterItem } from '../api/types'
+import { Help } from '../help/Help'
+import { HELP } from '../help/topics'
 import { RouterRail } from '../shell/RouterRail'
 import { AirMap } from './AirMap'
 import { Attention } from './Attention'
@@ -20,10 +22,13 @@ export function Dashboard() {
           <div className="row" style={{ alignItems: 'flex-end' }}>
             <div>
               <div className="eyebrow">Bench</div>
-              <h1>
-                {plural(items.length, 'router')} · {onAir} {onAir === 1 ? 'radio' : 'radios'} on air ·{' '}
-                {plural(stations, 'station')}
-              </h1>
+              <div className="hrow">
+                <h1>
+                  {plural(items.length, 'router')} · {onAir} {onAir === 1 ? 'radio' : 'radios'} on air ·{' '}
+                  {plural(stations, 'station')}
+                </h1>
+                <Help topic={HELP.headline} />
+              </div>
             </div>
             <div className="spacer" />
             <span className="muted">Refreshed every 5 s over SSH</span>

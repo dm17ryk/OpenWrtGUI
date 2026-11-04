@@ -54,3 +54,11 @@ Below the cards, anything that needs you:
 ## Router list
 
 The left column (top on narrow windows) lists every router with its state, and **+ Add router**.
+
+## Router overview
+
+**Open** on a card, or a router in the list, shows that router's overview. **What … says about itself**
+is what the router reported when the app connected, read from the sources LuCI uses: `board.json`, the
+ubus services, the typed Wi-Fi option lists, feature flags and the LuCI menu. **Ports** shows each
+internal switch port with its printed label and the label saved for this router. **Probe again** reads
+it all once more; **Open terminal** opens a shell on the router.

@@ -3,6 +3,8 @@ import { useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
 import { ApiError, apiFetch, postJson } from '../api/client'
 import type { DescriptionSummary, RouterDetail } from '../api/types'
+import { Help } from '../help/Help'
+import { HELP } from '../help/topics'
 
 const FEATURE_ORDER = ['sae', 'owe', 'wps', '11r', '11ax', 'swconfig', 'firewall4', 'apk', 'wep', '11be']
 
@@ -101,7 +103,10 @@ export function RouterOverview() {
             <span className="mono">{d.record.host}</span>
             {s ? ` · ${s.model} · ${s.revision}` : ''}
           </div>
-          <h1>{d.record.name}</h1>
+          <div className="hrow">
+            <h1>{d.record.name}</h1>
+            <Help topic={HELP.routerOverview} />
+          </div>
         </div>
         <div className="spacer" />
         {d.record.auth === 'key' && (
@@ -123,7 +128,10 @@ export function RouterOverview() {
       ) : (
         <section className="card stack" aria-labelledby="self-h">
           <div className="row">
-            <h2 id="self-h">What {d.record.name.split(' · ')[0]} says about itself</h2>
+            <div className="hrow">
+              <h2 id="self-h">What {d.record.name.split(' · ')[0]} says about itself</h2>
+              <Help topic={HELP.stepIdentify} />
+            </div>
             <span className="muted">read on connect, the same sources LuCI uses</span>
           </div>
           {s ? <Sources s={s} /> : <div className="muted">Not read yet.</div>}

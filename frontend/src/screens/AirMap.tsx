@@ -1,4 +1,6 @@
 import type { RadioStatus, RouterItem } from '../api/types'
+import { Help } from '../help/Help'
+import { HELP } from '../help/topics'
 import { radioText } from './routerState'
 
 const BANDS: ReadonlyArray<{ id: string; label: string; channels: number[] }> = [
@@ -28,7 +30,10 @@ export function AirMap({ items }: { items: RouterItem[] }) {
         return (
           <section className="card stack" key={band.id} aria-labelledby={`air-${band.id}`}>
             <div className="row">
-              <h2 id={`air-${band.id}`}>{band.label}</h2>
+              <div className="hrow">
+                <h2 id={`air-${band.id}`}>{band.label}</h2>
+                <Help topic={HELP.airMap} />
+              </div>
               <span className="b air">on air</span>
               <span className="b park">parked (staged channel)</span>
             </div>

@@ -102,6 +102,15 @@ test('folders, key and retention are shown', async () => {
   expect(puts.at(-1)?.body.audit_retention_days).toBe(365)
 })
 
+test('every settings section offers help, and the update buttons explain themselves', async () => {
+  renderSettings()
+  for (const name of ['Settings', 'Updates', 'Appearance', 'Folders', 'Bench Guard', 'App SSH key', 'Audit log', 'About']) {
+    expect(screen.getByRole('button', { name: `Help: ${name}` })).toBeInTheDocument()
+  }
+  await userEvent.setup().hover(screen.getByRole('button', { name: 'Check now' }))
+  expect(await screen.findByRole('tooltip')).toHaveTextContent('At start-up and once a day')
+})
+
 test('update status says when no check has run yet', () => {
   renderSettings({ ...UPDATE, latest: null, available: false })
   const updates = screen.getByRole('region', { name: 'Updates' })
