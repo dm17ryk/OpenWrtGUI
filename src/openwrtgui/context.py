@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -14,6 +14,7 @@ import httpx
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard, psutil_lister
 from openwrtgui.live import LiveHub
+from openwrtgui.onboard.pc_keys import find_pc_keys, ssh_dirs
 from openwrtgui.onboard.wizard import Connector, OnboardService, SshConnector
 from openwrtgui.paths import DataDir
 from openwrtgui.poller import StatusPoller
@@ -21,7 +22,7 @@ from openwrtgui.probe.describe import SelfDescription
 from openwrtgui.probe.status import RouterStatus
 from openwrtgui.simulator import SimConnector, seed_routers, sim_http_client, sim_process_lister
 from openwrtgui.store.keys import AppKey, load_or_create_app_key
-from openwrtgui.store.routers import RouterRecord, RouterStore
+from openwrtgui.store.routers import RouterRecord, RouterStore, router_key_paths
 from openwrtgui.store.settings import SettingsStore
 from openwrtgui.terminal import TerminalSession
 from openwrtgui.transport.base import Transport
@@ -61,6 +62,14 @@ def _real_http_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(follow_redirects=True, timeout=20.0)
 
 
+def _find_pc_keys() -> list[Path]:
+    return find_pc_keys(ssh_dirs())
+
+
+def _no_pc_keys() -> list[Path]:
+    return []  # the simulator never offers the developer's own keys
+
+
 def build_context(
     data: DataDir,
     *,
@@ -80,14 +89,18 @@ def build_context(
 
     connector: Connector
     client_factory: Callable[[], httpx.AsyncClient]
+    pc_keys: Callable[[], Sequence[Path]]
     if simulator is not None:
         sim = SimConnector(simulator)
         connector = sim
+        pc_keys = _no_pc_keys
         seed_routers(simulator, routers)
         guard = BenchGuard(current.guard, lister=sim_process_lister, use_lock_files=False)
 
         async def factory(rec: RouterRecord) -> Transport:
-            return await sim.connect(rec.host, rec.port, password=None, key_paths=[app_key.private_path])
+            return await sim.connect(
+                rec.host, rec.port, password=None, key_paths=router_key_paths(rec, app_key.private_path)
+            )
 
         def client_factory() -> httpx.AsyncClient:
             return sim_http_client(simulator)
@@ -95,10 +108,15 @@ def build_context(
     else:
         connector = SshConnector(host_keys)
         guard = BenchGuard(current.guard, lister=psutil_lister)
+        pc_keys = _find_pc_keys
 
         async def factory(rec: RouterRecord) -> Transport:
             return await SshTransport.connect(
-                rec.host, rec.port, rec.username, host_keys=host_keys, key_paths=[app_key.private_path]
+                rec.host,
+                rec.port,
+                rec.username,
+                host_keys=host_keys,
+                key_paths=router_key_paths(rec, app_key.private_path),
             )
 
         client_factory = _real_http_client
@@ -115,6 +133,7 @@ def build_context(
         guard=guard,
         audit=audit,
         pool=pool,
+        pc_keys=pc_keys,
     )
     updater = Updater(
         settings=settings,

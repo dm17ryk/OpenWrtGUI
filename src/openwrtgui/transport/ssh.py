@@ -16,6 +16,7 @@ from openwrtgui.transport.base import (
     HostKeyChanged,
     HostKeyInfo,
     HostKeyUnknown,
+    KeyFileError,
     ShellChannel,
     Unreachable,
 )
@@ -76,6 +77,17 @@ async def fetch_host_key(host: str, port: int = 22, timeout: float = 10.0) -> Ho
     return _info(key)
 
 
+def _load_keys(key_paths: Sequence[Path]) -> list[asyncssh.SSHKeyPair]:
+    """Load before connecting, so a bad key file is reported as such and not as "unreachable"."""
+    keys: list[asyncssh.SSHKeyPair] = []
+    for path in key_paths:
+        try:
+            keys.extend(asyncssh.load_keypairs([str(path)]))
+        except (OSError, ValueError) as exc:  # KeyImportError is a ValueError: passphrase or not a key
+            raise KeyFileError(str(path), str(exc)) from exc
+    return keys
+
+
 class _Shell:
     def __init__(self, process: asyncssh.SSHClientProcess[str]) -> None:
         self._process = process
@@ -114,6 +126,7 @@ class SshTransport:
         pinned = host_keys.get(host, port)
         if pinned is None:
             raise HostKeyUnknown(host, await fetch_host_key(host, port, timeout))
+        client_keys = _load_keys(key_paths)
         try:
             conn = await asyncio.wait_for(
                 asyncssh.connect(
@@ -121,7 +134,7 @@ class SshTransport:
                     port,
                     username=username,
                     password=password,
-                    client_keys=[str(p) for p in key_paths],
+                    client_keys=client_keys,
                     agent_path=None,
                     known_hosts=str(host_keys.path),
                 ),

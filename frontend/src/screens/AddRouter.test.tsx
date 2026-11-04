@@ -4,13 +4,17 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { ApiError } from '../api/client'
+import type { SessionView } from '../api/types'
 import { SUMMARY, sessionView } from '../testing/fixtures'
 import { AddRouter } from './AddRouter'
 
 const INSTALL = "mkdir -p /etc/dropbear && touch /etc/dropbear/authorized_keys && chmod 600 /etc/dropbear/authorized_keys && (grep -qxF 'ssh-ed25519 AAAA openwrtgui@PC' /etc/dropbear/authorized_keys || echo 'ssh-ed25519 AAAA openwrtgui@PC' >> /etc/dropbear/authorized_keys)"
 
+const PC_KEY = 'C:\\Essence_SC\\home\\.ssh\\id_rsa'
+
 const calls: Array<{ path: string; body: unknown }> = []
 let installFails = false
+let autoLogin: SessionView = sessionView('login')
 
 vi.mock('../api/client', async (orig) => {
   const actual = await orig<typeof import('../api/client')>()
@@ -18,7 +22,8 @@ vi.mock('../api/client', async (orig) => {
     calls.push({ path, body })
     if (path === '/api/onboard') return sessionView('host_key')
     if (path.endsWith('/trust')) return sessionView('login')
-    if (path.endsWith('/login')) return sessionView('install_key')
+    if (path.endsWith('/auto-login')) return autoLogin
+    if (path.endsWith('/login')) return sessionView('install_key', { login_method: 'password' })
     if (path.endsWith('/install-key/preview')) return { commands: [INSTALL] }
     if (path.endsWith('/install-key')) {
       if (installFails) {
@@ -28,7 +33,8 @@ vi.mock('../api/client', async (orig) => {
     }
     if (path.endsWith('/verify')) return sessionView('identify', { key_installed: true })
     if (path.endsWith('/identify')) {
-      return sessionView('ports', { key_installed: true, summary: SUMMARY, proposed_port_labels: SUMMARY.port_labels })
+      const after = autoLogin.step === 'identify' ? autoLogin : sessionView('identify', { key_installed: true })
+      return { ...after, step: 'ports', summary: SUMMARY, proposed_port_labels: SUMMARY.port_labels }
     }
     if (path.endsWith('/finish')) return { id: 'ap4' }
     throw new Error(`unexpected ${path}`)
@@ -43,6 +49,7 @@ vi.mock('../api/client', async (orig) => {
 beforeEach(() => {
   calls.length = 0
   installFails = false
+  autoLogin = sessionView('login')
 })
 
 function renderWizard() {
@@ -65,7 +72,7 @@ async function toLogin() {
 
 async function toInstall() {
   const user = await toLogin()
-  await user.type(screen.getByLabelText('Root password'), 'sim-password')
+  await user.type(await screen.findByLabelText('Password'), 'sim-password')
   await user.click(screen.getByRole('button', { name: 'Log in' }))
   await screen.findByRole('heading', { name: 'Install the app’s key' })
   return user
@@ -78,15 +85,44 @@ test('address comes from the link and the host key is shown before pinning', asy
   expect(await screen.findByText('SHA256:simkey')).toBeInTheDocument()
 })
 
-test('password field is emptied after login submit', async () => {
+test('after pinning it tries the logins by itself, then asks', async () => {
+  await toLogin()
+  expect(await screen.findByText(/None of them worked/)).toHaveTextContent('the app’s key, this PC’s keys and root / root')
+  expect(calls.map((c) => c.path)).toContain('/api/onboard/s1/auto-login')
+  expect(screen.getByLabelText('User')).toHaveValue('root')
+})
+
+test('password field is emptied after login submit and the user goes along', async () => {
   const user = await toLogin()
-  const field = screen.getByLabelText('Root password')
+  const field = await screen.findByLabelText('Password')
   expect(field).toHaveAttribute('type', 'password')
   await user.type(field, 'sim-password')
   await user.click(screen.getByRole('button', { name: 'Log in' }))
   await screen.findByRole('heading', { name: 'Install the app’s key' })
-  expect(calls.find((c) => c.path.endsWith('/login'))?.body).toEqual({ password: 'sim-password' })
+  expect(calls.find((c) => c.path.endsWith('/login'))?.body).toEqual({ password: 'sim-password', username: 'root' })
   expect(screen.queryByDisplayValue('sim-password')).toBeNull()
+})
+
+test('a key this PC already has goes straight to identify and installs nothing', async () => {
+  autoLogin = sessionView('identify', { login_method: 'pc_key', key_path: PC_KEY })
+  await toLogin()
+  expect(await screen.findByRole('heading', { name: 'What is this router?' })).toBeInTheDocument()
+  expect(screen.getByText(`this PC’s key ${PC_KEY} already works; the app uses it and installed nothing`)).toBeInTheDocument()
+  expect(calls.some((c) => c.path.includes('/install-key'))).toBe(false)
+})
+
+test('the app key already on the router goes straight to identify', async () => {
+  autoLogin = sessionView('identify', { login_method: 'app_key', key_installed: true })
+  await toLogin()
+  expect(await screen.findByText('the app key was already on the router and works')).toBeInTheDocument()
+})
+
+test('root / root lands on the install step with a note', async () => {
+  autoLogin = sessionView('install_key', { login_method: 'default_password' })
+  await toLogin()
+  await screen.findByRole('heading', { name: 'Install the app’s key' })
+  expect(screen.getByText(/Logged in with the default root \/ root/)).toBeInTheDocument()
+  expect(await screen.findByText(INSTALL)).toBeInTheDocument()
 })
 
 test('install step shows the exact preview command from the API', async () => {

@@ -1,7 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 
-from openwrtgui.store.routers import RouterRecord, RouterStore, make_router_id
+from openwrtgui.store.routers import RouterRecord, RouterStore, make_router_id, router_key_paths
 
 
 def _rec(router_id: str, host: str) -> RouterRecord:
@@ -41,6 +41,23 @@ def test_port_labels_survive_json(tmp_path: Path) -> None:
     store.upsert(_rec("ap2", "192.168.1.2").model_copy(update={"port_labels": {0: "LAN4", 6: "CPU (eth0)"}}))
     got = RouterStore(tmp_path / "routers.json").get("ap2")
     assert got is not None and got.port_labels == {0: "LAN4", 6: "CPU (eth0)"}
+
+
+def test_key_path_defaults_to_the_app_key_and_survives_json(tmp_path: Path) -> None:
+    assert _rec("ap1", "192.168.1.1").key_path is None
+    store = RouterStore(tmp_path / "routers.json")
+    store.upsert(
+        _rec("ap2", "192.168.1.2").model_copy(update={"key_path": r"C:\Essence_SC\home\.ssh\id_rsa"})
+    )
+    got = RouterStore(tmp_path / "routers.json").get("ap2")
+    assert got is not None and got.key_path == r"C:\Essence_SC\home\.ssh\id_rsa"
+
+
+def test_router_key_paths_use_the_records_own_key(tmp_path: Path) -> None:
+    app_key = tmp_path / "keys" / "id_ed25519"
+    assert router_key_paths(_rec("ap1", "192.168.1.1"), app_key) == [app_key]
+    own = _rec("ap2", "192.168.1.2").model_copy(update={"key_path": str(tmp_path / "id_rsa")})
+    assert router_key_paths(own, app_key) == [tmp_path / "id_rsa"]
 
 
 def test_missing_file_is_empty(tmp_path: Path) -> None:

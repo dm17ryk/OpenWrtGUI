@@ -17,9 +17,11 @@ The foundation: install, update, add routers, see them, and stay out of a runnin
 - Update check against GitHub Releases at start-up and daily, with a stable and a CI pre-release channel.
   Downloads are verified against `SHA256SUMS.txt`; the previous installer is kept for "Reinstall previous version".
 - App shell with light, dark and system themes, usable from 375 px to full-screen widths.
-- Add-router wizard: host key check and pinning, one login with the root password (or a key file), installing
-  the app's own SSH key with the exact command shown first, the router's self-description, socket labels
-  proposed from `board.json`.
+- Add-router wizard: host key check and pinning, then a login with nothing typed (the app key, this PC's own
+  `id_ed25519`/`id_ecdsa`/`id_rsa`, then the default `root`/`root`) before it asks for a user and password
+  or a key file. A key the router already trusts is used as is, with nothing installed; otherwise the app
+  installs its own SSH key with the exact command shown first. Then the router's self-description and socket
+  labels proposed from `board.json`.
 - Router self-description probe, read the way LuCI reads it: `board.json`, ubus services, typed option lists,
   feature flags and LuCI menu entries.
 - Dashboard: router cards (radio, stations, network, login), an air map per band, and a "Needs attention" list.

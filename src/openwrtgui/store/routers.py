@@ -24,11 +24,17 @@ class RouterRecord(BaseModel):
     port: int = 22
     username: str = "root"
     auth: Literal["key", "none"]
+    # A key this PC already had and the router already trusted; None means the app's own key.
+    key_path: str | None = None
     port_labels: dict[int, str] = {}
     added_at: datetime
 
 
 _LIST = TypeAdapter(list[RouterRecord])
+
+
+def router_key_paths(record: RouterRecord, app_key_path: Path) -> list[Path]:
+    return [Path(record.key_path)] if record.key_path else [app_key_path]
 
 
 def make_router_id(name: str, existing: Collection[str]) -> str:

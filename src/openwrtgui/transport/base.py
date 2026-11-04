@@ -46,6 +46,14 @@ class AuthFailed(TransportError):
     """The router refused the login."""
 
 
+class KeyFileError(TransportError):
+    """A key file on this PC is missing, unreadable or needs a passphrase. The router was not asked."""
+
+    def __init__(self, path: str, reason: str) -> None:
+        super().__init__(f"The key file {path} cannot be used: {reason}")
+        self.path = path
+
+
 class HostKeyUnknown(TransportError):
     def __init__(self, host: str, actual: HostKeyInfo) -> None:
         super().__init__(f"{host} has no pinned host key yet ({actual.fingerprint})")

@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
@@ -26,7 +26,7 @@ from openwrtgui.probe.describe import (
 )
 from openwrtgui.store.keys import AppKey
 from openwrtgui.store.routers import RouterRecord, RouterStore, make_router_id
-from openwrtgui.transport.base import HostKeyInfo, Transport, TransportError
+from openwrtgui.transport.base import AuthFailed, HostKeyInfo, KeyFileError, Transport, TransportError
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.transport.ssh import HostKeyStore, SshTransport, fetch_host_key
 
@@ -34,6 +34,11 @@ log = logging.getLogger(__name__)
 
 AUTHORIZED_KEYS = "/etc/dropbear/authorized_keys"
 SCREEN = "Add router"
+DEFAULT_USER = "root"
+DEFAULT_PASSWORD = "root"
+
+# How the wizard got in: by itself (the first four) or with what the user typed (the last two).
+LoginMethod = Literal["app_key", "pc_key", "default_password", "no_password", "password", "key_file"]
 
 
 def install_key_command(public_line: str) -> str:
@@ -57,7 +62,13 @@ class Step(StrEnum):
 class Connector(Protocol):
     async def fetch_host_key(self, host: str, port: int) -> HostKeyInfo: ...
     async def connect(
-        self, host: str, port: int, *, password: str | None, key_paths: Sequence[Path]
+        self,
+        host: str,
+        port: int,
+        *,
+        password: str | None,
+        key_paths: Sequence[Path],
+        username: str = DEFAULT_USER,
     ) -> Transport: ...
 
 
@@ -69,10 +80,16 @@ class SshConnector:
         return await fetch_host_key(host, port)
 
     async def connect(
-        self, host: str, port: int, *, password: str | None, key_paths: Sequence[Path]
+        self,
+        host: str,
+        port: int,
+        *,
+        password: str | None,
+        key_paths: Sequence[Path],
+        username: str = DEFAULT_USER,
     ) -> Transport:
         return await SshTransport.connect(
-            host, port, "root", host_keys=self._host_keys, password=password, key_paths=key_paths
+            host, port, username, host_keys=self._host_keys, password=password, key_paths=key_paths
         )
 
 
@@ -90,6 +107,13 @@ class SessionView:
     summary: DescriptionSummary | None
     proposed_port_labels: dict[int, str]
     error: str | None
+    username: str
+    login_method: LoginMethod | None
+    key_path: str | None  # a key this PC already had that the router trusts; the app will use it
+
+
+def _no_pc_keys() -> Sequence[Path]:
+    return ()
 
 
 @dataclass
@@ -108,6 +132,9 @@ class _Session:
     root_password: str = "unknown"
     key_installed: bool = False
     key_verified: bool = False
+    username: str = DEFAULT_USER
+    login_method: LoginMethod | None = None
+    key_path: Path | None = None
     description: SelfDescription | None = None
     error: str | None = None
 
@@ -125,8 +152,10 @@ class OnboardService:
         pool: ConnectionPool,
         clock: Callable[[], datetime] = datetime.now,
         idle_timeout_s: int = 900,
+        pc_keys: Callable[[], Sequence[Path]] = _no_pc_keys,
     ) -> None:
         self._connector = connector
+        self._pc_keys = pc_keys
         self._host_keys = host_keys
         self._app_key = app_key
         self._routers = routers
@@ -166,6 +195,9 @@ class OnboardService:
             summary=summarize(s.description) if s.description else None,
             proposed_port_labels=propose_port_labels(s.description.board) if s.description else {},
             error=s.error,
+            username=s.username,
+            login_method=s.login_method,
+            key_path=str(s.key_path) if s.key_path else None,
         )
 
     @staticmethod
@@ -173,6 +205,21 @@ class OnboardService:
         if s.transport is None:
             raise ValueError("Log in to the router first")
         return s.transport
+
+    @staticmethod
+    def _require_trusted(s: _Session) -> None:
+        if not s.trusted:
+            raise ValueError("Accept the router's host key first")
+
+    @staticmethod
+    async def _logged_in(s: _Session, transport: Transport, method: LoginMethod) -> None:
+        if s.transport is not None:
+            await s.transport.close()
+        s.transport = transport
+        state = (await transport.run(ROOT_PASSWORD_STATE)).stdout.strip()
+        s.root_password = state if state in ("none", "set") else "unknown"
+        s.login_method = method
+        s.step = Step.INSTALL_KEY
 
     # -- steps ---------------------------------------------------------------------------------
 
@@ -205,22 +252,65 @@ class OnboardService:
         s.step = Step.LOGIN
         return self._view(s)
 
+    async def auto_login(self, sid: str) -> SessionView:
+        """Log in with nothing typed: the app key, then this PC's own keys, then root/root.
+
+        A key that already works means nothing gets installed. If none of them work the session
+        stays at LOGIN for the user to type. A router that stops answering is raised, not hidden.
+        """
+        s = await self._get(sid)
+        self._require_trusted(s)
+        app_key = self._app_key.private_path
+        tries: list[tuple[LoginMethod, str | None, Path | None]] = [("app_key", None, app_key)]
+        tries += [("pc_key", None, p) for p in self._pc_keys() if p != app_key]
+        tries.append(("default_password", DEFAULT_PASSWORD, None))
+        for method, password, key in tries:
+            try:
+                transport = await self._connector.connect(
+                    s.host,
+                    s.port,
+                    username=s.username,
+                    password=password,
+                    key_paths=[key] if key else [],
+                )
+            except AuthFailed:
+                continue
+            except KeyFileError as exc:  # went away or will not load since it was found
+                log.info("auto-login skipped: %s", exc)
+                continue
+            await self._logged_in(s, transport, method)
+            if s.root_password == "none":
+                # Without a root password the router lets any login in, so no key was proven.
+                s.login_method = "no_password"
+            elif key is not None:
+                s.key_verified = True
+                s.key_installed = method == "app_key"
+                s.key_path = key if method == "pc_key" else None
+                s.step = Step.IDENTIFY
+            return self._view(s)
+        return self._view(s)
+
     async def login(
-        self, sid: str, *, password: str | None = None, key_path: Path | None = None
+        self,
+        sid: str,
+        *,
+        password: str | None = None,
+        key_path: Path | None = None,
+        username: str = DEFAULT_USER,
     ) -> SessionView:
         s = await self._get(sid)
-        if not s.trusted:
-            raise ValueError("Accept the router's host key first")
+        self._require_trusted(s)
+        user = username.strip() or DEFAULT_USER
         key_paths = [key_path] if key_path else []
         transport = await self._connector.connect(
-            s.host, s.port, password=password if key_path is None else None, key_paths=key_paths
+            s.host,
+            s.port,
+            username=user,
+            password=password if key_path is None else None,
+            key_paths=key_paths,
         )
-        if s.transport is not None:
-            await s.transport.close()
-        s.transport = transport
-        state = (await transport.run(ROOT_PASSWORD_STATE)).stdout.strip()
-        s.root_password = state if state in ("none", "set") else "unknown"
-        s.step = Step.INSTALL_KEY
+        s.username = user
+        await self._logged_in(s, transport, "key_file" if key_path else "password")
         return self._view(s)
 
     def install_key_preview(self, sid: str) -> list[str]:
@@ -278,7 +368,7 @@ class OnboardService:
     async def verify_key(self, sid: str) -> SessionView:
         s = await self._get(sid)
         t = await self._connector.connect(
-            s.host, s.port, password=None, key_paths=[self._app_key.private_path]
+            s.host, s.port, username=s.username, password=None, key_paths=[self._app_key.private_path]
         )
         try:
             ok = (await t.run("true")).ok
@@ -288,6 +378,7 @@ class OnboardService:
             raise TransportError("The router accepted the key but did not run a command")
         s.key_installed = True
         s.key_verified = True
+        s.key_path = None
         s.step = Step.IDENTIFY
         return self._view(s)
 
@@ -307,7 +398,9 @@ class OnboardService:
             name=label,
             host=s.host,
             port=s.port,
+            username=s.username,
             auth="key" if s.key_verified else "none",
+            key_path=str(s.key_path) if s.key_path else None,
             port_labels=dict(port_labels),
             added_at=self._clock(),
         )

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import asyncssh
 import pytest
 
 from openwrtgui.guard.audit import AuditLog
@@ -13,7 +15,7 @@ from openwrtgui.store import keys as keys_module
 from openwrtgui.store.keys import AppKey, load_or_create_app_key
 from openwrtgui.store.routers import RouterStore
 from openwrtgui.store.settings import GuardWatchList
-from openwrtgui.transport.base import AuthFailed
+from openwrtgui.transport.base import AuthFailed, Transport, Unreachable
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.transport.ssh import HostKeyStore
 
@@ -53,7 +55,12 @@ def connector() -> SimConnector:
 
 
 def _service(
-    tmp_path: Path, app_key: AppKey, connector: SimConnector, clock: Clock, live: bool = False
+    tmp_path: Path,
+    app_key: AppKey,
+    connector: SimConnector,
+    clock: Clock,
+    live: bool = False,
+    pc_keys: Sequence[Path] = (),
 ) -> OnboardService:
     async def factory(rec: object) -> object:
         raise AssertionError("pool not used by the wizard")
@@ -67,7 +74,30 @@ def _service(
         audit=AuditLog(tmp_path / "audit"),
         pool=ConnectionPool(factory),  # type: ignore[arg-type]
         clock=clock,
+        pc_keys=lambda: list(pc_keys),
     )
+
+
+def _pc_key(path: Path) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    key = asyncssh.generate_private_key("ssh-ed25519")
+    key.write_private_key(str(path))
+    key.write_public_key(f"{path}.pub")
+    return path
+
+
+def _public(path: Path) -> str:
+    return Path(f"{path}.pub").read_text(encoding="utf-8").strip()
+
+
+def _audit_text(tmp_path: Path) -> str:
+    return "".join(p.read_text(encoding="utf-8") for p in (tmp_path / "audit").glob("*.jsonl"))
+
+
+async def _trusted(service: OnboardService) -> str:
+    v = await service.start(NEW_HOST)
+    v = await service.trust(v.sid, v.host_key.fingerprint)  # type: ignore[union-attr]
+    return v.sid
 
 
 @pytest.fixture
@@ -188,3 +218,116 @@ async def test_changed_host_key_is_reported(service: OnboardService, tmp_path: P
     v2 = await service.start(NEW_HOST)
     assert v2.changed_from == v.host_key.fingerprint  # type: ignore[union-attr]
     assert not v2.known_before
+
+
+# -- auto-login: the app key, then this PC's keys, then root/root --------------------------------
+
+
+async def test_auto_login_uses_a_pc_key_and_writes_nothing(
+    tmp_path: Path, app_key: AppKey, connector: SimConnector, clock: Clock
+) -> None:
+    pc = _pc_key(tmp_path / "home" / ".ssh" / "id_rsa")
+    connector.state(NEW_HOST).authorized_keys.append(_public(pc))
+    service = _service(tmp_path, app_key, connector, clock, pc_keys=[pc])
+    v = await service.auto_login(await _trusted(service))
+    assert v.step == Step.IDENTIFY and v.login_method == "pc_key" and v.key_path == str(pc)
+    assert not v.key_installed
+    v = await service.identify(v.sid)
+    rec = await service.finish(v.sid, "AP4", v.proposed_port_labels)
+    assert rec.auth == "key" and rec.key_path == str(pc) and rec.username == "root"
+    assert connector.state(NEW_HOST).authorized_keys == [_public(pc)]
+    assert _audit_text(tmp_path) == ""
+
+
+async def test_auto_login_prefers_the_app_key(
+    tmp_path: Path, app_key: AppKey, connector: SimConnector, clock: Clock
+) -> None:
+    pc = _pc_key(tmp_path / "home" / ".ssh" / "id_ed25519")
+    connector.state(NEW_HOST).authorized_keys.extend([_public(pc), app_key.public_line])
+    service = _service(tmp_path, app_key, connector, clock, pc_keys=[pc])
+    v = await service.auto_login(await _trusted(service))
+    assert v.step == Step.IDENTIFY and v.login_method == "app_key"
+    assert v.key_installed and v.key_path is None
+    v = await service.identify(v.sid)
+    rec = await service.finish(v.sid, "AP4", v.proposed_port_labels)
+    assert rec.auth == "key" and rec.key_path is None
+
+
+async def test_auto_login_falls_back_to_root_root(service: OnboardService, connector: SimConnector) -> None:
+    connector.state(NEW_HOST).root_password = "root"
+    v = await service.auto_login(await _trusted(service))
+    assert v.step == Step.INSTALL_KEY and v.login_method == "default_password"
+    assert v.root_password == "set" and not v.key_installed
+    await service.install_key(v.sid)
+    v = await service.verify_key(v.sid)
+    assert v.step == Step.IDENTIFY and v.key_installed
+
+
+async def test_auto_login_leaves_the_form_when_nothing_works(service: OnboardService) -> None:
+    sid = await _trusted(service)
+    v = await service.auto_login(sid)
+    assert v.step == Step.LOGIN and v.login_method is None and v.error is None
+    v = await service.login(sid, password="sim-password")
+    assert v.step == Step.INSTALL_KEY and v.login_method == "password"
+
+
+async def test_auto_login_needs_the_host_key_accepted_first(service: OnboardService) -> None:
+    v = await service.start(NEW_HOST)
+    with pytest.raises(ValueError):
+        await service.auto_login(v.sid)
+
+
+async def test_auto_login_skips_a_key_it_cannot_read(
+    tmp_path: Path, app_key: AppKey, connector: SimConnector, clock: Clock
+) -> None:
+    connector.state(NEW_HOST).root_password = "root"
+    service = _service(tmp_path, app_key, connector, clock, pc_keys=[tmp_path / "gone" / "id_rsa"])
+    v = await service.auto_login(await _trusted(service))
+    assert v.step == Step.INSTALL_KEY and v.login_method == "default_password"
+
+
+async def test_auto_login_on_a_router_without_password(
+    service: OnboardService, connector: SimConnector
+) -> None:
+    # A router with no root password lets any login in, keys included: that proves no key.
+    connector.state(NEW_HOST).root_password = None
+    v = await service.auto_login(await _trusted(service))
+    assert v.step == Step.INSTALL_KEY and v.login_method == "no_password"
+    assert v.root_password == "none" and not v.key_installed and v.key_path is None
+
+
+class _GoneConnector(SimConnector):
+    async def connect(self, host: str, port: int, **kwargs: object) -> Transport:
+        raise Unreachable(f"{host}:{port}: timed out")
+
+
+async def test_auto_login_reports_a_router_that_stopped_answering(
+    tmp_path: Path, app_key: AppKey, clock: Clock
+) -> None:
+    service = _service(tmp_path, app_key, _GoneConnector(SIM_DIR), clock)
+    with pytest.raises(Unreachable):
+        await service.auto_login(await _trusted(service))
+
+
+class _RecordingConnector(SimConnector):
+    def __init__(self, sim_dir: Path) -> None:
+        super().__init__(sim_dir)
+        self.usernames: list[str] = []
+
+    async def connect(self, host: str, port: int, **kwargs: object) -> Transport:
+        self.usernames.append(str(kwargs["username"]))
+        return await super().connect(host, port, **kwargs)  # type: ignore[arg-type]
+
+
+async def test_login_with_another_user_is_kept(tmp_path: Path, app_key: AppKey, clock: Clock) -> None:
+    connector = _RecordingConnector(SIM_DIR)
+    service = _service(tmp_path, app_key, connector, clock)
+    sid = await _trusted(service)
+    v = await service.login(sid, password="sim-password", username="admin")
+    assert v.username == "admin"
+    await service.install_key(sid)
+    await service.verify_key(sid)
+    v = await service.identify(sid)
+    rec = await service.finish(sid, "AP4", v.proposed_port_labels)
+    assert rec.username == "admin"
+    assert connector.usernames == ["admin", "admin"]

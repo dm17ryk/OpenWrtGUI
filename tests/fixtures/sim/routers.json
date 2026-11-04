@@ -32,5 +32,15 @@
     "auth": "none",
     "password": "sim-password",
     "wizard_only": true
+  },
+  {
+    "id": "factory",
+    "name": "",
+    "host": "192.168.1.5",
+    "base": "ap2",
+    "overlay": "new.json",
+    "auth": "none",
+    "password": "root",
+    "wizard_only": true
   }
 ]

@@ -8,11 +8,18 @@ const LABELS = ['Address', 'Host key', 'First login', 'Install key', 'Identify',
 const TITLES = [
   'Where is the router?',
   'Check the router is the one you mean',
-  'Log in once with the root password',
+  'Log in to the router',
   'Install the app’s key',
   'What is this router?',
   'Map the sockets',
 ] as const
+
+function loginText(v: SessionView): string {
+  if (v.key_path) return `this PC’s key ${v.key_path} already works; the app uses it and installed nothing`
+  if (v.login_method === 'app_key') return 'the app key was already on the router and works'
+  if (v.key_installed) return 'app key installed and working'
+  return 'no app key: the app cannot reconnect until you install it'
+}
 
 function explain(err: unknown): string {
   if (err instanceof ApiError) {
@@ -33,6 +40,8 @@ export function AddRouter() {
   const [host, setHost] = useState(params.get('host') ?? '')
   const [port, setPort] = useState('22')
   const [view, setView] = useState<SessionView | null>(null)
+  const [trying, setTrying] = useState(false)
+  const [username, setUsername] = useState('root')
   const [password, setPassword] = useState('')
   const [useKeyFile, setUseKeyFile] = useState(false)
   const [keyPath, setKeyPath] = useState('')
@@ -64,21 +73,42 @@ export function AddRouter() {
     })
   }
 
+  const identify = async (): Promise<void> => {
+    const v = await postJson<SessionView>(`/api/onboard/${sid}/identify`)
+    setView(v)
+    setLabels(Object.fromEntries(Object.entries(v.proposed_port_labels).map(([k, val]) => [k, String(val)])))
+    setName(v.summary?.hostname && v.summary.hostname !== 'OpenWrt' ? v.summary.hostname : '')
+    setStep(4)
+  }
+
+  /** A key that already works skips the install step; any other login goes on to it. */
+  const loggedIn = async (v: SessionView): Promise<void> => {
+    setView(v)
+    if (v.step === 'identify') {
+      await identify()
+    } else if (v.step === 'install_key') {
+      setPreview((await apiFetch<Preview>(`/api/onboard/${sid}/install-key/preview`)).commands)
+      setStep(3)
+    }
+  }
+
   const trust = (): void =>
     void run(async () => {
       setView(await postJson<SessionView>(`/api/onboard/${sid}/trust`, { fingerprint: view?.host_key?.fingerprint }))
       setStep(2)
+      setTrying(true)
+      try {
+        await loggedIn(await postJson<SessionView>(`/api/onboard/${sid}/auto-login`))
+      } finally {
+        setTrying(false)
+      }
     })
 
   const login = (e: FormEvent): void => {
     e.preventDefault()
-    const body = useKeyFile ? { key_path: keyPath } : { password }
+    const body = useKeyFile ? { key_path: keyPath, username } : { password, username }
     setPassword('')
-    void run(async () => {
-      setView(await postJson<SessionView>(`/api/onboard/${sid}/login`, body))
-      setPreview((await apiFetch<Preview>(`/api/onboard/${sid}/install-key/preview`)).commands)
-      setStep(3)
-    })
+    void run(async () => loggedIn(await postJson<SessionView>(`/api/onboard/${sid}/login`, body)))
   }
 
   const setRootPassword = (e: FormEvent): void => {
@@ -86,14 +116,6 @@ export function AddRouter() {
     const pw = newPassword
     setNewPassword('')
     void run(async () => setView(await postJson<SessionView>(`/api/onboard/${sid}/set-password`, { password: pw })))
-  }
-
-  const identify = async (): Promise<void> => {
-    const v = await postJson<SessionView>(`/api/onboard/${sid}/identify`)
-    setView(v)
-    setLabels(Object.fromEntries(Object.entries(v.proposed_port_labels).map(([k, val]) => [k, String(val)])))
-    setName(v.summary?.hostname && v.summary.hostname !== 'OpenWrt' ? v.summary.hostname : '')
-    setStep(4)
   }
 
   const installKey = (): void =>
@@ -160,16 +182,27 @@ export function AddRouter() {
         </div>
       </div>
     )
+  } else if (step === 2 && trying) {
+    body = (
+      <div className="muted" role="status">
+        Trying the app’s key, this PC’s keys and root / root…
+      </div>
+    )
   } else if (step === 2) {
     body = (
       <form className="stack" onSubmit={login}>
+        <div className="muted">None of them worked: the app tried the app’s key, this PC’s keys and root / root. Log in once yourself.</div>
         <div className="seg" role="group" aria-label="How to log in">
           <button type="button" className={useKeyFile ? '' : 'on'} aria-pressed={!useKeyFile} onClick={() => setUseKeyFile(false)}>
-            Root password
+            Password
           </button>
           <button type="button" className={useKeyFile ? 'on' : ''} aria-pressed={useKeyFile} onClick={() => setUseKeyFile(true)}>
             Use a key file I already have
           </button>
+        </div>
+        <div className="field">
+          <label htmlFor="user">User</label>
+          <input id="user" className="in mono" autoComplete="off" value={username} onChange={(e) => setUsername(e.target.value)} />
         </div>
         {useKeyFile ? (
           <div className="field">
@@ -178,7 +211,7 @@ export function AddRouter() {
           </div>
         ) : (
           <div className="field">
-            <label htmlFor="pw">Root password</label>
+            <label htmlFor="pw">Password</label>
             <input id="pw" className="in" type="password" autoComplete="off" value={password} onChange={(e) => setPassword(e.target.value)} />
             <span className="muted">Used once to log in. It is never stored or logged. A fresh OpenWrt has no password: leave it empty.</span>
           </div>
@@ -193,6 +226,9 @@ export function AddRouter() {
   } else if (step === 3) {
     body = (
       <div className="stack">
+        {view?.login_method === 'default_password' && (
+          <div className="note">Logged in with the default root / root. Anyone on this network can do the same: think about changing it.</div>
+        )}
         {view?.root_password === 'none' && (
           <form className="note w stack" onSubmit={setRootPassword}>
             <strong>This router has no root password.</strong>
@@ -240,7 +276,7 @@ export function AddRouter() {
                 .join('; ') || 'no radios'}
             </dd>
             <dt>Login</dt>
-            <dd>{view.key_installed ? 'app key installed and working' : 'no app key: the app cannot reconnect until you install it'}</dd>
+            <dd>{loginText(view)}</dd>
           </dl>
         ) : (
           <div className="muted">The router described itself.</div>

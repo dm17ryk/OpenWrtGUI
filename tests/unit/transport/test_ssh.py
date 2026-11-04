@@ -6,9 +6,23 @@ import asyncssh
 import pytest
 from sshserver import TEST_PASSWORD, SshServer, start_server
 
+from openwrtgui.guard.audit import AuditLog
+from openwrtgui.guard.bench_guard import BenchGuard
+from openwrtgui.onboard.wizard import OnboardService, SshConnector, Step
 from openwrtgui.store import keys as keys_module
 from openwrtgui.store.keys import load_or_create_app_key
-from openwrtgui.transport.base import AuthFailed, HostKeyChanged, HostKeyInfo, HostKeyUnknown, Unreachable
+from openwrtgui.store.routers import RouterStore
+from openwrtgui.store.settings import GuardWatchList
+from openwrtgui.transport.base import (
+    AuthFailed,
+    HostKeyChanged,
+    HostKeyInfo,
+    HostKeyUnknown,
+    KeyFileError,
+    TransportError,
+    Unreachable,
+)
+from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.transport.ssh import HostKeyStore, SshTransport, fetch_host_key
 
 
@@ -85,6 +99,63 @@ async def test_app_key_login_and_stdin(tmp_path: Path, monkeypatch: pytest.Monke
             assert (await t.run_stdin("cat", "x\n")).stdout == "x\n"
         finally:
             await t.close()
+    finally:
+        srv.server.close()
+        await srv.server.wait_closed()
+
+
+async def test_a_missing_key_file_is_not_unreachable(ssh_server: SshServer, tmp_path: Path) -> None:
+    store = await _pinned(ssh_server, tmp_path)
+    with pytest.raises(KeyFileError) as exc:
+        await SshTransport.connect(
+            "127.0.0.1", ssh_server.port, "root", host_keys=store, key_paths=[tmp_path / "gone"]
+        )
+    assert not isinstance(exc.value, Unreachable)
+    assert isinstance(exc.value, TransportError)  # so the pool marks the router offline, with the reason
+    assert str(tmp_path / "gone") in str(exc.value)
+
+
+async def test_a_key_with_a_passphrase_is_a_key_file_error(ssh_server: SshServer, tmp_path: Path) -> None:
+    store = await _pinned(ssh_server, tmp_path)
+    locked = tmp_path / "id_ed25519"
+    asyncssh.generate_private_key("ssh-ed25519").write_private_key(
+        str(locked), format_name="pkcs8-pem", passphrase="secret"
+    )
+    with pytest.raises(KeyFileError):
+        await SshTransport.connect("127.0.0.1", ssh_server.port, "root", host_keys=store, key_paths=[locked])
+
+
+async def test_wizard_auto_login_finds_a_pc_key_over_ssh(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(keys_module, "restrict_to_user", lambda path: None)
+    app_key = load_or_create_app_key(tmp_path / "keys", comment="openwrtgui@TEST")
+    pc = asyncssh.generate_private_key("ssh-ed25519")
+    pc_path = tmp_path / "home" / ".ssh" / "id_rsa"
+    pc_path.parent.mkdir(parents=True)
+    pc.write_private_key(str(pc_path))
+    srv = await start_server(authorized=[pc.export_public_key("openssh").decode().strip()])
+    host_keys = HostKeyStore(tmp_path / "known_hosts")
+
+    async def no_pool(rec: object) -> object:
+        raise AssertionError("pool not used by the wizard")
+
+    service = OnboardService(
+        connector=SshConnector(host_keys),
+        host_keys=host_keys,
+        app_key=app_key,
+        routers=RouterStore(tmp_path / "routers.json"),
+        guard=BenchGuard(GuardWatchList(lock_files=[], processes=[]), lister=list),
+        audit=AuditLog(tmp_path / "audit"),
+        pool=ConnectionPool(no_pool),  # type: ignore[arg-type]
+        pc_keys=lambda: [tmp_path / "home" / ".ssh" / "id_ed25519", pc_path],
+    )
+    try:
+        v = await service.start("127.0.0.1", srv.port)
+        v = await service.trust(v.sid, v.host_key.fingerprint)  # type: ignore[union-attr]
+        v = await service.auto_login(v.sid)
+        assert v.step == Step.IDENTIFY and v.login_method == "pc_key" and v.key_path == str(pc_path)
+        await service.cancel(v.sid)
     finally:
         srv.server.close()
         await srv.server.wait_closed()

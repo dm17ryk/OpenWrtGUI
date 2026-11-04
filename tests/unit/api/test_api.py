@@ -77,6 +77,18 @@ async def test_onboard_flow_over_api(authed: httpx.AsyncClient, ctx: AppContext)
     assert (await authed.post(f"/api/onboard/{sid}/verify")).status_code == 404
 
 
+async def test_onboard_auto_login_over_api(authed: httpx.AsyncClient) -> None:
+    v = (await authed.post("/api/onboard", json={"host": "192.168.1.4"})).json()
+    sid, fp = v["sid"], v["host_key"]["fingerprint"]
+    assert (await authed.post(f"/api/onboard/{sid}/auto-login")).status_code == 422
+    await authed.post(f"/api/onboard/{sid}/trust", json={"fingerprint": fp})
+    v = (await authed.post(f"/api/onboard/{sid}/auto-login")).json()
+    assert v["step"] == "login" and v["login_method"] is None and v["username"] == "root"
+    body = {"password": "sim-password", "username": "root"}
+    v = (await authed.post(f"/api/onboard/{sid}/login", json=body)).json()
+    assert v["step"] == "install_key" and v["login_method"] == "password"
+
+
 async def test_removing_a_router_clears_its_guard_marker(authed: httpx.AsyncClient, ctx: AppContext) -> None:
     ctx.guard.update_watch(ctx.guard.watch.model_copy(update={"router_ssids": ["OpenWrtB"]}))
     ctx.guard.set_router_signs("ap1", ["OpenWrtB"])

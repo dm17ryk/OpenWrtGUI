@@ -90,6 +90,9 @@ export function sessionView(step: SessionView['step'], extra: Partial<SessionVie
     summary: null,
     proposed_port_labels: {},
     error: null,
+    username: 'root',
+    login_method: null,
+    key_path: null,
     ...extra,
   }
 }

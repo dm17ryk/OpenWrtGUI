@@ -8,7 +8,7 @@ test('a harness run makes everything read-only', async ({ page }) => {
   await page.goto('/#/add?host=192.168.1.4')
   await page.getByRole('button', { name: 'Connect' }).click()
   await page.getByRole('button', { name: 'Accept and pin' }).click()
-  await page.getByLabel('Root password').fill('sim-password')
+  await page.getByLabel('Password', { exact: true }).fill('sim-password')
   await page.getByRole('button', { name: 'Log in' }).click()
   await page.getByRole('button', { name: 'Install key' }).click()
   await expect(page.getByRole('alert')).toContainText('dima_night.py started 21:04 (PID 18244)')

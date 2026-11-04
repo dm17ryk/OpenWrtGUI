@@ -1,7 +1,7 @@
 # First router
 
-Adding a router takes five steps. Afterwards the app logs in with its own SSH key; it never stores the
-router's password.
+Adding a router takes five steps. Afterwards the app logs in with an SSH key (its own, or one this PC
+already had that the router trusts); it never stores the router's password.
 
 ![The Add router wizard, first step](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/add-router.png)
 
@@ -21,11 +21,22 @@ router itself if you can (serial console: `dropbearkey -y -f /etc/dropbear/dropb
 If the address had a different key pinned before, the wizard says so. A reflash makes a new key; anything
 else means you may not be talking to your router.
 
-## 3. Log in once with the root password
+## 3. Log in to the router
 
-Type the **Root password** and **Log in**. It is used for this one login only.
+Right after you pin the key, the wizard tries to log in by itself, as `root`, in this order:
 
-- Already have a key that works on the router? Choose **Use a key file I already have** and point to it.
+1. **The app's own key.** Already on the router (you added it before): the wizard goes straight to step 5.
+2. **This PC's own SSH keys**: `id_ed25519`, `id_ecdsa` and `id_rsa` in `%HOME%\.ssh` (on the bench PCs
+   `C:\Essence_SC\home\.ssh`) and in your Windows profile's `.ssh`. If the router already trusts one, the
+   app uses that key from then on and **installs nothing**; it goes straight to step 5. Keys protected by
+   a passphrase are skipped.
+3. **The default password `root` / `root`.** If that works, the wizard says so and goes on to step 4.
+
+If none of them work, the login form appears. Check **User** (normally `root`), type the **Password** and
+**Log in**. It is used for this one login only.
+
+- Already have a key that works on the router but is not one of the files above? Choose **Use a key file
+  I already have** and point to it.
 - If the router has no root password yet, the wizard says so and offers to **Set a root password** first.
 
 ## 4. Install the app's key

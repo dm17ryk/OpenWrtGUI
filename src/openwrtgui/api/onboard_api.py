@@ -31,6 +31,7 @@ class TrustIn(BaseModel):
 class LoginIn(BaseModel):
     password: str | None = None
     key_path: str | None = None
+    username: str = Field(default="root", max_length=32)
 
 
 class PasswordIn(BaseModel):
@@ -59,10 +60,17 @@ async def trust(sid: str, body: TrustIn, ctx: Ctx) -> SessionView:
     return await _session(ctx.onboard.trust(sid, body.fingerprint))
 
 
+@router.post("/{sid}/auto-login")
+async def auto_login(sid: str, ctx: Ctx) -> SessionView:
+    return await _session(ctx.onboard.auto_login(sid))
+
+
 @router.post("/{sid}/login")
 async def login(sid: str, body: LoginIn, ctx: Ctx) -> SessionView:
     key_path = Path(body.key_path) if body.key_path else None
-    return await _session(ctx.onboard.login(sid, password=body.password, key_path=key_path))
+    return await _session(
+        ctx.onboard.login(sid, password=body.password, key_path=key_path, username=body.username)
+    )
 
 
 @router.get("/{sid}/install-key/preview")

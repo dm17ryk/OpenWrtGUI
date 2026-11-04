@@ -1,8 +1,18 @@
 # FAQ
 
 **Does the app store my router's root password?**
-No. You type it once in the Add-router wizard; the app uses it to install its own SSH key and discards
+No. If you type it in the Add-router wizard, the app uses it once to install its own SSH key and discards
 it. From then on it logs in with that key.
+
+**My routers already accept my PC's SSH key. Do I need the app key?**
+No. The wizard tries this PC's own keys (`id_ed25519`, `id_ecdsa`, `id_rsa` in `%HOME%\.ssh` and your
+profile's `.ssh`) before asking for anything. If the router trusts one, the app keeps using that key and
+changes nothing on the router.
+
+**Why does the wizard try `root` / `root`?**
+It is a common factory default on bench routers. The wizard tries it after the keys, and only if
+nothing else worked; the password is never stored. If it works, the wizard tells you so: think about
+changing it.
 
 **What exactly does installing the app key change on the router?**
 One line is appended to `/etc/dropbear/authorized_keys`, only if it is not there already. Nothing

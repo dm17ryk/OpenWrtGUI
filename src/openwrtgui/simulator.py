@@ -14,7 +14,14 @@ import httpx
 
 from openwrtgui.guard.bench_guard import ProcessInfo
 from openwrtgui.store.routers import RouterRecord, RouterStore
-from openwrtgui.transport.base import AuthFailed, CommandResult, HostKeyInfo, Transport, Unreachable
+from openwrtgui.transport.base import (
+    AuthFailed,
+    CommandResult,
+    HostKeyInfo,
+    KeyFileError,
+    Transport,
+    Unreachable,
+)
 from openwrtgui.transport.fake import ReplayTransport, SimState, load_commands
 
 SIM_ROOT_PASSWORD = "set-on-router"
@@ -79,7 +86,13 @@ def sim_http_client(sim_dir: Path) -> httpx.AsyncClient:
 
 
 def _public_lines(key_paths: Sequence[Path]) -> list[str]:
-    return [Path(f"{p}.pub").read_text(encoding="utf-8").strip() for p in key_paths]
+    lines = []
+    for path in key_paths:
+        try:
+            lines.append(Path(f"{path}.pub").read_text(encoding="utf-8").strip())
+        except OSError as exc:  # as SshTransport does for a key file it cannot load
+            raise KeyFileError(str(path), str(exc)) from exc
+    return lines
 
 
 class SimConnector:
@@ -115,12 +128,20 @@ class SimConnector:
         return self._host_keys[host]
 
     async def connect(
-        self, host: str, port: int, *, password: str | None, key_paths: Sequence[Path]
+        self,
+        host: str,
+        port: int,
+        *,
+        password: str | None,
+        key_paths: Sequence[Path],
+        username: str = "root",
     ) -> Transport:
         entry = self._entry(host)
         state = self.state(host)
-        if password is not None:
-            if state.root_password is not None and password != state.root_password:
+        if state.root_password is None:
+            pass  # like dropbear with an empty root password: any login gets in
+        elif password is not None:
+            if password != state.root_password:
                 raise AuthFailed(f"{host} refused the login")
         elif key_paths:
             if entry.get("auth") != "key" and not any(

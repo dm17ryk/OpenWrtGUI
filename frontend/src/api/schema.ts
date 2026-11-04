@@ -191,6 +191,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/onboard/{sid}/auto-login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Auto Login */
+        post: operations["auto_login_api_onboard__sid__auto_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/onboard/{sid}/finish": {
         parameters: {
             query?: never;
@@ -650,6 +667,11 @@ export interface components {
             key_path?: string | null;
             /** Password */
             password?: string | null;
+            /**
+             * Username
+             * @default root
+             */
+            username: string;
         };
         /** Ok */
         Ok: {
@@ -762,6 +784,8 @@ export interface components {
             host: string;
             /** Id */
             id: string;
+            /** Key Path */
+            key_path?: string | null;
             /** Name */
             name: string;
             /**
@@ -819,8 +843,12 @@ export interface components {
             host_key: components["schemas"]["HostKeyInfo"] | null;
             /** Key Installed */
             key_installed: boolean;
+            /** Key Path */
+            key_path: string | null;
             /** Known Before */
             known_before: boolean;
+            /** Login Method */
+            login_method: ("app_key" | "pc_key" | "default_password" | "no_password" | "password" | "key_file") | null;
             /** Port */
             port: number;
             /** Proposed Port Labels */
@@ -833,6 +861,8 @@ export interface components {
             sid: string;
             step: components["schemas"]["Step"];
             summary: components["schemas"]["DescriptionSummary"] | null;
+            /** Username */
+            username: string;
         };
         /** Settings */
         Settings: {
@@ -1195,6 +1225,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    auto_login_api_onboard__sid__auto_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionView"];
                 };
             };
             /** @description Validation Error */
