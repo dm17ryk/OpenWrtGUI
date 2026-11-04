@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
-import { expect, test } from 'vitest'
+import { afterEach, expect, test, vi } from 'vitest'
 import type { RouterItem } from '../api/types'
 import { AP1, AP2, ROUTERS } from '../testing/fixtures'
 import { Dashboard } from './Dashboard'
@@ -17,6 +17,31 @@ function renderWith(items: RouterItem[]) {
     </QueryClientProvider>,
   )
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals()
+})
+
+test('a lost connection shows the plain message, not an error class name', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => {
+      throw new TypeError('Failed to fetch')
+    }),
+  )
+  render(
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+  expect(
+    await screen.findByText(
+      'Could not load the routers: Lost the connection to OpenWrtGUI. The app may have closed. Start it again.',
+    ),
+  ).toBeInTheDocument()
+})
 
 test('heading counts routers, radios on air and stations', () => {
   renderWith(ROUTERS)

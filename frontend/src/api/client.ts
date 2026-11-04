@@ -48,11 +48,26 @@ function detailOf(body: unknown, fallback: string): string {
   return fallback
 }
 
+export const LOST_CONNECTION = 'Lost the connection to OpenWrtGUI. The app may have closed. Start it again.'
+
+/**
+ * fetch(), except that "no answer at all" (the app closed, so its local server is gone)
+ * becomes an ApiError with status 0 instead of the browser's "Failed to fetch".
+ */
+async function send(path: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(path, init)
+  } catch (err) {
+    if (err instanceof TypeError) throw new ApiError(0, LOST_CONNECTION, null)
+    throw err
+  }
+}
+
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers)
   if (token) headers.set('Authorization', `Bearer ${token}`)
   if (init.body !== undefined && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
-  const res = await fetch(path, { ...init, headers })
+  const res = await send(path, { ...init, headers })
   const text = await res.text()
   let body: unknown = null
   if (text) {
@@ -86,7 +101,7 @@ export function openSocket(path: string, params: Record<string, string> = {}): W
 
 /** Download a protected file (the token travels in a header, so a plain link cannot do it). */
 export async function downloadFile(path: string, fallbackName: string): Promise<void> {
-  const res = await fetch(path, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+  const res = await send(path, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
   if (!res.ok) throw new ApiError(res.status, `${res.status} ${res.statusText}`, null)
   const name = /filename="?([^"]+)"?/.exec(res.headers.get('content-disposition') ?? '')?.[1] ?? fallbackName
   const url = URL.createObjectURL(await res.blob())

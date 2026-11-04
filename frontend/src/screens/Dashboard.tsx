@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { apiFetch } from '../api/client'
+import { ApiError, apiFetch } from '../api/client'
 import type { RouterItem } from '../api/types'
 import { RouterRail } from '../shell/RouterRail'
 import { AirMap } from './AirMap'
@@ -28,7 +28,12 @@ export function Dashboard() {
             <div className="spacer" />
             <span className="muted">Refreshed every 5 s over SSH</span>
           </div>
-          {routers.isError && <div className="note x">Could not load the routers: {String(routers.error)}</div>}
+          {routers.isError && (
+            <div className="note x">
+              Could not load the routers:{' '}
+              {routers.error instanceof ApiError ? routers.error.detail : String(routers.error)}
+            </div>
+          )}
           {items.length === 0 && routers.isSuccess && (
             <div className="note">No routers yet. Use Add router to connect the first one.</div>
           )}

@@ -1,5 +1,16 @@
 import { afterEach, describe, expect, test, vi } from 'vitest'
-import { ApiError, apiFetch, readTokenFromHash, setToken } from './client'
+import { ApiError, apiFetch, downloadFile, readTokenFromHash, setToken } from './client'
+
+const LOST = 'Lost the connection to OpenWrtGUI. The app may have closed. Start it again.'
+
+function serverGone() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => {
+      throw new TypeError('Failed to fetch')
+    }),
+  )
+}
 
 describe('readTokenFromHash', () => {
   test('token moves from hash to sessionStorage and the hash is cleared', () => {
@@ -35,5 +46,35 @@ describe('apiFetch', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('{"detail":"The router refused the login."}', { status: 403 })))
     await expect(apiFetch('/api/x')).rejects.toEqual(expect.objectContaining({ status: 403, detail: 'The router refused the login.' }))
     await expect(apiFetch('/api/x')).rejects.toBeInstanceOf(ApiError)
+  })
+
+  test('a closed app reads as a lost connection, not "Failed to fetch"', async () => {
+    serverGone()
+    await expect(apiFetch('/api/x')).rejects.toEqual(expect.objectContaining({ status: 0, detail: LOST }))
+    await expect(apiFetch('/api/x')).rejects.toBeInstanceOf(ApiError)
+  })
+
+  test('an aborted request is passed through unchanged', async () => {
+    const abort = new DOMException('The operation was aborted.', 'AbortError')
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw abort
+      }),
+    )
+    await expect(apiFetch('/api/x')).rejects.toBe(abort)
+  })
+})
+
+describe('downloadFile', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  test('a closed app reads as a lost connection', async () => {
+    serverGone()
+    await expect(downloadFile('/api/audit/export', 'audit.zip')).rejects.toEqual(
+      expect.objectContaining({ status: 0, detail: LOST }),
+    )
   })
 })
