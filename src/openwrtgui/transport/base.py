@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import json
 import shlex
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Protocol
+from typing import Any, Protocol, runtime_checkable
 
 UBUS_METHOD_NOT_FOUND = 3
 UBUS_NOT_FOUND = 4
@@ -84,6 +84,21 @@ class Transport(Protocol):
     async def run_stdin(self, command: str, stdin: str, *, timeout: float = 15.0) -> CommandResult: ...
     async def open_shell(self, cols: int, rows: int) -> ShellChannel: ...
     async def close(self) -> None: ...
+
+
+@dataclass(frozen=True)
+class LocalForward:
+    """A loopback port on this PC that reaches a host:port as seen from the router."""
+
+    port: int
+    close: Callable[[], Awaitable[None]]
+
+
+@runtime_checkable
+class Forwarder(Protocol):
+    """Transports that can forward a local port (SSH can; the simulator cannot)."""
+
+    async def forward_local(self, remote_host: str, remote_port: int) -> LocalForward: ...
 
 
 def ubus_command(obj: str, method: str, args: Mapping[str, object] | None = None) -> str:

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import socket
 from pathlib import Path
@@ -242,6 +243,33 @@ async def test_shell_channel(ssh_server: SshServer, tmp_path: Path) -> None:
         await shell.close()
     finally:
         await t.close()
+
+
+async def test_forward_local_reaches_the_server(ssh_server: SshServer, tmp_path: Path) -> None:
+    async def echo(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        writer.write(await reader.read(4))
+        await writer.drain()
+        writer.close()
+
+    target = await asyncio.start_server(echo, "127.0.0.1", 0)
+    target_port = target.sockets[0].getsockname()[1]
+    store = await _pinned(ssh_server, tmp_path)
+    t = await SshTransport.connect(
+        "127.0.0.1", ssh_server.port, "root", host_keys=store, password=TEST_PASSWORD
+    )
+    try:
+        fwd = await t.forward_local("127.0.0.1", target_port)
+        assert fwd.port != target_port
+        reader, writer = await asyncio.open_connection("127.0.0.1", fwd.port)
+        writer.write(b"ping")
+        await writer.drain()
+        assert await asyncio.wait_for(reader.read(4), 5) == b"ping"
+        writer.close()
+        await fwd.close()
+    finally:
+        await t.close()
+        target.close()
+        await target.wait_closed()
 
 
 async def test_closed_port_is_unreachable(tmp_path: Path) -> None:

@@ -6,9 +6,9 @@ import pytest
 
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked, ProcessInfo
-from openwrtgui.guard.writes import WriteAction, perform_write
+from openwrtgui.guard.writes import WriteAction, perform_write, run_audited
 from openwrtgui.store.settings import GuardWatchList
-from openwrtgui.transport.base import CommandResult
+from openwrtgui.transport.base import CommandResult, Unreachable
 from openwrtgui.transport.fake import ReplayTransport
 
 
@@ -107,6 +107,42 @@ async def test_writes_to_one_router_are_serialized(tmp_path: Path) -> None:
         perform_write(b, transport=t, lock=lock, guard=guard, audit=audit),
     )
     assert log == ["start a", "end a", "start b", "end b"]
+
+
+async def test_run_audited_masks_secrets_and_refuses_when_guard_live(tmp_path: Path) -> None:
+    cmd = "uci set wireless.default_radio0.key='s3cret-key'"
+    t = ReplayTransport(_ok(cmd))
+    audit = AuditLog(tmp_path)
+    with pytest.raises(GuardLocked):
+        await run_audited(t, cmd, router_id="ap2", screen="Wi-Fi", guard=_live_guard(), audit=audit)
+    assert t.calls == [] and audit.query() == []
+    result = await run_audited(
+        t, cmd, router_id="ap2", screen="Wi-Fi", guard=_clear_guard(), audit=audit, secrets=("s3cret-key",)
+    )
+    assert result.ok
+    [entry] = audit.query()
+    assert entry.command == "uci set wireless.default_radio0.key='<hidden>'"
+    assert entry.exit_status == 0 and entry.source == "user" and entry.screen == "Wi-Fi"
+
+
+class DeadTransport(ReplayTransport):
+    async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
+        raise Unreachable("192.168.1.2:22: connection lost")
+
+
+async def test_run_audited_records_transport_failure(tmp_path: Path) -> None:
+    audit = AuditLog(tmp_path)
+    with pytest.raises(Unreachable):
+        await run_audited(
+            DeadTransport({}),
+            "wifi up radio0",
+            router_id="ap2",
+            screen="Wi-Fi",
+            guard=_clear_guard(),
+            audit=audit,
+        )
+    [entry] = audit.query()
+    assert entry.command == "wifi up radio0" and entry.exit_status is None
 
 
 async def test_reads_do_not_wait_for_the_write_lock(tmp_path: Path) -> None:

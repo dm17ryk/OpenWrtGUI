@@ -17,6 +17,7 @@ from openwrtgui.transport.base import (
     HostKeyInfo,
     HostKeyUnknown,
     KeyFileError,
+    LocalForward,
     ShellChannel,
     Unreachable,
 )
@@ -175,6 +176,18 @@ class SshTransport:
     async def open_shell(self, cols: int, rows: int) -> ShellChannel:
         process = await self._conn.create_process(term_type="xterm-256color", term_size=(cols, rows))
         return _Shell(process)
+
+    async def forward_local(self, remote_host: str, remote_port: int) -> LocalForward:
+        try:
+            listener = await self._conn.forward_local_port("127.0.0.1", 0, remote_host, remote_port)
+        except (OSError, asyncssh.Error) as exc:
+            raise Unreachable(f"{self.host}: cannot forward to {remote_host}:{remote_port}: {exc}") from exc
+
+        async def close() -> None:
+            listener.close()
+            await listener.wait_closed()
+
+        return LocalForward(port=listener.get_port(), close=close)
 
     async def close(self) -> None:
         self._conn.close()
