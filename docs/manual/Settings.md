@@ -18,7 +18,8 @@ switches between light and dark directly.
 ## Folders
 
 The data folder in use, and **Open data folder** to show it in Explorer. On the Essence bench PCs keep it
-inside `C:\Essence_SC\` (see [Install](Install)).
+inside `C:\Essence_SC\`; the installer proposes `C:\Essence_SC\apps\OpenWrtGUI-data` there (see
+[Install](Install)).
 
 The app looks for its data folder in this order: the `OPENWRTGUI_DATA` environment variable, the folder
 chosen at install (stored under `HKCU\Software\OpenWrtGUI`), then `%LOCALAPPDATA%\OpenWrtGUI`.

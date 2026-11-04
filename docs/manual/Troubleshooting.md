@@ -23,6 +23,23 @@ The app retries on its own, waiting a little longer each time (up to a minute). 
 4. Did someone remove the app key from `/etc/dropbear/authorized_keys`? Then the error says
    authentication failed; add the router again to reinstall the key.
 
+## The wizard asks for a password although the router has my key
+
+The wizard tries `id_ed25519`, `id_ecdsa` and `id_rsa` from `%HOME%\.ssh` and from your Windows
+profile's `.ssh`, as the user `root`. It skips:
+
+- keys protected by a passphrase (it cannot unlock them, and does not use an SSH agent);
+- keys with other file names or in other folders.
+
+For those, choose **Use a key file I already have** in the login form and point to the file, or log in
+with the password once and let the app install its own key.
+
+## A router that worked now says "The key file … cannot be used"
+
+That router logs in with a key from this PC (it was already trusted when you added it), and the file has
+since been moved, deleted or given a passphrase. Put the file back, or add the router again: the wizard
+then finds another way in, or installs the app's own key.
+
 ## The app opens in my browser instead of its own window
 
 The app window needs the Microsoft Edge WebView2 Runtime. Without it, the app opens in your default
@@ -34,8 +51,9 @@ the app. Closing the browser tab does not stop the app; use Settings → **Quit*
 
 SentinelOne on the bench PCs stops programs that run from outside `C:\Essence_SC\` or `D:\Essence_SC\`,
 without a message. Uninstall, then install again with both the app folder and the data folder inside
-`C:\Essence_SC\`, for example `C:\Essence_SC\apps\OpenWrtGUI` and `C:\Essence_SC\apps\OpenWrtGUI-data`.
-Also run the installer itself from a folder inside `C:\Essence_SC\`.
+`C:\Essence_SC\`, for example `C:\Essence_SC\apps\OpenWrtGUI` and `C:\Essence_SC\apps\OpenWrtGUI-data`
+(the installer proposes these when `C:\Essence_SC` exists). Also run the installer itself from a folder
+inside `C:\Essence_SC\`.
 
 ## "OpenWrtGUI is already running."
 

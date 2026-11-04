@@ -23,9 +23,19 @@ and LTE screens (see the [roadmap](https://github.com/dm17ryk/OpenWrtGUI/blob/ma
 
 ## Three things to know
 
-- **The app never stores router passwords.** You type the root password once, the app installs its own
-  SSH key, and logs in with that key from then on.
+- **The app never stores router passwords.** It logs in with an SSH key: one this PC already has and the
+  router trusts, or its own key, which it installs after you log in once (it tries `root` / `root` before
+  asking you to type anything).
 - **It stays out of a running test's way.** While a harness run is live, every router is read-only.
 - **Everything it sends is recorded** in the audit log, with secrets masked.
+
+## Help inside the app
+
+Every page title and section has a **?** next to it, and the main buttons explain themselves when you
+rest the pointer on them. The text is the matching part of this manual, built into the app so it works
+offline; **More in the manual** opens the page here.
+
+Questions are welcome in [Discussions](https://github.com/dm17ryk/OpenWrtGUI/discussions); bugs and
+feature requests go to [Issues](https://github.com/dm17ryk/OpenWrtGUI/issues/new/choose).
 
 This manual lives in the repository under `docs/manual/` and is published here on every change.
