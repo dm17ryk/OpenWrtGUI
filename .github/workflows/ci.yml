@@ -33,7 +33,7 @@ jobs:
         run: uv run pytest --cov=openwrtgui --cov-report=term --cov-fail-under=80
       - name: OpenAPI schema
         run: uv run python tools/dump_openapi.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: openapi
           path: build/openapi.json
@@ -90,12 +90,12 @@ jobs:
       - name: Playwright against the simulator
         working-directory: frontend
         run: npm run e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: e2e-screenshots
           path: frontend/e2e-screenshots
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report
@@ -135,7 +135,7 @@ jobs:
         run: ./tools/build_windows.ps1 -Version "${{ steps.base.outputs.base }}-ci.${{ github.run_number }}"
       - name: Install, check and uninstall
         run: ./tools/test_installer.ps1
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: installer
           path: dist/OpenWrtGUI-Setup-*.exe
