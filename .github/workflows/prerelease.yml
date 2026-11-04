@@ -1,0 +1,51 @@
+name: Pre-release
+
+# Every green CI run of a push to master becomes a "vX.Y.Z-ci.N" pre-release, which the app's
+# Pre-release update channel offers. Only the newest 10 are kept.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [master]
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  prerelease:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN: ${{ github.event.workflow_run.run_number }}
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/download-artifact@v5
+        with:
+          name: installer
+          path: dist
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum OpenWrtGUI-Setup-*.exe > SHA256SUMS.txt
+      - name: Create the pre-release
+        run: |
+          BASE="$(PYTHONPATH=src python3 -c 'from openwrtgui.version import BASE_VERSION as v; print(v)')"
+          VERSION="${BASE}-ci.${RUN}"
+          gh release create "v${VERSION}" --prerelease --target "${HEAD_SHA}" \
+            --title "OpenWrtGUI ${VERSION}" --notes "CI build of ${HEAD_SHA}" \
+            dist/OpenWrtGUI-Setup-*.exe dist/SHA256SUMS.txt
+      - name: Keep the newest 10 CI pre-releases
+        run: |
+          gh release list --limit 200 --json tagName,isPrerelease,createdAt \
+            --jq '[.[] | select(.isPrerelease and (.tagName | test("-ci\\.[0-9]+$")))] | sort_by(.createdAt) | reverse | .[10:] | .[].tagName' |
+          while read -r tag; do
+            gh release delete "${tag}" --cleanup-tag -y
+          done

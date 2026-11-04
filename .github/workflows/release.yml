@@ -1,0 +1,66 @@
+name: Release
+
+# Pushing tag vX.Y.Z (equal to BASE_VERSION) runs CI, builds the installer as X.Y.Z and publishes it
+# with SHA256SUMS.txt and the CHANGELOG section as notes.
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: write
+
+jobs:
+  tests:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: tests
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - run: uv python install 3.13
+      - run: uv sync --frozen --extra build
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Inno Setup
+        run: |
+          if (-not (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --no-progress -y
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+      - name: The tag must equal BASE_VERSION
+        id: base
+        run: |
+          $base = uv run python -c "from openwrtgui.version import BASE_VERSION as v; print(v)"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ("v$base" -ne $env:GITHUB_REF_NAME) {
+            throw "tag $($env:GITHUB_REF_NAME) does not match BASE_VERSION $base"
+          }
+          "base=$base" >> $env:GITHUB_OUTPUT
+      - name: Build
+        run: ./tools/build_windows.ps1 -Version "${{ steps.base.outputs.base }}"
+      - name: Checksums and notes
+        env:
+          BASE: ${{ steps.base.outputs.base }}
+        run: |
+          $setup = Get-Item "dist/OpenWrtGUI-Setup-$env:BASE.exe"
+          $hash = (Get-FileHash -Algorithm SHA256 $setup.FullName).Hash.ToLowerInvariant()
+          Set-Content -Path dist/SHA256SUMS.txt -Value "$hash  $($setup.Name)" -Encoding utf8NoBOM
+          uv run python tools/release_notes.py $env:BASE | Set-Content -Path dist/notes.md -Encoding utf8NoBOM
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Publish
+        env:
+          BASE: ${{ steps.base.outputs.base }}
+        run: |
+          gh release create "v$env:BASE" --title "OpenWrtGUI $env:BASE" --notes-file dist/notes.md `
+            "dist/OpenWrtGUI-Setup-$env:BASE.exe" dist/SHA256SUMS.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
