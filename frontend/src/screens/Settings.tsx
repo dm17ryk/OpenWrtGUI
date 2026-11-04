@@ -37,7 +37,7 @@ function WatchGroup({ title, noun, items, onChange }: { title: string; noun: str
       <div className="row" style={{ gap: 6 }}>
         {items.length === 0 && <span className="muted">none</span>}
         {items.map((item) => (
-          <span key={item} className="b neu mono" style={{ paddingRight: 4 }}>
+          <span key={item} className="b neu mono chip" style={{ paddingRight: 4 }}>
             {item}
             <button type="button" className="btn" aria-label={`Remove ${item}`} style={{ minHeight: 28, padding: '0 8px' }} onClick={() => onChange(items.filter((i) => i !== item))}>
               ×
@@ -140,7 +140,9 @@ export function SettingsScreen() {
           Check at start-up and daily
         </button>
         {u?.error && <div className="note x">{u.error}</div>}
-        {u && !u.available && !u.error && <div className="muted">You are up to date.</div>}
+        {u && !u.available && !u.error && (
+          <div className="muted">{u.last_check ? `You are up to date (checked ${new Date(u.last_check).toLocaleString()}).` : 'Not checked yet.'}</div>
+        )}
         {u?.latest && u.available && !hidden && (
           <div className="card stack" style={{ background: 'var(--surface2)' }}>
             <div className="row">

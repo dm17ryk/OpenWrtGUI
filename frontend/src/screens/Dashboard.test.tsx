@@ -31,6 +31,12 @@ test('AP2 shows parked and its staged channel', () => {
   expect(within(air).getByText('staged ch 1 · HT40 · radio off')).toBeInTheDocument()
 })
 
+test('air map bars carry their full text as a tooltip for narrow screens', () => {
+  renderWith(ROUTERS)
+  const air = screen.getByRole('region', { name: '2.4 GHz air' })
+  expect(within(air).getByText('staged ch 1 · HT40 · radio off')).toHaveAttribute('title', 'staged ch 1 · HT40 · radio off')
+})
+
 test('a router on air shows its station', () => {
   renderWith(ROUTERS)
   const card = screen.getByRole('article', { name: 'AP1 · bench' })

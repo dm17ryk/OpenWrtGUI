@@ -50,10 +50,10 @@ beforeEach(() => {
   puts.length = 0
 })
 
-function renderSettings() {
+function renderSettings(update: UpdateOut = UPDATE) {
   const client = new QueryClient()
   client.setQueryData(['settings'], SETTINGS)
-  client.setQueryData(['update'], UPDATE)
+  client.setQueryData(['update'], update)
   client.setQueryData(['app-info'], INFO)
   client.setQueryData(['app-key'], { public_line: 'ssh-ed25519 AAAA openwrtgui@PC', fingerprint: 'SHA256:appkey' })
   render(
@@ -100,4 +100,17 @@ test('folders, key and retention are shown', async () => {
   expect(screen.getByText('SHA256:appkey')).toBeInTheDocument()
   await userEvent.setup().click(screen.getByRole('button', { name: '1 year' }))
   expect(puts.at(-1)?.body.audit_retention_days).toBe(365)
+})
+
+test('update status says when no check has run yet', () => {
+  renderSettings({ ...UPDATE, latest: null, available: false })
+  const updates = screen.getByRole('region', { name: 'Updates' })
+  expect(within(updates).getByText('Not checked yet.')).toBeInTheDocument()
+  expect(within(updates).queryByText(/up to date/)).toBeNull()
+})
+
+test('update status names the last check when up to date', () => {
+  renderSettings({ ...UPDATE, latest: null, available: false, last_check: '2026-11-04T09:30:00Z' })
+  const updates = screen.getByRole('region', { name: 'Updates' })
+  expect(within(updates).getByText(/^You are up to date \(checked .+\)\.$/)).toBeInTheDocument()
 })

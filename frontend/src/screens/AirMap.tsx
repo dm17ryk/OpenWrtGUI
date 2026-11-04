@@ -52,6 +52,7 @@ export function AirMap({ items }: { items: RouterItem[] }) {
                     <div key={`${item.record.id}-${radio.name}-s`} style={{ display: 'grid', gridTemplateColumns: cols, background: 'var(--surface2)', borderRadius: 6, minHeight: 30 }}>
                       <div
                         className="mono"
+                        title={radioText(radio)}
                         style={{
                           gridColumn: `${start} / ${end}`,
                           borderRadius: 6,

@@ -227,6 +227,11 @@ h2 {
   background: var(--accent-soft);
   color: var(--accent);
 }
+.b.chip {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
 .dot {
   width: 8px;
   height: 8px;
@@ -284,6 +289,9 @@ h2 {
   border-radius: 8px;
   overflow: hidden;
   background: var(--surface);
+}
+.stack > .seg {
+  align-self: flex-start;
 }
 .seg button {
   font: inherit;
