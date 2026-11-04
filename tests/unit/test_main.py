@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -45,6 +46,19 @@ def test_self_check_passes_with_simulator(tmp_path: Path) -> None:
     ]
     assert run(args) == 0
     assert run(args) == 0  # the instance lock was released
+
+
+def test_self_check_passes_without_console_streams(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The windowed exe (console=False) runs with sys.stdout and sys.stderr set to None."""
+    web = tmp_path / "web"
+    web.mkdir()
+    (web / "index.html").write_text('<div id="root"></div>', encoding="utf-8")
+    monkeypatch.setattr(sys, "stdout", None)
+    monkeypatch.setattr(sys, "stderr", None)
+    args = [
+        "--self-check", "--simulator", str(SIM_DIR), "--web-dir", str(web), "--data-dir", str(tmp_path / "d"),
+    ]  # fmt: skip
+    assert run(args) == 0
 
 
 def test_self_check_fails_without_ui(tmp_path: Path) -> None:

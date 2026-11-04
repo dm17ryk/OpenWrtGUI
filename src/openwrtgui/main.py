@@ -124,8 +124,15 @@ def _setup_logging(data: DataDir) -> None:
 
 
 def _start_server(ctx: AppContext) -> tuple[uvicorn.Server, threading.Thread]:
+    # log_config=None: uvicorn's console formatters touch sys.stdout, which is None in the
+    # windowed exe; its loggers propagate to the app log instead.
     config = uvicorn.Config(
-        create_app(ctx), host="127.0.0.1", port=ctx.port, log_level="warning", lifespan="on"
+        create_app(ctx),
+        host="127.0.0.1",
+        port=ctx.port,
+        log_level="warning",
+        log_config=None,
+        lifespan="on",
     )
     server = uvicorn.Server(config)
     thread = threading.Thread(target=server.run, name="openwrtgui-server", daemon=True)
