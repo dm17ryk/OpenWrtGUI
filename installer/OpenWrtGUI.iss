@@ -20,7 +20,7 @@ AppPublisherURL=https://github.com/dm17ryk/OpenWrtGUI
 AppSupportURL=https://github.com/dm17ryk/OpenWrtGUI/issues
 AppUpdatesURL=https://github.com/dm17ryk/OpenWrtGUI/releases
 PrivilegesRequired=lowest
-DefaultDirName={localappdata}\Programs\OpenWrtGUI
+DefaultDirName={code:DefaultAppDir}
 DisableDirPage=no
 UsePreviousAppDir=yes
 DisableProgramGroupPage=yes
@@ -65,6 +65,34 @@ var
   DataDirPage: TInputDirWizardPage;
   UninstallDataDir: String;
 
+{ Bench PCs run SentinelOne, which kills programs outside the Essence_SC tree, so when that
+  tree exists the defaults go under <drive>:\Essence_SC\apps; elsewhere the usual per-user folders. }
+function EssenceAppsDir: String;
+begin
+  if DirExists('C:\Essence_SC') then
+    Result := 'C:\Essence_SC\apps'
+  else if DirExists('D:\Essence_SC') then
+    Result := 'D:\Essence_SC\apps'
+  else
+    Result := '';
+end;
+
+function DefaultAppDir(Param: String): String;
+begin
+  if EssenceAppsDir <> '' then
+    Result := EssenceAppsDir + '\OpenWrtGUI'
+  else
+    Result := ExpandConstant('{localappdata}\Programs\OpenWrtGUI');
+end;
+
+function DefaultDataDir: String;
+begin
+  if EssenceAppsDir <> '' then
+    Result := EssenceAppsDir + '\OpenWrtGUI-data'
+  else
+    Result := ExpandConstant('{localappdata}\OpenWrtGUI');
+end;
+
 function GetDataDir(Param: String): String;
 begin
   Result := DataDirPage.Values[0];
@@ -82,13 +110,13 @@ var
 begin
   DataDirPage := CreateInputDirPage(wpSelectDir,
     'Data folder', 'Where should OpenWrtGUI keep its routers, keys and audit log?',
-    'On the bench PC use a folder inside C:\Essence_SC.' + #13#10 +
+    'On a PC with SentinelOne keep it inside C:\Essence_SC or D:\Essence_SC.' + #13#10 +
     'Updates keep this folder; uninstall asks before deleting it.',
     False, '');
   DataDirPage.Add('');
   Initial := ExpandConstant('{param:DATADIR|}');
   if Initial = '' then
-    Initial := GetPreviousData('DataDir', ExpandConstant('{localappdata}\OpenWrtGUI'));
+    Initial := GetPreviousData('DataDir', DefaultDataDir);
   DataDirPage.Values[0] := Initial;
 end;
 
@@ -122,7 +150,7 @@ begin
   begin
     { Read before [Registry] uninsdeletekey removes the value. }
     if not RegQueryStringValue(HKCU, 'Software\OpenWrtGUI', 'DataDir', UninstallDataDir) then
-      UninstallDataDir := ExpandConstant('{localappdata}\OpenWrtGUI');
+      UninstallDataDir := DefaultDataDir;
   end;
   if (CurUninstallStep = usPostUninstall) and not UninstallSilent and DirExists(UninstallDataDir) then
   begin

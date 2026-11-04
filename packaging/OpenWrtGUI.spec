@@ -53,7 +53,9 @@ a = Analysis(
     pathex=["../src"],
     datas=[("../frontend/dist", "openwrtgui/web")],
     hiddenimports=hiddenimports,
-    excludes=["tkinter"],
+    # pydantic's hook collects pydantic.mypy (which imports mypy); pygments' image formatter imports
+    # PIL. The app needs neither, and together they are ~16 MB. build_windows.ps1 checks they stay out.
+    excludes=["tkinter", "mypy", "pydantic.mypy", "PIL"],
     noarchive=False,
 )
 pyz = PYZ(a.pure)

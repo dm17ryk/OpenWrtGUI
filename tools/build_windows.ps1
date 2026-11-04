@@ -44,6 +44,11 @@ Invoke-Step "PyInstaller" {
 }
 $Exe = Join-Path $Root "dist\OpenWrtGUI\OpenWrtGUI.exe"
 if (-not (Test-Path $Exe)) { throw "PyInstaller produced no $Exe" }
+# Dev tools and optional extras that hooks drag in (pydantic.mypy, pygments' image formatter) only
+# make the installer bigger; packaging/OpenWrtGUI.spec excludes them.
+$Leaked = @("mypy", "PIL", "pytest", "_pytest", "ruff") |
+    Where-Object { Test-Path (Join-Path $Root "dist\OpenWrtGUI\_internal\$_") }
+if ($Leaked) { throw "the bundle contains packages it must not ship: $($Leaked -join ', ')" }
 
 # 4. Self-check of the built exe. It is a windowed app, so wait for it explicitly. Its own data
 #    folder keeps the check away from a running OpenWrtGUI and from your real routers and keys.
@@ -62,6 +67,9 @@ Write-Host "    self-check passed"
 # 5. Installer
 $Iscc = @(
     (Get-Command ISCC.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source),
+    "C:\Essence_SC\Inno Setup 7\ISCC.exe",
+    "C:\Program Files (x86)\Inno Setup 7\ISCC.exe",
+    "C:\Program Files\Inno Setup 7\ISCC.exe",
     "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
     "C:\Essence_SC\scoop\apps\innosetup\current\ISCC.exe"
 ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
