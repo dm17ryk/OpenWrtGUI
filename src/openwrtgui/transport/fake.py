@@ -7,8 +7,12 @@ import shlex
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from openwrtgui.transport.base import CommandResult, ShellChannel
+
+if TYPE_CHECKING:
+    from openwrtgui.simwifi import SimWifi
 
 INSTALL_KEY_PREFIX = "mkdir -p /etc/dropbear && "
 ROOT_PASSWORD_PROBE = "/etc/shadow"
@@ -21,6 +25,7 @@ class SimState:
     authorized_keys: list[str] = field(default_factory=list)
     root_password: str | None = None
     password_login: str | None = None
+    wifi: SimWifi | None = None
 
 
 def load_commands(path: Path) -> dict[str, CommandResult]:
@@ -66,6 +71,8 @@ class ReplayTransport:
 
     def _simulate(self, command: str) -> CommandResult | None:
         assert self.state is not None
+        if self.state.wifi is not None and (answered := self.state.wifi.answer(command)) is not None:
+            return answered
         if command == "true":
             return CommandResult(command, "", "", 0)
         if command.startswith(INSTALL_KEY_PREFIX):
