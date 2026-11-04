@@ -13,6 +13,14 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 SIM_DIR = FIXTURES / "sim"
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    # Registered here, not in tests/hardware/conftest.py: pytest reads options only from start-up conftests.
+    group = parser.getgroup("hardware", "tests on a real router (pytest -m hardware)")
+    group.addoption("--router", default="192.168.1.2", help="router address (default AP2, 192.168.1.2)")
+    group.addoption("--identity", type=Path, help="an SSH private key the router accepts")
+    group.addoption("--allow-other", action="store_true", help="allow a router other than 192.168.1.2")
+
+
 @pytest.fixture
 def ap2_transport() -> ReplayTransport:
     return ReplayTransport(load_commands(FIXTURES / "ap2" / "commands.json"))
