@@ -12,6 +12,12 @@ from openwrtgui.probe.luci_menu import SECTION_SEP, LuciPage
 NATIVE: dict[str, str] = {
     "admin/network/wireless": "wifi",
     "admin/status/overview": "dashboard",
+    "admin/network/network": "network",
+    "admin/network/dhcp": "network",
+    "admin/network/dns": "network",
+    "admin/network/routes": "network",
+    "admin/status/routes": "network",
+    "admin/network/switch": "ports",
 }
 
 

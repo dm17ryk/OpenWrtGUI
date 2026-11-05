@@ -92,7 +92,11 @@ def test_page_views_mark_native() -> None:
     views = {v.path: v for v in page_views(parse_menu(MENUS))}
     assert views["admin/network/wireless"].native == "wifi"
     assert views["admin/status/overview"].native == "dashboard"
-    assert views["admin/network/dhcp"].native is None
+    for path in ("network", "dhcp", "dns", "routes"):
+        assert views[f"admin/network/{path}"].native == "network"
+    assert views["admin/status/routes"].native == "network"
+    assert views["admin/network/switch"].native == "ports"
+    assert views["admin/network/firewall/zones"].native is None
 
 
 def test_page_groups_fall_back_to_the_package() -> None:
