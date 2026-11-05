@@ -75,9 +75,9 @@ export const PANEL: Station = {
 }
 
 export const OPTIONS: OptionRow[] = [
-  { group: 'device', section: 'radio0', name: 'htmode', type: 'string', editor: 'text', value: 'HT40', set_in_config: true, control: 'Modes', writer: null },
-  { group: 'device', section: 'radio0', name: 'cell_density', type: 'uinteger', editor: 'number', value: '0', set_in_config: true, control: null, writer: 'dima_night' },
-  { group: 'device', section: 'radio0', name: 'beacon_int', type: 'uinteger', editor: 'number', value: null, set_in_config: false, control: null, writer: null },
-  { group: 'device', section: 'radio0', name: 'noscan', type: 'bool', editor: 'switch', value: null, set_in_config: false, control: 'Modes', writer: null },
-  { group: 'interface', section: 'default_radio0', name: 'key', type: '<hidden>', editor: 'secret', value: null, set_in_config: true, control: 'Security (hidden)', writer: null },
+  { config: 'wireless', group: 'device', section: 'radio0', name: 'htmode', type: 'string', editor: 'text', value: 'HT40', set_in_config: true, control: 'Modes', writer: null },
+  { config: 'wireless', group: 'device', section: 'radio0', name: 'cell_density', type: 'uinteger', editor: 'number', value: '0', set_in_config: true, control: null, writer: 'dima_night' },
+  { config: 'wireless', group: 'device', section: 'radio0', name: 'beacon_int', type: 'uinteger', editor: 'number', value: null, set_in_config: false, control: null, writer: null },
+  { config: 'wireless', group: 'device', section: 'radio0', name: 'noscan', type: 'bool', editor: 'switch', value: null, set_in_config: false, control: 'Modes', writer: null },
+  { config: 'wireless', group: 'interface', section: 'default_radio0', name: 'key', type: '<hidden>', editor: 'secret', value: null, set_in_config: true, control: 'Security (hidden)', writer: null },
 ]

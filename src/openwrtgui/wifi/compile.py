@@ -7,9 +7,10 @@ basic rate of the BSS, so an HT-only mask keeps the lowest basic rate 6 (proven 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from typing import Literal
 
+from openwrtgui.uci import UciOp, render_uci
+from openwrtgui.uci import drop_unchanged as drop_unchanged  # the Wi-Fi tests import them from here
+from openwrtgui.uci import shell_quote as shell_quote
 from openwrtgui.wifi.model import (
     CCK_BASIC_KBPS,
     CCK_KBPS,
@@ -24,13 +25,6 @@ from openwrtgui.wifi.model import (
 )
 
 PSK_MODES = ("wpa2", "wpa3", "wpa2_wpa3")
-
-
-@dataclass(frozen=True)
-class UciOp:
-    op: Literal["set", "delete", "add_list"]
-    path: str
-    value: str | None = None
 
 
 def _kbps(rates: Sequence[int]) -> str:
@@ -153,33 +147,6 @@ def compile_ssid(req: SsidRequest, band: str, sae: bool, current: Mapping[str, s
             raise ValueError("A Wi-Fi key needs 8 to 63 characters, or 64 hex digits")
         ops.append(UciOp("set", f"{p}.key", req.key))
     return ops
-
-
-def drop_unchanged(ops: Sequence[UciOp], current: Mapping[str, str]) -> list[UciOp]:
-    """Only changes are written: a set to the current value or a delete of an absent option goes."""
-    kept: list[UciOp] = []
-    for op in ops:
-        if op.op == "set" and current.get(op.path) == op.value:
-            continue
-        if op.op == "delete" and op.path not in current:
-            continue
-        kept.append(op)
-    return kept
-
-
-def shell_quote(value: str) -> str:
-    return "'" + value.replace("'", "'\\''") + "'"
-
-
-def render_uci(ops: Sequence[UciOp]) -> list[str]:
-    lines = []
-    for op in ops:
-        if op.op == "delete":
-            lines.append(f"uci -q delete {op.path}")
-        else:
-            verb = "set" if op.op == "set" else "add_list"
-            lines.append(f"uci {verb} {op.path}={shell_quote(op.value or '')}")
-    return lines
 
 
 def apply_script(radio: str, ops: Sequence[UciOp]) -> str:

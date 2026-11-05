@@ -14,8 +14,7 @@ import shlex
 from typing import Any
 
 from openwrtgui.transport.base import CommandResult
-from openwrtgui.wifi.compile import shell_quote
-from openwrtgui.wifi.parse import parse_uci_show
+from openwrtgui.uci import parse_uci_show, shell_quote
 
 STATION_MAC = "f4:12:fa:f3:57:68"
 STATION_NAME = "panel"

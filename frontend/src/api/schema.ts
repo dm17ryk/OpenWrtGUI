@@ -1089,6 +1089,8 @@ export interface components {
         };
         /** OptionRow */
         OptionRow: {
+            /** Config */
+            config: string;
             /** Control */
             control: string | null;
             /**
@@ -1096,11 +1098,8 @@ export interface components {
              * @enum {string}
              */
             editor: "switch" | "number" | "text" | "list" | "secret" | "readonly";
-            /**
-             * Group
-             * @enum {string}
-             */
-            group: "device" | "interface";
+            /** Group */
+            group: string;
             /** Name */
             name: string;
             /** Section */

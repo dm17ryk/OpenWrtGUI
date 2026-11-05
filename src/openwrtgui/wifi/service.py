@@ -17,17 +17,16 @@ from openwrtgui.probe.status import RouterStatus, ssids_on_air
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import CommandResult, Transport, TransportError, ubus_call
 from openwrtgui.transport.pool import ConnectionPool
+from openwrtgui.uci import UciOp, drop_unchanged, render_uci
+from openwrtgui.uci import after as after_ops
 from openwrtgui.wifi.compile import (
-    UciOp,
     apply_script,
     compile_channels,
     compile_modes,
     compile_ssid,
     compile_txpower,
-    drop_unchanged,
     mask_command,
     reload_command,
-    render_uci,
     tx_mask_args,
 )
 from openwrtgui.wifi.model import CCK_BASIC_KBPS, OFDM_BASIC_KBPS, ModeSelection, RadioRequest
@@ -98,24 +97,12 @@ class ApplyResult:
     error: str | None
 
 
-def _after(uci: Mapping[str, str], ops: Sequence[UciOp]) -> dict[str, str]:
-    out = dict(uci)
-    for op in ops:
-        if op.op == "set":
-            out[op.path] = op.value or ""
-        elif op.op == "delete":
-            out.pop(op.path, None)
-        else:
-            out[op.path] = f"{out.get(op.path, '')} {op.value}".strip()
-    return out
-
-
 def _mask_after(
     uci: Mapping[str, str], ops: Sequence[UciOp], radio: RadioState, modes: ModeSelection | None = None
 ) -> str | None:
     """The TX mask that goes with the radio's modes after `ops`: every reload the app makes drops the
     runtime mask, so it is set again. None for modes set outside the selector (custom)."""
-    chosen = modes or modes_from_uci(_after(uci, ops), radio.name, radio.limits.max_htmode)
+    chosen = modes or modes_from_uci(after_ops(uci, ops), radio.name, radio.limits.max_htmode)
     return None if chosen.kind == "custom" else tx_mask_args(chosen, radio.limits.mcs)
 
 
@@ -305,7 +292,7 @@ class WifiService:
         full_verify: bool,
     ) -> WifiPlan:
         ops = drop_unchanged(ops, uci)
-        after = _after(uci, ops)
+        after = after_ops(uci, ops)
         expect = _expectation(after, radio, _chosen_channels(after, radio.name))
         if not expect.radio_up:
             mask_args = None
