@@ -20,6 +20,7 @@ from openwrtgui.paths import DataDir
 from openwrtgui.poller import StatusPoller
 from openwrtgui.probe.describe import SelfDescription
 from openwrtgui.probe.status import RouterStatus
+from openwrtgui.rf.sampler import RfHub
 from openwrtgui.simulator import SimConnector, seed_routers, sim_http_client, sim_process_lister
 from openwrtgui.store.keys import AppKey, load_or_create_app_key
 from openwrtgui.store.routers import RouterRecord, RouterStore, router_key_paths
@@ -49,6 +50,7 @@ class AppContext:
     hub: LiveHub
     poller: StatusPoller
     wifi: WifiService
+    rf: RfHub
     token: str
     port: int
     mode: Literal["real", "simulator"]
@@ -169,6 +171,7 @@ def build_context(
         hub=hub,
         poller=poller,
         wifi=wifi,
+        rf=RfHub(pool=pool, routers=routers),
         token=token,
         port=port,
         mode="simulator" if simulator is not None else "real",

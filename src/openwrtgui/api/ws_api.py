@@ -1,4 +1,4 @@
-"""WebSockets: /ws/live (guard, status, updates) and /ws/terminal/{router_id}."""
+"""WebSockets: /ws/live (guard, status, updates), /ws/rf/{router_id} and /ws/terminal/{router_id}."""
 
 from __future__ import annotations
 
@@ -36,6 +36,45 @@ async def live(ws: WebSocket) -> None:
         pass
     finally:
         ctx.hub.unsubscribe(queue)
+
+
+@router.websocket("/ws/rf/{router_id}")
+async def rf_live(ws: WebSocket, router_id: str) -> None:
+    """RF samples once a second; the client may ask to record to CSV or for a station's rates."""
+    ctx = await ws_accept(ws)
+    if ctx is None:
+        return
+    if ctx.routers.get(router_id) is None:
+        await ws.close(code=WS_NOT_FOUND)
+        return
+    sampler = ctx.rf.sampler(router_id, ws.query_params.get("radio", "radio0"))
+    queue = sampler.subscribe()
+
+    async def send_samples() -> None:
+        while True:
+            await ws.send_json(wire(await queue.get()))
+
+    sender = asyncio.create_task(send_samples())
+    try:
+        while True:
+            msg = await ws.receive_json()
+            kind = msg.get("type")
+            if kind == "record":
+                path = sampler.start_recording() if msg.get("on") else sampler.stop_recording()
+                await ws.send_json(
+                    {"type": "recording", "path": str(path) if path and msg.get("on") else None}
+                )
+            elif kind == "rates":
+                mac = str(msg.get("mac", ""))
+                try:
+                    await ws.send_json(wire({"type": "rates", "mac": mac, "rows": await sampler.rates(mac)}))
+                except (NotImplementedError, TransportError, ValueError) as exc:
+                    await ws.send_json({"type": "rates", "mac": mac, "error": str(exc)})
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+    finally:
+        sender.cancel()
+        sampler.unsubscribe(queue)
 
 
 @router.websocket("/ws/terminal/{router_id}")

@@ -42,6 +42,7 @@ def create_app(ctx: AppContext) -> FastAPI:
             for task in tasks:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
+            ctx.rf.close_all()
             await ctx.pool.close_all()
 
     app = FastAPI(title="OpenWrtGUI", version=APP_VERSION, lifespan=lifespan)
