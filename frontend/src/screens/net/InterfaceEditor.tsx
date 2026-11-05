@@ -9,8 +9,7 @@ import { PreviewApply } from '../../components/PreviewApply'
 import { usePlanApply } from '../../components/usePlanApply'
 import { HELP } from '../../help/topics'
 import { interfaceDraft, interfaceRequest } from './draft'
-
-const words = (text: string): string[] => text.split(/[\s,]+/).filter(Boolean)
+import { words } from './rows'
 
 type Props = {
   routerId: string

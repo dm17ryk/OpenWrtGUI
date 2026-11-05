@@ -63,6 +63,7 @@ type Body<T, Required extends keyof T> = Partial<T> & Pick<T, Required>
 export type InterfaceIn = Body<S['InterfaceIn'], 'name'>
 export type DhcpIn = Body<S['DhcpIn'], 'interface'>
 export type HostIn = Body<S['HostIn'], 'mac'>
+export type HostsIn = { upserts: HostIn[]; deletes: string[] }
 export type DnsIn = Partial<S['DnsIn']>
 export type RouteIn = Body<S['RouteIn'], 'interface' | 'target'>
 export type RuleIn = Partial<S['RuleIn']>
