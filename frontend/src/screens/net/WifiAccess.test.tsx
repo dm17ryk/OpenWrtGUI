@@ -2,18 +2,19 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, test, vi } from 'vitest'
-import type { NetPlan } from '../../api/types'
+import type { AccessState, NetPlan } from '../../api/types'
 import { ACCESS, SAVED_BLOCK_PLAN } from '../../testing/net'
 import { WifiAccess } from './WifiAccess'
 
 const calls: Array<{ path: string; body: unknown }> = []
 let preview: NetPlan | { refuse: string } = SAVED_BLOCK_PLAN
+let access: AccessState = ACCESS
 
 vi.mock('../../api/client', async (orig) => {
   const actual = await orig<typeof import('../../api/client')>()
   const respond = async (path: string, body?: unknown): Promise<unknown> => {
     calls.push({ path, body })
-    if (path === '/api/routers/ap2/network/access') return ACCESS
+    if (path === '/api/routers/ap2/network/access') return access
     if (path === '/api/routers/ap2/network/access/preview') {
       if ('refuse' in preview) throw new actual.ApiError(422, preview.refuse, {})
       return preview
@@ -30,6 +31,7 @@ vi.mock('../../api/client', async (orig) => {
 beforeEach(() => {
   calls.length = 0
   preview = SAVED_BLOCK_PLAN
+  access = ACCESS
 })
 
 function renderAccess() {
@@ -72,6 +74,19 @@ test('a saved block on an Everyone SSID shows the policy warning', async () => {
   await user.click(screen.getByRole('button', { name: 'Saved' }))
   expect(await screen.findByText('lab-open changes from Everyone to Block listed.')).toBeInTheDocument()
   expect(lastBody()).toEqual({ kind: 'block', sections: ['default_radio0'], mac: 'e4:5f:01:aa:bb:01', method: 'saved' })
+})
+
+test('a name given with + Device stays when the router lists that MAC without a name', async () => {
+  access = { ...ACCESS, devices: [...ACCESS.devices, { mac: '02:00:00:00:ca:fe', name: null, saved_in: [], blocked_now_on: ['wlan0'] }] }
+  const user = renderAccess()
+  await user.click(await screen.findByRole('button', { name: '+ Device' }))
+  await user.type(screen.getByRole('textbox', { name: 'New device MAC' }), '02:00:00:00:CA:FE')
+  await user.type(screen.getByRole('textbox', { name: 'New device name' }), 'cam')
+  await user.click(screen.getByRole('button', { name: 'Add' }))
+  const row = within(screen.getByRole('table', { name: 'Devices' })).getByRole('row', { name: /02:00:00:00:ca:fe/ })
+  expect(row).toHaveTextContent('cam')
+  expect(row).toHaveTextContent('wlan0')
+  expect(within(row).getByRole('button', { name: 'Unblock cam' })).toBeInTheDocument()
 })
 
 test('a block for N s sends the seconds', async () => {

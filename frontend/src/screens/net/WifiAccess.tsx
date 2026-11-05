@@ -93,7 +93,10 @@ export function WifiAccess({ routerId, routerName, onApplied }: Props) {
   }
   const policyChange = usePlanApply(base, policy && sections.length ? { kind: 'policy', sections, policy } : null, applied)
   const short = shortName(routerName, routerId)
-  const devices = [...(access.data?.devices ?? []), ...extra.filter((e) => !access.data?.devices.some((d) => d.mac === e.mac))]
+  // A device added here keeps the name given to it when the router lists its MAC without one.
+  const given = new Map(extra.map((e) => [e.mac, e.name]))
+  const listed = (access.data?.devices ?? []).map((d) => (d.name ? d : { ...d, name: given.get(d.mac) ?? null }))
+  const devices = [...listed, ...extra.filter((e) => !listed.some((d) => d.mac === e.mac))]
   const ssidOf = (section: string): string => ssids.find((s) => s.section === section)?.ssid ?? section
   const addDevice = (): void => {
     const mac = adding.mac.trim().toLowerCase()
