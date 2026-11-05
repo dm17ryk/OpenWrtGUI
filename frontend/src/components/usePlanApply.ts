@@ -15,6 +15,7 @@ export type PlanApply = {
 /**
  * One change on the Network and Ports screens: its preview from `<base>/preview` while `body` is set, and
  * Apply, which sends the same body with the preview's digest to `<base>/apply` (so only the lines shown run).
+ * `onApplied` runs only when the router took the change; the result shows either way.
  */
 export function usePlanApply(base: string, body: object | null, onApplied: (result: NetApplyResult) => void): PlanApply {
   const preview = usePreview<NetPlan>(`${base}/preview`, body)
@@ -29,7 +30,8 @@ export function usePlanApply(base: string, body: object | null, onApplied: (resu
     try {
       const done = await postJson<NetApplyResult>(`${base}/apply`, { ...body, digest: plan.digest })
       setResult(done)
-      onApplied(done)
+      // a refused or rolled-back change left the router as it was: keep the user's edits
+      if (done.applied) onApplied(done)
     } catch (err) {
       setApplyError(err instanceof ApiError ? err.detail : String(err))
     } finally {

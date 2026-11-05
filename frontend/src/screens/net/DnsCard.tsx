@@ -66,7 +66,7 @@ function dnsRequest(dns: DnsConf, d: Draft): DnsIn | null | 'bad' {
     ...(!sameList(words(d.rebind), words(was.rebind)) ? { rebind_domains: words(d.rebind) } : {}),
     ...(!sameList(overrideList(d.overrides), overrideList(was.overrides)) ? { overrides: d.overrides.filter((o) => o.host.trim() || o.ip.trim()) } : {}),
     ...(Object.keys(switches).length ? { switches } : {}),
-    ...(d.cachesize !== was.cachesize && cachesize !== null ? { cachesize } : {}),
+    ...(d.cachesize !== was.cachesize ? { cachesize: cachesize ?? ('default' as const) } : {}), // emptied: back to the default
     ...(Object.keys(others).length ? { others } : {}),
   }
   return Object.keys(req).length ? req : null

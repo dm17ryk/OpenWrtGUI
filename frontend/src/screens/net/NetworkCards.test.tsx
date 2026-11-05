@@ -9,6 +9,14 @@ import { NetworkScreen } from './NetworkScreen'
 
 const calls: Array<{ path: string; body: unknown }> = []
 const refusals: Record<string, string> = {}
+const NOT_APPLIED = {
+  router_id: 'ap2',
+  applied: false,
+  verified: false,
+  checks: [],
+  error: 'The router refused the change: uci: Invalid argument',
+  host: '192.168.1.2',
+}
 const PLANS: Record<string, unknown> = {
   dhcp: DHCP_ON_PLAN,
   hosts: HOSTS_PLAN,
@@ -31,6 +39,7 @@ vi.mock('../../api/client', async (orig) => {
       if (refusals[card]) throw new actual.ApiError(422, refusals[card], {})
       return PLANS[card]
     }
+    if (path === '/api/routers/ap2/network/hosts/apply') return NOT_APPLIED
     throw new Error(`unexpected ${path}`)
   }
   return {
@@ -92,6 +101,24 @@ test('deleting two fixed addresses sends both in one preview', async () => {
   await within(hosts).findByRole('region', { name: 'Command preview' })
   expect(within(hosts).getAllByRole('region', { name: 'Command preview' })).toHaveLength(1)
   expect(lastBody('hosts')).toEqual({ upserts: [], deletes: ['cfg0bfb35', 'cfg0cfb35'] })
+})
+
+test('an apply that changed nothing keeps the edits', async () => {
+  const user = renderNetwork()
+  const hosts = await screen.findByRole('region', { name: 'Fixed addresses by MAC' })
+  await user.click(await within(hosts).findByRole('button', { name: 'Delete bench-pc' }))
+  await within(hosts).findByRole('region', { name: 'Command preview' })
+  await user.click(within(hosts).getByRole('button', { name: 'Apply' }))
+  expect(await within(hosts).findByText('Not applied: The router refused the change: uci: Invalid argument')).toBeInTheDocument()
+  expect(within(hosts).getByRole('button', { name: 'Delete bench-pc' })).toHaveAttribute('aria-pressed', 'true')
+})
+
+test('clearing the cache size puts it back to the default', async () => {
+  const user = renderNetwork()
+  const dns = await screen.findByRole('region', { name: 'DNS' })
+  await user.clear(within(dns).getByRole('textbox', { name: 'Cache size' }))
+  await within(dns).findByRole('region', { name: 'Command preview' })
+  expect(lastBody('dns')).toEqual({ cachesize: 'default' })
 })
 
 test('a refused DNS forwarder shows the reason', async () => {

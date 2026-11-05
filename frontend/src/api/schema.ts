@@ -1451,7 +1451,7 @@ export interface components {
         /** DnsApplyIn */
         DnsApplyIn: {
             /** Cachesize */
-            cachesize?: number | null;
+            cachesize?: number | "default" | null;
             /** Digest */
             digest: string;
             /** Domain */
@@ -1489,7 +1489,7 @@ export interface components {
         /** DnsIn */
         DnsIn: {
             /** Cachesize */
-            cachesize?: number | null;
+            cachesize?: number | "default" | null;
             /** Domain */
             domain?: string | null;
             /** Forwarders */
