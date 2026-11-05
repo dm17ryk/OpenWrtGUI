@@ -7,6 +7,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
+from openwrtgui.net.parse import options
 from openwrtgui.ports.model import Members
 from openwrtgui.ports.parse import render_members, switch_conf, switch_ports
 from openwrtgui.ports.state import PortsState, PortView
@@ -14,6 +15,7 @@ from openwrtgui.uci import UciOp
 
 Cell = Literal["u", "t"]
 NOT_MANAGED = "This router's switch is not managed by swconfig"
+_MIRROR_ONLY = frozenset({"device", "port", "enable_mirror_rx", "enable_mirror_tx"})
 
 
 @dataclass(frozen=True)
@@ -175,6 +177,13 @@ def compile_mirror(req: MirrorRequest, state: PortsState, uci: Mapping[str, str]
     new = 0
     for port in sorted(set(existing) | set(sources)):
         rx, tx = sources.get(port, (False, False))
+        if (
+            port in existing
+            and not (rx or tx)
+            and set(options(uci, "network", existing[port])) <= _MIRROR_ONLY
+        ):
+            ops.append(UciOp("delete", f"network.{existing[port]}"))  # a section only the mirror needed
+            continue
         if port in existing:
             s = f"network.{existing[port]}"
         elif rx or tx:

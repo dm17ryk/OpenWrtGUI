@@ -12,6 +12,7 @@ from openwrtgui.net.state import NetworkState, read_network
 from openwrtgui.ports.compile import MirrorRequest, VlanRequest, enable_commands
 from openwrtgui.ports.state import PortsState, read_ports
 from openwrtgui.simnet import PC_MAC, SimNetwork
+from openwrtgui.uci import parse_uci_show
 
 P = "uci -P /var/run/rpcd/uci-<session>"
 
@@ -187,6 +188,30 @@ async def test_mirror_plan_and_apply(net: NetEnv) -> None:
     assert not any("add network switch_port" in line for line in again.lines)  # the port's section is reused
     off = await net.ports.apply_mirror("ap2", MirrorRequest(monitor=None, sources={}))
     assert off.verified and (await net.ports.state("ap2")).mirror.sources == {}
+
+
+def _by_content(text: str) -> list[tuple[str, tuple[tuple[str, str], ...]]]:
+    """A config's sections as (type, options), whatever libuci names them."""
+    shown = parse_uci_show(text)
+    return sorted(
+        (
+            shown[name],
+            tuple(sorted((k.rsplit(".", 1)[1], v) for k, v in shown.items() if k.startswith(name + "."))),
+        )
+        for name in (k for k in shown if k.count(".") == 1)
+    )
+
+
+async def test_mirror_off_leaves_the_network_config_as_it_was(net: NetEnv) -> None:
+    """Off removes the switch_port sections the mirror added (holding nothing but the mirror), so a mirror
+    switched on and off leaves the router as it found it."""
+    t = await net.sim("ap2")
+    before = _by_content((await t.run("uci -X show network")).stdout)
+    on = await net.ports.apply_mirror("ap2", MirrorRequest(monitor=1, sources={2: (True, True)}))
+    assert on.verified, on
+    off = await net.ports.apply_mirror("ap2", MirrorRequest(monitor=None, sources={}))
+    assert off.verified, off
+    assert _by_content((await t.run("uci -X show network")).stdout) == before
 
 
 async def test_mirror_monitor_cannot_be_source(net: NetEnv) -> None:
