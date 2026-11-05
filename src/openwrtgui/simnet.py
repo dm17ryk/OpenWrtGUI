@@ -101,7 +101,8 @@ class SimNetwork:
         self._clock = clock
         self._leases = list(leases)
         self._wifi_mirror = wifi_mirror
-        self._arl = dict(arl or {})
+        self.arl = dict(arl or {})  # MAC → port in `get arl_table` (empty, as on AP2's mt7620)
+        self.extra_links: set[int] = set()  # more switch ports with a link than the PC's
 
     # ---------------------------------------------------------------- what the connector asks
     def _expire(self) -> None:
@@ -445,7 +446,7 @@ class SimNetwork:
         if rest == "help":
             return _ok(HELP)
         if rest == "get arl_table":
-            lines = "".join(f"Port {port}: MAC {mac}\n" for mac, port in self._arl.items())
+            lines = "".join(f"Port {port}: MAC {mac}\n" for mac, port in self.arl.items())
             return _ok("address resolution table\n" + lines + "\n")
         if rest == "show":
             return _ok(self._show())
@@ -470,7 +471,8 @@ class SimNetwork:
             sp = mirror.get(port)
             pvid = next((v.vid or v.vlan for v in vlans if (port, False) in v.members), 0)
             enable = ("1" if self._enabled[port] else "0") if port in EXTERNAL else "???"
-            up = (port == self.pc_port and self._enabled.get(port, False)) or port == CPU
+            linked = port == self.pc_port or port in self.extra_links
+            up = (linked and self._enabled.get(port, False)) or port == CPU
             speed = "1000" if port == CPU else "100"
             link = f"port:{port} link:up speed:{speed}baseT full-duplex " if up else f"port:{port} link:down"
             lines += [

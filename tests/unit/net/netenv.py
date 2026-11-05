@@ -10,6 +10,7 @@ from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard, ProcessInfo
 from openwrtgui.net.apply import ApplyRunner
 from openwrtgui.net.service import NetworkService
+from openwrtgui.ports.service import PortsService
 from openwrtgui.probe.describe import SelfDescription
 from openwrtgui.probe.status import RouterStatus, read_status
 from openwrtgui.simulator import SimConnector, seed_routers
@@ -38,6 +39,7 @@ class Clock:
 @dataclass
 class NetEnv:
     service: NetworkService
+    ports: PortsService
     wifi: WifiService
     connector: SimConnector
     routers: RouterStore
@@ -45,6 +47,7 @@ class NetEnv:
     audit: AuditLog
     pool: ConnectionPool
     statuses: dict[str, RouterStatus]
+    descriptions: dict[str, SelfDescription]
     processes: list[ProcessInfo] = field(default_factory=list)
 
     def go_live(self) -> None:
@@ -113,6 +116,17 @@ async def build(tmp_path: Path) -> NetEnv:
         wifi=wifi,
         sleep=clock.sleep,
     )
-    env = NetEnv(service, wifi, connector, routers, guard, audit, pool, statuses, processes)
+    ports = PortsService(
+        pool=pool,
+        routers=routers,
+        guard=guard,
+        audit=audit,
+        descriptions=descriptions,
+        runner=runner,
+        sleep=clock.sleep,
+    )
+    env = NetEnv(
+        service, ports, wifi, connector, routers, guard, audit, pool, statuses, descriptions, processes
+    )
     statuses["ap1"] = await read_status(await env.sim("ap1"))
     return env
