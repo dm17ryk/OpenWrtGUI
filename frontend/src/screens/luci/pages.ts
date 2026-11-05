@@ -17,6 +17,7 @@ export function nativeScreen(native: string, routerId: string): { label: string;
   if (native === 'wifi') return { label: 'Wi-Fi', to: `/routers/${routerId}/wifi` }
   if (native === 'dashboard') return { label: 'Dashboard', to: '/' }
   if (native === 'network') return { label: 'Network & DHCP', to: `/routers/${routerId}/network` }
+  if (native === 'ports') return { label: 'Ports & VLANs', to: `/routers/${routerId}/ports` }
   return null
 }
 

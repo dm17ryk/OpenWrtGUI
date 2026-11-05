@@ -49,6 +49,13 @@ export const HELP = {
   netAccess: 'Network-and-DHCP#wi-fi-access-by-mac',
   netDns: 'Network-and-DHCP#dns',
   netRoutes: 'Network-and-DHCP#static-routes-and-rules',
+  // Ports, VLANs, mirroring
+  ports: 'Ports-and-VLANs',
+  portsPanel: 'Ports-and-VLANs#front-panel',
+  portsOwn: 'Ports-and-VLANs#this-apps-port',
+  portsVlans: 'Ports-and-VLANs#vlans',
+  portsMirror: 'Ports-and-VLANs#switch-port-mirror',
+  portsWifiMirror: 'Ports-and-VLANs#wi-fi-mirror',
   // LuCI pages
   luci: 'LuCI-pages',
   luciWhich: 'LuCI-pages#which-pages-open-here',
