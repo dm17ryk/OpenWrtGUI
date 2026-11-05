@@ -1760,6 +1760,8 @@ export interface components {
             ipv4: components["schemas"]["Address"][];
             /** Ipv6 */
             ipv6: string[];
+            /** L3 Device */
+            l3_device?: string | null;
             /** Name */
             name: string;
             /** Parent */
@@ -2214,7 +2216,7 @@ export interface components {
              * Own Reason
              * @enum {string}
              */
-            own_reason: "arl" | "only-link" | "candidates" | "none";
+            own_reason: "arl" | "only-link" | "candidates" | "unplaced" | "none";
             /** Port Count */
             port_count: number;
             /** Ports */

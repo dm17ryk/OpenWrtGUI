@@ -58,6 +58,11 @@ def enable_commands(state: PortsState, port: int, on: bool, router_name: str) ->
         raise ValueError(
             f"{view.label} carries this app's SSH to {router_name}; turning it off cuts the app off."
         )
+    if not on and view.lock and state.own_reason == "unplaced":
+        raise ValueError(
+            f"{view.label} may carry this app's SSH to {router_name}: the app cannot tell which socket "
+            "its connection uses, so every socket with a link stays on."
+        )
     if not on and view.lock:
         linked = sum(1 for p in state.ports if p.lock)
         raise ValueError(

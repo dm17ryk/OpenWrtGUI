@@ -26,7 +26,9 @@ from openwrtgui.store.routers import RouterRecord
 from openwrtgui.transport.base import Transport
 
 Cell = Literal["u", "t"]
-OwnReason = Literal["arl", "only-link", "candidates", "none"]
+# arl: the switch's address table names the PC's port; only-link / candidates: the linked ports of the VLAN
+# that carries the app's interface; unplaced: neither (fail closed: every linked port may carry the SSH)
+OwnReason = Literal["arl", "only-link", "candidates", "unplaced", "none"]
 OWN = "carries this app's SSH"
 MAYBE_OWN = "may carry this app's SSH"
 
@@ -113,8 +115,10 @@ async def read_wifi_mirror(t: Transport) -> WifiMirror:
 
 def _used_by(device: str, net: NetworkState) -> tuple[str, ...]:
     bridges = {d.name for d in net.devices if device in d.ports}
-    return tuple(
-        v.conf.name for v in net.interfaces if v.conf is not None and v.conf.device in ({device} | bridges)
+    return tuple(  # a legacy `option ifname 'eth0.1 eth1'` lists several devices
+        v.conf.name
+        for v in net.interfaces
+        if v.conf is not None and set((v.conf.device or "").split()) & ({device} | bridges)
     )
 
 
@@ -146,18 +150,16 @@ async def read_ports(
     by_num = {p.num: p for p in live.ports}
     own_ports: set[int] = set()
     reason: OwnReason = "none"
+    is_linked = {p.num for p in external if by_num.get(p.num) is not None and by_num[p.num].link}
+    own_vlans = [v for v in vlans if net.own_interface and net.own_interface in v.used_by]
     if pc_mac and arl.get(pc_mac) in {p.num for p in external}:
         own_ports, reason = {arl[pc_mac]}, "arl"
-    elif net.own_interface:
-        own_vlans = [v for v in vlans if net.own_interface in v.used_by]
-        linked = {
-            p.num
-            for p in external
-            for v in own_vlans
-            if p.num in v.members and by_num.get(p.num) is not None and by_num[p.num].link
-        }
+    elif own_vlans:
+        linked = {n for n in is_linked for v in own_vlans if n in v.members}
         if linked:
             own_ports, reason = linked, "only-link" if len(linked) == 1 else "candidates"
+    elif is_linked:  # the app cannot place its own path on this switch: no linked socket goes off
+        own_ports, reason = is_linked, "unplaced"
     lock = OWN if reason in ("arl", "only-link") else MAYBE_OWN
     ports = []
     for p in external:

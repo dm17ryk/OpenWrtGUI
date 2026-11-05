@@ -17,7 +17,9 @@ reboot or network reload, when the socket comes back on. **Enable all ports** tu
 The socket this app's SSH comes in on cannot be turned off, so it shows **carries this app's SSH** instead of a
 switch. The app finds it in the switch's address table (the entry for this PC's MAC address), or, if the switch
 has no such table, it is the only socket with a link in the VLAN that carries the app's interface. When several
-sockets have a link there, each shows **may carry this app's SSH**, and all of them stay on.
+sockets have a link there, each shows **may carry this app's SSH**, and all of them stay on. When the app cannot
+tell at all how its connection reaches the switch, every socket with a link shows **may carry this app's SSH**
+and stays on.
 
 ## VLANs
 

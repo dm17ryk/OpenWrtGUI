@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 
 import pytest
 from netenv import NetEnv
 
-from openwrtgui.ports.compile import MirrorRequest, VlanRequest
+from openwrtgui.net.state import NetworkState, read_network
+from openwrtgui.ports.compile import MirrorRequest, VlanRequest, enable_commands
+from openwrtgui.ports.state import PortsState, read_ports
 from openwrtgui.simnet import PC_MAC, SimNetwork
 
 P = "uci -P /var/run/rpcd/uci-<session>"
@@ -64,6 +67,40 @@ async def test_candidates_locked_when_own_port_ambiguous(net: NetEnv) -> None:
     await net.ports.apply_ports("ap2", 1, False)
     plan = await net.ports.plan_ports("ap2", None, None, all_on=True)
     assert plan.lines == ("swconfig dev switch0 port 1 set enable 1",)
+
+
+async def _ports_with(net: NetEnv, change: Callable[[NetworkState], NetworkState]) -> PortsState:
+    """The Ports state as read_ports makes it from a network state changed by `change`."""
+    await net.ports.state("ap2")  # creates the simulated router and its description
+    rec = net.rec("ap2")
+    t = await net.pool.get(rec)
+    desc = net.descriptions[rec.id]
+    state, uci = await read_network(t, rec.id, desc)
+    return await read_ports(t, rec, desc, change(state), uci)
+
+
+async def test_own_path_not_placed_locks_every_linked_port(net: NetEnv) -> None:
+    """Fail closed: when the app cannot tell how its SSH reaches the switch, no linked socket goes off."""
+    state = await _ports_with(net, lambda s: replace(s, own_interface=None))
+    assert state.own_reason == "unplaced"
+    assert {p.label: p.lock for p in state.ports if p.lock} == {"LAN1": "may carry this app's SSH"}
+    assert not any(p.own for p in state.ports)
+    refusal = "LAN1 may carry this app's SSH to AP2 · office: the app cannot tell"
+    with pytest.raises(ValueError, match=refusal):
+        enable_commands(state, 3, False, "AP2 · office")
+    assert enable_commands(state, 2, False, "AP2 · office") == ["swconfig dev switch0 port 2 set enable 0"]
+
+
+async def test_legacy_ifname_list_places_the_own_vlan(net: NetEnv) -> None:
+    def legacy(s: NetworkState) -> NetworkState:  # lan on `option ifname 'eth0.1 eth1'`, no bridge device
+        lan = next(v for v in s.interfaces if v.conf is not None and v.conf.name == "lan")
+        assert lan.conf is not None
+        moved = replace(lan, conf=replace(lan.conf, device="eth0.1 eth1"))
+        return replace(s, devices=(), interfaces=tuple(moved if v is lan else v for v in s.interfaces))
+
+    state = await _ports_with(net, legacy)
+    assert state.own_reason == "only-link"
+    assert [p.label for p in state.ports if p.own] == ["LAN1"]
 
 
 async def test_arl_wins(net: NetEnv) -> None:
