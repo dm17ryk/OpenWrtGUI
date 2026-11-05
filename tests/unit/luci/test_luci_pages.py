@@ -95,6 +95,7 @@ def test_page_views_mark_native() -> None:
     for path in ("network", "dhcp", "dns", "routes"):
         assert views[f"admin/network/{path}"].native == "network"
     assert views["admin/status/routes"].native == "network"
+    assert views["admin/status/routesj"].native == "network"  # LuCI shows this or routes, by dependencies
     assert views["admin/network/switch"].native == "ports"
     assert views["admin/network/firewall/zones"].native is None
 

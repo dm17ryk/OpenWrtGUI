@@ -17,6 +17,7 @@ NATIVE: dict[str, str] = {
     "admin/network/dns": "network",
     "admin/network/routes": "network",
     "admin/status/routes": "network",
+    "admin/status/routesj": "network",  # the JSON variant; LuCI shows one of the two
     "admin/network/switch": "ports",
 }
 
