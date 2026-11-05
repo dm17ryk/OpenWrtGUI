@@ -1,4 +1,4 @@
-import type { InterfaceView, Lease, LiveTables, NetApplyResult, NetPlan, NetworkState, OptionRow } from '../api/types'
+import type { AccessState, InterfaceView, Lease, LiveTables, NetApplyResult, NetPlan, NetworkState, OptionRow } from '../api/types'
 
 function live(name: string, up: boolean, proto: string, device: string | null, ipv4: { ip: string; prefix: number }[] = []) {
   return { name, up, proto, device, ipv4, ipv6: [], dynamic: false, parent: null, uptime_s: up ? 1786039 : null, errors: [] }
@@ -130,6 +130,20 @@ export const ROUTE_PLAN = plan(
   ["ubus call session create '{\"timeout\":300}'", 'set -e', `uci -P ${SESSION} set network.$r1.target='10.8.0.0/24'`],
   ['Applies with a 60 s rollback: if the app cannot reach AP2 · office at 192.168.1.2 again and confirm, the router restores its previous network settings by itself.'],
   true,
+)
+
+/** Two SSIDs (made up): one on air for everyone, one parked that blocks a listed device. */
+export const ACCESS: AccessState = {
+  ssids: [
+    { section: 'default_radio0', ssid: 'lab-open', radio: 'radio0', ifname: 'wlan0', policy: 'everyone', maclist: [], runtime: [] },
+    { section: 'wifinet1', ssid: 'lab-iot', radio: 'radio0', ifname: null, policy: 'deny', maclist: ['e4:5f:01:aa:bb:01'], runtime: [] },
+  ],
+  devices: [{ mac: 'e4:5f:01:aa:bb:01', name: 'sta-1', saved_in: ['wifinet1'], blocked_now_on: [] }],
+}
+
+export const SAVED_BLOCK_PLAN = plan(
+  ['set -e', "uci set wireless.default_radio0.macfilter='deny'", "uci add_list wireless.default_radio0.maclist='e4:5f:01:aa:bb:01'", 'uci commit wireless', 'wifi reload radio0'],
+  ['lab-open changes from Everyone to Block listed.'],
 )
 
 export const LAN_OPTIONS: OptionRow[] = [

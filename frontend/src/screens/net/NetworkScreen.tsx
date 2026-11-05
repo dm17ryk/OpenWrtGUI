@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import { useParams } from 'react-router'
+import { useEffect, useState } from 'react'
+import { useLocation, useParams } from 'react-router'
 import { ApiError, apiFetch } from '../../api/client'
 import type { NetworkState, RouterDetail } from '../../api/types'
 import { Help } from '../../help/Help'
@@ -12,6 +12,7 @@ import { FixedHosts, type HostRow } from './FixedHosts'
 import { Interfaces } from './Interfaces'
 import { Leases } from './Leases'
 import { RoutesCard } from './RoutesCard'
+import { WifiAccess } from './WifiAccess'
 
 /** Network and DHCP (spec 7.4): router addresses, DHCP, fixed addresses, Wi-Fi access, leases, DNS, routes. */
 export function NetworkScreen() {
@@ -31,6 +32,11 @@ export function NetworkScreen() {
     void client.invalidateQueries({ queryKey: ['net-routes-live', id] })
   }
   const cards = { routerId: id, routerName: name, onApplied: refresh }
+  // A link like the Wi-Fi screen's "…#wifi-access" opens at its card once the cards are there.
+  const { hash } = useLocation()
+  useEffect(() => {
+    if (net.isSuccess && hash) document.getElementById(hash.slice(1))?.scrollIntoView?.()
+  }, [hash, net.isSuccess])
   return (
     <main className="wrap">
       <div className="row" style={{ alignItems: 'flex-end' }}>
@@ -52,6 +58,7 @@ export function NetworkScreen() {
           <Interfaces {...cards} host={host} state={net.data} />
           <DhcpCard {...cards} state={net.data} />
           <FixedHosts {...cards} state={net.data} added={newHosts} onAdded={setNewHosts} />
+          <WifiAccess {...cards} />
           <Leases routerId={id} state={net.data} onMakeFixed={(row) => setNewHosts([...newHosts, row])} />
           <DnsCard {...cards} state={net.data} />
           <RoutesCard {...cards} state={net.data} />
