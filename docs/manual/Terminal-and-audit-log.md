@@ -35,7 +35,8 @@ write, and every line typed in the terminal. The dashboard's routine 5-second re
 
 Filter by **Router**, by **Text**, and by **Since** (a date).
 
-**Export for a bug report** saves `openwrtgui-audit.zip` with the audit files. Attach it to a
+**Export for a bug report** saves `openwrtgui-audit.zip` with one file per day, holding what this page
+shows: every secret masked, including in entries an older version wrote. Attach it to a
 [bug report](https://github.com/dm17ryk/OpenWrtGUI/issues/new/choose). Check it first if your router
 names or addresses are private.
 

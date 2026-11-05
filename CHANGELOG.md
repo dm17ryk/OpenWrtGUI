@@ -30,6 +30,8 @@ Wi-Fi and the LuCI fallback.
 
 - More secrets are hidden in previews, the audit log and the LuCI change list: WEP keys, Wi-Fi backhaul
   keys, RADIUS and DAE secrets, private key passwords, WPS and AP PINs, 802.11r keys and WireGuard keys.
+- Audit entries written by an earlier version are masked the same way when shown and when exported; the
+  export now holds what the audit log shows, so an unreadable line is left out instead of copied.
 
 ## [0.1.0] - 2026-11-04
 

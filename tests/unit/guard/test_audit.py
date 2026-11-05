@@ -116,6 +116,39 @@ def test_corrupt_line_is_skipped(tmp_path: Path) -> None:
     assert [e.command for e in log.query()] == ["ok"]
 
 
+def _old_line(command: str) -> str:
+    """An entry as 0.1.0 wrote it: `key1` and `wps_pin` were not on its secret list yet."""
+    entry = {
+        "ts": "2026-11-04T12:00:00+02:00",
+        "router": "ap2",
+        "screen": "Terminal",
+        "command": command,
+        "exit_status": 0,
+        "verify": None,
+        "source": "terminal",
+    }
+    return json.dumps(entry, ensure_ascii=False) + "\n"
+
+
+OLD_COMMAND = "uci set wireless.wep.key1='s:wep-secret'; uci set wireless.ap.wps_pin='12345670'"
+
+
+def test_entries_from_an_older_version_are_masked_when_shown(tmp_path: Path) -> None:
+    (tmp_path / "2026-11-04.jsonl").write_text(_old_line(OLD_COMMAND), encoding="utf-8")
+    [entry] = AuditLog(tmp_path).query()
+    assert entry.command == "uci set wireless.wep.key1='<hidden>'; uci set wireless.ap.wps_pin='<hidden>'"
+
+
+def test_entries_from_an_older_version_are_masked_in_the_export(tmp_path: Path) -> None:
+    (tmp_path / "2026-11-04.jsonl").write_text(
+        _old_line(OLD_COMMAND) + "{not json key1='s:wep-secret'\n", encoding="utf-8"
+    )
+    with zipfile.ZipFile(AuditLog(tmp_path).export_zip(tmp_path / "export.zip")) as z:
+        text = z.read("2026-11-04.jsonl").decode("utf-8")
+    assert "wep-secret" not in text and "12345670" not in text
+    assert json.loads(text.splitlines()[0])["command"].endswith("wps_pin='<hidden>'")
+
+
 def test_since_filter_and_export(tmp_path: Path) -> None:
     log = AuditLog(tmp_path)
     log.record(router="ap2", screen="Terminal", command="uname", exit_status=0, source="terminal")
