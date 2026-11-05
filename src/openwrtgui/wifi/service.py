@@ -14,7 +14,7 @@ from openwrtgui.guard.writes import run_audited
 from openwrtgui.probe.describe import SelfDescription, describe_router
 from openwrtgui.probe.status import RouterStatus, ssids_on_air
 from openwrtgui.store.routers import RouterRecord, RouterStore
-from openwrtgui.transport.base import Transport, TransportError, ubus_call
+from openwrtgui.transport.base import CommandResult, Transport, TransportError, ubus_call
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.wifi.compile import (
     UciOp,
@@ -31,11 +31,13 @@ from openwrtgui.wifi.compile import (
 from openwrtgui.wifi.model import CCK_BASIC_KBPS, OFDM_BASIC_KBPS, ModeSelection, RadioRequest
 from openwrtgui.wifi.parse import parse_beacon_rates, parse_iw_dev, parse_iw_dev_info
 from openwrtgui.wifi.state import RadioState, WifiState, modes_from_uci, read_uci, read_wifi
+from openwrtgui.wifi.stations import Station, del_client_command, read_stations
 
 SCREEN = "Wi-Fi"
 NOTHING = "Nothing to apply: the router already has these settings."
 MONITOR = "owgmon0"
 SCRIPT_TIMEOUT_S = 60.0
+BLOCK_MIN_S, BLOCK_MAX_S = 10, 3600
 CheckName = Literal["radio", "channel", "width", "TX power", "TX mask", "beacon rate"]
 CHECKS: tuple[CheckName, ...] = ("radio", "channel", "width", "TX power", "TX mask", "beacon rate")
 
@@ -179,6 +181,38 @@ class WifiService:
 
     async def state(self, router_id: str) -> WifiState:
         return (await self._read(router_id))[2]
+
+    # ---------------------------------------------------------------- stations
+    async def stations(self, router_id: str) -> list[Station]:
+        _rec, t = await self._connect(router_id)
+        status = await ubus_call(t, "network.wireless", "status") or {}
+        ifaces = [
+            (str(i["ifname"]), str(i.get("config", {}).get("ssid", "")))
+            for radio in status.values()
+            if radio.get("up")
+            for i in radio.get("interfaces", [])
+            if i.get("ifname")
+        ]
+        return await read_stations(t, ifaces)
+
+    async def _station_action(self, router_id: str, mac: str, ban_ms: int) -> CommandResult:
+        rec, t = await self._connect(router_id)
+        station = next((s for s in await self.stations(router_id) if s.mac == mac.lower()), None)
+        if station is None:
+            raise ValueError(f"{mac.lower()} is not connected to {rec.name}")
+        async with self._pool.write_lock(rec.id):
+            result: CommandResult = await self._run(
+                t, rec, del_client_command(station.ifname, station.mac, ban_ms)
+            )
+        return result
+
+    async def deauth(self, router_id: str, mac: str) -> CommandResult:
+        return await self._station_action(router_id, mac, 0)
+
+    async def block(self, router_id: str, mac: str, seconds: int) -> CommandResult:
+        if not BLOCK_MIN_S <= seconds <= BLOCK_MAX_S:
+            raise ValueError(f"Block for {BLOCK_MIN_S} to {BLOCK_MAX_S} seconds")
+        return await self._station_action(router_id, mac, seconds * 1000)
 
     # ---------------------------------------------------------------- planning
     def _radio(self, state: WifiState, rec: RouterRecord, name: str) -> RadioState:
