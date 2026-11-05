@@ -62,6 +62,15 @@ class HostKeyStore:
         kept.append(f"{pattern} {info.public}")
         write_atomic(self.path, "\n".join(kept) + "\n")
 
+    def carry(self, old_host: str, new_host: str, port: int, actual: HostKeyInfo) -> bool:
+        """Pin `actual` for `new_host` only when it is the key pinned for `old_host`: the same router at a
+        new address. Any other key is not trusted here."""
+        pinned = self.get(old_host, port)
+        if pinned is None or pinned != actual.fingerprint:
+            return False
+        self.pin(new_host, port, actual)
+        return True
+
     def forget(self, host: str, port: int) -> None:
         pattern = _host_pattern(host, port)
         kept = [ln for ln in self._lines() if ln.partition(" ")[0] != pattern]
