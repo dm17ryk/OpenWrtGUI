@@ -105,6 +105,15 @@ test('closing ends the session once and shows what changed', async () => {
   expect(closes()).toHaveLength(1)
 })
 
+test('closing with no changes says nothing changed', async () => {
+  const user = userEvent.setup()
+  renderLuci()
+  await screen.findByTitle('LuCI page DHCP')
+  await user.click(screen.getByRole('button', { name: 'Close and end session' }))
+  expect(await screen.findByText('Nothing changed.')).toBeInTheDocument()
+  expect(screen.queryByText(/Press Save & Apply/)).not.toBeInTheDocument()
+})
+
 test('leaving the page without closing ends the session', async () => {
   const view = renderLuci()
   await screen.findByTitle('LuCI page DHCP')

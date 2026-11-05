@@ -7,6 +7,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Wi-Fi and the LuCI fallback.
+
+### Added
+
+- Wi-Fi screen per radio: modes and rates on air (802.11b, g, n 20/40 MHz, or Auto), channels (one, a list,
+  all, or none to park the radio), TX power, SSIDs with security. Every change shows its commands first;
+  after Apply the app checks on air that the radio is up and that channel, width, TX power, the TX rate mask
+  and the rate of real beacons are what was asked for.
+- Stations list with disconnect and block; every radio and SSID option the router validates, editable with
+  the same preview.
+- RF live: radio and per-station RX/TX figures once a second, signal and data-rate charts over one minute to
+  one hour, and CSV recording to `Documents\OpenWrtGUI\`.
+- LuCI pages: a page from the router's LuCI menu that has no screen here opens inside the app over an SSH
+  tunnel, logged in with a session that may touch only that page's settings (read-only during a harness
+  run). The app lists every option changed through LuCI and records the page in the audit log.
+- Router overview lists every LuCI page and where it lives in the app.
+
 ## [0.1.0] - 2026-11-04
 
 The foundation: install, update, add routers, see them, and stay out of a running test's way.

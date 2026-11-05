@@ -4,7 +4,7 @@ Some things a router can do have no screen in OpenWrtGUI yet. For those, the app
 LuCI page inside its window, already logged in, so you never type the router's password. The app's look does
 not apply inside the page: it is LuCI as the router serves it.
 
-![LuCI page](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/luci.png)
+![LuCI page](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/luci-page.png)
 
 ## Which pages open here
 

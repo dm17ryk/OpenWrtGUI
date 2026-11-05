@@ -198,7 +198,10 @@ def build_context(
         hub=hub,
         poller=poller,
         wifi=wifi,
-        rf=RfHub(pool=pool, routers=routers),
+        # the simulator never writes into the user's Documents
+        rf=RfHub(
+            pool=pool, routers=routers, recordings=data.root / "recordings" if simulator is not None else None
+        ),
         luci=luci,
         token=token,
         port=port,

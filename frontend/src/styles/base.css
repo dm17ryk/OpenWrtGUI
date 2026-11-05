@@ -379,6 +379,7 @@ h2 {
 /* tables, code, notes */
 .scroll-x {
   overflow-x: auto;
+  position: relative; /* clips .sr-only headers too; else they widen the page past a phone screen */
 }
 .tbl {
   width: 100%;

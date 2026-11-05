@@ -24,7 +24,10 @@ function closeQuietly(routerId: string, bridgeId: string): void {
   postJson(`/api/routers/${routerId}/luci/bridges/${bridgeId}/close`).catch(() => undefined)
 }
 
-function ChangesCard({ changes }: { changes: UciChange[] }) {
+function ChangesCard({ changes, isEnded }: { changes: UciChange[]; isEnded: boolean }) {
+  const none = isEnded
+    ? 'Nothing changed.'
+    : 'Nothing yet. Press Save & Apply in the page above to see how a change shows up here.'
   return (
     <section className="card stack" aria-labelledby="luci-changes-h">
       <div className="row" style={{ alignItems: 'baseline' }}>
@@ -35,7 +38,7 @@ function ChangesCard({ changes }: { changes: UciChange[] }) {
         <span className="muted">the app compares the config before and after; it cannot preview LuCI's changes</span>
       </div>
       {changes.length === 0 ? (
-        <div className="muted">Nothing yet. Press Save &amp; Apply in the page above to see how a change shows up here.</div>
+        <div className="muted">{none}</div>
       ) : (
         <div className="scroll-x">
           <table className="tbl">
@@ -175,7 +178,7 @@ function LuciBridge({ routerId, path }: { routerId: string; path: string }) {
           The LuCI session on {short} is closed. Open the page again from the router's sections to make more changes.
         </div>
       )}
-      {view && <ChangesCard changes={final ?? changes.data ?? []} />}
+      {view && <ChangesCard changes={final ?? changes.data ?? []} isEnded={ended} />}
     </main>
   )
 }

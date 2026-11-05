@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -16,10 +15,8 @@ def _client(ctx: AppContext) -> TestClient:
     return TestClient(create_app(ctx), base_url=BASE)
 
 
-def test_rf_ws_streams_samples_and_records(
-    ctx: AppContext, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr("openwrtgui.rf.sampler.documents_dir", lambda: tmp_path)
+def test_rf_ws_streams_samples_and_records(ctx: AppContext) -> None:
+    # the simulator records under its own data folder, never the user's Documents
     with _client(ctx).websocket_connect(f"{WS}/ws/rf/ap1?radio=radio0&t={TOKEN}") as ws:
         first: dict[str, Any] = ws.receive_json()
         assert first["type"] == "rf" and first["sample"]["radio_sample"]["channel"] == 1
@@ -28,7 +25,7 @@ def test_rf_ws_streams_samples_and_records(
         msg = ws.receive_json()
         while msg["type"] != "recording":
             msg = ws.receive_json()
-        assert msg["path"].startswith(str(tmp_path / "OpenWrtGUI"))
+        assert msg["path"].startswith(str(ctx.data.root / "recordings"))
         ws.send_json({"type": "rates", "mac": "f4:12:fa:f3:57:68"})
         msg = ws.receive_json()
         while msg["type"] != "rates":

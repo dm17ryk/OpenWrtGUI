@@ -40,11 +40,13 @@ class RfSampler:
         clock: Callable[[], datetime] = datetime.now,
         sleep: Callable[[float], Awaitable[Any]] = asyncio.sleep,
         interval_s: float = 1.0,
+        recordings: Path | None = None,
     ) -> None:
         self.router_id = router_id
         self.radio = radio
         self._pool = pool
         self._routers = routers
+        self._recordings = recordings
         self._clock = clock
         self._sleep = sleep
         self._interval_s = interval_s
@@ -151,7 +153,8 @@ class RfSampler:
     def start_recording(self) -> Path:
         self.stop_recording()
         stamp = self._clock().strftime("%Y%m%d-%H%M%S")
-        path = documents_dir() / "OpenWrtGUI" / f"rf-{self.router_id}-{self.radio}-{stamp}.csv"
+        folder = self._recordings or documents_dir() / "OpenWrtGUI"
+        path = folder / f"rf-{self.router_id}-{self.radio}-{stamp}.csv"
         self._recorder = CsvRecorder(path)
         return path
 
@@ -170,15 +173,18 @@ class RfSampler:
 class RfHub:
     """One sampler per router radio, shared by every client watching it."""
 
-    def __init__(self, *, pool: ConnectionPool, routers: RouterStore) -> None:
+    def __init__(self, *, pool: ConnectionPool, routers: RouterStore, recordings: Path | None = None) -> None:
         self._pool = pool
         self._routers = routers
+        self._recordings = recordings  # None: Documents\OpenWrtGUI
         self._samplers: dict[tuple[str, str], RfSampler] = {}
 
     def sampler(self, router_id: str, radio: str) -> RfSampler:
         key = (router_id, radio)
         if key not in self._samplers:
-            self._samplers[key] = RfSampler(router_id, radio, pool=self._pool, routers=self._routers)
+            self._samplers[key] = RfSampler(
+                router_id, radio, pool=self._pool, routers=self._routers, recordings=self._recordings
+            )
         return self._samplers[key]
 
     def close_all(self) -> None:

@@ -145,6 +145,16 @@ async def test_recording_writes_to_documents(tmp_path: Path, monkeypatch: pytest
     assert len(path.read_text(encoding="utf-8").splitlines()) == 3
 
 
+def test_recording_goes_to_the_given_folder(tmp_path: Path) -> None:
+    routers = RouterStore(tmp_path / "routers.json")
+    sampler = RfSampler(
+        "ap1", "radio0", pool=ConnectionPool(None), routers=routers, recordings=tmp_path / "rec"
+    )  # type: ignore[arg-type]
+    path = sampler.start_recording()
+    sampler.stop_recording()
+    assert path.parent == tmp_path / "rec" and path.exists()
+
+
 def test_documents_dir_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(paths, "_windows_documents", lambda: None)
     assert paths.documents_dir() == Path.home() / "Documents"
