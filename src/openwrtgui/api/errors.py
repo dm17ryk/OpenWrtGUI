@@ -10,6 +10,7 @@ from openwrtgui.api.models import GuardOut
 from openwrtgui.guard.bench_guard import GuardLocked
 from openwrtgui.transport.base import AuthFailed, HostKeyChanged, HostKeyUnknown, TransportError, Unreachable
 from openwrtgui.update.service import UpdateFailed, UpdateInProgress
+from openwrtgui.wifi.service import PreviewChanged
 
 ROUTER_REFUSED = "The router refused the login."
 
@@ -54,6 +55,10 @@ def install(app: FastAPI) -> None:
 
     @app.exception_handler(UpdateInProgress)
     async def update_in_progress(request: Request, exc: UpdateInProgress) -> JSONResponse:
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    @app.exception_handler(PreviewChanged)
+    async def preview_changed(request: Request, exc: PreviewChanged) -> JSONResponse:
         return JSONResponse(status_code=409, content={"detail": str(exc)})
 
     @app.exception_handler(ValueError)

@@ -51,6 +51,21 @@ async def test_fetch_and_pin_then_password_login(ssh_server: SshServer, tmp_path
         await t.close()
 
 
+async def test_a_timeout_says_so(ssh_server: SshServer, tmp_path: Path) -> None:
+    t = await SshTransport.connect(
+        "127.0.0.1",
+        ssh_server.port,
+        "root",
+        host_keys=await _pinned(ssh_server, tmp_path),
+        password=TEST_PASSWORD,
+    )
+    try:
+        with pytest.raises(Unreachable, match=r"^127\.0\.0\.1: no answer within 0\.3 s$"):
+            await t.run("cat", timeout=0.3)  # waits for input that never comes
+    finally:
+        await t.close()
+
+
 async def test_unpinned_host_is_refused(ssh_server: SshServer, tmp_path: Path) -> None:
     with pytest.raises(HostKeyUnknown) as exc:
         await SshTransport.connect(

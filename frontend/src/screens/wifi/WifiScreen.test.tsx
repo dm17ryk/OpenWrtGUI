@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, expect, test, vi } from 'vitest'
@@ -9,6 +9,7 @@ import { AP2_RADIO, AP2_WIFI, N20_CH6_PLAN, OPTIONS, PANEL, PROVEN } from '../..
 import { WifiScreen } from './WifiScreen'
 
 const calls: Array<{ path: string; body: unknown }> = []
+const OPTIONS_PLAN = { ...N20_CH6_PLAN, lines: ['set -e', "uci set wireless.radio0.beacon_int='200'"], digest: 'a1b2c3d4e5f60718' }
 let wifi: WifiState = AP2_WIFI
 let applyFails = false
 
@@ -22,6 +23,8 @@ vi.mock('../../api/client', async (orig) => {
     if (path.startsWith('/api/routers/ap2/wifi/options?')) return OPTIONS
     if (path === '/api/routers/ap2/luci/pages') return []
     if (path === '/api/routers/ap2/wifi/preview') return N20_CH6_PLAN
+    if (path === '/api/routers/ap2/wifi/options/preview') return OPTIONS_PLAN
+    if (path === '/api/routers/ap2/wifi/options/apply') return PROVEN
     if (path === '/api/routers/ap2/wifi/apply') {
       if (applyFails) throw new actual.ApiError(423, 'dima_night.py started 21:04 (PID 18244)', {})
       return PROVEN
@@ -90,6 +93,21 @@ test('Apply shows what was proven on air', async () => {
   await user.click(screen.getByRole('button', { name: 'Apply to AP2' }))
   expect(await screen.findByText('Applied and proven on air')).toBeInTheDocument()
   expect(screen.getByRole('status', { name: 'Apply result' })).toHaveTextContent('6.0 Mb/s ×5')
+  // Apply names the preview it confirms, so the app refuses if the router changed meanwhile
+  expect(calls.find((c) => c.path.endsWith('/wifi/apply'))?.body).toMatchObject({ digest: N20_CH6_PLAN.digest })
+})
+
+test('All options Apply names its preview too', async () => {
+  const user = userEvent.setup()
+  renderWifi()
+  await user.click(await screen.findByRole('button', { name: 'Show all options' }))
+  await user.click(within(await screen.findByRole('group', { name: 'Show' })).getByRole('button', { name: 'All' }))
+  await user.type(await screen.findByRole('textbox', { name: 'beacon_int' }), '200')
+  expect(await screen.findByText("uci set wireless.radio0.beacon_int='200'", { exact: false })).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Apply options' }))
+  await waitFor(() =>
+    expect(calls.find((c) => c.path.endsWith('/options/apply'))?.body).toMatchObject({ digest: OPTIONS_PLAN.digest }),
+  )
 })
 
 test('a harness run refuses Apply with its reason', async () => {

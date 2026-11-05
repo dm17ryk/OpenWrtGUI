@@ -61,6 +61,33 @@ def test_acl_groups_merge_across_files() -> None:
     assert ACL["luci-mod-network-config"]["write"]["ubus"]["hostapd.*"] == ["del_client"]
 
 
+def test_a_group_defined_in_two_files_keeps_both_parts() -> None:
+    # AP2: `unauthenticated` is in luci-base.json (luci getFeatures) and unauthenticated.json (session login)
+    ubus = ACL["unauthenticated"]["read"]["ubus"]
+    assert "getFeatures" in ubus["luci"] and "login" in ubus["session"]
+    dhcp = next(p for p in parse_menu(MENUS) if p.path == "admin/network/dhcp")
+    grants = " ".join(grant_commands("s1", page_groups(dhcp, ACL), ACL, "read"))
+    assert '["luci","getFeatures"]' in grants
+
+
+def test_merge_unions_lists_and_methods() -> None:
+    merged = parse_acl(
+        {
+            "a": {"g": {"read": {"ubus": {"x": ["m1"]}, "uci": ["one"]}}},
+            "b": {
+                "g": {
+                    "read": {"ubus": {"x": ["m2", "m1"], "y": ["n"]}, "uci": ["two"]},
+                    "write": {"uci": ["one"]},
+                }
+            },
+        }
+    )
+    assert merged["g"] == {
+        "read": {"ubus": {"x": ["m1", "m2"], "y": ["n"]}, "uci": ["one", "two"]},
+        "write": {"uci": ["one"]},
+    }
+
+
 def test_page_views_mark_native() -> None:
     views = {v.path: v for v in page_views(parse_menu(MENUS))}
     assert views["admin/network/wireless"].native == "wifi"

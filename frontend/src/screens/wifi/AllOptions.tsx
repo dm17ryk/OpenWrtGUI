@@ -84,11 +84,11 @@ export function AllOptions({ routerId, radio, short, onApplied }: Props) {
   const error = applyError ?? preview?.error ?? null
 
   const apply = async (): Promise<void> => {
-    if (!body) return
+    if (!body || !plan) return
     setBusy(true)
     setApplyError(null)
     try {
-      setResult(await postJson<ApplyResult>(`/api/routers/${routerId}/wifi/options/apply`, body))
+      setResult(await postJson<ApplyResult>(`/api/routers/${routerId}/wifi/options/apply`, { ...body, digest: plan.digest }))
       setEdits({})
       await client.invalidateQueries({ queryKey: ['wifi-options', routerId, radio.name] })
       onApplied()

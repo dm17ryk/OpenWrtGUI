@@ -183,7 +183,13 @@ def render_uci(ops: Sequence[UciOp]) -> list[str]:
 
 
 def apply_script(radio: str, ops: Sequence[UciOp]) -> str:
-    return "\n".join([*render_uci(ops), "uci commit wireless", f"wifi down {radio}; wifi up {radio}"])
+    """The change: `set -e` stops at the first failing line, so a half-done change is never committed."""
+    return "\n".join(["set -e", *render_uci(ops), "uci commit wireless"])
+
+
+def reload_command(radio: str) -> str:
+    """Sent on its own after the commit, so a failed reload is told apart from a refused change."""
+    return f"wifi down {radio}; wifi up {radio}"
 
 
 def mask_command(ifname: str, args: str) -> str:

@@ -396,6 +396,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/luci/bridges/{bridge_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Luci Bridge
+         * @description The bridge as it is now: `access` turns to read when Bench Guard sees a run.
+         */
+        get: operations["luci_bridge_api_routers__router_id__luci_bridges__bridge_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/luci/bridges/{bridge_id}/changes": {
         parameters: {
             query?: never;
@@ -1094,6 +1114,15 @@ export interface components {
             /** Writer */
             writer: string | null;
         };
+        /** OptionsApplyIn */
+        OptionsApplyIn: {
+            /** Digest */
+            digest: string;
+            /** Edits */
+            edits: components["schemas"]["OptionEditIn"][];
+            /** Radio */
+            radio: string;
+        };
         /** OptionsIn */
         OptionsIn: {
             /** Edits */
@@ -1132,6 +1161,8 @@ export interface components {
          * @description The preview: never the script itself, which can hold a Wi-Fi key.
          */
         PlanOut: {
+            /** Digest */
+            digest: string;
             expect: components["schemas"]["Expectation"];
             /** Lines */
             lines: string[];
@@ -1146,6 +1177,21 @@ export interface components {
         Preview: {
             /** Commands */
             commands: string[];
+        };
+        /** RadioApplyIn */
+        RadioApplyIn: {
+            channels?: components["schemas"]["ChannelsIn"] | null;
+            /** Digest */
+            digest: string;
+            modes?: components["schemas"]["ModesIn"] | null;
+            /** Radio */
+            radio: string;
+            /**
+             * Ssids
+             * @default []
+             */
+            ssids: components["schemas"]["SsidIn"][];
+            txpower?: components["schemas"]["TxPowerIn"] | null;
         };
         /**
          * RadioLimits
@@ -2263,6 +2309,38 @@ export interface operations {
             };
         };
     };
+    luci_bridge_api_routers__router_id__luci_bridges__bridge_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+                bridge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BridgeView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     luci_changes_api_routers__router_id__luci_bridges__bridge_id__changes_get: {
         parameters: {
             query?: never;
@@ -2435,7 +2513,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["RadioRequestIn"];
+                "application/json": components["schemas"]["RadioApplyIn"];
             };
         };
         responses: {
@@ -2503,7 +2581,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["OptionsIn"];
+                "application/json": components["schemas"]["OptionsApplyIn"];
             };
         };
         responses: {

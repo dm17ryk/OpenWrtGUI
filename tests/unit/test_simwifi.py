@@ -6,7 +6,7 @@ from pathlib import Path
 from openwrtgui.simulator import SimConnector
 from openwrtgui.simwifi import SimWifi
 from openwrtgui.transport.fake import ReplayTransport, SimState
-from openwrtgui.wifi.compile import apply_script, compile_channels, compile_modes
+from openwrtgui.wifi.compile import apply_script, compile_channels, compile_modes, reload_command
 from openwrtgui.wifi.model import ChannelSelection, ModeSelection, RadioLimits
 from openwrtgui.wifi.parse import parse_beacon_rates, parse_iw_dev_info, parse_uci_show
 
@@ -26,8 +26,9 @@ def _ap2() -> ReplayTransport:
 
 async def _apply(t: ReplayTransport, modes: ModeSelection, channels: ChannelSelection) -> None:
     ops = compile_modes("radio0", modes, LIMITS) + compile_channels("radio0", channels, LIMITS)
-    result = await t.run(apply_script("radio0", ops), timeout=60)
-    assert result.ok, result.stderr
+    for command in (apply_script("radio0", ops), reload_command("radio0")):
+        result = await t.run(command, timeout=60)
+        assert result.ok, result.stderr
 
 
 async def test_apply_script_changes_state_and_reload_recreates_interface() -> None:

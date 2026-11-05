@@ -93,6 +93,42 @@ async def test_router_unreachable_sends_idle_and_keeps_running(tmp_path: Path) -
     assert (await sampler.tick())["type"] == "rf"
 
 
+class _NoHints(_Count):
+    async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
+        if "getHostHints" in command:
+            self._calls.append(command)
+            return CommandResult(command, "", "Command failed: Request timed out", 7)
+        return await super().run(command, timeout=timeout)
+
+
+async def test_a_failed_name_lookup_still_samples_and_is_not_retried_every_second(tmp_path: Path) -> None:
+    sampler, calls = _sampler(tmp_path, wrap=_NoHints)
+    first, second = await sampler.tick(), await sampler.tick()
+    assert first["type"] == "rf" and second["type"] == "rf"
+    assert second["sample"].stations[0].name is None
+    assert sum("getHostHints" in c for c in calls) == 1
+
+
+async def test_an_unexpected_error_is_reported_and_sampling_goes_on(tmp_path: Path) -> None:
+    sampler, _ = _sampler(tmp_path)
+    real_tick = sampler.tick
+    failed = False
+
+    async def tick_once_broken() -> dict[str, object]:
+        nonlocal failed
+        if not failed:
+            failed = True
+            raise ValueError("odd station dump line")
+        return await real_tick()  # type: ignore[return-value]
+
+    sampler.tick = tick_once_broken  # type: ignore[method-assign]
+    queue = sampler.subscribe()
+    first = await asyncio.wait_for(queue.get(), 5)
+    assert first == {"type": "rf-idle", "reason": "RF sampling failed: odd station dump line"}
+    assert (await asyncio.wait_for(queue.get(), 5))["type"] == "rf"
+    sampler.unsubscribe(queue)
+
+
 async def test_sampler_runs_only_while_subscribed(tmp_path: Path) -> None:
     sampler, calls = _sampler(tmp_path)
     await asyncio.sleep(0)

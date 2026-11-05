@@ -22,7 +22,10 @@ class _QuietServer(uvicorn.Server):
 
 async def serve(app: ASGIApp) -> tuple[int, Callable[[], Awaitable[None]]]:
     """Serve `app` on 127.0.0.1:<random>; returns the port and a coroutine function that stops it."""
-    server = _QuietServer(uvicorn.Config(app, host="127.0.0.1", port=0, log_level="warning", lifespan="off"))
+    # log_config=None: uvicorn's own logging config needs a console (the windowed exe has none) and would
+    # rewire the app's uvicorn loggers away from app.log
+    config = uvicorn.Config(app, host="127.0.0.1", port=0, log_config=None, lifespan="off")
+    server = _QuietServer(config)
     task = asyncio.create_task(server.serve())
     waited = 0.0
     while not server.started:

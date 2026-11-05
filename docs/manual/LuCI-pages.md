@@ -25,8 +25,9 @@ preview and its 60 s rollback; LuCI applies them with its own rollback.
 ## Read-only during a run
 
 While Bench Guard sees a harness run, a page opens with a read-only session: LuCI shows it but cannot save. A
-page that is open when a run starts switches to read-only within a few seconds and stays read-only until you
-close it. If the app cannot make the read-only session (the SSH link dropped), it closes the page instead.
+page that is open when a run starts switches to read-only within a few seconds: the page reloads with the new
+session and stays read-only until you close it. If the app cannot make the read-only session, or cannot end
+the writable one, it closes the page instead.
 
 ## Changed via LuCI
 

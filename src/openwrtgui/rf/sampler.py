@@ -91,7 +91,13 @@ class RfSampler:
 
     async def _loop(self) -> None:
         while True:
-            self._publish(await self.tick())
+            try:
+                msg = await self.tick()
+            except Exception as exc:  # odd router output must not freeze the screen: say so, keep sampling
+                log.exception("RF sample of %s %s failed", self.router_id, self.radio)
+                self._prev, self._where = None, None
+                msg = {"type": "rf-idle", "reason": f"RF sampling failed: {exc}"}
+            self._publish(msg)
             await self._sleep(self._interval_s)
 
     async def _locate(self, t: Any) -> tuple[str, str] | None:
@@ -108,9 +114,13 @@ class RfSampler:
     async def _refresh_names(self, t: Any, now: datetime) -> None:
         if self._names_at is not None and now - self._names_at < NAMES_EVERY:
             return
-        hints = await ubus_call(t, "luci-rpc", "getHostHints") or {}
+        self._names_at = now  # tried now, answered or not: names are optional, the sample is not
+        try:
+            hints = await ubus_call(t, "luci-rpc", "getHostHints") or {}
+        except (TransportError, ValueError) as exc:
+            log.info("no host names from %s: %s", self.router_id, exc)
+            return
         self._names = {mac.lower(): str(h["name"]) for mac, h in hints.items() if h.get("name")}
-        self._names_at = now
 
     async def tick(self) -> Message:
         """One sample (or the reason there is none). Background read: not audited."""

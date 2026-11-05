@@ -12,6 +12,7 @@ from openwrtgui.wifi.compile import (
     drop_unchanged,
     lowest_basic_mbps,
     mask_command,
+    reload_command,
     render_uci,
     shell_quote,
     tx_mask_args,
@@ -215,10 +216,7 @@ def test_add_list_is_rendered() -> None:
 
 def test_apply_script_and_mask_command() -> None:
     script = apply_script("radio0", [UciOp("set", "wireless.radio0.channel", "6")])
-    assert script.splitlines() == [
-        "uci set wireless.radio0.channel='6'",
-        "uci commit wireless",
-        "wifi down radio0; wifi up radio0",
-    ]
+    assert script.splitlines() == ["set -e", "uci set wireless.radio0.channel='6'", "uci commit wireless"]
+    assert reload_command("radio0") == "wifi down radio0; wifi up radio0"
     assert mask_command("phy0-ap0", "") == "iw dev phy0-ap0 set bitrates"
     assert mask_command("phy0-ap0", "legacy-2.4 6") == "iw dev phy0-ap0 set bitrates legacy-2.4 6"

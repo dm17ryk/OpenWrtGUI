@@ -130,6 +130,11 @@ class SimWifi:
     def _one(self, p: str) -> CommandResult | None:
         if p.startswith("echo "):
             return _ok(p[5:] + "\n")
+        if p == "set -e":  # answer() already stops at the first failing part
+            return _ok()
+        if p == "ip link del owgmon0 2>/dev/null":
+            self._monitor = False
+            return _ok()
         if p in ("uci -q show wireless", "uci show wireless", "uci show"):
             return _ok(self._show())
         if p.startswith("uci "):

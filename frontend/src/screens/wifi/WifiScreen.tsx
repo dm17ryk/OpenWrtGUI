@@ -48,11 +48,12 @@ function RadioPanel({ routerId, short, radio, result, onResult, onApplied }: Pan
   const error = applyError ?? preview?.error ?? null
 
   const apply = async (): Promise<void> => {
-    if (!req) return
+    if (!req || !plan) return
     setBusy(true)
     setApplyError(null)
     try {
-      onResult(await postJson<ApplyResult>(`/api/routers/${routerId}/wifi/apply`, req))
+      // the digest names the preview shown: the app refuses if the router changed since
+      onResult(await postJson<ApplyResult>(`/api/routers/${routerId}/wifi/apply`, { ...req, digest: plan.digest }))
       onApplied()
     } catch (err) {
       setApplyError(err instanceof ApiError ? err.detail : String(err))

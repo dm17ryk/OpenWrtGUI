@@ -63,11 +63,24 @@ def parse_menu(menus: Mapping[str, Mapping[str, Any]]) -> list[LuciPage]:
     return sorted(pages, key=lambda p: p.path)
 
 
+def _merge(into: Any, more: Any) -> Any:
+    """Dicts merge per key, lists keep every item once (first order kept); anything else: the later value."""
+    if isinstance(into, dict) and isinstance(more, dict):
+        out = dict(into)
+        for key, value in more.items():
+            out[key] = _merge(out[key], value) if key in out else value
+        return out
+    if isinstance(into, list) and isinstance(more, list):
+        return [*into, *(v for v in more if v not in into)]
+    return more
+
+
 def parse_acl(acls: Mapping[str, Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
-    """{access group: its definition} from every acl.d file."""
+    """{access group: its definition} from every acl.d file. A group defined in several files gets all of
+    them, as rpcd applies them (luci-base.json and unauthenticated.json both define `unauthenticated`)."""
     groups: dict[str, dict[str, Any]] = {}
     for definitions in acls.values():
         for name, definition in definitions.items():
             if isinstance(definition, dict):
-                groups[name] = definition
+                groups[name] = _merge(groups[name], definition) if name in groups else definition
     return groups

@@ -9,6 +9,7 @@ import { RouterSections } from '../../shell/RouterSections'
 import { useLuciPages } from './pages'
 
 const CHANGES_POLL_MS = 5000
+const BRIDGE_POLL_MS = 2000 // the app checks for a run every 2 s and then makes the session read-only
 const WRITE_TEXT =
   "This is LuCI's own page, shown inside the app, for a feature with no screen here yet. Changes made here skip the app's preview and its 60 s rollback; LuCI applies them with its own rollback. The app shows what changed below."
 const READ_TEXT =
@@ -87,6 +88,13 @@ function LuciBridge({ routerId, path }: { routerId: string; path: string }) {
     refetchInterval: CHANGES_POLL_MS,
     retry: false,
   })
+  const bridgeNow = useQuery({
+    queryKey: ['luci-bridge', view?.id],
+    queryFn: () => apiFetch<BridgeView>(`/api/routers/${routerId}/luci/bridges/${view?.id}`),
+    enabled: view !== null && final === null,
+    refetchInterval: BRIDGE_POLL_MS,
+    retry: false,
+  })
 
   useEffect(() => {
     const s: Session = { view: null, ended: false, alive: true }
@@ -130,7 +138,8 @@ function LuciBridge({ routerId, path }: { routerId: string; path: string }) {
   const short = record?.name.split(' · ')[0] ?? routerId
   const page = view?.page ?? pages.data?.find((p) => p.path === path)
   const title = page?.title ?? path
-  const readOnly = view?.access === 'read' || sawRun
+  const access = bridgeNow.data?.access ?? view?.access
+  const readOnly = access === 'read' || sawRun
   const ended = final !== null
   return (
     <main className="wrap">
@@ -165,7 +174,8 @@ function LuciBridge({ routerId, path }: { routerId: string; path: string }) {
             </span>
             <span className="b neu">session ends 5 min idle or on close</span>
           </div>
-          <iframe className="luci-frame" title={`LuCI page ${title}`} src={view.url} />
+          {/* a new session means a fresh page: LuCI keeps its session id in the loaded page */}
+          <iframe key={access} className="luci-frame" title={`LuCI page ${title}`} src={view.url} />
         </>
       )}
       {!view && !error && <div className="muted">Opening the LuCI page…</div>}

@@ -79,6 +79,10 @@ class RadioRequestIn(BaseModel):
         )
 
 
+class RadioApplyIn(RadioRequestIn):
+    digest: str  # the preview's: the router must not have changed since
+
+
 class PlanOut(BaseModel):
     """The preview: never the script itself, which can hold a Wi-Fi key."""
 
@@ -87,6 +91,7 @@ class PlanOut(BaseModel):
     lines: list[str]
     warnings: list[str]
     expect: Expectation
+    digest: str
 
     @classmethod
     def of(cls, plan: WifiPlan) -> PlanOut:
@@ -96,6 +101,7 @@ class PlanOut(BaseModel):
             lines=list(plan.lines),
             warnings=list(plan.warnings),
             expect=plan.expect,
+            digest=plan.digest,
         )
 
 
@@ -111,6 +117,10 @@ class OptionsIn(BaseModel):
 
     def edits_domain(self) -> list[OptionEdit]:
         return [OptionEdit(e.section, e.name, e.value) for e in self.edits]
+
+
+class OptionsApplyIn(OptionsIn):
+    digest: str
 
 
 class BlockIn(BaseModel):
@@ -134,8 +144,8 @@ async def wifi_preview(router_id: str, body: RadioRequestIn, ctx: Ctx) -> PlanOu
 
 
 @router.post("/apply")
-async def wifi_apply(router_id: str, body: RadioRequestIn, ctx: Ctx) -> ApplyResult:
-    return await ctx.wifi.apply(_known(ctx, router_id), body.to_domain())
+async def wifi_apply(router_id: str, body: RadioApplyIn, ctx: Ctx) -> ApplyResult:
+    return await ctx.wifi.apply(_known(ctx, router_id), body.to_domain(), digest=body.digest)
 
 
 @router.get("/options")
@@ -149,8 +159,10 @@ async def wifi_options_preview(router_id: str, body: OptionsIn, ctx: Ctx) -> Pla
 
 
 @router.post("/options/apply")
-async def wifi_options_apply(router_id: str, body: OptionsIn, ctx: Ctx) -> ApplyResult:
-    return await ctx.wifi.apply_options(_known(ctx, router_id), body.radio, body.edits_domain())
+async def wifi_options_apply(router_id: str, body: OptionsApplyIn, ctx: Ctx) -> ApplyResult:
+    return await ctx.wifi.apply_options(
+        _known(ctx, router_id), body.radio, body.edits_domain(), digest=body.digest
+    )
 
 
 @router.get("/stations")

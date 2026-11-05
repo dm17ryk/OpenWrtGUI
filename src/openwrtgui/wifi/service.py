@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from collections.abc import Awaitable, Callable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -25,6 +26,7 @@ from openwrtgui.wifi.compile import (
     compile_txpower,
     drop_unchanged,
     mask_command,
+    reload_command,
     render_uci,
     tx_mask_args,
 )
@@ -64,6 +66,19 @@ class WifiPlan:
     secrets: tuple[str, ...] = field(repr=False)
     expect: Expectation
     full_verify: bool = True
+    reload: str = ""  # sent after `script` committed the change
+
+    @property
+    def digest(self) -> str:
+        """Names the preview: Apply sends it back, so only the lines the user saw ever run."""
+        return hashlib.sha256("\n".join(self.lines).encode()).hexdigest()[:16]
+
+
+class PreviewChanged(Exception):
+    """The router changed between the preview and Apply: the lines to send are no longer the shown ones."""
+
+    def __init__(self, router_name: str) -> None:
+        super().__init__(f"{router_name} changed since the preview. Check the new preview, then apply.")
 
 
 @dataclass(frozen=True)
@@ -93,6 +108,25 @@ def _after(uci: Mapping[str, str], ops: Sequence[UciOp]) -> dict[str, str]:
         else:
             out[op.path] = f"{out.get(op.path, '')} {op.value}".strip()
     return out
+
+
+def _mask_after(
+    uci: Mapping[str, str], ops: Sequence[UciOp], radio: RadioState, modes: ModeSelection | None = None
+) -> str | None:
+    """The TX mask that goes with the radio's modes after `ops`: every reload the app makes drops the
+    runtime mask, so it is set again. None for modes set outside the selector (custom)."""
+    chosen = modes or modes_from_uci(_after(uci, ops), radio.name, radio.limits.max_htmode)
+    return None if chosen.kind == "custom" else tx_mask_args(chosen, radio.limits.mcs)
+
+
+def _as_previewed(rec: RouterRecord, plan: WifiPlan, digest: str | None) -> WifiPlan:
+    if digest is not None and digest != plan.digest:
+        raise PreviewChanged(rec.name)
+    return plan
+
+
+def _reason(result: CommandResult) -> str:
+    return (result.stderr or result.stdout).strip() or f"exit {result.exit_status}"
 
 
 def _beacon_mbps(after: Mapping[str, str], radio: str) -> float:
@@ -196,9 +230,11 @@ class WifiService:
         ops, secrets = compile_edits(edits, await self.options(router_id, radio))
         return await self.plan_ops(router_id, radio, ops, secrets)
 
-    async def apply_options(self, router_id: str, radio: str, edits: Sequence[OptionEdit]) -> ApplyResult:
+    async def apply_options(
+        self, router_id: str, radio: str, edits: Sequence[OptionEdit], digest: str | None = None
+    ) -> ApplyResult:
         ops, secrets = compile_edits(edits, await self.options(router_id, radio))
-        return await self.apply_ops(router_id, radio, ops, secrets)
+        return await self.apply_ops(router_id, radio, ops, secrets, digest=digest)
 
     # ---------------------------------------------------------------- stations
     async def stations(self, router_id: str) -> list[Station]:
@@ -276,7 +312,10 @@ class WifiService:
         if not ops and not (mask_args is not None and radio.mask == "missing"):
             raise ValueError(NOTHING)
         script = apply_script(radio.name, ops) if ops else ""
+        reload = reload_command(radio.name) if ops else ""
         lines = [mask(line, secrets) for line in script.splitlines()]
+        if reload:
+            lines.append(reload)
         if mask_args is not None:
             ifname = radio.actual.ifname if radio.up and radio.actual else f"<AP interface of {radio.name}>"
             lines.append(mask_command(ifname, mask_args))
@@ -290,6 +329,7 @@ class WifiService:
             secrets=tuple(secrets),
             expect=expect,
             full_verify=full_verify,
+            reload=reload,
         )
 
     async def plan(self, router_id: str, req: RadioRequest) -> WifiPlan:
@@ -308,11 +348,13 @@ class WifiService:
             ops += compile_channels(radio.name, req.channels, limits)
         if req.txpower is not None:
             ops += compile_txpower(radio.name, req.txpower, limits)
+        own = {s.section for s in radio.ssids}
         for s in req.ssids:
+            if s.section not in own:  # never a section name from outside into the shell
+                raise ValueError(f"{s.section} is not an SSID of {radio.name}")
             ops += compile_ssid(s, radio.band, limits.sae, uci)
-        modes: ModeSelection = req.modes or modes_from_uci(_after(uci, ops), radio.name, limits.max_htmode)
-        mask_args = None if modes.kind == "custom" else tx_mask_args(modes, limits.mcs)
         secrets = [s.key for s in req.ssids if s.key]
+        mask_args = _mask_after(uci, ops, radio, req.modes)
         return self._plan(rec, radio, uci, ops, secrets, mask_args, full_verify=True)
 
     async def plan_ops(
@@ -320,21 +362,27 @@ class WifiService:
     ) -> WifiPlan:
         rec, _t, state, uci = await self._read(router_id)
         radio = self._radio(state, rec, radio_name)
-        return self._plan(rec, radio, uci, ops, secrets, None, full_verify=False)
+        return self._plan(rec, radio, uci, ops, secrets, _mask_after(uci, ops, radio), full_verify=False)
 
     # ---------------------------------------------------------------- applying
-    async def apply(self, router_id: str, req: RadioRequest) -> ApplyResult:
+    async def apply(self, router_id: str, req: RadioRequest, digest: str | None = None) -> ApplyResult:
         rec, t, state, uci = await self._read(router_id)
         plan = self._plan_request(rec, state, uci, req)
-        return await self._execute(rec, t, plan)
+        return await self._execute(rec, t, _as_previewed(rec, plan, digest))
 
     async def apply_ops(
-        self, router_id: str, radio_name: str, ops: Sequence[UciOp], secrets: Sequence[str] = ()
+        self,
+        router_id: str,
+        radio_name: str,
+        ops: Sequence[UciOp],
+        secrets: Sequence[str] = (),
+        *,
+        digest: str | None = None,
     ) -> ApplyResult:
         rec, t, state, uci = await self._read(router_id)
         radio = self._radio(state, rec, radio_name)
-        plan = self._plan(rec, radio, uci, ops, secrets, None, full_verify=False)
-        return await self._execute(rec, t, plan)
+        plan = self._plan(rec, radio, uci, ops, secrets, _mask_after(uci, ops, radio), full_verify=False)
+        return await self._execute(rec, t, _as_previewed(rec, plan, digest))
 
     async def _run(self, t: Transport, rec: RouterRecord, command: str, **kw: Any) -> Any:
         return await run_audited(
@@ -344,18 +392,33 @@ class WifiService:
     async def _execute(self, rec: RouterRecord, t: Transport, plan: WifiPlan) -> ApplyResult:
         checks: list[Check] = []
         applied = False
+        reload_error: str | None = None
         async with self._pool.write_lock(rec.id):
             try:
                 if plan.script:
-                    done = await self._run(
-                        t, rec, plan.script, secrets=plan.secrets, timeout=SCRIPT_TIMEOUT_S
-                    )
+                    try:
+                        done = await self._run(
+                            t, rec, plan.script, secrets=plan.secrets, timeout=SCRIPT_TIMEOUT_S
+                        )
+                    except TransportError as exc:  # the commit may or may not have run
+                        return self._finish(
+                            rec,
+                            plan,
+                            [],
+                            f"Lost the connection to {rec.name} while the change ran; "
+                            f"it may have been committed: {exc}",
+                        )
                     if not done.ok:
-                        reason = (done.stderr or done.stdout).strip() or f"exit {done.exit_status}"
+                        reason = _reason(done)
                         return ApplyResult(
                             rec.id, plan.radio, False, False, (), f"The router refused the change: {reason}"
                         )
                     applied = True
+                    reloaded = await self._run(t, rec, plan.reload, timeout=SCRIPT_TIMEOUT_S)
+                    if not reloaded.ok:
+                        reload_error = (
+                            f"The radio reload failed after the change was committed: {_reason(reloaded)}"
+                        )
                 checks = await self._verify(rec, t, plan)
             except GuardLocked as exc:
                 if not applied:
@@ -374,7 +437,7 @@ class WifiService:
                     checks,
                     f"Lost the connection to {rec.name} after the change was committed: {exc}",
                 )
-        return self._finish(rec, plan, checks, None)
+        return self._finish(rec, plan, checks, reload_error)
 
     def _finish(
         self, rec: RouterRecord, plan: WifiPlan, checks: list[Check], error: str | None
@@ -477,9 +540,10 @@ class WifiService:
     ) -> Check:
         if info.addr is None or expect.beacon_mbps is None:
             return Check("beacon rate", False, "no BSSID to listen for")
-        added = await self._run(
+        added = await self._run(  # a monitor left by a dropped connection would block the add
             t,
             rec,
+            f"ip link del {MONITOR} 2>/dev/null; "
             f"iw phy {phy} interface add {MONITOR} type monitor && ip link set {MONITOR} up",
             source="app",
         )
@@ -491,8 +555,8 @@ class WifiService:
                 f"'type mgt subtype beacon and wlan addr2 {info.addr}'"
             )
             rates = parse_beacon_rates((await self._run(t, rec, capture, source="app", timeout=15.0)).stdout)
-        finally:
-            await self._run(t, rec, f"ip link del {MONITOR}", source="app")
+        finally:  # cleaning up restores the radio, so it runs even when a run has started meanwhile
+            await self._run(t, rec, f"ip link del {MONITOR}", source="app", require_guard=False)
         if not rates:
             return Check("beacon rate", False, "no beacon seen in 5 s")
         if set(rates) != {expect.beacon_mbps}:
@@ -501,4 +565,13 @@ class WifiService:
         return Check("beacon rate", True, f"{expect.beacon_mbps:.1f} Mb/s ×{len(rates)}")
 
 
-__all__ = ["CHECKS", "ApplyResult", "Check", "Expectation", "WifiPlan", "WifiService", "render_uci"]
+__all__ = [
+    "CHECKS",
+    "ApplyResult",
+    "Check",
+    "Expectation",
+    "PreviewChanged",
+    "WifiPlan",
+    "WifiService",
+    "render_uci",
+]

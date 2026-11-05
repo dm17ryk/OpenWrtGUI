@@ -41,6 +41,7 @@ async def test_state_of_ap1_on_air(env: WifiEnv) -> None:
 async def test_plan_shows_exact_lines_and_unpark_warning(env: WifiEnv) -> None:
     plan = await env.service.plan("ap2", N20_CH6)
     assert list(plan.lines) == [
+        "set -e",
         "uci set wireless.radio0.htmode='HT20'",
         "uci set wireless.radio0.legacy_rates='0'",
         "uci set wireless.radio0.supported_rates='6000 12000 24000'",
@@ -75,10 +76,15 @@ async def test_apply_verifies_on_air_and_audits(env: WifiEnv) -> None:
     ]
     assert next(c for c in result.checks if c.name == "beacon rate").detail == "6.0 Mb/s ×5"
     lines = env.audit_lines()
-    assert lines[0][0].startswith("uci set wireless.radio0.htmode='HT20'\n") and lines[0][1] == "user"
+    assert lines[0][0].startswith("set -e\nuci set wireless.radio0.htmode='HT20'\n") and lines[0][1] == "user"
     assert lines[1:] == [
+        ("wifi down radio0; wifi up radio0", "user"),
         (f"iw dev phy0-ap0 set bitrates legacy-2.4 6 ht-mcs-2.4 {MCS16}", "app"),
-        ("iw phy phy0 interface add owgmon0 type monitor && ip link set owgmon0 up", "app"),
+        (
+            "ip link del owgmon0 2>/dev/null; "
+            "iw phy phy0 interface add owgmon0 type monitor && ip link set owgmon0 up",
+            "app",
+        ),
         (
             "timeout 5 tcpdump -i owgmon0 -e -n -c 5 -l "
             "'type mgt subtype beacon and wlan addr2 02:00:00:00:00:02'",
@@ -126,7 +132,7 @@ class _AfterScript:
         if self._done and self._mode == "drop" and command.startswith("ubus call network.wireless status"):
             raise Unreachable("192.168.1.2:22: connection lost")
         result = await self._inner.run(command, timeout=timeout)
-        if command.startswith("uci set") and "uci commit wireless" in command:
+        if "uci commit wireless" in command:
             self._done = True
             if self._mode == "guard":
                 self._env.go_live()
@@ -152,7 +158,106 @@ async def test_apply_interrupted_after_commit_is_not_verified(env: WifiEnv, mode
     result = await env.service.apply("ap2", N20_CH6)
     assert result.applied and not result.verified
     assert result.error is not None and result.error.startswith(error)
-    assert env.audit_lines()[0][0].startswith("uci set wireless.radio0.htmode='HT20'")
+    assert env.audit_lines()[0][0].startswith("set -e\nuci set wireless.radio0.htmode='HT20'")
+
+
+class _OnCommand:
+    """Wraps a transport and changes what one command does."""
+
+    def __init__(self, inner: Transport, match: str, do: str, env: WifiEnv | None = None) -> None:
+        self._inner, self._match, self._do, self._env = inner, match, do, env
+        self.sent: list[str] = []
+
+    async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
+        self.sent.append(command)
+        if self._match in command:
+            if self._do == "drop":
+                raise Unreachable("192.168.1.2: no answer within 60 s")
+            if self._do == "fail":
+                return CommandResult(command, "", "Command failed: Not found", 1)
+            if self._do == "guard" and self._env is not None:
+                result = await self._inner.run(command, timeout=timeout)
+                self._env.go_live()
+                return result
+        return await self._inner.run(command, timeout=timeout)
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._inner, name)
+
+
+async def test_the_change_and_the_reload_run_apart_and_a_failing_line_stops_the_commit(env: WifiEnv) -> None:
+    plan = await env.service.plan("ap2", N20_CH6)
+    assert plan.lines[0] == "set -e"  # a failing uci line stops the script before `uci commit`
+    await env.service.apply("ap2", N20_CH6)
+    sent = [c for c, _ in env.audit_lines()[:2]]
+    assert sent[0].startswith("set -e\nuci set wireless.radio0.htmode='HT20'") and sent[0].endswith(
+        "uci commit wireless"
+    )
+    assert sent[1] == "wifi down radio0; wifi up radio0"
+
+
+async def test_connection_lost_while_the_change_runs_may_have_committed(env: WifiEnv) -> None:
+    env.wrap.append(lambda t: _OnCommand(t, "uci commit wireless", "drop"))  # type: ignore[arg-type, return-value]
+    result = await env.service.apply("ap2", N20_CH6)
+    assert result.applied and not result.verified
+    assert result.error == (
+        "Lost the connection to AP2 · office while the change ran; it may have been committed: "
+        "192.168.1.2: no answer within 60 s"
+    )
+    assert env.audit.query()[0].command == "verify radio0" and env.audit.query()[0].verify.startswith("fail")
+
+
+async def test_a_failed_reload_is_applied_but_not_verified(env: WifiEnv) -> None:
+    env.wrap.append(lambda t: _OnCommand(t, "wifi down radio0", "fail"))  # type: ignore[arg-type, return-value]
+    result = await env.service.apply("ap2", N20_CH6)
+    assert result.applied and not result.verified
+    assert result.error == "The radio reload failed after the change was committed: Command failed: Not found"
+
+
+async def test_monitor_interface_is_removed_even_when_a_run_starts(env: WifiEnv) -> None:
+    env.wrap.append(lambda t: _OnCommand(t, "tcpdump", "guard", env))  # type: ignore[arg-type, return-value]
+    await env.service.apply("ap2", N20_CH6)
+    commands = [c for c, _ in env.audit_lines()]
+    assert "ip link del owgmon0" in commands
+
+
+async def test_a_stale_monitor_interface_is_cleared_before_adding_one(env: WifiEnv) -> None:
+    await env.service.apply("ap2", N20_CH6)
+    commands = [c for c, _ in env.audit_lines()]
+    add = "iw phy phy0 interface add owgmon0 type monitor && ip link set owgmon0 up"
+    assert f"ip link del owgmon0 2>/dev/null; {add}" in commands
+
+
+async def test_an_options_apply_restores_the_tx_mask(env: WifiEnv) -> None:
+    from openwrtgui.wifi.compile import UciOp
+
+    await env.service.apply("ap2", N20_CH6)
+    plan = await env.service.plan_ops("ap2", "radio0", [UciOp("set", "wireless.radio0.beacon_int", "200")])
+    assert plan.lines[-1] == f"iw dev phy0-ap0 set bitrates legacy-2.4 6 ht-mcs-2.4 {MCS16}"
+    result = await env.service.apply_ops("ap2", "radio0", [UciOp("set", "wireless.radio0.beacon_int", "200")])
+    assert result.verified and (await env.service.state("ap2")).radios[0].mask == "active"
+
+
+async def test_only_this_radios_ssids_can_be_changed(env: WifiEnv) -> None:
+    req = RadioRequest("radio0", ssids=(SsidRequest("x; reboot; #", ssid="a"),))
+    with pytest.raises(ValueError, match="x; reboot; # is not an SSID of radio0"):
+        await env.service.plan("ap2", req)
+    with pytest.raises(ValueError, match="radio0 is not an SSID of radio0"):
+        await env.service.plan("ap2", RadioRequest("radio0", ssids=(SsidRequest("radio0", ssid="a"),)))
+
+
+async def test_apply_sends_only_what_was_previewed(env: WifiEnv) -> None:
+    from openwrtgui.wifi.service import PreviewChanged
+
+    preview = await env.service.plan("ap2", N20_CH6)
+    t = await env.pool.get(env.routers.get("ap2"))  # type: ignore[arg-type]
+    await t.run("uci set wireless.radio0.channel='6'\nuci commit wireless")  # someone else, meanwhile
+    with pytest.raises(PreviewChanged, match="AP2 · office changed since the preview"):
+        await env.service.apply("ap2", N20_CH6, digest=preview.digest)
+    assert env.audit.query() == []  # nothing was sent
+    fresh = await env.service.plan("ap2", N20_CH6)
+    assert fresh.digest != preview.digest
+    assert (await env.service.apply("ap2", N20_CH6, digest=fresh.digest)).verified
 
 
 async def test_mask_reported_missing_after_interface_recreated(env: WifiEnv) -> None:
@@ -171,7 +276,7 @@ async def test_key_never_reaches_preview_or_audit(env: WifiEnv) -> None:
     key = "it's $x `y` z"
     req = RadioRequest("radio0", ssids=(SsidRequest("default_radio0", key=key),))
     plan = await env.service.plan("ap1", req)
-    assert plan.lines[0] == "uci set wireless.default_radio0.key='<hidden>'"
+    assert plan.lines[1] == "uci set wireless.default_radio0.key='<hidden>'"
     assert all("it's" not in line and "$x" not in line for line in plan.lines)
     result = await env.service.apply("ap1", req)
     assert result.applied

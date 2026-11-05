@@ -48,8 +48,11 @@ router's hostapd supports SAE. The key is never shown: leave the field empty to 
 
 ## Apply and proof on air
 
-The preview shows the exact commands the app will send; only settings that change are written. **Apply** sends
-them, waits for the radio to settle, sets the TX mask, and then checks on air:
+The preview shows the exact commands the app will send; only settings that change are written. The first
+line, `set -e`, makes the router stop at a failing line, so a half-done change is never committed; the radio
+reload runs on its own after the commit. If the router changed since the preview (LuCI, another program),
+Apply is refused with "changed since the preview" and the new preview shows what would be sent now.
+**Apply** sends the commands, waits for the radio to settle, sets the TX mask, and then checks on air:
 
 - the radio is up (or parked, for None);
 - the channel and width;
@@ -57,8 +60,9 @@ them, waits for the radio to settle, sets the TX mask, and then checks on air:
 - the TX mask;
 - the beacon rate, read from real beacons through a temporary monitor interface.
 
-A change counts as done only when these checks pass. If the connection drops or a harness run starts after
-the change was committed, the result says "Applied, not verified" with the reason. While a harness run is live,
+A change counts as done only when these checks pass. If the connection drops while the change runs, or a
+harness run starts after it was committed, the result says "Applied, not verified" with the reason (a dropped
+connection may or may not have let the commit through; the screen reads the router again). While a harness run is live,
 Apply is refused and the banner names the run.
 
 ## TX mask after a reload

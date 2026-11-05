@@ -48,6 +48,12 @@ async def luci_open(router_id: str, body: OpenIn, ctx: Ctx) -> BridgeView:
     return await ctx.luci.open(_known(ctx, router_id), body.path)
 
 
+@router.get("/bridges/{bridge_id}")
+async def luci_bridge(router_id: str, bridge_id: str, ctx: Ctx) -> BridgeView:
+    """The bridge as it is now: `access` turns to read when Bench Guard sees a run."""
+    return ctx.luci.view(_bridge(ctx, router_id, bridge_id))
+
+
 @router.get("/bridges/{bridge_id}/changes")
 async def luci_changes(router_id: str, bridge_id: str, ctx: Ctx) -> list[UciChange]:
     return list(await ctx.luci.changes(_bridge(ctx, router_id, bridge_id)))

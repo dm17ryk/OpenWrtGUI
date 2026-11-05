@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, expect, test, vi } from 'vitest'
@@ -10,6 +10,7 @@ import { LuciPage } from './LuciPage'
 
 const calls: Array<{ path: string; body: unknown }> = []
 let bridge: BridgeView = DHCP_BRIDGE
+let bridgeNow: BridgeView = DHCP_BRIDGE
 let changes: UciChange[] = []
 
 vi.mock('../../api/client', async (orig) => {
@@ -20,6 +21,7 @@ vi.mock('../../api/client', async (orig) => {
     if (path === '/api/guard') return { live: false, reasons: [], checked_at: 'x' }
     if (path === '/api/routers/ap2/luci/pages') return LUCI_PAGES
     if (path === '/api/routers/ap2/luci/open') return bridge
+    if (path === '/api/routers/ap2/luci/bridges/b1') return bridgeNow
     if (path === '/api/routers/ap2/luci/bridges/b1/changes') return changes
     if (path === '/api/routers/ap2/luci/bridges/b1/close') return { id: 'b1', changes }
     throw new Error(`unexpected ${path}`)
@@ -34,6 +36,7 @@ vi.mock('../../api/client', async (orig) => {
 beforeEach(() => {
   calls.length = 0
   bridge = DHCP_BRIDGE
+  bridgeNow = DHCP_BRIDGE
   changes = []
 })
 
@@ -86,6 +89,17 @@ test('a run starting while the page is open turns it read-only and it stays so',
   client.setQueryData(['guard'], { ...live, live: false })
   expect(await screen.findByText('read-only session')).toBeInTheDocument()
   expect(screen.queryByText('can change: DHCP settings')).not.toBeInTheDocument()
+})
+
+test('the page reloads when the app turns its session read-only', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  renderLuci(client)
+  const first = await screen.findByTitle('LuCI page DHCP')
+  bridgeNow = { ...DHCP_BRIDGE, access: 'read' }
+  await client.invalidateQueries({ queryKey: ['luci-bridge'] })
+  await waitFor(() => expect(screen.getByTitle('LuCI page DHCP')).not.toBe(first))
+  expect(screen.getByTitle('LuCI page DHCP')).toHaveAttribute('src', DHCP_BRIDGE.url)
+  expect(screen.getByText('read-only session')).toBeInTheDocument()
 })
 
 test('closing ends the session once and shows what changed', async () => {

@@ -8,9 +8,9 @@ import httpx
 import pytest
 
 from openwrtgui.guard.audit import AuditLog
-from openwrtgui.guard.bench_guard import BenchGuard, ProcessInfo
+from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked, ProcessInfo
 from openwrtgui.luci_bridge.service import LuciBridgeService
-from openwrtgui.luci_bridge.upstream import sim_upstream
+from openwrtgui.luci_bridge.upstream import Upstream, sim_upstream
 from openwrtgui.probe.describe import SelfDescription
 from openwrtgui.simulator import SimConnector, seed_routers
 from openwrtgui.store.routers import RouterRecord, RouterStore
@@ -121,6 +121,13 @@ async def test_secrets_in_a_luci_diff_are_hidden(env: Env) -> None:
     assert change.option == "wireless.default_radio0.key" and change.after == "<hidden>"
 
 
+def test_wireguard_keys_in_a_luci_diff_are_hidden() -> None:
+    from openwrtgui.luci_bridge.service import diff_uci
+
+    [change] = diff_uci({}, {"network.wg0.private_key": "aGVsbG8="})
+    assert change.after == "<hidden>"
+
+
 async def test_session_ids_never_reach_the_audit_log(env: Env) -> None:
     await env.service.open("ap1", "admin/network/wireless")
     assert not any("sim-1" in line for line in env.audit_lines())
@@ -161,6 +168,65 @@ async def test_bridge_closes_when_guard_live_and_no_read_session(env: Env) -> No
         env.service.view(view.id)
     with pytest.raises(httpx.ConnectError):
         await _fetch(view.url)
+
+
+async def test_downgrade_closes_the_bridge_when_the_write_session_survives(env: Env) -> None:
+    view = await env.service.open("ap1", "admin/network/wireless")
+    env.go_live()
+    t = env.transports[0]
+    real_run = t.run
+
+    async def destroy_refused(command: str, *, timeout: float = 15.0) -> CommandResult:
+        if command.startswith("ubus call session destroy"):
+            return CommandResult(command, "", "Command failed: Permission denied", 4)
+        return await real_run(command, timeout=timeout)
+
+    t.run = destroy_refused  # type: ignore[method-assign]
+    await env.service.tick()
+    with pytest.raises(KeyError):
+        env.service.view(view.id)  # fail closed: the page cannot keep using the write session
+    with pytest.raises(httpx.ConnectError):
+        await _fetch(view.url)
+
+
+async def test_a_failed_open_leaves_no_session_behind(env: Env) -> None:
+    async def broken(rec: RouterRecord, t: Transport) -> Upstream:
+        raise TransportError("this connection cannot forward a port to the router's web server")
+
+    service = LuciBridgeService(
+        pool=env.pool,
+        routers=env.routers,
+        guard=env.guard,
+        audit=env.audit,
+        descriptions=env.descriptions,
+        upstream_factory=broken,
+        clock=env.clock,
+    )
+    with pytest.raises(TransportError):
+        await service.open("ap1", "admin/network/dhcp")
+    assert 'ubus call session destroy \'{"ubus_rpc_session":"<hidden>"}\'' in env.audit_lines()
+    assert env.calls()[-1].startswith("ubus call session destroy")
+
+
+async def test_write_grants_are_refused_once_a_run_is_live(env: Env) -> None:
+    clear = env.guard.state()
+    env.go_live()
+    answers = iter([clear])  # the access decision still saw no run; the grants come after it started
+    real_state = env.guard.state
+    env.guard.state = lambda: next(answers, None) or real_state()  # type: ignore[method-assign]
+    with pytest.raises(GuardLocked):
+        await env.service.open("ap1", "admin/network/dhcp")
+    grants = [c for c in env.calls() if c.startswith("ubus call session grant ")]
+    assert all('"write"' not in c for c in grants)
+    assert env.calls()[-1].startswith("ubus call session destroy")
+
+
+async def test_view_follows_the_downgrade(env: Env) -> None:
+    view = await env.service.open("ap1", "admin/network/wireless")
+    assert env.service.view(view.id).access == "write"
+    env.go_live()
+    await env.service.tick()
+    assert env.service.view(view.id).access == "read" and env.service.view(view.id).url == view.url
 
 
 async def test_idle_bridge_is_closed_and_session_destroyed(env: Env) -> None:

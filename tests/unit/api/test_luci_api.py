@@ -19,9 +19,11 @@ async def test_luci_api_open_list_close(authed: httpx.AsyncClient, ctx: AppConte
     view = (await authed.post("/api/routers/ap1/luci/open", json={"path": "admin/network/dhcp"})).json()
     assert view["access"] == "write" and view["url"].startswith("http://127.0.0.1:") and view["page"] == dhcp
     assert (await authed.get(f"/api/routers/ap1/luci/bridges/{view['id']}/changes")).json() == []
+    assert (await authed.get(f"/api/routers/ap1/luci/bridges/{view['id']}")).json() == view
     closed = (await authed.post(f"/api/routers/ap1/luci/bridges/{view['id']}/close")).json()
     assert closed == {"id": view["id"], "changes": []}
     assert (await authed.post(f"/api/routers/ap1/luci/bridges/{view['id']}/close")).status_code == 404
+    assert (await authed.get(f"/api/routers/ap1/luci/bridges/{view['id']}")).status_code == 404
     await ctx.luci.close_all()
 
 

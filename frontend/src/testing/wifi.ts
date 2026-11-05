@@ -40,6 +40,7 @@ export const N20_CH6_PLAN: PlanOut = {
   ],
   warnings: ['OpenWrt is already on air on AP1 · bench. The bench rule is one radio on air per SSID.'],
   expect: { radio_up: true, channels: [6], widths: [20], no_ht: false, txpower_dbm: null, beacon_mbps: 6 },
+  digest: '5c1e0a9d7b3f2e41',
 }
 
 export const PROVEN: ApplyResult = {

@@ -66,6 +66,24 @@ def test_shell_escaped_quote_inside_a_secret_is_masked_whole() -> None:
     assert mask(json_line, ()) == 'ubus call uci set \'{"values":{"key":"<hidden>"}}\''
 
 
+def test_every_secret_option_the_router_has_is_masked() -> None:
+    # options AP2's get_validate types as plain strings, WEP keys, and WireGuard keys (a typical LuCI page)
+    for path in (
+        "wireless.default_radio0.multi_ap_backhaul_key",
+        "wireless.default_radio0.dae_secret",
+        "wireless.default_radio0.auth_server_shared_secret",
+        "wireless.default_radio0.acct_server_shared_secret",
+        "wireless.default_radio0.private_key_passwd",
+        "wireless.default_radio0.wps_pin",
+        "wireless.default_radio0.ap_pin",
+        "wireless.default_radio0.r0kh",
+        "wireless.default_radio0.key1",
+        "network.wg0.private_key",
+        "network.wg_peer.preshared_key",
+    ):
+        assert mask(f"uci set {path}='s3cret'", []) == f"uci set {path}='<hidden>'", path
+
+
 def test_empty_secret_ignored() -> None:
     assert mask("uname -a", ["", "x"]) == "uname -a"
 

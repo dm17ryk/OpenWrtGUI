@@ -134,8 +134,17 @@ class LuciBridgeService:
     def view(self, bridge_id: str) -> BridgeView:
         return self._bridges[bridge_id].view
 
-    async def _run(self, t: Transport, rec: RouterRecord, command: str, secret: tuple[str, ...]) -> str:
-        # rpcd sessions live in memory and change no config, so a read-only one is fine during a run.
+    async def _run(
+        self,
+        t: Transport,
+        rec: RouterRecord,
+        command: str,
+        secret: tuple[str, ...],
+        *,
+        require_guard: bool = False,
+    ) -> str:
+        # rpcd sessions live in memory and change no config, so a read-only one is fine during a run;
+        # granting write access is not (require_guard).
         result = await run_audited(
             t,
             command,
@@ -145,7 +154,7 @@ class LuciBridgeService:
             audit=self._audit,
             source="app",
             secrets=secret,
-            require_guard=False,
+            require_guard=require_guard,
         )
         if not result.ok:
             raise TransportError(
@@ -156,18 +165,27 @@ class LuciBridgeService:
     async def _new_session(self, rec: RouterRecord, t: Transport, page: LuciPage, access: Access) -> str:
         created = json.loads(await self._run(t, rec, create_command(), ()) or "{}")
         sid = str(created["ubus_rpc_session"])
-        token = secrets.token_hex(16)
-        acl = self._acl(rec.id)
-        for command in grant_commands(sid, page_groups(page, acl), acl, access):
-            await self._run(t, rec, command, (sid,))
-        await self._run(t, rec, set_command(sid, token), (sid, token))
+        try:
+            token = secrets.token_hex(16)
+            acl = self._acl(rec.id)
+            for command in grant_commands(sid, page_groups(page, acl), acl, access):
+                await self._run(t, rec, command, (sid,), require_guard=access == "write")
+            await self._run(t, rec, set_command(sid, token), (sid, token))
+        except BaseException:
+            await self._destroy_sid(t, rec, sid)
+            raise
         return sid
 
-    async def _destroy(self, b: _Bridge, sid: str) -> None:
+    async def _destroy_sid(self, t: Transport, rec: RouterRecord, sid: str, *, strict: bool = False) -> None:
         try:
-            await self._run(b.transport, b.rec, destroy_command(sid), (sid,))
-        except TransportError as exc:  # it expires on its own after 5 minutes idle
-            log.info("LuCI session on %s not destroyed: %s", b.rec.id, exc)
+            await self._run(t, rec, destroy_command(sid), (sid,))
+        except TransportError as exc:
+            if strict:
+                raise
+            log.info("LuCI session on %s not destroyed: %s", rec.id, exc)  # it expires after 5 min idle
+
+    async def _destroy(self, b: _Bridge, sid: str) -> None:
+        await self._destroy_sid(b.transport, b.rec, sid)
 
     async def open(self, router_id: str, path: str) -> BridgeView:
         rec, t = await self._connect(router_id)
@@ -179,13 +197,23 @@ class LuciBridgeService:
         access: Access = "read" if self._guard.state().live else "write"
         before = parse_uci_show((await t.run(UCI_SHOW)).stdout)
         sid = await self._new_session(rec, t, page, access)
-        upstream = await self._upstream_factory(rec, t)
         bridge_id = secrets.token_hex(8)
         secret = secrets.token_urlsafe(24)
-        proxy = BridgeProxy(
-            upstream_port=upstream.port, secret=secret, sid=sid, on_use=lambda: self._touch(bridge_id)
-        )
-        port = await proxy.start()
+        upstream: Upstream | None = None
+        proxy: BridgeProxy | None = None
+        try:
+            upstream = await self._upstream_factory(rec, t)
+            proxy = BridgeProxy(
+                upstream_port=upstream.port, secret=secret, sid=sid, on_use=lambda: self._touch(bridge_id)
+            )
+            port = await proxy.start()
+        except BaseException:  # leave nothing behind: no session, no SSH forward, no listener
+            await self._destroy_sid(t, rec, sid)
+            if proxy is not None:
+                await proxy.stop()
+            if upstream is not None:
+                await upstream.close()
+            raise
         now = self._clock()
         view = BridgeView(
             id=bridge_id,
@@ -252,7 +280,8 @@ class LuciBridgeService:
         b.sid = await self._new_session(b.rec, b.transport, b.page, "read")
         b.proxy.set_sid(b.sid)
         b.view = replace(b.view, access="read")
-        await self._destroy(b, old)
+        # strict: if the write session survives, the caller closes the bridge (fail closed)
+        await self._destroy_sid(b.transport, b.rec, old, strict=True)
         self._audit.record(
             router=b.rec.id,
             screen=SCREEN,

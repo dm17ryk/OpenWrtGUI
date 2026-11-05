@@ -87,10 +87,11 @@ async def test_plan_and_apply_options_run_reload_and_verify_radio(env: WifiEnv) 
     edits = [OptionEdit("radio0", "beacon_int", "200")]
     plan = await env.service.plan_options("ap1", "radio0", edits)
     assert list(plan.lines) == [
+        "set -e",
         "uci set wireless.radio0.beacon_int='200'",
         "uci commit wireless",
         "wifi down radio0; wifi up radio0",
-    ]
+    ]  # AP1's modes are set outside the selector, so no TX mask goes with them
     result = await env.service.apply_options("ap1", "radio0", edits)
     assert result.applied and result.verified
     assert [c.name for c in result.checks] == ["radio", "channel", "width", "TX power"]
@@ -102,4 +103,4 @@ async def test_secret_option_is_hidden_in_the_preview(env: WifiEnv) -> None:
     plan = await env.service.plan_options(
         "ap1", "radio0", [OptionEdit("default_radio0", "key", "x'y-lab-key")]
     )
-    assert plan.lines[0] == "uci set wireless.default_radio0.key='<hidden>'"
+    assert plan.lines[1] == "uci set wireless.default_radio0.key='<hidden>'"
