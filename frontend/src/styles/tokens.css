@@ -30,6 +30,9 @@
   --rx: #2a78d6;
   --tx: #eb6834;
   --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --tip: #15181c;
+  --tip-ink: #ffffff;
   color-scheme: light;
 }
 
@@ -63,5 +66,8 @@
   --rx: #3987e5;
   --tx: #d95926;
   --grid: #2c2c2a;
+  --axis: #383835;
+  --tip: #eceeef;
+  --tip-ink: #111316;
   color-scheme: dark;
 }

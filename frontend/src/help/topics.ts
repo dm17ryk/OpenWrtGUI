@@ -31,6 +31,14 @@ export const HELP = {
   wifiStations: 'Wi-Fi#stations',
   wifiWho: 'Wi-Fi#who-may-join',
   wifiOptions: 'Wi-Fi#all-options',
+  // RF live
+  rf: 'RF-live',
+  rfRadio: 'RF-live#radio',
+  rfRx: 'RF-live#rx-at-ap',
+  rfTx: 'RF-live#tx-from-ap',
+  rfCharts: 'RF-live#charts',
+  rfRates: 'RF-live#which-rates-reach-the-station',
+  rfRecord: 'RF-live#record-to-csv',
   // Bench Guard
   guardBanner: 'Bench-Guard#what-you-see',
   readOnlyRun: 'Bench-Guard#what-still-works-during-a-run',

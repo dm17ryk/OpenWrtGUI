@@ -8,6 +8,7 @@
 **Using it**
 - [Dashboard](Dashboard)
 - [Wi-Fi](Wi-Fi)
+- [RF live](RF-live)
 - [Bench Guard](Bench-Guard)
 - [Terminal and audit log](Terminal-and-audit-log)
 - [Settings](Settings)

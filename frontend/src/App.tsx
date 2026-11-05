@@ -10,6 +10,7 @@ import { Dashboard } from './screens/Dashboard'
 import { RouterOverview } from './screens/RouterOverview'
 import { SettingsScreen } from './screens/Settings'
 import { Terminal } from './screens/Terminal'
+import { RfLive } from './screens/rf/RfLive'
 import { WifiScreen } from './screens/wifi/WifiScreen'
 import { GuardBanner } from './shell/GuardBanner'
 import { Header } from './shell/Header'
@@ -54,6 +55,7 @@ export function App() {
         <Route path="/add" element={<AddRouter />} />
         <Route path="/routers/:id" element={<RouterOverview />} />
         <Route path="/routers/:id/wifi" element={<WifiScreen />} />
+        <Route path="/routers/:id/rf" element={<RfLive />} />
         <Route path="/terminal/:id?" element={<Terminal />} />
         <Route path="/audit" element={<AuditLog />} />
         <Route path="/settings" element={<SettingsScreen />} />
