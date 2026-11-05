@@ -14,6 +14,8 @@ import httpx
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard, psutil_lister
 from openwrtgui.live import LiveHub
+from openwrtgui.luci_bridge.service import LuciBridgeService, UpstreamFactory
+from openwrtgui.luci_bridge.upstream import Upstream, sim_upstream, ssh_upstream
 from openwrtgui.onboard.pc_keys import find_pc_keys, ssh_dirs
 from openwrtgui.onboard.wizard import Connector, OnboardService, SshConnector
 from openwrtgui.paths import DataDir
@@ -51,6 +53,7 @@ class AppContext:
     poller: StatusPoller
     wifi: WifiService
     rf: RfHub
+    luci: LuciBridgeService
     token: str
     port: int
     mode: Literal["real", "simulator"]
@@ -72,6 +75,22 @@ def _find_pc_keys() -> list[Path]:
 
 def _no_pc_keys() -> list[Path]:
     return []  # the simulator never offers the developer's own keys
+
+
+async def _ssh_upstream(rec: RouterRecord, t: Transport) -> Upstream:
+    return await ssh_upstream(t)
+
+
+def _sim_upstream(descriptions: dict[str, SelfDescription]) -> UpstreamFactory:
+    async def factory(rec: RouterRecord, t: Transport) -> Upstream:
+        def title_of(path: str) -> str:
+            desc = descriptions.get(rec.id)
+            pages = desc.luci.pages if desc and desc.luci else ()
+            return next((p.title for p in pages if p.path == path), path)
+
+        return await sim_upstream(title_of)
+
+    return factory
 
 
 def build_context(
@@ -157,6 +176,14 @@ def build_context(
     wifi = WifiService(
         pool=pool, routers=routers, guard=guard, audit=audit, descriptions=descriptions, statuses=statuses
     )
+    luci = LuciBridgeService(
+        pool=pool,
+        routers=routers,
+        guard=guard,
+        audit=audit,
+        descriptions=descriptions,
+        upstream_factory=_sim_upstream(descriptions) if simulator is not None else _ssh_upstream,
+    )
     return AppContext(
         data=data,
         settings=settings,
@@ -172,6 +199,7 @@ def build_context(
         poller=poller,
         wifi=wifi,
         rf=RfHub(pool=pool, routers=routers),
+        luci=luci,
         token=token,
         port=port,
         mode="simulator" if simulator is not None else "real",

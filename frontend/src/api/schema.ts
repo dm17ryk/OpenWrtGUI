@@ -396,6 +396,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/luci/bridges/{bridge_id}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Luci Changes */
+        get: operations["luci_changes_api_routers__router_id__luci_bridges__bridge_id__changes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/luci/bridges/{bridge_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Luci Close */
+        post: operations["luci_close_api_routers__router_id__luci_bridges__bridge_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/luci/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Luci Open */
+        post: operations["luci_open_api_routers__router_id__luci_open_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/luci/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Luci Pages */
+        get: operations["luci_pages_api_routers__router_id__luci_pages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/wifi": {
         parameters: {
             query?: never;
@@ -717,6 +785,33 @@ export interface components {
             /** Seconds */
             seconds: number;
         };
+        /** BridgeClosed */
+        BridgeClosed: {
+            /** Changes */
+            changes: components["schemas"]["UciChange"][];
+            /** Id */
+            id: string;
+        };
+        /** BridgeView */
+        BridgeView: {
+            /**
+             * Access
+             * @enum {string}
+             */
+            access: "read" | "write";
+            /** Id */
+            id: string;
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            page: components["schemas"]["PageView"];
+            /** Router Id */
+            router_id: string;
+            /** Url */
+            url: string;
+        };
         /** ChannelSelection */
         ChannelSelection: {
             /**
@@ -958,6 +1053,11 @@ export interface components {
              */
             ok: boolean;
         };
+        /** OpenIn */
+        OpenIn: {
+            /** Path */
+            path: string;
+        };
         /** OptionEditIn */
         OptionEditIn: {
             /** Name */
@@ -1000,6 +1100,17 @@ export interface components {
             edits: components["schemas"]["OptionEditIn"][];
             /** Radio */
             radio: string;
+        };
+        /** PageView */
+        PageView: {
+            /** Native */
+            native: string | null;
+            /** Package */
+            package: string;
+            /** Path */
+            path: string;
+            /** Title */
+            title: string;
         };
         /** PasswordIn */
         PasswordIn: {
@@ -1411,6 +1522,15 @@ export interface components {
              * @enum {string}
              */
             kind: "auto" | "fixed" | "cap";
+        };
+        /** UciChange */
+        UciChange: {
+            /** After */
+            after: string | null;
+            /** Before */
+            before: string | null;
+            /** Option */
+            option: string;
         };
         /** UpdateOut */
         UpdateOut: {
@@ -2120,6 +2240,136 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DescriptionSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    luci_changes_api_routers__router_id__luci_bridges__bridge_id__changes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+                bridge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UciChange"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    luci_close_api_routers__router_id__luci_bridges__bridge_id__close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+                bridge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BridgeClosed"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    luci_open_api_routers__router_id__luci_open_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BridgeView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    luci_pages_api_routers__router_id__luci_pages_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageView"][];
                 };
             };
             /** @description Validation Error */

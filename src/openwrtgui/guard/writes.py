@@ -35,9 +35,13 @@ async def run_audited(
     secrets: Sequence[str] = (),
     stdin: str | None = None,
     timeout: float = 15.0,
+    require_guard: bool = True,
 ) -> CommandResult:
-    """One command: refused while Bench Guard is live, audited masked. The caller holds the write lock."""
-    guard.require_clear()
+    """One command: refused while Bench Guard is live, audited masked. The caller holds the write lock.
+
+    require_guard=False is for commands that change no router config (rpcd sessions in memory)."""
+    if require_guard:
+        guard.require_clear()
     try:
         if stdin is not None:
             result = await transport.run_stdin(command, stdin, timeout=timeout)
