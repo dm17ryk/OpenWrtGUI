@@ -21,6 +21,9 @@ export default defineConfig({
     environment: 'jsdom',
     // Typing through the wizard takes ~3 s on a busy bench PC; 5 s (the default) flakes there.
     testTimeout: 15_000,
+    // The module cache keys src/help/manual.ts by its own text, so a new docs/manual page behind its
+    // import.meta.glob stays invisible to the tests until the cache is cleared.
+    fsModuleCache: false,
     setupFiles: ['./src/test-setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
   },

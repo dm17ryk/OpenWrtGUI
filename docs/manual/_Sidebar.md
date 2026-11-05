@@ -7,6 +7,7 @@
 
 **Using it**
 - [Dashboard](Dashboard)
+- [Wi-Fi](Wi-Fi)
 - [Bench Guard](Bench-Guard)
 - [Terminal and audit log](Terminal-and-audit-log)
 - [Settings](Settings)

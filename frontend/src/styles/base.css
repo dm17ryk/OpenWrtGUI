@@ -454,6 +454,88 @@ h2 {
   font-size: 13px;
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Wi-Fi: radio tabs, mode tiles, channel boxes */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tab {
+  font: inherit;
+  font-size: 13px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink2);
+  cursor: pointer;
+}
+.tab.on {
+  border-color: var(--ink);
+  color: var(--ink);
+  font-weight: 600;
+}
+.tab:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+.tile,
+.chan {
+  font: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface2);
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+.tile.on,
+.chan.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.tile:focus-visible,
+.chan:focus-visible,
+.tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.chans {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 6px;
+}
+.chan {
+  align-items: center;
+  min-height: 44px;
+  padding: 6px;
+}
+.chan:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
 /* a router's own screens (shell/RouterSections) */
 .sections {
   display: flex;

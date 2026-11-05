@@ -19,6 +19,18 @@ export const HELP = {
   stepInstallKey: 'First-router#4-install-the-apps-key',
   stepIdentify: 'First-router#5-what-is-this-router-and-its-sockets',
   skipKey: 'First-router#afterwards',
+  // Wi-Fi
+  wifi: 'Wi-Fi',
+  wifiRadios: 'Wi-Fi#radio-tabs',
+  wifiModes: 'Wi-Fi#modes',
+  wifiChannels: 'Wi-Fi#channels',
+  wifiTxPower: 'Wi-Fi#tx-power',
+  wifiSecurity: 'Wi-Fi#ssid-and-security',
+  wifiApply: 'Wi-Fi#apply-and-proof-on-air',
+  wifiMask: 'Wi-Fi#tx-mask-after-a-reload',
+  wifiStations: 'Wi-Fi#stations',
+  wifiWho: 'Wi-Fi#who-may-join',
+  wifiOptions: 'Wi-Fi#all-options',
   // Bench Guard
   guardBanner: 'Bench-Guard#what-you-see',
   readOnlyRun: 'Bench-Guard#what-still-works-during-a-run',
