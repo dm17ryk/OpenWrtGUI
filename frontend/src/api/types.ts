@@ -58,15 +58,17 @@ export type LiveTables = S['LiveTables']
 export type PortsState = S['PortsState']
 export type PortView = S['PortView']
 export type VlanView = S['VlanView']
-export type InterfaceIn = S['InterfaceIn']
-export type DhcpIn = S['DhcpIn']
-export type HostIn = S['HostIn']
-export type DnsIn = S['DnsIn']
-export type RouteIn = S['RouteIn']
-export type RuleIn = S['RuleIn']
-export type AccessIn = S['AccessIn']
-export type VlanIn = S['VlanIn']
-export type MirrorIn = S['MirrorIn']
+// Request bodies: the schema marks fields that have a default as required; the server fills them in.
+type Body<T, Required extends keyof T> = Partial<T> & Pick<T, Required>
+export type InterfaceIn = Body<S['InterfaceIn'], 'name'>
+export type DhcpIn = Body<S['DhcpIn'], 'interface'>
+export type HostIn = Body<S['HostIn'], 'mac'>
+export type DnsIn = Partial<S['DnsIn']>
+export type RouteIn = Body<S['RouteIn'], 'interface' | 'target'>
+export type RuleIn = Partial<S['RuleIn']>
+export type AccessIn = Body<S['AccessIn'], 'kind' | 'sections'>
+export type VlanIn = Body<S['VlanIn'], 'vlan' | 'members'>
+export type MirrorIn = Partial<S['MirrorIn']>
 
 // RF live (/ws/rf/{id}); WebSocket messages are not in the OpenAPI schema (src/openwrtgui/rf/sample.py).
 export type Bitrate = { mbps: number; mcs: number | null; width_mhz: number; short_gi: boolean; mode: Mode }

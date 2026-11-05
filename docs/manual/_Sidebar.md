@@ -9,6 +9,7 @@
 - [Dashboard](Dashboard)
 - [Wi-Fi](Wi-Fi)
 - [RF live](RF-live)
+- [Network and DHCP](Network-and-DHCP)
 - [LuCI pages](LuCI-pages)
 - [Bench Guard](Bench-Guard)
 - [Terminal and audit log](Terminal-and-audit-log)

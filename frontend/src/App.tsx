@@ -11,6 +11,7 @@ import { RouterOverview } from './screens/RouterOverview'
 import { SettingsScreen } from './screens/Settings'
 import { Terminal } from './screens/Terminal'
 import { LuciPage } from './screens/luci/LuciPage'
+import { NetworkScreen } from './screens/net/NetworkScreen'
 import { RfLive } from './screens/rf/RfLive'
 import { WifiScreen } from './screens/wifi/WifiScreen'
 import { GuardBanner } from './shell/GuardBanner'
@@ -58,6 +59,7 @@ export function App() {
         <Route path="/routers/:id/wifi" element={<WifiScreen />} />
         <Route path="/routers/:id/rf" element={<RfLive />} />
         <Route path="/routers/:id/luci" element={<LuciPage />} />
+        <Route path="/routers/:id/network" element={<NetworkScreen />} />
         <Route path="/terminal/:id?" element={<Terminal />} />
         <Route path="/audit" element={<AuditLog />} />
         <Route path="/settings" element={<SettingsScreen />} />
