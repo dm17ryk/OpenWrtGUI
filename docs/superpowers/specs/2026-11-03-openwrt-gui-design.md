@@ -166,7 +166,7 @@ docs/            manual/ (user manual, synced to the wiki) · design/ · superpo
 | Write lock | One write at a time per router. Reads run in parallel |
 | Preview | Every write shows the exact commands before Apply. Secrets are masked |
 | Verify by effect | A write is reported as done only when the effect is proven. Radio park: uci committed + netifd settled + no AP in `iw dev`. Link up: polled for up to 20 s. nft rule: present, ahead of `ct state established accept`, counter readable |
-| Rollback | Changes that can cut the app's own path (lan address, VLAN 1, firewall input on the app's zone, bridge members) arm a router-side 60 s restore timer first. The app reconnects, confirms and cancels the timer; otherwise the router restores itself |
+| Rollback | Changes that can cut the app's own path (lan address, VLAN 1, firewall input on the app's zone, bridge members) arm a router-side 60 s restore timer first. The app reconnects, confirms and cancels the timer; otherwise the router restores itself. The timer is rpcd's own, as LuCI uses it: changes staged in an rpcd session (`uci -P /var/run/rpcd/uci-<session>`), `ubus call uci apply` with rollback, then `ubus call uci confirm` from the reconnected session (O14) |
 | Own path | The PC's switch port and the app's SSH rule cannot be disabled from the UI |
 | Ownership | Every nft table and tc hook has an owner: fw4, the app, the harness, or unknown. Tables owned by someone else are locked by default. **Unlock** names the owner and what depends on it (e.g. "dima_night expects BENCHSIPGUARD") and asks for confirmation; after that edit, delete and add are allowed (D12). Bench Guard still wins during a run |
 | Timed faults | A timer on the router clears them, so they end on time even if the PC goes away |
@@ -419,6 +419,7 @@ Each milestone gets its own implementation plan. The first plan covers v0.1 Foun
 | O11 | Installing the app key on AP1 (live bench router) | Dmitry's go |
 | O12 | Claude Code GitHub Action (needs an API key secret) | Dmitry's call |
 | O13 | LuCI fallback login: LuCI accepts an rpcd session created over SSH (`session create` + `grant` + `set` user root) through its `sysauth` cookie; a read-only grant gives LuCI's read-only view; the session expires and is destroyed as planned | **Done 2026-11-05 on AP2:** a read-only session with only the page's own access groups (from acl.d) opened `admin/network/wireless` through the SSH forward: HTTP 200, no login form; the page's ubus calls (`iwinfo assoclist`, `uci get`) were allowed; `session destroy` left no session behind (`tests/hardware/test_ap2_luci.py`). No password and no "every group" retry needed |
+| O14 | rpcd `uci apply` with rollback and `uci confirm` work from SSH, with the confirm sent over a second SSH connection | **Done 2026-11-05 on AP2** (`tools/rollback_spike.py`, throwaway config `owgprobe`, nothing reloaded): a value staged in an rpcd session and applied with a 10 s rollback was committed, then restored by rpcd 10 s later with no confirm; with a 30 s rollback and `uci confirm` sent from a new SSH connection it stayed. `session destroy` also removes the session's staging folder. Still to prove with a real `network` change (v0.3 Task 17) |
 
 ## 14. Out of scope
 
