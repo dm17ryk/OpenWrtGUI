@@ -96,3 +96,7 @@ def test_current_survey_without_a_frequency_takes_the_in_use_entry() -> None:
     assert current_survey(parse_survey(SURVEY_RT2800), None) == parse_survey(SURVEY_RT2800)[0]
     assert current_survey(parse_survey(SURVEY_RT2800), 2462) is None
     assert current_survey([], 2437) is None
+
+
+def test_current_survey_without_a_frequency_and_every_channel_in_use_is_none() -> None:
+    assert current_survey(parse_survey(SURVEY_ALL_IN_USE), None) is None

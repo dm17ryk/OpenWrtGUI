@@ -132,8 +132,9 @@ def parse_station_dump(text: str) -> list[StationRaw]:
 
 def current_survey(entries: list[SurveyEntry], freq_mhz: int | None) -> SurveyEntry | None:
     """The entry of the radio's own frequency: rt2800 (AP2) marks every channel "[in use]"."""
-    if freq_mhz is None:
-        return next((s for s in entries if s.in_use), None)
+    if freq_mhz is None:  # no channel line yet (hostapd starting): trust "[in use]" only when it is one
+        in_use = [s for s in entries if s.in_use]
+        return in_use[0] if len(in_use) == 1 else None
     return next((s for s in entries if s.freq_mhz == freq_mhz), None)
 
 

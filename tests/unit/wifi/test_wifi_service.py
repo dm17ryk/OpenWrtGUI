@@ -164,13 +164,15 @@ async def test_apply_interrupted_after_commit_is_not_verified(env: WifiEnv, mode
 class _OnCommand:
     """Wraps a transport and changes what one command does."""
 
-    def __init__(self, inner: Transport, match: str, do: str, env: WifiEnv | None = None) -> None:
-        self._inner, self._match, self._do, self._env = inner, match, do, env
+    def __init__(
+        self, inner: Transport, match: str, do: str, env: WifiEnv | None = None, *, exact: bool = False
+    ) -> None:
+        self._inner, self._match, self._do, self._env, self._exact = inner, match, do, env, exact
         self.sent: list[str] = []
 
     async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
         self.sent.append(command)
-        if self._match in command:
+        if command == self._match if self._exact else self._match in command:
             if self._do == "drop":
                 raise Unreachable("192.168.1.2: no answer within 60 s")
             if self._do == "fail":
@@ -219,6 +221,29 @@ async def test_monitor_interface_is_removed_even_when_a_run_starts(env: WifiEnv)
     await env.service.apply("ap2", N20_CH6)
     commands = [c for c, _ in env.audit_lines()]
     assert "iw dev owgmon0 del" in commands
+
+
+async def test_a_monitor_that_cannot_be_removed_fails_the_beacon_check(env: WifiEnv) -> None:
+    # AP2, 2026-11-05: the cleanup failed unnoticed and owgmon0 stayed on the radio.
+    env.wrap.append(
+        lambda t: _OnCommand(t, "iw dev owgmon0 del", "fail", exact=True)  # type: ignore[arg-type, return-value]
+    )
+    result = await env.service.apply("ap2", N20_CH6)
+    beacon = next(c for c in result.checks if c.name == "beacon rate")
+    assert not beacon.ok and beacon.detail == "owgmon0 is still on the radio: Command failed: Not found"
+    assert result.applied and not result.verified
+
+
+async def test_the_monitor_is_removed_when_the_connection_drops_while_adding_it(env: WifiEnv) -> None:
+    wrappers: list[_OnCommand] = []
+
+    def wrap(t: Transport) -> _OnCommand:
+        wrappers.append(_OnCommand(t, "interface add owgmon0", "drop"))
+        return wrappers[-1]
+
+    env.wrap.append(wrap)  # type: ignore[arg-type]
+    await env.service.apply("ap2", N20_CH6)
+    assert "iw dev owgmon0 del" in wrappers[0].sent
 
 
 async def test_a_stale_monitor_interface_is_cleared_before_adding_one(env: WifiEnv) -> None:

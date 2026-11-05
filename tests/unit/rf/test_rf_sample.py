@@ -88,6 +88,22 @@ def test_station_leaving_is_marked_left() -> None:
     assert sample.left == ("aa:bb:cc:dd:ee:ff",) and [s.mac for s in sample.stations] == ["f4:12:fa:f3:57:68"]
 
 
+def test_busy_is_none_across_a_channel_change() -> None:
+    # AP2 survey numbers (rt2800 keeps per-channel counters): 2437 MHz, then 2412 MHz.
+    prev = replace(_tick(T0, (), 0, 0, 10), survey=SurveyEntry(2437, True, None, 21265934, 10852854))
+    cur = replace(
+        _tick(T0 + timedelta(seconds=1), (), 0, 0, 11),
+        survey=SurveyEntry(2412, True, None, 23938987, 15270606),
+    )
+    assert derive(prev, cur, "ap2", "radio0", {}).radio_sample.busy_pct is None
+
+
+def test_busy_above_active_time_is_not_shown() -> None:
+    prev = _tick(T0, (), 1000, 200, 10)
+    cur = _tick(T0 + timedelta(seconds=1), (), 2000, 1500, 11)
+    assert derive(prev, cur, "ap2", "radio0", {}).radio_sample.busy_pct is None
+
+
 def test_counter_reset_gives_none() -> None:
     prev = _tick(T0, (_sta(tx_packets=5000),), 1000, 200, 10)
     cur = _tick(T0 + timedelta(seconds=1), (_sta(tx_packets=10),), 500, 100, 2)

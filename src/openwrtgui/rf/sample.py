@@ -112,10 +112,11 @@ def derive(
 ) -> RfSample:
     dt = (cur.at - prev.at).total_seconds() if prev else None
     busy = None
-    if prev and prev.survey and cur.survey:
+    # Survey counters are per channel: a delta across a channel change means nothing.
+    if prev and prev.survey and cur.survey and prev.survey.freq_mhz == cur.survey.freq_mhz:
         d_active = _delta(cur.survey.active_ms, prev.survey.active_ms)
         d_busy = _delta(cur.survey.busy_ms, prev.survey.busy_ms)
-        if d_active and d_busy is not None:
+        if d_active and d_busy is not None and d_busy <= d_active:
             busy = round(100 * d_busy / d_active, 1)
     before = {s.mac: s for s in prev.stations} if prev else {}
     return RfSample(

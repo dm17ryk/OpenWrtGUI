@@ -540,24 +540,27 @@ class WifiService:
     ) -> Check:
         if info.addr is None or expect.beacon_mbps is None:
             return Check("beacon rate", False, "no BSSID to listen for")
-        added = await self._run(  # a monitor left by a dropped connection would block the add
-            t,
-            rec,
-            f"iw dev {MONITOR} del 2>/dev/null; "
-            f"iw phy {phy} interface add {MONITOR} type monitor && ip link set {MONITOR} up",
-            source="app",
+        capture = (
+            f"timeout 5 tcpdump -i {MONITOR} -e -n -c 5 -l "
+            f"'type mgt subtype beacon and wlan addr2 {info.addr}'"
         )
-        try:
-            if not added.ok:
-                return Check("beacon rate", False, f"no monitor interface: {added.stderr.strip()}")
-            capture = (
-                f"timeout 5 tcpdump -i {MONITOR} -e -n -c 5 -l "
-                f"'type mgt subtype beacon and wlan addr2 {info.addr}'"
+        try:  # the add is inside: a connection dropped after the router made it still cleans up
+            added = await self._run(  # a monitor left by a dropped connection would block the add
+                t,
+                rec,
+                f"iw dev {MONITOR} del 2>/dev/null; "
+                f"iw phy {phy} interface add {MONITOR} type monitor && ip link set {MONITOR} up",
+                source="app",
             )
-            rates = parse_beacon_rates((await self._run(t, rec, capture, source="app", timeout=15.0)).stdout)
+            heard = (await self._run(t, rec, capture, source="app", timeout=15.0)).stdout if added.ok else ""
         finally:  # cleaning up restores the radio, so it runs even when a run has started meanwhile
             # `iw`, not `ip link del`: AP2's kernel refuses the latter for a wireless interface.
-            await self._run(t, rec, f"iw dev {MONITOR} del", source="app", require_guard=False)
+            removed = await self._run(t, rec, f"iw dev {MONITOR} del", source="app", require_guard=False)
+        if not added.ok:
+            return Check("beacon rate", False, f"no monitor interface: {added.stderr.strip()}")
+        if not removed.ok:
+            return Check("beacon rate", False, f"{MONITOR} is still on the radio: {removed.stderr.strip()}")
+        rates = parse_beacon_rates(heard)
         if not rates:
             return Check("beacon rate", False, "no beacon seen in 5 s")
         if set(rates) != {expect.beacon_mbps}:
