@@ -205,7 +205,7 @@ class NetworkService:
     async def apply_dhcp(self, router_id: str, req: DhcpRequest, digest: str | None = None) -> NetApplyResult:
         rec, t, state, uci, _desc = await self._read(router_id)
         plan = as_previewed(rec, self._dhcp_plan(rec, state, uci, req), digest)
-        return await self._runner.run(rec, t, plan, self._dhcp_checks(plan))
+        return await self._runner.run(rec, t, plan, self._dhcp_checks(plan, uci))
 
     def _hosts_plan(
         self,
@@ -241,11 +241,13 @@ class NetworkService:
     ) -> NetApplyResult:
         rec, t, state, uci, _desc = await self._read(router_id)
         plan = as_previewed(rec, self._hosts_plan(rec, state, uci, upserts, deletes), digest)
-        return await self._runner.run(rec, t, plan, self._dhcp_checks(plan))
+        return await self._runner.run(rec, t, plan, self._dhcp_checks(plan, uci))
 
-    def _dhcp_checks(self, plan: NetPlan) -> Callable[[Transport], Awaitable[list[NetCheck]]]:
+    def _dhcp_checks(
+        self, plan: NetPlan, uci: Mapping[str, str]
+    ) -> Callable[[Transport], Awaitable[list[NetCheck]]]:
         async def verify(t: Transport) -> list[NetCheck]:
-            return [await saved_check(t, UCI_DHCP, plan.ops), await service_check(t, "dnsmasq")]
+            return [await saved_check(t, UCI_DHCP, plan.ops, uci), await service_check(t, "dnsmasq")]
 
         return verify
 
@@ -271,7 +273,7 @@ class NetworkService:
     async def apply_dns(self, router_id: str, req: DnsRequest, digest: str | None = None) -> NetApplyResult:
         rec, t, state, uci, _desc = await self._read(router_id)
         plan = as_previewed(rec, self._dns_plan(rec, state, uci, req), digest)
-        return await self._runner.run(rec, t, plan, self._dhcp_checks(plan))
+        return await self._runner.run(rec, t, plan, self._dhcp_checks(plan, uci))
 
     # ---------------------------------------------------------------- static routes and rules
     def _routes_plan(

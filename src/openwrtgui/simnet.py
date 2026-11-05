@@ -9,6 +9,7 @@ drops port 3 from lan's VLAN, or turns port 3 off, cuts the app off until the ro
 
 from __future__ import annotations
 
+import hashlib
 import ipaddress
 import json
 import re
@@ -33,6 +34,7 @@ _UBUS = re.compile(r"^ubus call (\S+) (\S+)(?: '(.*)')?$")
 _ASSIGN = re.compile(r"^(\w+)=\$\((uci .+)\)$")
 _VAR = re.compile(r"\$(\w+)")
 _RELOADS = frozenset(f"/etc/init.d/{s} reload" for s in ("dnsmasq", "odhcpd", "network"))
+_ANONYMOUS = re.compile(r"cfg[0-9a-f]{6}")
 HELP = (
     "switch0: mt7620(mt7620), ports: 8 (cpu @ 6), vlans: 16\n     --switch\n"
     "\tAttribute 1 (int): enable_vlan (VLAN mode (1:enabled))\n"
@@ -64,6 +66,37 @@ def _ok(stdout: str = "") -> CommandResult:
 
 def _fail(stderr: str, status: int = 1) -> CommandResult:
     return CommandResult("", "", stderr, status)
+
+
+def _contents(uci: dict[str, str]) -> dict[str, tuple[str, tuple[tuple[str, str], ...]]]:
+    """{config.section: (type, its options)}."""
+    out: dict[str, tuple[str, tuple[tuple[str, str], ...]]] = {
+        k: (v, ()) for k, v in uci.items() if k.count(".") == 1
+    }
+    for key, value in uci.items():
+        if key.count(".") == 2:
+            section = key.rsplit(".", 1)[0]
+            type_, options = out.get(section, ("", ()))
+            out[section] = (type_, (*options, (key.rsplit(".", 1)[1], value)))
+    return out
+
+
+def _libuci_names(before: dict[str, str], after: dict[str, str]) -> dict[str, str]:
+    """libuci names an unnamed section from its type and options each time it loads a config, so once a
+    change is committed an edited or new one has another name (the app must not count on the old one)."""
+    old, new = _contents(before), _contents(after)
+    renamed = {
+        section: f"{section.split('.')[0]}.cfg{hashlib.sha1(repr(content).encode()).hexdigest()[:6]}"
+        for section, content in new.items()
+        if _ANONYMOUS.fullmatch(section.split(".")[1]) and old.get(section) != content
+    }
+    if not renamed:
+        return after
+    out: dict[str, str] = {}
+    for key, value in after.items():
+        section = ".".join(key.split(".")[:2])
+        out[renamed.get(section, section) + key[len(section) :]] = value
+    return out
 
 
 def _render(uci: dict[str, str], config: str) -> str:
@@ -228,7 +261,8 @@ class SimNetwork:
             work = self._work.pop(savedir, None)
             if work is not None:
                 kept = {k: v for k, v in self._committed.items() if not k.startswith(config + ".")}
-                self._committed = kept | {k: v for k, v in work.items() if k.startswith(config + ".")}
+                now = kept | {k: v for k, v in work.items() if k.startswith(config + ".")}
+                self._committed = _libuci_names(self._committed, now)
             return _ok()
         if verb == "add" and len(args) == 2:
             name = f"cfg{self._new:06x}"
@@ -310,7 +344,7 @@ class SimNetwork:
             self._snapshot = dict(self._committed)
             self._deadline = self._clock() + int(args.get("timeout", 30))
             self._apply_sid = sid
-        self._committed = work
+        self._committed = _libuci_names(self._committed, work)
         if network_changed:
             self._reset_switch()  # the network reload re-applies the switch config
         return _ok()

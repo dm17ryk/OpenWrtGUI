@@ -13,6 +13,7 @@ import asyncio
 import contextlib
 import hashlib
 import json
+import re
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -39,11 +40,12 @@ from openwrtgui.uci import UciOp, drop_unchanged, order_for_script, parse_uci_sh
 ROLLBACK_S = 60
 RECONNECT_WINDOW_S = 40.0
 RECONNECT_EVERY_S = 2.0
-SETTLE_S = 2.0
+SETTLE_S = 5.0  # before the first reconnect; LuCI holds off 4 s (apply_holdoff)
 RESTORE_CHECK_S = 65.0
 SCRIPT_TIMEOUT_S = 60.0
 SESSION = "<session>"
 NOTHING = "Nothing to apply: the router already has these settings."
+_ANONYMOUS = re.compile(r"cfg[0-9a-f]{6}")  # libuci's name for an unnamed section
 
 
 @dataclass(frozen=True)
@@ -179,10 +181,72 @@ def _holds(op: UciOp, shown: Mapping[str, str]) -> bool:
     return op.value not in items  # del_list
 
 
-async def saved_check(t: Transport, show_command: str, ops: Sequence[UciOp]) -> NetCheck:
-    """`saved`: the config read back holds every change of the plan."""
+def _sections(shown: Mapping[str, str], config: str) -> dict[str, tuple[str, dict[str, str]]]:
+    """{section: (type, {option: value})} of one config in a `uci -X show` map."""
+    out: dict[str, tuple[str, dict[str, str]]] = {}
+    for key, value in shown.items():
+        parts = key.split(".")
+        if parts[0] != config or len(parts) not in (2, 3):
+            continue
+        type_, options = out.get(parts[1], ("", {}))
+        if len(parts) == 2:
+            out[parts[1]] = (value, options)
+        else:
+            out[parts[1]] = (type_, {**options, parts[2]: value})
+    return out
+
+
+def _after(options: Mapping[str, str], ops: Sequence[UciOp]) -> dict[str, str] | None:
+    """A section's options once `ops` ran on it; None when they delete it."""
+    now = dict(options)
+    for op in ops:
+        name = op.path.split(".")[2] if op.path.count(".") == 2 else None
+        if name is None:
+            if op.op == "delete":
+                return None
+            continue
+        items = now.get(name, "").split()
+        if op.op == "set":
+            now[name] = op.value or ""
+        elif op.op == "delete":
+            now.pop(name, None)
+        elif op.op == "add_list":
+            now[name] = " ".join([*items, op.value or ""])
+        else:  # del_list
+            kept = [i for i in items if i != op.value]
+            if kept:
+                now[name] = " ".join(kept)
+            else:
+                now.pop(name, None)
+    return now
+
+
+async def saved_check(
+    t: Transport, show_command: str, ops: Sequence[UciOp], before: Mapping[str, str] | None = None
+) -> NetCheck:
+    """`saved`: the config read back holds every change of the plan.
+
+    An anonymous section (`cfg<n><hash>`) is found by its content: libuci names it from its type and
+    options each time it loads the config, so after the commit an edited one has another name. `before`
+    is the config the plan was made from."""
     shown = parse_uci_show((await t.run(show_command)).stdout)
-    wrong = [op.path for op in ops if not _holds(op, shown)]
+    by_section: dict[tuple[str, str], list[UciOp]] = {}
+    rest: list[UciOp] = []
+    for op in ops:
+        parts = op.path.split(".")
+        anonymous = len(parts) >= 2 and _ANONYMOUS.fullmatch(parts[1]) is not None
+        if before is not None and anonymous and f"{parts[0]}.{parts[1]}" in before:
+            by_section.setdefault((parts[0], parts[1]), []).append(op)
+            continue
+        rest.append(op)
+    wrong = [op.path for op in rest if not _holds(op, shown)]
+    for (config, section), section_ops in by_section.items():
+        assert before is not None
+        type_, options = _sections(before, config)[section]
+        want = _after(options, section_ops)
+        now = [o for t_, o in _sections(shown, config).values() if t_ == type_]
+        if (want is None and options in now) or (want is not None and want not in now):
+            wrong.append(f"{config}.{section}")
     if wrong:
         return NetCheck("saved", False, "not as asked: " + ", ".join(wrong))
     return NetCheck("saved", True, "the router has the change")
@@ -364,10 +428,18 @@ class ApplyRunner:
             pass  # the change may have cut this connection: reconnect and confirm decides
         applied_at = self._clock()
         target = plan.target_host or rec.host
-        t2, why = await self._reconnect(rec, target, applied_at)
-        if t2 is None:
-            return await self._restored(rec, plan, target, why, applied_at, snapshot)
-        return await self._confirm(rec, plan, t2, target, confirm, destroy, verify)
+        t2, why = await self._reconnect(rec, target, applied_at, SETTLE_S)
+        while t2 is not None:
+            # Confirm only once the change is seen in effect over the new connection (the verifier polls
+            # for it): procd reloads a few seconds after `uci apply`, and a confirm sent before that would
+            # cancel the rollback of a change that then cuts the app off.
+            try:
+                checks = await verify(t2)
+            except TransportError:  # the change took effect and cut this connection
+                t2, why = await self._reconnect(rec, target, applied_at, self._every_s)
+                continue
+            return await self._confirm(rec, plan, t2, target, confirm, destroy, checks)
+        return await self._restored(rec, plan, target, why, applied_at, snapshot)
 
     def _elapsed(self, since: datetime) -> float:
         return (self._clock() - since).total_seconds()
@@ -377,10 +449,10 @@ class ApplyRunner:
         return await self._pool.get(rec.model_copy(update={"host": host}))
 
     async def _reconnect(
-        self, rec: RouterRecord, target: str, applied_at: datetime
+        self, rec: RouterRecord, target: str, applied_at: datetime, settle_s: float
     ) -> tuple[Transport | None, str | None]:
         await self._pool.drop(rec.id)
-        await self._sleep(SETTLE_S)
+        await self._sleep(settle_s)
         carried = False
         while self._elapsed(applied_at) < self._window_s:
             try:
@@ -406,7 +478,7 @@ class ApplyRunner:
         target: str,
         confirm: str,
         destroy: str,
-        verify: Verifier,
+        seen: Sequence[NetCheck],
     ) -> NetApplyResult:
         checks = [NetCheck("reconnected", True, f"{rec.name} answered at {target}")]
         done = await self._run(t, rec, plan, confirm, source="app", require_guard=False)
@@ -426,11 +498,7 @@ class ApplyRunner:
         if state.live:
             run = state.reasons[0].text if state.reasons else "a harness run"
             error = f"Confirmed although Bench Guard went live ({run})"
-        try:
-            checks += await verify(t)
-        except TransportError as exc:
-            checks.append(NetCheck("verify", None, f"not run: {exc}"))
-        return self._finish(rec, plan, True, checks, error, host)
+        return self._finish(rec, plan, True, [*checks, *seen], error, host)
 
     async def _restored(
         self,

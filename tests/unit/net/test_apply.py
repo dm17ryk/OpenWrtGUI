@@ -13,7 +13,7 @@ import pytest
 
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard, ProcessInfo
-from openwrtgui.net.apply import ApplyRunner, NetCheck, net_plan
+from openwrtgui.net.apply import ApplyRunner, NetCheck, net_plan, saved_check
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.store.settings import GuardWatchList
 from openwrtgui.transport.base import CommandResult, HostKeyInfo, HostKeyUnknown, Transport, Unreachable
@@ -284,6 +284,40 @@ async def test_unreachable_after_apply_reports_restored(env: Env) -> None:
     assert not any(c.startswith("ubus call uci confirm") for c in env.commands())
 
 
+async def test_change_that_cuts_the_path_late_is_never_confirmed(env: Env) -> None:
+    """The reload runs a few seconds after `uci apply` (procd's trigger delay, a busy router): a confirm
+    sent while the old path still works would cancel the rollback of a change that then cuts the app off."""
+    applied_at: list[datetime] = []
+
+    def note(command: str) -> None:
+        if command.startswith("ubus call uci apply"):
+            applied_at.append(env.clock.t)
+
+    def cut(now: datetime) -> bool:  # the change takes effect 6 s after the apply; rpcd restores at 60 s
+        return bool(applied_at) and timedelta(seconds=6) <= now - applied_at[0] < timedelta(seconds=64)
+
+    def respond(command: str) -> CommandResult | None:
+        if cut(env.clock.t):
+            raise Unreachable("192.168.1.2: no route to host")
+        return None
+
+    env.bench.on_command = note
+    env.bench.respond = respond
+    env.bench.answers_at = lambda host, now: host == "192.168.1.2" and not cut(now)
+
+    async def verify_lan(t: Transport) -> list[NetCheck]:  # polls the router, as the real verifiers do
+        for _ in range(10):
+            await t.run("ubus call network.interface.lan status")
+            await env.clock.sleep(1.0)
+        return [NetCheck("interface lan", True, "up with 192.168.1.2/30")]
+
+    t = FakeT(env.bench, "192.168.1.2")
+    result = await env.runner.run(env.rec, t, _lan_plan(target=None), verify_lan, SNAPSHOT)  # type: ignore[arg-type]
+    assert not any(c.startswith("ubus call uci confirm") for c in env.commands())
+    assert not result.applied
+    assert {c.name: c.ok for c in result.checks} == {"reconnected": False, "restored": True}
+
+
 async def test_guard_live_after_apply_still_confirms(env: Env) -> None:
     def go_live(command: str) -> None:
         if command.startswith("ubus call uci apply"):
@@ -310,6 +344,48 @@ async def test_script_refused_sends_no_apply(env: Env) -> None:
     assert not any(c.startswith("ubus call uci apply") for c in env.commands())
     assert env.commands()[-1] == 'ubus call session destroy \'{"ubus_rpc_session":"S"}\''
     assert not result.applied and result.error == "The router refused the change: uci: Invalid argument"
+
+
+DHCP_BEFORE = parse_uci_show(
+    "dhcp.cfg01411c=dnsmasq\ndhcp.cfg01411c.domain='lan'\ndhcp.cfg01411c.cachesize='1000'\n"
+    "dhcp.cfg02f37d=host\ndhcp.cfg02f37d.mac='e4:5f:01:aa:bb:01'\ndhcp.cfg02f37d.ip='192.168.1.50'\n"
+    "dhcp.cfg03a1b2=host\ndhcp.cfg03a1b2.mac='e4:5f:01:aa:bb:02'\ndhcp.cfg03a1b2.ip='192.168.1.51'\n"
+)
+DHCP_OPS = [
+    UciOp("add_list", "dhcp.cfg01411c.server", "1.1.1.1"),
+    UciOp("set", "dhcp.cfg02f37d.ip", "192.168.1.60"),
+    UciOp("delete", "dhcp.cfg03a1b2"),
+]
+# After the commit libuci names every anonymous section anew from its content (cfg<n><hash>).
+DHCP_AFTER = (
+    "dhcp.cfg01e6a0=dnsmasq\ndhcp.cfg01e6a0.domain='lan'\ndhcp.cfg01e6a0.cachesize='1000'\n"
+    "dhcp.cfg01e6a0.server='1.1.1.1'\n"
+    "dhcp.cfg0277c4=host\ndhcp.cfg0277c4.mac='e4:5f:01:aa:bb:01'\ndhcp.cfg0277c4.ip='192.168.1.60'\n"
+)
+
+
+class Shown:
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
+        return CommandResult(command, self.text, "", 0)
+
+
+async def test_saved_check_finds_renamed_anonymous_sections_by_content() -> None:
+    check = await saved_check(Shown(DHCP_AFTER), "uci -X show dhcp", DHCP_OPS, DHCP_BEFORE)  # type: ignore[arg-type]
+    assert check == NetCheck("saved", True, "the router has the change")
+
+
+async def test_saved_check_still_catches_a_change_the_router_does_not_hold() -> None:
+    stale = DHCP_AFTER.replace("192.168.1.60", "192.168.1.50")
+    check = await saved_check(Shown(stale), "uci -X show dhcp", DHCP_OPS, DHCP_BEFORE)  # type: ignore[arg-type]
+    assert check == NetCheck("saved", False, "not as asked: dhcp.cfg02f37d")
+    kept = DHCP_AFTER + (
+        "dhcp.cfg03b9e1=host\ndhcp.cfg03b9e1.mac='e4:5f:01:aa:bb:02'\ndhcp.cfg03b9e1.ip='192.168.1.51'\n"
+    )
+    check = await saved_check(Shown(kept), "uci -X show dhcp", DHCP_OPS, DHCP_BEFORE)  # type: ignore[arg-type]
+    assert check == NetCheck("saved", False, "not as asked: dhcp.cfg03a1b2")
 
 
 def test_carry_pins_only_identical_key(tmp_path: Path) -> None:

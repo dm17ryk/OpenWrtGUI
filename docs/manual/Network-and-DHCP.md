@@ -25,7 +25,8 @@ comes with v0.4; until then use LuCI › Network › Firewall.
 
 Every change to the router's network settings (addresses, bridges, routes, rules, VLANs, the switch mirror)
 applies with a **60 s rollback**, the same way LuCI applies them. The router keeps a copy of its settings; after
-the change the app connects to the router again and confirms. If it cannot within 40 s, the router puts its
+the change the app connects to the router again, checks that the change is in effect, and only then confirms
+(the router takes a few seconds to apply it). If it cannot reach the router within 40 s, the router puts its
 previous settings back by itself 60 s after the change, and the app checks that they are back.
 
 When you change the address of the interface this app talks through, the app reconnects at the **new**
