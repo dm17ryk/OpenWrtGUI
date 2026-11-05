@@ -6,6 +6,7 @@ import type { DescriptionSummary, RouterDetail } from '../api/types'
 import { Help } from '../help/Help'
 import { HELP } from '../help/topics'
 import { RouterSections } from '../shell/RouterSections'
+import { LuciPagesCard } from './luci/LuciPagesCard'
 
 const FEATURE_ORDER = ['sae', 'owe', 'wps', '11r', '11ax', 'swconfig', 'firewall4', 'apk', 'wep', '11be']
 
@@ -139,6 +140,7 @@ export function RouterOverview() {
           {s ? <Sources s={s} /> : <div className="muted">Not read yet.</div>}
         </section>
       )}
+      {d.record.auth === 'key' && <LuciPagesCard routerId={d.record.id} short={d.record.name.split(' · ')[0]} />}
       {s && Object.keys(s.port_labels).length > 0 && (
         <section className="card" aria-labelledby="ports-h">
           <h2 id="ports-h" style={{ marginBottom: 10 }}>

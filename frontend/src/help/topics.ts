@@ -39,6 +39,13 @@ export const HELP = {
   rfCharts: 'RF-live#charts',
   rfRates: 'RF-live#which-rates-reach-the-station',
   rfRecord: 'RF-live#record-to-csv',
+  // LuCI pages
+  luci: 'LuCI-pages',
+  luciWhich: 'LuCI-pages#which-pages-open-here',
+  luciOpen: 'LuCI-pages#opening-a-page',
+  luciReadOnly: 'LuCI-pages#read-only-during-a-run',
+  luciChanged: 'LuCI-pages#changed-via-luci',
+  luciSession: 'LuCI-pages#session-end',
   // Bench Guard
   guardBanner: 'Bench-Guard#what-you-see',
   readOnlyRun: 'Bench-Guard#what-still-works-during-a-run',

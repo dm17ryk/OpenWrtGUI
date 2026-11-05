@@ -171,9 +171,11 @@ class LuciBridgeService:
 
     async def open(self, router_id: str, path: str) -> BridgeView:
         rec, t = await self._connect(router_id)
-        page = next((p for p in await self._luci_pages(rec, t) if p.path == path), None)
+        pages = await self._luci_pages(rec, t)
+        page = next((p for p in pages if p.path == path), None)
         if page is None:
             raise ValueError(f"No LuCI page {path} on {rec.name}")
+        shown = next(v for v in page_views(pages) if v.path == path)
         access: Access = "read" if self._guard.state().live else "write"
         before = parse_uci_show((await t.run(UCI_SHOW)).stdout)
         sid = await self._new_session(rec, t, page, access)
@@ -188,7 +190,7 @@ class LuciBridgeService:
         view = BridgeView(
             id=bridge_id,
             router_id=rec.id,
-            page=PageView(page.path, page.title, page.package, None),
+            page=shown,
             url=f"http://127.0.0.1:{port}/__owg/enter?k={secret}&to=/cgi-bin/luci/{page.path}",
             access=access,
             opened_at=now,

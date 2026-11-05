@@ -425,6 +425,24 @@ h2 {
 .note.x {
   background: var(--bad-soft);
 }
+.luci-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+}
+.luci-strip-text {
+  flex: 1 1 520px;
+}
+.luci-frame {
+  display: block;
+  width: 100%;
+  height: calc(100vh - 260px);
+  min-height: 480px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff; /* LuCI's own page; the app theme does not apply inside */
+}
 .guard {
   background: var(--bad-soft);
   border-bottom: 1px solid var(--line);
@@ -608,9 +626,62 @@ h2 {
   border-color: var(--ink);
   color: var(--bg);
 }
-.sections a:focus-visible {
+.sections a:focus-visible,
+.sections-more summary:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+.sections-more {
+  position: relative;
+}
+.sections-more summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 18px;
+  border: 1px dashed var(--line);
+  color: var(--ink2);
+  font-size: 13px;
+  cursor: pointer;
+  list-style: none;
+}
+.sections-more summary::-webkit-details-marker {
+  display: none;
+}
+.sections-more summary::after {
+  content: '▾';
+  margin-left: 6px;
+}
+.sections-more[open] summary::after {
+  content: '▴';
+}
+.sections-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 260px;
+  max-width: min(420px, calc(100vw - 32px));
+  max-height: min(420px, 60vh);
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+.sections .sections-menu a {
+  border: 0;
+  border-radius: 6px;
+  min-height: 32px;
+  background: transparent;
+}
+.sections .sections-menu a:hover {
+  background: var(--surface2);
 }
 
 /* what an Apply proved (components/CheckList) */

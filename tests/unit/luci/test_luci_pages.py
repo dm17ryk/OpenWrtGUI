@@ -32,10 +32,28 @@ def test_menu_pages_from_ap2_recording() -> None:
         ("luci-mod-network-config",),
         ("wireless",),
         (),
+        "Network",
     )
     assert len(pages) == 42 and [p.path for p in pages] == sorted(p.path for p in pages)
     untitled = next(p for p in pages if p.path == "admin/status/nftables/iptables")
     assert untitled.title == "iptables"
+
+
+def test_pages_carry_their_menu_section() -> None:
+    by_path = {p.path: p for p in parse_menu(MENUS)}
+    assert by_path["admin/network/dhcp"].section == "Network"
+    assert by_path["admin/network/firewall/zones"].section == "Network › Firewall"
+    assert by_path["admin/status/realtime/wireless"].section == "Status › Realtime Graphs"
+
+
+def test_page_labels_tell_same_titled_pages_apart() -> None:
+    views = {v.path: v for v in page_views(parse_menu(MENUS))}
+    assert views["admin/network/routes"].label == "Network › Routing"
+    assert views["admin/status/realtime/wireless"].label == "Status › Realtime Graphs › Wireless"
+    assert views["admin/status/iptables"].label == "Status › Firewall (iptables)"
+    assert views["admin/status/nftables"].label == "Status › Firewall (nftables)"
+    labels = [v.label for v in views.values()]
+    assert len(labels) == len(set(labels))
 
 
 def test_acl_groups_merge_across_files() -> None:

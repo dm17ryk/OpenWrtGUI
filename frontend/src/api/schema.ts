@@ -1103,12 +1103,22 @@ export interface components {
         };
         /** PageView */
         PageView: {
+            /**
+             * Label
+             * @default
+             */
+            label: string;
             /** Native */
             native: string | null;
             /** Package */
             package: string;
             /** Path */
             path: string;
+            /**
+             * Section
+             * @default
+             */
+            section: string;
             /** Title */
             title: string;
         };

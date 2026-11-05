@@ -16,7 +16,7 @@ class _QuietServer(uvicorn.Server):
     """Ctrl+C and SIGTERM belong to the app's own server; a bridge must not take them over."""
 
     @contextlib.contextmanager
-    def capture_signals(self) -> Generator[None, None, None]:
+    def capture_signals(self) -> Generator[None]:
         yield
 
 

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 PAGE_ACTIONS = frozenset({"view", "template", "cbi", "form"})
+SECTION_SEP = " › "
 
 
 @dataclass(frozen=True)
@@ -17,6 +18,7 @@ class LuciPage:
     acl: tuple[str, ...]
     uci: tuple[str, ...]
     fs: tuple[str, ...]
+    section: str = ""  # the menu entries above the page, below "admin": "Network › Firewall"
 
 
 def _names(value: Any) -> tuple[str, ...]:
@@ -27,8 +29,20 @@ def _names(value: Any) -> tuple[str, ...]:
     return ()
 
 
+def _section(path: str, titles: Mapping[str, str]) -> str:
+    parts = path.split("/")
+    above = ("/".join(parts[:n]) for n in range(2, len(parts)))
+    return SECTION_SEP.join(titles.get(p, p.rsplit("/", 1)[-1]) for p in above)
+
+
 def parse_menu(menus: Mapping[str, Mapping[str, Any]]) -> list[LuciPage]:
     """Every menu entry that shows a page, from {menu.d file stem: its JSON}."""
+    titles = {
+        path: str(entry["title"])
+        for entries in menus.values()
+        for path, entry in entries.items()
+        if isinstance(entry, dict) and entry.get("title")
+    }
     pages = []
     for package, entries in menus.items():
         for path, entry in entries.items():
@@ -43,6 +57,7 @@ def parse_menu(menus: Mapping[str, Mapping[str, Any]]) -> list[LuciPage]:
                     acl=_names(depends.get("acl")),
                     uci=_names(depends.get("uci")),
                     fs=_names(depends.get("fs")),
+                    section=_section(path, titles),
                 )
             )
     return sorted(pages, key=lambda p: p.path)

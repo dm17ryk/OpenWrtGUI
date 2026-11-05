@@ -31,6 +31,10 @@ export type ApplyResult = S['ApplyResult']
 export type Check = S['Check']
 export type Station = S['Station']
 export type OptionRow = S['OptionRow']
+export type LuciPageView = S['PageView']
+export type BridgeView = S['BridgeView']
+export type BridgeClosed = S['BridgeClosed']
+export type UciChange = S['UciChange']
 export type Mode = ModesIn['modes'][number]
 
 // RF live (/ws/rf/{id}); WebSocket messages are not in the OpenAPI schema (src/openwrtgui/rf/sample.py).

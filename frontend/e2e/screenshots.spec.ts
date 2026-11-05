@@ -7,6 +7,7 @@ const SCREENS: ReadonlyArray<readonly [string, string, string]> = [
   ['router-overview', '/routers/ap2', 'What AP2 says about itself'],
   ['wifi', '/routers/ap1/wifi', 'Modes'],
   ['rf-live', '/routers/ap1/rf', 'RX at AP'],
+  ['luci', '/routers/ap1/luci?page=admin%2Fnetwork%2Fdhcp', 'Changed via LuCI since you opened this page'],
   ['terminal', '/terminal/ap2', 'Command'],
   ['audit-log', '/audit', 'Audit log'],
   ['settings', '/settings', 'Updates'],
