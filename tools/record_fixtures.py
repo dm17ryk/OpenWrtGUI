@@ -11,7 +11,7 @@ taken on trust: connect with ssh once and check the fingerprint first.
 
 Sets: probe (the self-description and status probes, commands.json), wifi-parked (the Wi-Fi
 config and limits, wifi_parked.json), wifi-on (the radio while it is on air, wifi_on.json; needs
-an AP interface up on phy0).
+an AP interface up on phy0), network (interfaces, DHCP, leases, routes and the switch, network.json).
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import Protocol
 
 from openwrtgui.guard.audit import mask
+from openwrtgui.net.commands import network_reads
 from openwrtgui.probe.commands import DESCRIBE_COMMANDS, STATUS_COMMANDS, wireless_validate
 from openwrtgui.rf.parse import parse_station_dump
 from openwrtgui.transport.base import CommandResult
@@ -47,8 +48,15 @@ SETS: dict[str, tuple[str, ...]] = {
         "ubus call network.wireless status",
         'ubus call iwinfo phyname \'{"section":"radio0"}\'',
     ),
+    # The Network & DHCP and Ports screens' reads (AP2's switch is switch0)
+    "network": network_reads("switch0"),
 }
-FILES = {"probe": "commands.json", "wifi-parked": "wifi_parked.json", "wifi-on": "wifi_on.json"}
+FILES = {
+    "probe": "commands.json",
+    "wifi-parked": "wifi_parked.json",
+    "wifi-on": "wifi_on.json",
+    "network": "network.json",
+}
 _IMEI = re.compile(r"\b\d{15}\b")
 
 
