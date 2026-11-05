@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from collections.abc import Awaitable, Callable, Mapping, MutableMapping, Sequence
 from dataclasses import replace
 from typing import Any
@@ -10,7 +11,9 @@ from typing import Any
 from openwrtgui.forms import OptionRow
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
+from openwrtgui.net.access import AccessChange, AccessState, compile_access, read_access
 from openwrtgui.net.apply import (
+    NOTHING,
     ApplyRunner,
     NetApplyResult,
     NetCheck,
@@ -44,11 +47,14 @@ from openwrtgui.probe.status import RouterStatus
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import Transport, ubus_call
 from openwrtgui.transport.pool import ConnectionPool
+from openwrtgui.uci import UciOp, drop_unchanged
 from openwrtgui.wifi.service import PreviewChanged, WifiService
+from openwrtgui.wifi.state import read_uci
 
 SCREEN = "Network"
 SETTLE_S = 20.0  # "Link up: polled for up to 20 s"
 POLL_S = 1.0
+_ACL = re.compile(r"hostapd_cli -i (\S+) (deny_acl|accept_acl) (ADD_MAC|DEL_MAC) (\S+)")
 
 
 def as_previewed(rec: RouterRecord, plan: NetPlan, digest: str | None) -> NetPlan:
@@ -238,6 +244,88 @@ class NetworkService:
         leases = parse_leases(await ubus_call(t, "luci-rpc", "getDHCPLeases") or {})
         hints = parse_host_hints(await ubus_call(t, "luci-rpc", "getHostHints") or {})
         return [replace(lease, hostname=lease.hostname or hints.get(lease.mac or "")) for lease in leases]
+
+    # ---------------------------------------------------------------- Wi-Fi access by MAC
+    async def _access_read(
+        self, router_id: str
+    ) -> tuple[RouterRecord, Transport, AccessState, dict[str, str]]:
+        rec, t = await self._connect(router_id)
+        uci = await read_uci(t)
+        status = await ubus_call(t, "network.wireless", "status") or {}
+        hints = parse_host_hints(await ubus_call(t, "luci-rpc", "getHostHints") or {})
+        return rec, t, await read_access(t, uci, status, hints), uci
+
+    async def access(self, router_id: str) -> AccessState:
+        return (await self._access_read(router_id))[2]
+
+    async def _access_plan(
+        self, rec: RouterRecord, state: AccessState, uci: Mapping[str, str], change: AccessChange
+    ) -> tuple[NetPlan, dict[str, list[UciOp]]]:
+        """Saved changes are Wi-Fi config changes, shown and applied as the Wi-Fi screen does them (reload,
+        TX mask, checks); the runtime ones are hostapd commands."""
+        ops, commands, warnings = compile_access(change, state, rec.name)
+        by_radio: dict[str, list[UciOp]] = {}
+        for op in drop_unchanged(ops, uci):
+            radio = uci.get(f"wireless.{op.path.split('.')[1]}.device", "")
+            by_radio.setdefault(radio, []).append(op)
+        lines: list[str] = []
+        for radio, radio_ops in by_radio.items():
+            wifi_plan = await self._wifi.plan_ops(rec.id, radio, radio_ops)
+            lines += wifi_plan.lines
+            warnings += wifi_plan.warnings
+        if not lines and not commands:
+            raise ValueError(NOTHING)
+        plan = NetPlan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config="wireless" if by_radio else None,
+            lines=(*lines, *commands),
+            ops=tuple(op for radio_ops in by_radio.values() for op in radio_ops),
+            commands=tuple(commands),
+            reloads=(),
+            rollback=False,
+            target_host=None,
+            warnings=tuple(warnings),
+            secrets=(),
+        )
+        return plan, by_radio
+
+    async def plan_access(self, router_id: str, change: AccessChange) -> NetPlan:
+        rec, _t, state, uci = await self._access_read(router_id)
+        return (await self._access_plan(rec, state, uci, change))[0]
+
+    async def apply_access(
+        self, router_id: str, change: AccessChange, digest: str | None = None
+    ) -> NetApplyResult:
+        rec, t, state, uci = await self._access_read(router_id)
+        plan, by_radio = await self._access_plan(rec, state, uci, change)
+        as_previewed(rec, plan, digest)
+        if not by_radio:
+            return await self._runner.run(rec, t, plan, self._runtime_checks(plan))
+        checks: list[NetCheck] = []
+        applied = verified = True
+        errors: list[str] = []
+        for radio, radio_ops in by_radio.items():
+            done = await self._wifi.apply_ops(rec.id, radio, radio_ops, screen=SCREEN)
+            checks += [NetCheck(c.name, c.ok, c.detail) for c in done.checks]
+            applied, verified = applied and done.applied, verified and done.verified
+            errors += [done.error] if done.error else []
+        return NetApplyResult(rec.id, applied, verified, tuple(checks), "; ".join(errors) or None, rec.host)
+
+    def _runtime_checks(self, plan: NetPlan) -> Callable[[Transport], Awaitable[list[NetCheck]]]:
+        async def verify(t: Transport) -> list[NetCheck]:
+            checks = []
+            for command in plan.commands:
+                if m := _ACL.fullmatch(command):
+                    ifname, kind, verb, mac = m.groups()
+                    shown = await t.run(f"hostapd_cli -i {ifname} {kind} SHOW")
+                    listed = mac in shown.stdout.lower()
+                    want = verb == "ADD_MAC"
+                    where = "in" if want else "off"
+                    checks.append(NetCheck(f"runtime list {ifname}", listed == want, f"{mac} {where} {kind}"))
+            return checks or [NetCheck("hostapd", True, "hostapd took the request")]
+
+        return verify
 
     async def _interface_check(self, t: Transport, req: InterfaceRequest, state: NetworkState) -> NetCheck:
         """The interface as asked, polled for up to 20 s: gone, there (no address), or up with its address."""

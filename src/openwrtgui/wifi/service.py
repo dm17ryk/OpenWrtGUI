@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import hashlib
 from collections.abc import Awaitable, Callable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass, field
@@ -36,6 +37,7 @@ from openwrtgui.wifi.state import RadioState, WifiState, modes_from_uci, read_uc
 from openwrtgui.wifi.stations import Station, del_client_command, read_stations
 
 SCREEN = "Wi-Fi"
+_AUDIT_SCREEN: contextvars.ContextVar[str] = contextvars.ContextVar("wifi_audit_screen", default=SCREEN)
 NOTHING = "Nothing to apply: the router already has these settings."
 MONITOR = "owgmon0"
 SCRIPT_TIMEOUT_S = 60.0
@@ -365,15 +367,27 @@ class WifiService:
         secrets: Sequence[str] = (),
         *,
         digest: str | None = None,
+        screen: str = SCREEN,
     ) -> ApplyResult:
-        rec, t, state, uci = await self._read(router_id)
-        radio = self._radio(state, rec, radio_name)
-        plan = self._plan(rec, radio, uci, ops, secrets, _mask_after(uci, ops, radio), full_verify=False)
-        return await self._execute(rec, t, _as_previewed(rec, plan, digest))
+        """`screen` names the screen in the audit log: Network & DHCP applies its saved MAC lists here."""
+        token = _AUDIT_SCREEN.set(screen)
+        try:
+            rec, t, state, uci = await self._read(router_id)
+            radio = self._radio(state, rec, radio_name)
+            plan = self._plan(rec, radio, uci, ops, secrets, _mask_after(uci, ops, radio), full_verify=False)
+            return await self._execute(rec, t, _as_previewed(rec, plan, digest))
+        finally:
+            _AUDIT_SCREEN.reset(token)
 
     async def _run(self, t: Transport, rec: RouterRecord, command: str, **kw: Any) -> Any:
         return await run_audited(
-            t, command, router_id=rec.id, screen=SCREEN, guard=self._guard, audit=self._audit, **kw
+            t,
+            command,
+            router_id=rec.id,
+            screen=_AUDIT_SCREEN.get(),
+            guard=self._guard,
+            audit=self._audit,
+            **kw,
         )
 
     async def _execute(self, rec: RouterRecord, t: Transport, plan: WifiPlan) -> ApplyResult:
@@ -433,7 +447,7 @@ class WifiService:
         verified = error is None and not failed and any(c.ok for c in checks)
         self._audit.record(
             router=rec.id,
-            screen=SCREEN,
+            screen=_AUDIT_SCREEN.get(),
             command=f"verify {plan.radio}",
             exit_status=None,
             verify="pass" if verified else f"fail: {error or ', '.join(failed) or 'not verified'}",
