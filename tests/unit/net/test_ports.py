@@ -10,6 +10,7 @@ from netenv import NetEnv
 
 from openwrtgui.net.state import NetworkState, read_network
 from openwrtgui.ports.compile import MirrorRequest, VlanRequest, enable_commands
+from openwrtgui.ports.parse import parse_swconfig_show
 from openwrtgui.ports.state import PortsState, read_ports
 from openwrtgui.simnet import PC_MAC, SimNetwork
 from openwrtgui.uci import parse_uci_show
@@ -212,6 +213,9 @@ async def test_mirror_off_leaves_the_network_config_as_it_was(net: NetEnv) -> No
     off = await net.ports.apply_mirror("ap2", MirrorRequest(monitor=None, sources={}))
     assert off.verified, off
     assert _by_content((await t.run("uci -X show network")).stdout) == before
+    # a reload leaves the switch's monitor port as it is: off puts it back to 0 (AP2, 2026-11-06)
+    live = parse_swconfig_show("switch0", (await t.run("swconfig dev switch0 show")).stdout)
+    assert live.mirror_monitor_port == 0
 
 
 async def test_mirror_monitor_cannot_be_source(net: NetEnv) -> None:

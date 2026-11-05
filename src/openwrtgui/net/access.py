@@ -93,6 +93,8 @@ async def read_access(
         if key.count(".") != 1 or value != "wifi-iface":
             continue
         section = key.split(".")[1]
+        if uci.get(f"wireless.{section}.mode", "ap") != "ap":  # a client or mesh link admits no stations
+            continue
         policy = policy_of(uci, section)
         ifname = up.get(section)
         runtime: tuple[str, ...] = ()
@@ -161,8 +163,8 @@ def _saved_ops(change: AccessChange, s: SsidAccess, mac: str, warnings: list[str
     p = f"wireless.{s.section}"
     block = change.kind == "block"
     if s.policy == "everyone":
-        if not block:
-            return []
+        if not block:  # a list kept from an earlier policy: take the MAC off it, or it comes back with one
+            return [UciOp("del_list", f"{p}.maclist", mac)] if mac in s.maclist else []
         warnings.append(f"{s.ssid} changes from Everyone to Block listed.")
         return [UciOp("set", f"{p}.macfilter", "deny"), UciOp("add_list", f"{p}.maclist", mac)]
     listed = mac in s.maclist

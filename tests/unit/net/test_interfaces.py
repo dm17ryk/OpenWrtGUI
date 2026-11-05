@@ -110,11 +110,22 @@ async def test_apply_lan_in_sim_follows_and_verifies(net: NetEnv) -> None:
         "ap2", InterfaceRequest("lan", address="192.168.1.12/24"), plan.digest
     )
     assert result.applied and result.verified, result
-    assert [c.name for c in result.checks] == ["reconnected", "confirmed", "interface lan"]
+    assert [c.name for c in result.checks] == ["reconnected", "confirmed", "interface lan", "saved"]
     assert net.rec("ap2").host == "192.168.1.12" and result.host == "192.168.1.12"
     back = await net.service.apply_interface("ap2", InterfaceRequest("lan", address="192.168.1.2/24"))
     assert back.verified and net.rec("ap2").host == "192.168.1.2"
     assert "verify network" in net.audit_lines()
+
+
+async def test_fields_other_than_the_address_are_proven_by_the_saved_config(net: NetEnv) -> None:
+    """An MTU or bridge edit leaves lan up with its address, so "up" proves nothing about it: the saved
+    config must hold every field asked for (Codex review, PR #23)."""
+    result = await net.service.apply_interface(
+        "ap2", InterfaceRequest("lan", mtu=1400, bridge_ports=("eth0.1", "eth0.3"))
+    )
+    assert result.verified, result
+    saved = next(c for c in result.checks if c.name == "saved")
+    assert saved.ok is True
 
 
 async def test_apply_with_stale_digest_is_refused(net: NetEnv) -> None:

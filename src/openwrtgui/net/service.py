@@ -10,7 +10,7 @@ from typing import Any
 
 from openwrtgui.forms import OptionRow
 from openwrtgui.guard.audit import AuditLog
-from openwrtgui.guard.bench_guard import BenchGuard
+from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked
 from openwrtgui.net.access import AccessChange, AccessState, compile_access, read_access
 from openwrtgui.net.apply import (
     NOTHING,
@@ -23,7 +23,7 @@ from openwrtgui.net.apply import (
     saved_check,
     service_check,
 )
-from openwrtgui.net.commands import UCI_DHCP
+from openwrtgui.net.commands import UCI_DHCP, UCI_NETWORK
 from openwrtgui.net.dhcp import (
     DNSMASQ_RELOAD,
     DhcpRequest,
@@ -58,7 +58,7 @@ from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import Transport, ubus_call
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.uci import UciOp, drop_unchanged
-from openwrtgui.wifi.service import PreviewChanged, WifiService
+from openwrtgui.wifi.service import ApplyResult, PreviewChanged, WifiService
 from openwrtgui.wifi.state import read_uci
 
 SCREEN = "Network"
@@ -76,6 +76,21 @@ def as_previewed(rec: RouterRecord, plan: NetPlan, digest: str | None) -> NetPla
 
 def network_snapshot(uci: Mapping[str, str]) -> dict[str, str]:
     return {k: v for k, v in uci.items() if k.startswith("network.")}
+
+
+def radio_results(
+    router_id: str, host: str, done: Sequence[ApplyResult], not_tried: Sequence[str]
+) -> NetApplyResult:
+    """One saved access change applied radio by radio: applied when any radio took it, and when only some
+    did, the error says which took it, why the next did not, and which were not tried."""
+    several = len(done) + len(not_tried) > 1
+    took = [r.radio for r in done if r.applied]
+    parts = [f"Applied on {', '.join(took)} only"] if took and len(took) < len(done) + len(not_tried) else []
+    parts += [f"{r.radio}: {r.error}" if several else r.error for r in done if r.error]
+    parts += [f"{radio}: not tried" for radio in not_tried]
+    checks = tuple(NetCheck(c.name, c.ok, c.detail) for r in done for c in r.checks)
+    verified = bool(done) and not not_tried and all(r.applied and r.verified for r in done)
+    return NetApplyResult(router_id, bool(took), verified, checks, ". ".join(parts) or None, host)
 
 
 class NetworkService:
@@ -174,7 +189,12 @@ class NetworkService:
         plan = as_previewed(rec, self._interface_plan(rec, state, uci, desc, req), digest)
 
         async def verify(t2: Transport) -> list[NetCheck]:
-            return [await self._interface_check(t2, req, state)]
+            # "up with its address" says nothing about an MTU, gateway, DNS or bridge edit: the saved
+            # config must hold every field asked for too
+            return [
+                await self._interface_check(t2, req, state),
+                await saved_check(t2, UCI_NETWORK, plan.ops, uci),
+            ]
 
         return await self._runner.run(rec, t, plan, verify, network_snapshot(uci))
 
@@ -408,15 +428,19 @@ class NetworkService:
         as_previewed(rec, plan, digest)
         if not by_radio:
             return await self._runner.run(rec, t, plan, self._runtime_checks(plan))
-        checks: list[NetCheck] = []
-        applied = verified = True
-        errors: list[str] = []
-        for radio, radio_ops in by_radio.items():
-            done = await self._wifi.apply_ops(rec.id, radio, radio_ops, screen=SCREEN)
-            checks += [NetCheck(c.name, c.ok, c.detail) for c in done.checks]
-            applied, verified = applied and done.applied, verified and done.verified
-            errors += [done.error] if done.error else []
-        return NetApplyResult(rec.id, applied, verified, tuple(checks), "; ".join(errors) or None, rec.host)
+        radios = list(by_radio)
+        done: list[ApplyResult] = []
+        for n, radio in enumerate(radios):
+            try:
+                result = await self._wifi.apply_ops(rec.id, radio, by_radio[radio], screen=SCREEN)
+            except GuardLocked as exc:
+                if not done:
+                    raise
+                result = ApplyResult(rec.id, radio, False, False, (), str(exc))
+            done.append(result)
+            if not result.applied:  # stop: say what the earlier radios took, and what was not tried
+                return radio_results(rec.id, rec.host, done, radios[n + 1 :])
+        return radio_results(rec.id, rec.host, done, [])
 
     def _runtime_checks(self, plan: NetPlan) -> Callable[[Transport], Awaitable[list[NetCheck]]]:
         async def verify(t: Transport) -> list[NetCheck]:

@@ -7,6 +7,7 @@ import ipaddress
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import Literal
 
 from openwrtgui.net.model import DnsConf
 from openwrtgui.uci import UciOp
@@ -33,7 +34,7 @@ class DnsRequest:
     rebind_domains: tuple[str, ...] | None = None
     overrides: tuple[tuple[str, str], ...] | None = None  # (host, ip) → address='/host/ip'
     switches: Mapping[str, bool] = field(default_factory=dict)
-    cachesize: int | None = None
+    cachesize: int | Literal["default"] | None = None  # "default" removes it (dnsmasq's default applies)
     others: Mapping[str, str | None] = field(default_factory=dict)  # None removes the option
 
 
@@ -97,7 +98,9 @@ def compile_dns(req: DnsRequest, dns: DnsConf | None) -> list[UciOp]:
         if name not in DNS_SWITCHES:
             raise ValueError(f"{name} is not a DNS switch")
         ops.append(UciOp("set", f"{p}.{name}", "1" if on else "0"))
-    if req.cachesize is not None:
+    if req.cachesize == "default":
+        ops.append(UciOp("delete", f"{p}.cachesize"))
+    elif req.cachesize is not None:
         if not 0 <= req.cachesize <= CACHE_MAX:
             raise ValueError(f"Cache size is 0 to {CACHE_MAX}")
         ops.append(UciOp("set", f"{p}.cachesize", str(req.cachesize)))

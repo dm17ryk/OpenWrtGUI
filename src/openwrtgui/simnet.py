@@ -128,6 +128,8 @@ class SimNetwork:
         self._deadline: float | None = None
         self._apply_sid: str | None = None
         self._enabled = dict.fromkeys(EXTERNAL, True)
+        conf = switch_conf(self._committed, SWITCH)
+        self._monitor = (conf.mirror_monitor_port if conf else None) or 0  # the switch's live monitor port
         self._new = 0x1000A0
         self.pc_ip = pc_ip
         self.pc_port = pc_port
@@ -475,6 +477,11 @@ class SimNetwork:
     # ---------------------------------------------------------------- switch
     def _reset_switch(self) -> None:
         self._enabled = dict.fromkeys(EXTERNAL, True)  # swconfig reset on every network reload
+        # A reload sets the monitor port only when the config names one; otherwise the switch keeps the one
+        # it has (AP2, 2026-11-06: 1 stayed after mirror_monitor_port left the config).
+        conf = switch_conf(self._committed, SWITCH)
+        if conf is not None and conf.mirror_monitor_port is not None:
+            self._monitor = conf.mirror_monitor_port
 
     def _swconfig(self, rest: str) -> CommandResult:
         if rest == "help":
@@ -490,16 +497,18 @@ class SimNetwork:
                 return _fail("Failed to set attribute: invalid port\n")
             self._enabled[port] = m.group(2) == "1"
             return _ok()
+        if m := re.fullmatch(r"set mirror_monitor_port (\d+)", rest):
+            self._monitor = int(m.group(1))
+            return _ok()
         return _fail("Unknown command\n")
 
     def _show(self) -> str:
-        conf = switch_conf(self._committed, SWITCH)
         mirror = {p.port: p for p in switch_ports(self._committed)}
         vlans = switch_vlans(self._committed)
         lines = [
             "Global attributes:",
             "\tenable_vlan: 1",
-            f"\tmirror_monitor_port: {(conf and conf.mirror_monitor_port) or 0}",
+            f"\tmirror_monitor_port: {self._monitor}",
         ]
         for port in range(PORTS):
             sp = mirror.get(port)

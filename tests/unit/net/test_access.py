@@ -5,7 +5,11 @@ from __future__ import annotations
 import pytest
 from netenv import NetEnv
 
-from openwrtgui.net.access import AccessChange
+from openwrtgui.net.access import AccessChange, AccessState, SsidAccess, compile_access, read_access
+from openwrtgui.net.service import radio_results
+from openwrtgui.transport.base import CommandResult
+from openwrtgui.uci import UciOp, parse_uci_show
+from openwrtgui.wifi.service import ApplyResult, Check
 
 PANEL = "f4:12:fa:f3:57:68"
 OTHER = "aa:bb:cc:dd:ee:01"
@@ -103,6 +107,48 @@ async def test_timed_block_uses_ban_time(net: NetEnv) -> None:
         await net.service.plan_access(
             "ap1", AccessChange("block", ("default_radio0",), mac=PANEL, method="timed", seconds=5)
         )
+
+
+class Idle:
+    async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
+        return CommandResult(command, "", "", 0)
+
+
+async def test_only_access_point_ssids_are_listed() -> None:
+    """A client (sta) or mesh interface admits no stations: it is not an SSID here (Codex review, PR #23)."""
+    uci = parse_uci_show(
+        "wireless.default_radio0=wifi-iface\nwireless.default_radio0.device='radio0'\n"
+        "wireless.default_radio0.mode='ap'\nwireless.default_radio0.ssid='OpenWrt'\n"
+        "wireless.wwan=wifi-iface\nwireless.wwan.device='radio0'\nwireless.wwan.mode='sta'\n"
+        "wireless.wwan.ssid='uplink'\n"
+        "wireless.mesh0=wifi-iface\nwireless.mesh0.device='radio0'\nwireless.mesh0.mode='mesh'\n"
+    )
+    state = await read_access(Idle(), uci, {}, {})  # type: ignore[arg-type]
+    assert [s.section for s in state.ssids] == ["default_radio0"]
+
+
+def test_saved_unblock_under_everyone_removes_a_listed_mac() -> None:
+    """Everyone leaves the old maclist in place; Saved → Unblock must still take a MAC off it, or the entry
+    comes back the day a list policy is chosen (Codex review, PR #23)."""
+    ssid = SsidAccess("default_radio0", "OpenWrt", "radio0", "phy0-ap0", "everyone", (OTHER,), ())
+    change = AccessChange("unblock", ("default_radio0",), mac=OTHER, method="saved")
+    ops, commands, warnings = compile_access(change, AccessState((ssid,), ()), "AP1 · bench")
+    assert ops == [UciOp("del_list", "wireless.default_radio0.maclist", OTHER)]
+    assert commands == [] and warnings == []
+
+
+def test_a_partial_multi_radio_apply_says_what_changed() -> None:
+    """Saved access changes go radio by radio: when one radio takes the change and the next refuses it, the
+    result must not claim nothing was applied (Codex review, PR #23)."""
+    took = ApplyResult("ap1", "radio0", True, True, (Check("radio", True, "on air"),), None)
+    refused = ApplyResult("ap1", "radio1", False, False, (), "dima_night.py started 21:04 (PID 18244)")
+    result = radio_results("ap1", "192.168.1.1", [took, refused], ["radio2"])
+    assert result.applied and not result.verified
+    assert result.error == (
+        "Applied on radio0 only. radio1: dima_night.py started 21:04 (PID 18244). radio2: not tried"
+    )
+    single = radio_results("ap1", "192.168.1.1", [took], [])
+    assert single.applied and single.verified and single.error is None
 
 
 async def test_unknown_ssid_and_bad_mac_refused(net: NetEnv) -> None:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -13,7 +13,7 @@ import pytest
 
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard, ProcessInfo
-from openwrtgui.net.apply import ApplyRunner, NetCheck, net_plan, saved_check
+from openwrtgui.net.apply import ApplyRunner, NetCheck, net_plan, saved_check, service_check
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.store.settings import GuardWatchList
 from openwrtgui.transport.base import CommandResult, HostKeyInfo, HostKeyUnknown, Transport, Unreachable
@@ -26,8 +26,8 @@ NETWORK = "network.lan=interface\nnetwork.lan.proto='static'\nnetwork.lan.ipaddr
 SNAPSHOT = parse_uci_show(NETWORK)
 
 
-def _key() -> HostKeyInfo:
-    key = asyncssh.generate_private_key("ssh-ed25519")
+def _key(alg: str = "ssh-ed25519") -> HostKeyInfo:
+    key = asyncssh.generate_private_key(alg)
     return HostKeyInfo(
         type=key.get_algorithm(),
         fingerprint=key.get_fingerprint("sha256"),
@@ -53,6 +53,7 @@ class Bench:
     clock: Clock
     key: HostKeyInfo
     answers_at: Callable[[str, datetime], bool]
+    first_key: HostKeyInfo | None = None  # what a fetch with no key type asked for gets, when not `key`
     log: list[tuple[int, str, str]] = field(default_factory=list)  # (connection, host, command)
     connections: int = 0
     respond: Callable[[str], CommandResult | None] = lambda command: None
@@ -124,8 +125,15 @@ def env(tmp_path: Path) -> Env:
         if not bench.answers_at(rec.host, clock.now()):
             raise Unreachable(f"{rec.host}: no route to host")
         if host_keys.get(rec.host, rec.port) is None:
-            raise HostKeyUnknown(rec.host, bench.key)
+            raise HostKeyUnknown(rec.host, bench.first_key or bench.key)
         return FakeT(bench, rec.host)
+
+    async def fetch_key(
+        host: str, port: int = 22, timeout: float = 10.0, algs: Sequence[str] = ()
+    ) -> HostKeyInfo:
+        if not bench.answers_at(host, clock.now()):
+            raise Unreachable(f"{host}: no route to host")
+        return bench.key if bench.key.type in algs or not bench.first_key else bench.first_key
 
     processes: list[ProcessInfo] = []
     guard = BenchGuard(GuardWatchList(lock_files=[], processes=["dima_night.py"]), lister=lambda: processes)
@@ -140,6 +148,7 @@ def env(tmp_path: Path) -> Env:
         host_keys=host_keys,
         clock=clock.now,
         sleep=clock.sleep,
+        fetch_key=fetch_key,
     )
     return Env(runner, routers, host_keys, bench, clock, pool, processes, guard, audit)
 
@@ -249,6 +258,17 @@ async def test_changed_address_followed_and_record_updated(env: Env) -> None:
     assert any(h == "192.168.1.12" and c.startswith("ubus call uci confirm") for _, h, c in env.bench.log)
 
 
+async def test_follow_asks_for_the_key_type_pinned_at_the_old_address(env: Env) -> None:
+    """AP2, 2026-11-06: known_hosts pinned its ed25519 key, and at 192.168.1.12 a fetch that asked for no
+    key type got another type of the same router's keys, so the app took it for another router."""
+    env.bench.answers_at = lambda host, now: host == "192.168.1.12"
+    env.bench.first_key = _key("ecdsa-sha2-nistp256")  # the same router's other key, offered first
+    t = FakeT(env.bench, "192.168.1.2")
+    result = await env.runner.run(env.rec, t, _lan_plan(), _verify_ok, SNAPSHOT)  # type: ignore[arg-type]
+    assert result.applied and result.verified and result.host == "192.168.1.12", result
+    assert env.host_keys.get("192.168.1.12", 22) == env.bench.key.fingerprint
+
+
 async def test_new_address_with_other_host_key_is_not_confirmed(env: Env) -> None:
     env.bench.answers_at = lambda host, now: host == "192.168.1.12" or now >= env.clock.t + timedelta(days=1)
     t = FakeT(env.bench, "192.168.1.2")
@@ -316,6 +336,29 @@ async def test_change_that_cuts_the_path_late_is_never_confirmed(env: Env) -> No
     assert not any(c.startswith("ubus call uci confirm") for c in env.commands())
     assert not result.applied
     assert {c.name: c.ok for c in result.checks} == {"reconnected": False, "restored": True}
+
+
+async def test_change_not_seen_in_effect_is_left_to_roll_back(env: Env) -> None:
+    """A change the verifier does not see in effect is not confirmed: the router puts its previous network
+    settings back by itself, so it never keeps a configuration that did not work (Codex review, PR #23)."""
+
+    async def not_up(t: Transport) -> list[NetCheck]:
+        return [NetCheck("interface lan", False, "not up with 192.168.1.2/30 after 20 s")]
+
+    t = await env.pool.get(env.rec)
+    result = await env.runner.run(env.rec, t, _lan_plan(target=None), not_up, SNAPSHOT)  # type: ignore[arg-type]
+    assert not any(c.startswith("ubus call uci confirm") for c in env.commands())
+    assert not result.applied and not result.verified
+    assert [(c.name, c.ok) for c in result.checks] == [
+        ("reconnected", True),
+        ("interface lan", False),
+        ("restored", True),
+    ]
+    assert result.error == (
+        "Not applied: the change was not seen in effect "
+        "(interface lan: not up with 192.168.1.2/30 after 20 s). "
+        "The router restores its previous network settings 60 s after the change."
+    )
 
 
 async def test_guard_live_after_apply_still_confirms(env: Env) -> None:
@@ -386,6 +429,23 @@ async def test_saved_check_still_catches_a_change_the_router_does_not_hold() -> 
     )
     check = await saved_check(Shown(kept), "uci -X show dhcp", DHCP_OPS, DHCP_BEFORE)  # type: ignore[arg-type]
     assert check == NetCheck("saved", False, "not as asked: dhcp.cfg03a1b2")
+
+
+async def test_service_check_waits_for_the_restart() -> None:
+    """AP2, 2026-11-06: right after a DNS change dnsmasq was being restarted under its section's new name, so
+    an immediate look found no running instance; a moment later it ran."""
+    answers = iter(["{}\n", "{}\n", '{"dnsmasq": {"instances": {"cfg9f3a21": {"running": true}}}}\n'])
+    slept: list[float] = []
+
+    class Restarting:
+        async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
+            return CommandResult(command, next(answers), "", 0)
+
+    async def sleep(seconds: float) -> None:
+        slept.append(seconds)
+
+    check = await service_check(Restarting(), "dnsmasq", sleep=sleep)  # type: ignore[arg-type]
+    assert check == NetCheck("dnsmasq", True, "running") and slept == [1.0, 1.0]
 
 
 def test_carry_pins_only_identical_key(tmp_path: Path) -> None:

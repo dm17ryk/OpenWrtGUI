@@ -75,8 +75,10 @@ def compile_dhcp(req: DhcpRequest, state: NetworkState, uci: Mapping[str, str]) 
     section = current.section if current else req.interface
     p = f"dhcp.{section}"
     ops: list[UciOp] = []
-    if current is None:
+    if current is None:  # dnsmasq serves a section without ignore=1: a new one stays off unless turned on
         ops += [UciOp("set", p, "dhcp"), UciOp("set", f"{p}.interface", req.interface)]
+        if req.enabled is None:  # enabled=False sets it below
+            ops.append(UciOp("set", f"{p}.ignore", "1"))
     if req.start is not None or req.limit is not None:
         start = req.start if req.start is not None else (current.start if current and current.start else 100)
         limit = req.limit if req.limit is not None else (current.limit if current and current.limit else 150)

@@ -28,6 +28,7 @@ from openwrtgui.probe.describe import SelfDescription, describe_router
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import Transport
 from openwrtgui.transport.pool import ConnectionPool
+from openwrtgui.uci import drop_unchanged
 
 SCREEN = "Ports"
 SETTLE_S = 10.0
@@ -211,12 +212,17 @@ class PortsService:
     def _mirror_plan(
         self, rec: RouterRecord, state: PortsState, uci: Mapping[str, str], req: MirrorRequest
     ) -> NetPlan:
+        ops = compile_mirror(req, state, uci)
+        # A reload sets the monitor port only when the config names one, so off puts it back by hand
+        # (AP2, 2026-11-06: it stayed at 1 after the mirror was off).
+        off = req.monitor is None and drop_unchanged(ops, uci) and state.switch is not None
         return net_plan(
             router_id=rec.id,
             screen=SCREEN,
             config="network",
-            ops=compile_mirror(req, state, uci),
+            ops=ops,
             current=uci,
+            commands=[f"swconfig dev {state.switch} set mirror_monitor_port 0"] if off else [],
             rollback=True,
             warnings=[rollback_warning(rec.name, rec.host)],
         )
@@ -234,7 +240,7 @@ class PortsService:
 
         def holds(live: SwitchLive) -> bool:
             flags = {p.num: (p.mirror_rx, p.mirror_tx) for p in live.ports if p.mirror_rx or p.mirror_tx}
-            monitor_ok = req.monitor is None or live.mirror_monitor_port == req.monitor
+            monitor_ok = live.mirror_monitor_port == (req.monitor if req.monitor is not None else 0)
             return flags == sources and monitor_ok
 
         async def verify(t2: Transport) -> list[NetCheck]:

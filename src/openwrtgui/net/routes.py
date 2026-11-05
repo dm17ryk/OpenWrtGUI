@@ -236,6 +236,7 @@ def expectations(
         if not r.disabled
         for t in [str(parse_cidr(r.target, family_of(r.kind)))]
     ]
+    turned_off = {r.section for r in upserts if r.disabled and r.section}
     out += [
         Expect(
             f"route {old.target}",
@@ -245,17 +246,20 @@ def expectations(
             family=family_of(old.kind),
         )
         for old in state.routes
-        if old.section in deletes and not old.disabled
+        if (old.section in deletes or old.section in turned_off) and not old.disabled
     ]
     out += [
         Expect(f"rule {r.priority}", True, priority=r.priority, family=family_of(r.kind))
         for r in rule_upserts
         if r.priority is not None and not r.disabled
     ]
+    rules_off = {r.section for r in rule_upserts if r.disabled and r.section}
     out += [
         Expect(f"rule {old.priority}", False, priority=old.priority, family=family_of(old.kind))
         for old in state.rules
-        if old.section in rule_deletes and old.priority is not None
+        if (old.section in rule_deletes or old.section in rules_off)
+        and old.priority is not None
+        and not old.disabled
     ]
     return out
 

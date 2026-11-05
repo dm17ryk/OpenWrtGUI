@@ -148,7 +148,7 @@ class DnsIn(BaseModel):
     rebind_domains: list[str] | None = None
     overrides: list[OverrideIn] | None = None
     switches: dict[str, bool] = {}
-    cachesize: int | None = None
+    cachesize: int | Literal["default"] | None = None  # "default" removes it
     others: dict[str, str | None] = {}
 
     def to_domain(self) -> DnsRequest:

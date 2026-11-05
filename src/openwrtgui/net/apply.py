@@ -27,6 +27,7 @@ from openwrtgui.net.commands import UCI_NETWORK
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import (
     CommandResult,
+    HostKeyInfo,
     HostKeyUnknown,
     Transport,
     TransportError,
@@ -34,7 +35,7 @@ from openwrtgui.transport.base import (
     ubus_command,
 )
 from openwrtgui.transport.pool import ConnectionPool
-from openwrtgui.transport.ssh import HostKeyStore
+from openwrtgui.transport.ssh import HostKeyStore, fetch_host_key
 from openwrtgui.uci import UciOp, drop_unchanged, order_for_script, parse_uci_show, render_uci
 
 ROLLBACK_S = 60
@@ -43,6 +44,7 @@ RECONNECT_EVERY_S = 2.0
 SETTLE_S = 5.0  # before the first reconnect; LuCI holds off 4 s (apply_holdoff)
 RESTORE_CHECK_S = 65.0
 SCRIPT_TIMEOUT_S = 60.0
+SERVICE_WAIT_S = 10.0
 SESSION = "<session>"
 NOTHING = "Nothing to apply: the router already has these settings."
 _ANONYMOUS = re.compile(r"cfg[0-9a-f]{6}")  # libuci's name for an unnamed section
@@ -252,12 +254,23 @@ async def saved_check(
     return NetCheck("saved", True, "the router has the change")
 
 
-async def service_check(t: Transport, name: str) -> NetCheck:
-    """`<service>`: procd has a running instance of it."""
-    listed = await ubus_call(t, "service", "list", {"name": name}) or {}
-    instances = listed.get(name, {}).get("instances", {})
-    running = any(isinstance(i, dict) and i.get("running") for i in instances.values())
-    return NetCheck(name, running, "running" if running else f"{name} is not running")
+async def service_check(
+    t: Transport,
+    name: str,
+    *,
+    wait_s: float = SERVICE_WAIT_S,
+    sleep: Callable[[float], Awaitable[Any]] = asyncio.sleep,
+) -> NetCheck:
+    """`<service>`: procd has a running instance of it, polled for a few seconds: a reload restarts it,
+    under a new instance name when libuci named its section anew (AP2, 2026-11-06)."""
+    for attempt in range(int(wait_s) + 1):
+        if attempt:
+            await sleep(1.0)
+        listed = await ubus_call(t, "service", "list", {"name": name}) or {}
+        instances = listed.get(name, {}).get("instances", {})
+        if any(isinstance(i, dict) and i.get("running") for i in instances.values()):
+            return NetCheck(name, True, "running")
+    return NetCheck(name, False, f"{name} is not running")
 
 
 class ApplyRunner:
@@ -275,6 +288,7 @@ class ApplyRunner:
         window_s: float = RECONNECT_WINDOW_S,
         every_s: float = RECONNECT_EVERY_S,
         restore_s: float = RESTORE_CHECK_S,
+        fetch_key: Callable[..., Awaitable[HostKeyInfo]] = fetch_host_key,
     ) -> None:
         self._pool = pool
         self._routers = routers
@@ -287,6 +301,7 @@ class ApplyRunner:
         self._window_s = window_s
         self._every_s = every_s
         self._restore_s = restore_s
+        self._fetch_key = fetch_key
 
     async def _run(
         self, t: Transport, rec: RouterRecord, plan: NetPlan, command: str, source: Source = "user", **kw: Any
@@ -438,6 +453,8 @@ class ApplyRunner:
             except TransportError:  # the change took effect and cut this connection
                 t2, why = await self._reconnect(rec, target, applied_at, self._every_s)
                 continue
+            if any(c.ok is False for c in checks):  # not seen in effect: the router keeps nothing that failed
+                return await self._unproven(rec, plan, target, checks, applied_at, snapshot)
             return await self._confirm(rec, plan, t2, target, confirm, destroy, checks)
         return await self._restored(rec, plan, target, why, applied_at, snapshot)
 
@@ -458,17 +475,24 @@ class ApplyRunner:
             try:
                 return await self._connect(rec, target), None
             except HostKeyUnknown as exc:
-                if (
-                    not carried
-                    and target != rec.host
-                    and self._host_keys.carry(rec.host, target, rec.port, exc.actual)
-                ):
+                if not carried and target != rec.host and await self._carry(rec, target, exc.actual):
                     carried = True
                     continue  # the same router at its new address: connect again with the key pinned
                 return None, f"{target} answers with a different host key, so it is not {rec.name}"
             except TransportError:
                 await self._sleep(self._every_s)
         return None, None
+
+    async def _carry(self, rec: RouterRecord, target: str, offered: HostKeyInfo) -> bool:
+        """Pin the key at `target` only when it is the key pinned for the old address. A router has one key
+        per type and offers whichever comes first, so ask `target` for the pinned type before comparing."""
+        kind = self._host_keys.key_type(rec.host, rec.port)
+        if kind is not None and offered.type != kind:
+            try:
+                offered = await self._fetch_key(target, rec.port, algs=[kind])
+            except TransportError:
+                return False
+        return self._host_keys.carry(rec.host, target, rec.port, offered)
 
     async def _confirm(
         self,
@@ -514,24 +538,43 @@ class ApplyRunner:
             f"Not applied: {reason}. The router restores its previous network settings "
             f"{self._rollback_s:g} s after the change."
         )
-        checks = [NetCheck("reconnected", False, reason)]
+        restored = await self._restore_check(rec, plan, applied_at, snapshot)
+        return self._finish(
+            rec, plan, False, [NetCheck("reconnected", False, reason), restored], error, rec.host
+        )
+
+    async def _unproven(
+        self,
+        rec: RouterRecord,
+        plan: NetPlan,
+        target: str,
+        seen: Sequence[NetCheck],
+        applied_at: datetime,
+        snapshot: Mapping[str, str] | None,
+    ) -> NetApplyResult:
+        """Reached, but the change is not in effect: no confirm, so rpcd's rollback undoes it."""
+        failed = "; ".join(f"{c.name}: {c.detail}" for c in seen if c.ok is False)
+        error = (
+            f"Not applied: the change was not seen in effect ({failed}). The router restores its previous "
+            f"network settings {self._rollback_s:g} s after the change."
+        )
+        reached = NetCheck("reconnected", True, f"{rec.name} answered at {target}")
+        restored = await self._restore_check(rec, plan, applied_at, snapshot)
+        return self._finish(rec, plan, False, [reached, *seen, restored], error, rec.host)
+
+    async def _restore_check(
+        self, rec: RouterRecord, plan: NetPlan, applied_at: datetime, snapshot: Mapping[str, str] | None
+    ) -> NetCheck:
+        """`restored`: after rpcd's rollback the router answers at its old address with its old settings."""
         await self._sleep(max(0.0, self._restore_s - self._elapsed(applied_at)))
         try:
             t = await self._connect(rec, rec.host)
             shown = await self._run(t, rec, plan, UCI_NETWORK, source="app", require_guard=False)
-            now = {k: v for k, v in parse_uci_show(shown.stdout).items() if k.startswith("network.")}
-            if snapshot is None:
-                checks.append(NetCheck("restored", None, f"{rec.name} answers again at {rec.host}"))
-            elif now == dict(snapshot):
-                checks.append(
-                    NetCheck("restored", True, "the router is back on its previous network settings")
-                )
-            else:
-                checks.append(
-                    NetCheck("restored", False, "the network settings differ from before the change")
-                )
         except TransportError as exc:
-            checks.append(
-                NetCheck("restored", False, f"{rec.name} does not answer at {rec.host} either: {exc}")
-            )
-        return self._finish(rec, plan, False, checks, error, rec.host)
+            return NetCheck("restored", False, f"{rec.name} does not answer at {rec.host} either: {exc}")
+        now = {k: v for k, v in parse_uci_show(shown.stdout).items() if k.startswith("network.")}
+        if snapshot is None:
+            return NetCheck("restored", None, f"{rec.name} answers again at {rec.host}")
+        if now == dict(snapshot):
+            return NetCheck("restored", True, "the router is back on its previous network settings")
+        return NetCheck("restored", False, "the network settings differ from before the change")

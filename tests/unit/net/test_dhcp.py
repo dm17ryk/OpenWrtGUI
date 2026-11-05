@@ -61,6 +61,17 @@ async def test_new_dhcp_section_for_an_interface_without_one(net: NetEnv) -> Non
     )
 
 
+async def test_a_new_dhcp_section_stays_off_unless_turned_on(net: NetEnv) -> None:
+    """Editing the pool of an interface with no DHCP section must not start a DHCP server (dnsmasq serves
+    any section without ignore=1); on the bench AP1 is the only DHCP server (Codex review, PR #23)."""
+    guest = InterfaceRequest("guest", create=True, proto="static", device="eth0.3", address="10.3.0.1/24")
+    await net.service.apply_interface("ap2", guest)
+    pool_only = await net.service.plan_dhcp("ap2", DhcpRequest("guest", start=10, limit=20))
+    assert "uci set dhcp.guest.ignore='1'" in pool_only.lines
+    turned_on = await net.service.plan_dhcp("ap2", DhcpRequest("guest", enabled=True))
+    assert not any("ignore" in line for line in turned_on.lines)
+
+
 async def test_v6_change_reloads_odhcpd(net: NetEnv) -> None:
     plan = await net.service.plan_dhcp("ap2", DhcpRequest("lan", ra="server"))
     assert plan.reloads == ("/etc/init.d/dnsmasq reload", "/etc/init.d/odhcpd reload")
