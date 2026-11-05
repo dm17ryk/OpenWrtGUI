@@ -81,7 +81,7 @@ async def test_apply_verifies_on_air_and_audits(env: WifiEnv) -> None:
         ("wifi down radio0; wifi up radio0", "user"),
         (f"iw dev phy0-ap0 set bitrates legacy-2.4 6 ht-mcs-2.4 {MCS16}", "app"),
         (
-            "ip link del owgmon0 2>/dev/null; "
+            "iw dev owgmon0 del 2>/dev/null; "
             "iw phy phy0 interface add owgmon0 type monitor && ip link set owgmon0 up",
             "app",
         ),
@@ -90,7 +90,7 @@ async def test_apply_verifies_on_air_and_audits(env: WifiEnv) -> None:
             "'type mgt subtype beacon and wlan addr2 02:00:00:00:00:02'",
             "app",
         ),
-        ("ip link del owgmon0", "app"),
+        ("iw dev owgmon0 del", "app"),
         ("verify radio0", "app"),
     ]
     assert env.audit.query()[0].verify == "pass"
@@ -218,14 +218,14 @@ async def test_monitor_interface_is_removed_even_when_a_run_starts(env: WifiEnv)
     env.wrap.append(lambda t: _OnCommand(t, "tcpdump", "guard", env))  # type: ignore[arg-type, return-value]
     await env.service.apply("ap2", N20_CH6)
     commands = [c for c, _ in env.audit_lines()]
-    assert "ip link del owgmon0" in commands
+    assert "iw dev owgmon0 del" in commands
 
 
 async def test_a_stale_monitor_interface_is_cleared_before_adding_one(env: WifiEnv) -> None:
     await env.service.apply("ap2", N20_CH6)
     commands = [c for c, _ in env.audit_lines()]
     add = "iw phy phy0 interface add owgmon0 type monitor && ip link set owgmon0 up"
-    assert f"ip link del owgmon0 2>/dev/null; {add}" in commands
+    assert f"iw dev owgmon0 del 2>/dev/null; {add}" in commands
 
 
 async def test_an_options_apply_restores_the_tx_mask(env: WifiEnv) -> None:

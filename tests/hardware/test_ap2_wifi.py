@@ -11,8 +11,10 @@ While on air it records tests/fixtures/ap2/wifi_on.json (the RF set, the beacon 
 
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import json
+import secrets
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -39,6 +41,7 @@ ROOT = Path(__file__).resolve().parents[2]
 WIFI_ON = ROOT / "tests" / "fixtures" / "ap2" / "wifi_on.json"
 TEST_SSID = "OwgTest"  # not a run SSID, so no harness station joins and Bench Guard stays quiet
 CONFIG = "/etc/config/wireless"
+PARK_WAIT_S = 20
 LAB = {
     "wireless.radio0.country": "IL",
     "wireless.radio0.legacy_rates": "1",
@@ -98,9 +101,13 @@ async def _record_on_air(t: SshTransport) -> None:
     try:
         recorded |= await rf.run_set(t, tuple(capture))
     finally:
-        await t.run(f"ip link del {MONITOR}")
+        await t.run(f"iw dev {MONITOR} del")
     WIFI_ON.write_text(json.dumps(recorded, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"\nrecorded {len(recorded)} commands to {WIFI_ON}")
+
+
+async def _on_air(t: SshTransport) -> bool:
+    return any(i.phy == 0 and i.type == "AP" for i in parse_iw_dev((await t.run("iw dev")).stdout))
 
 
 async def _restore(t: SshTransport, snapshot: str) -> None:
@@ -108,6 +115,11 @@ async def _restore(t: SshTransport, snapshot: str) -> None:
     wrote = await t.run_stdin(f"cat > {CONFIG}", snapshot)
     assert wrote.ok, wrote.stderr
     await t.run("wifi down radio0; wifi up radio0", timeout=60.0)
+    # netifd takes the AP interface down after `wifi` returns (AP2, 2026-11-05: about a second later).
+    for _ in range(PARK_WAIT_S):
+        if not await _on_air(t):
+            return
+        await asyncio.sleep(1)
 
 
 async def test_apply_verify_record_restore(ap2_rw: SshTransport, tmp_path: Path) -> None:
@@ -124,7 +136,8 @@ async def test_apply_verify_record_restore(ap2_rw: SshTransport, tmp_path: Path)
             modes=ModeSelection("set", frozenset({"n20"})),
             channels=ChannelSelection("set", frozenset({6})),
             txpower=TxPowerSetting("auto"),
-            ssids=(SsidRequest(section="default_radio0", ssid=TEST_SSID),),
+            # A key made for this run only: no station that knows AP2's own key can join OwgTest.
+            ssids=(SsidRequest(section="default_radio0", ssid=TEST_SSID, key=secrets.token_urlsafe(16)),),
         )
         _proven(await service.apply("ap2", n20), "6.0")
         await _record_on_air(t)
@@ -148,4 +161,4 @@ async def test_apply_verify_record_restore(ap2_rw: SshTransport, tmp_path: Path)
     assert {k: uci.get(k) for k in LAB} == LAB
     ifaces = parse_iw_dev((await t.run("iw dev")).stdout)
     assert not any(i.ifname == MONITOR for i in ifaces), "monitor interface left behind"
-    assert not any(i.phy == 0 and i.type == "AP" for i in ifaces), "radio0 still on air after the restore"
+    assert not await _on_air(t), f"radio0 still on air {PARK_WAIT_S} s after the restore"

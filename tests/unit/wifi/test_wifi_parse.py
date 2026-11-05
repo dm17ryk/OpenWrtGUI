@@ -76,6 +76,21 @@ def test_beacons() -> None:
     assert parse_beacon_rates("") == []
 
 
+# AP2 (rt2800), 2026-11-05: its own beacons, seen on a monitor interface of the same radio, come from
+# the TX path: the radiotap header has the rate and TX flags ([bit 15]) but no channel or signal.
+OWN_BEACONS = (
+    "23:45:08.773740 1.0 Mb/s [bit 15] BSSID:00:0c:43:76:20:18 DA:ff:ff:ff:ff:ff:ff SA:00:0c:43:76:20:18 "
+    "Beacon (OwgTest) [1.0* 2.0* 5.5* 11.0* 6.0 9.0 12.0 18.0 Mbit] ESS CH: 6, PRIVACY\n"
+    "23:45:09.388120 1.0 Mb/s [bit 15] 0us BSSID:00:0c:43:76:20:18 DA:ff:ff:ff:ff:ff:ff SA:00:0c:43:76:20:18 "
+    "Beacon (OwgTest) [1.0* 2.0* 5.5* 11.0* 6.0 9.0 12.0 18.0 Mbit] ESS CH: 6, PRIVACY\n"
+    "5 packets captured\n"
+)
+
+
+def test_own_beacons_seen_on_the_same_radio() -> None:
+    assert parse_beacon_rates(OWN_BEACONS) == [1.0, 1.0]
+
+
 def test_uci_show() -> None:
     text = (
         "wireless.radio0=wifi-device\n"

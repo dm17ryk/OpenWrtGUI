@@ -10,7 +10,8 @@ from typing import Any
 
 _CHANNEL = re.compile(r"channel (\d+) \((\d+) MHz\)(?:, width: (\d+) MHz( \(no HT\))?)?")
 _MCS = re.compile(r"HT TX/RX MCS rate indexes supported:\s*(.+)")
-_BEACON_RATE = re.compile(r"(\d+(?:\.\d+)?) Mb/s \d+ MHz")
+# The rate right after the timestamp. A radio's own beacons (TX path) have no "<freq> MHz" after it.
+_BEACON_RATE = re.compile(r"\S+ (\d+(?:\.\d+)?) Mb/s ")
 
 
 @dataclass(frozen=True)
@@ -142,6 +143,6 @@ def parse_beacon_rates(tcpdump_text: str) -> list[float]:
     """The rate of every beacon in a `tcpdump -e` capture on a monitor interface."""
     rates = []
     for line in tcpdump_text.splitlines():
-        if "Beacon" in line and (m := _BEACON_RATE.search(line)):
+        if "Beacon" in line and (m := _BEACON_RATE.match(line)):
             rates.append(float(m.group(1)))
     return rates

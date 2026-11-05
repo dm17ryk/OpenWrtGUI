@@ -130,6 +130,13 @@ def parse_station_dump(text: str) -> list[StationRaw]:
     return out
 
 
+def current_survey(entries: list[SurveyEntry], freq_mhz: int | None) -> SurveyEntry | None:
+    """The entry of the radio's own frequency: rt2800 (AP2) marks every channel "[in use]"."""
+    if freq_mhz is None:
+        return next((s for s in entries if s.in_use), None)
+    return next((s for s in entries if s.freq_mhz == freq_mhz), None)
+
+
 def parse_survey(text: str) -> list[SurveyEntry]:
     out: list[SurveyEntry] = []
     block: dict[str, str] | None = None

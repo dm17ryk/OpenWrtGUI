@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from openwrtgui.paths import documents_dir
-from openwrtgui.rf.parse import parse_station_dump, parse_survey, split_sections
+from openwrtgui.rf.parse import current_survey, parse_station_dump, parse_survey, split_sections
 from openwrtgui.rf.recorder import CsvRecorder
 from openwrtgui.rf.sample import RawTick, derive, rf_command
 from openwrtgui.store.routers import RouterStore
@@ -146,7 +146,7 @@ class RfSampler:
             self._where = None  # the interface went away (a reload): find it again next time
             return {"type": "rf-idle", "reason": f"{self.radio} is restarting"}
         ack = sections.get("ACK", "").strip()
-        survey = next((s for s in parse_survey(sections.get("SURVEY", "")) if s.in_use), None)
+        survey = current_survey(parse_survey(sections.get("SURVEY", "")), info.freq_mhz)
         raw = RawTick(
             now,
             tuple(parse_station_dump(sections.get("STA", ""))),

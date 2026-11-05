@@ -132,7 +132,7 @@ class SimWifi:
             return _ok(p[5:] + "\n")
         if p == "set -e":  # answer() already stops at the first failing part
             return _ok()
-        if p == "ip link del owgmon0 2>/dev/null":
+        if p == "iw dev owgmon0 del 2>/dev/null":
             self._monitor = False
             return _ok()
         if p in ("uci -q show wireless", "uci show wireless", "uci show"):
@@ -154,7 +154,11 @@ class SimWifi:
             return _ok()
         if p == "ip link set owgmon0 up":
             return _ok() if self._monitor else _fail("ip: SIOCGIFFLAGS: No such device\n")
-        if p == "ip link del owgmon0":
+        if p == "ip link del owgmon0":  # as on AP2: a wireless interface goes only with `iw dev … del`
+            return _fail("RTNETLINK answers: Not supported\n")
+        if p == "iw dev owgmon0 del":
+            if not self._monitor:
+                return _fail("command failed: No such device (-19)\n")
             self._monitor = False
             return _ok()
         if p.startswith("timeout 5 tcpdump -i owgmon0 "):
@@ -423,8 +427,9 @@ class SimWifi:
         ch = self._channel(radio)
         rate = self._basic_mbps(radio)
         ssid = self._opt(self._ifaces(radio)[0][1], "ssid", "")
+        b = self._bssid  # own beacons come from the TX path: rate and TX flags, no channel or signal
         line = (
-            f"10:00:00.{{n:06d}} {rate:.1f} Mb/s {2407 + 5 * ch} MHz 11g -38dBm signal antenna 0 "
+            f"10:00:00.{{n:06d}} {rate:.1f} Mb/s [bit 15] BSSID:{b} DA:ff:ff:ff:ff:ff:ff SA:{b} "
             f"Beacon ({ssid}) [6.0* 9.0 12.0* 18.0 24.0* 36.0 48.0 54.0 Mbit] ESS CH: {ch}, PRIVACY"
         )
         return _ok("".join(line.format(n=102400 * i + 1) + "\n" for i in range(5)))

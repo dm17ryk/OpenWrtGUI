@@ -62,11 +62,30 @@ async def test_beacon_rate_follows_basic_rate() -> None:
     await _apply(t, ModeSelection.of("b", "n20"), ChannelSelection.of(1))
     assert (await t.run("iw phy phy0 interface add owgmon0 type monitor && ip link set owgmon0 up")).ok
     assert set(parse_beacon_rates((await t.run(BEACON, timeout=10)).stdout)) == {1.0}
-    assert (await t.run("ip link del owgmon0")).ok
+    assert (await t.run("iw dev owgmon0 del")).ok
     await _apply(t, ModeSelection.of("n20"), ChannelSelection.of(1))
     await t.run("iw phy phy0 interface add owgmon0 type monitor && ip link set owgmon0 up")
     rates = parse_beacon_rates((await t.run(BEACON, timeout=10)).stdout)
     assert len(rates) == 5 and set(rates) == {6.0}
+
+
+async def test_monitor_interface_goes_only_with_iw_like_on_ap2() -> None:
+    t = _ap2()
+    await _apply(t, ModeSelection.of("g"), ChannelSelection.of(1))
+    assert (await t.run("iw phy phy0 interface add owgmon0 type monitor && ip link set owgmon0 up")).ok
+    refused = await t.run("ip link del owgmon0")
+    assert not refused.ok and refused.stderr == "RTNETLINK answers: Not supported\n"
+    assert parse_beacon_rates((await t.run(BEACON, timeout=10)).stdout) != []
+    assert (await t.run("iw dev owgmon0 del")).ok
+    assert parse_beacon_rates((await t.run(BEACON, timeout=10)).stdout) == []
+
+
+async def test_own_beacons_look_like_ap2s() -> None:
+    t = _ap2()
+    await _apply(t, ModeSelection.of("g"), ChannelSelection.of(1))
+    await t.run("iw phy phy0 interface add owgmon0 type monitor && ip link set owgmon0 up")
+    first = (await t.run(BEACON, timeout=10)).stdout.splitlines()[0]
+    assert " 6.0 Mb/s [bit 15] BSSID:" in first and " MHz " not in first
 
 
 async def test_no_beacons_without_the_monitor_interface() -> None:

@@ -543,7 +543,7 @@ class WifiService:
         added = await self._run(  # a monitor left by a dropped connection would block the add
             t,
             rec,
-            f"ip link del {MONITOR} 2>/dev/null; "
+            f"iw dev {MONITOR} del 2>/dev/null; "
             f"iw phy {phy} interface add {MONITOR} type monitor && ip link set {MONITOR} up",
             source="app",
         )
@@ -556,7 +556,8 @@ class WifiService:
             )
             rates = parse_beacon_rates((await self._run(t, rec, capture, source="app", timeout=15.0)).stdout)
         finally:  # cleaning up restores the radio, so it runs even when a run has started meanwhile
-            await self._run(t, rec, f"ip link del {MONITOR}", source="app", require_guard=False)
+            # `iw`, not `ip link del`: AP2's kernel refuses the latter for a wireless interface.
+            await self._run(t, rec, f"iw dev {MONITOR} del", source="app", require_guard=False)
         if not rates:
             return Check("beacon rate", False, "no beacon seen in 5 s")
         if set(rates) != {expect.beacon_mbps}:

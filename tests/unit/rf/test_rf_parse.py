@@ -1,6 +1,13 @@
 from __future__ import annotations
 
-from openwrtgui.rf.parse import Bitrate, parse_bitrate, parse_station_dump, parse_survey, split_sections
+from openwrtgui.rf.parse import (
+    Bitrate,
+    current_survey,
+    parse_bitrate,
+    parse_station_dump,
+    parse_survey,
+    split_sections,
+)
 
 # Formats as AP2 prints them (txlab_4b_rx tests, 2026-10-25).
 STA = """Station 7c:df:a1:e8:ca:08 (on phy0-ap0)
@@ -66,3 +73,26 @@ def test_split_sections() -> None:
     sections = split_sections("===STA\nx\ny\n===ACK\n12\n===INFO\n\ttxpower 4.00 dBm\n")
     assert sections == {"STA": "x\ny", "ACK": "12", "INFO": "\ttxpower 4.00 dBm"}
     assert split_sections("") == {}
+
+
+# AP2 on air on channel 6 (2026-11-05): rt2800 marks every channel "[in use]".
+SURVEY_ALL_IN_USE = """Survey data from phy0-ap0
+\tfrequency:\t\t\t2412 MHz [in use]
+\tchannel active time:\t\t23938987 ms
+\tchannel busy time:\t\t15270606 ms
+Survey data from phy0-ap0
+\tfrequency:\t\t\t2437 MHz [in use]
+\tchannel active time:\t\t18000000 ms
+\tchannel busy time:\t\t6000000 ms
+"""
+
+
+def test_current_survey_is_the_radios_own_frequency() -> None:
+    picked = current_survey(parse_survey(SURVEY_ALL_IN_USE), 2437)
+    assert picked is not None and picked.freq_mhz == 2437 and picked.busy_ms == 6000000
+
+
+def test_current_survey_without_a_frequency_takes_the_in_use_entry() -> None:
+    assert current_survey(parse_survey(SURVEY_RT2800), None) == parse_survey(SURVEY_RT2800)[0]
+    assert current_survey(parse_survey(SURVEY_RT2800), 2462) is None
+    assert current_survey([], 2437) is None
