@@ -7,6 +7,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Network, DHCP, ports and VLANs.
+
+### Added
+
+- Network and DHCP screen: every interface with its protocol, address, gateway, DNS and state (the one
+  carrying this app is marked; interfaces the router makes at run time are read-only). Edit an interface's
+  protocol, static address, gateway, DNS, MTU, bridge members and every other option its protocol handler
+  knows, or add one.
+- Changes that can cut the app off (addresses, bridges, routes, rules, VLANs, the switch mirror) apply with a
+  60 s rollback, as LuCI does: the router restores its previous network settings by itself unless the app
+  reaches it again and confirms. The app then follows the router to its new address.
+- DHCP server per interface (pool, lease time, options by code, DHCPv6 and RA), with a warning when another
+  router already serves DHCP on the subnet; fixed addresses by MAC; active IPv4 and IPv6 leases with
+  **Make fixed**.
+- Wi-Fi access by MAC: Everyone, Block listed or Only listed per SSID, and blocking one device now (no Wi-Fi
+  restart), for 10 to 3600 s, or saved. The Wi-Fi screen's "Who may join" sums it up per SSID.
+- DNS: forwarders, local domain, rebind protection, overrides, dnsmasq's switches and any other option.
+- Static routes and policy rules for IPv4 and IPv6, and the live routing table.
+- Ports, VLANs, mirroring screen for swconfig switches: the front panel with link and speed and turning a
+  socket off or on (the socket carrying this app's SSH is locked), the VLAN matrix, the switch port mirror,
+  and the Wi-Fi mirror status.
+- LuCI's Network › Interfaces, DHCP and DNS, Routing and Switch pages open the app's own screens.
+
 ## [0.2.0] - 2026-11-05
 
 Wi-Fi and the LuCI fallback.

@@ -231,6 +231,8 @@ Mockups for screens 1–12 are on the canvas (`docs/design/canvas/project/`). Sc
 - **VLAN matrix** (— / U / T per port, CPU included). Changes to VLAN 1 apply with rollback.
 - **Switch port mirror**: monitor port, sources with RX/TX.
 - **Wi-Fi mirror** (`wifi-mirror` where present): status, stop/restart, excluded MACs, warning before iperf.
+  v0.3 shows the status only (present, running or stopped, from `ubus call service list`); stop/restart, the
+  excluded MACs and the iperf warning come with image import (v0.5), which reads how `wifi-mirror` is set up.
 
 ### 7.6 Firewall (4)
 

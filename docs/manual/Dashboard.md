@@ -63,5 +63,6 @@ ubus services, the typed Wi-Fi option lists, feature flags and the LuCI menu. **
 internal switch port with its printed label and the label saved for this router. **Probe again** reads
 it all once more; **Open terminal** opens a shell on the router.
 
-The row of buttons under the title opens the router's other screens: [Wi-Fi](Wi-Fi), RF live and the
-terminal, then every LuCI page that has no screen in the app yet.
+The row of buttons under the title opens the router's other screens: [Wi-Fi](Wi-Fi), RF live,
+[Network & DHCP](Network-and-DHCP), [Ports & VLANs](Ports-and-VLANs) and the terminal, then every LuCI page
+that has no screen in the app yet.
