@@ -165,24 +165,50 @@ def compile_routes(
     return ops
 
 
+def dst_key(text: str) -> str:
+    """A route target as `ip -j route` prints it: "default", a host without its prefix, a network in its
+    network form (the kernel drops host bits)."""
+    if text.strip() == "default":
+        return "default"
+    try:
+        net = ipaddress.ip_network(text.strip(), strict=False)
+    except ValueError:
+        return text.strip()
+    if net.prefixlen == 0:
+        return "default"
+    return str(net.network_address) if net.prefixlen == net.max_prefixlen else str(net)
+
+
+def _ip_key(text: str | None) -> str | None:
+    if text is None:
+        return None
+    try:
+        return str(ipaddress.ip_address(text.strip()))
+    except ValueError:
+        return text.strip()
+
+
 @dataclass(frozen=True)
 class Expect:
-    """One proof for the live table: a route (target, gateway, device) or a rule (priority), there or gone."""
+    """One proof for the live table: a route (target, gateway, device) or a rule (priority), there or gone,
+    in one address family."""
 
     name: str
     present: bool
-    dst: str | None = None
+    dst: str | None = None  # as dst_key gives it
     gateway: str | None = None
     dev: str | None = None
     priority: int | None = None
+    family: Family = 4
 
     def holds(self, live: LiveTables) -> bool:
         if self.priority is not None:
-            found = any(x.priority == self.priority for x in live.rules)
+            found = any(x.priority == self.priority and x.family == self.family for x in live.rules)
         else:
             found = any(
-                x.dst == self.dst
-                and (self.gateway is None or x.gateway == self.gateway)
+                x.family == self.family
+                and dst_key(x.dst) == self.dst
+                and (self.gateway is None or _ip_key(x.gateway) == self.gateway)
                 and (self.dev is None or x.dev == self.dev)
                 for x in live.routes
             )
@@ -196,25 +222,38 @@ def expectations(
     rule_upserts: Sequence[RuleRequest],
     rule_deletes: Sequence[str],
 ) -> list[Expect]:
-    devices = {v.live.name: v.live.device for v in state.interfaces if v.live is not None}
+    devices = {v.live.name: v.live.l3_device or v.live.device for v in state.interfaces if v.live is not None}
     out = [
-        Expect(f"route {t}", True, dst=t, gateway=r.gateway, dev=devices.get(r.interface))
+        Expect(
+            f"route {t}",
+            True,
+            dst=dst_key(t),
+            gateway=_ip_key(r.gateway),
+            dev=devices.get(r.interface),
+            family=family_of(r.kind),
+        )
         for r in upserts
         if not r.disabled
         for t in [str(parse_cidr(r.target, family_of(r.kind)))]
     ]
     out += [
-        Expect(f"route {old.target}", False, dst=old.target, gateway=old.gateway)
+        Expect(
+            f"route {old.target}",
+            False,
+            dst=dst_key(old.target),
+            gateway=_ip_key(old.gateway),
+            family=family_of(old.kind),
+        )
         for old in state.routes
         if old.section in deletes and not old.disabled
     ]
     out += [
-        Expect(f"rule {r.priority}", True, priority=r.priority)
+        Expect(f"rule {r.priority}", True, priority=r.priority, family=family_of(r.kind))
         for r in rule_upserts
         if r.priority is not None and not r.disabled
     ]
     out += [
-        Expect(f"rule {old.priority}", False, priority=old.priority)
+        Expect(f"rule {old.priority}", False, priority=old.priority, family=family_of(old.kind))
         for old in state.rules
         if old.section in rule_deletes and old.priority is not None
     ]

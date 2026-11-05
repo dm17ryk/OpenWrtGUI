@@ -215,6 +215,7 @@ def parse_interface_dump(result: Mapping[str, Any]) -> list[InterfaceLive]:
                 parent=parent,
                 uptime_s=_int(str(i["uptime"])) if "uptime" in i else None,
                 errors=tuple(f"{e.get('subsystem', '')}: {e.get('code', '')}" for e in i.get("errors", [])),
+                l3_device=str(i["l3_device"]) if i.get("l3_device") else None,
             )
         )
     return out

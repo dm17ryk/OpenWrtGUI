@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 from netenv import NetEnv
 
 from openwrtgui.net.dns import DnsRequest
-from openwrtgui.net.routes import RouteRequest, RuleRequest, read_live
+from openwrtgui.net.model import Family, LiveRoute, LiveRule, RouteConf, RuleConf
+from openwrtgui.net.routes import LiveTables, RouteRequest, RuleRequest, expectations, read_live
 from openwrtgui.transport.base import CommandResult
 
 D = "dhcp.cfg01411c"
@@ -104,6 +107,58 @@ async def test_rule_by_priority(net: NetEnv) -> None:
     assert any(
         r.priority == 90 and r.src == "192.168.5.0/24" for r in (await net.service.live_routes("ap2")).rules
     )
+
+
+def _live(*routes: LiveRoute, rules: tuple[LiveRule, ...] = ()) -> LiveTables:
+    return LiveTables(routes, rules, None)
+
+
+def _r(dst: str, gateway: str | None = None, dev: str = "br-lan", family: Family = 4) -> LiveRoute:
+    return LiveRoute(family, dst, gateway, dev, "main", "static", None, "unicast")
+
+
+async def test_route_checks_read_targets_as_ip_prints_them(net: NetEnv) -> None:
+    """`ip -j route` prints the default route as "default", a host route without its prefix, a network
+    in its network form, and addresses in lower case."""
+    state = await net.service.state("ap2")
+
+    def holds(req: RouteRequest, live: LiveTables) -> bool:
+        (want,) = expectations(state, [req], [], [], [])
+        return want.holds(live)
+
+    gw = "192.168.1.1"
+    assert holds(RouteRequest(None, "route", "lan", "0.0.0.0/0", gateway=gw), _live(_r("default", gw)))
+    assert holds(RouteRequest(None, "route", "lan", "10.10.0.1/16"), _live(_r("10.10.0.0/16")))
+    assert holds(RouteRequest(None, "route", "lan", "10.9.9.9/32"), _live(_r("10.9.9.9")))
+    six = RouteRequest(None, "route6", "lan", "fd00:9::/64", gateway="FD00::1")
+    assert holds(six, _live(_r("fd00:9::/64", "fd00::1", family=6)))
+    assert not holds(RouteRequest(None, "route", "lan", "0.0.0.0/0"), _live(_r("default", family=6)))
+
+
+async def test_a_deleted_host_route_is_gone_only_when_ip_no_longer_shows_it(net: NetEnv) -> None:
+    host = RouteConf("cfgabc123", "route", "lan", "10.9.9.9/32", None, None, None, None, False)
+    state = replace(await net.service.state("ap2"), routes=(host,))
+    (want,) = expectations(state, [], ["cfgabc123"], [], [])
+    assert not want.holds(_live(_r("10.9.9.9")))
+    assert want.holds(_live())
+
+
+async def test_a_route_over_pppoe_is_matched_on_the_kernel_device(net: NetEnv) -> None:
+    state = await net.service.state("ap2")
+    wan = next(v for v in state.interfaces if v.conf is not None and v.conf.name == "wan")
+    assert wan.live is not None
+    pppoe = replace(wan, live=replace(wan.live, device="eth0.2", l3_device="pppoe-wan"))
+    state = replace(state, interfaces=tuple(pppoe if v is wan else v for v in state.interfaces))
+    (want,) = expectations(state, [RouteRequest(None, "route", "wan", "10.20.0.0/16")], [], [], [])
+    assert want.holds(_live(_r("10.20.0.0/16", dev="pppoe-wan")))
+
+
+async def test_a_deleted_rule_is_matched_in_its_own_family(net: NetEnv) -> None:
+    rule = RuleConf("cfgdef456", "rule", "10.9.0.0/24", None, None, None, "main", 100, None, False)
+    state = replace(await net.service.state("ap2"), rules=(rule,))
+    (want,) = expectations(state, [], [], [], ["cfgdef456"])
+    assert want.holds(_live(rules=(LiveRule(6, 100, None, "main"),)))  # only an IPv6 rule has 100 now
+    assert not want.holds(_live(rules=(LiveRule(4, 100, "10.9.0.0/24", "main"),)))
 
 
 async def test_live_tables_fallback_to_text(net: NetEnv) -> None:

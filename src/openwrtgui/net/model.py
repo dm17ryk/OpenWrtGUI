@@ -73,6 +73,7 @@ class InterfaceLive:
     parent: str | None
     uptime_s: int | None
     errors: tuple[str, ...]
+    l3_device: str | None = None  # the kernel's device for its routes (pppoe-wan for a PPPoE wan)
 
 
 @dataclass(frozen=True)
