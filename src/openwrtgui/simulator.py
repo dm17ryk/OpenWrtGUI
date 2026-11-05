@@ -13,6 +13,7 @@ import asyncssh
 import httpx
 
 from openwrtgui.guard.bench_guard import ProcessInfo
+from openwrtgui.simwifi import SimWifi
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import (
     AuthFailed,
@@ -113,7 +114,11 @@ class SimConnector:
     def state(self, host: str) -> SimState:
         if host not in self._states:
             entry = self._entry(host)
-            self._states[host] = SimState(root_password=entry.get("password") or SIM_ROOT_PASSWORD)
+            wifi = None
+            if entry.get("wifi"):
+                text = (self._sim_dir / "wifi" / entry["wifi"]).read_text(encoding="utf-8")
+                wifi = SimWifi(text, bssid=f"02:00:00:00:00:{int(host.rsplit('.', 1)[1]):02x}")
+            self._states[host] = SimState(root_password=entry.get("password") or SIM_ROOT_PASSWORD, wifi=wifi)
         return self._states[host]
 
     async def fetch_host_key(self, host: str, port: int = 22) -> HostKeyInfo:

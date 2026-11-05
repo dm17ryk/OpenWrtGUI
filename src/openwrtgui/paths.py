@@ -94,6 +94,34 @@ def simulator_data_dir(
     return DataDir.at(root.with_name(f"{root.name}-simulator"))
 
 
+def _windows_documents() -> Path | None:
+    """The user's Documents folder as Windows knows it (it may be redirected, e.g. to OneDrive)."""
+    if sys.platform != "win32":
+        return None
+    import ctypes
+    from ctypes import wintypes
+    from uuid import UUID
+
+    class _Guid(ctypes.Structure):
+        _fields_ = [("data", ctypes.c_byte * 16)]
+
+    folder = _Guid()
+    folder.data[:] = UUID("{FDD39AD0-238F-46AF-ADB4-6C85480369C7}").bytes_le  # FOLDERID_Documents
+    path = ctypes.c_wchar_p()
+    shell32 = ctypes.windll.shell32  # type: ignore[attr-defined, unused-ignore]
+    if shell32.SHGetKnownFolderPath(ctypes.byref(folder), 0, wintypes.HANDLE(0), ctypes.byref(path)) != 0:
+        return None
+    try:
+        return Path(path.value) if path.value else None
+    finally:
+        ctypes.windll.ole32.CoTaskMemFree(path)  # type: ignore[attr-defined, unused-ignore]
+
+
+def documents_dir() -> Path:
+    """Where RF recordings and captures go (inside it, OpenWrtGUI\\)."""
+    return _windows_documents() or Path.home() / "Documents"
+
+
 def web_dir(explicit: Path | None) -> Path | None:
     """The built UI: explicit path, the bundled copy when frozen, or frontend/dist in a checkout."""
     if explicit is not None:

@@ -54,6 +54,16 @@ def test_readme_links_the_project_files() -> None:
     assert SCREENSHOT_URL + "dashboard.png" in readme
 
 
+def test_readme_screenshots_are_ones_e2e_writes() -> None:
+    shown = {
+        t.removeprefix(SCREENSHOT_URL).removesuffix(".png")
+        for t in _LINK.findall(_read(ROOT / "README.md"))
+        if t.startswith(SCREENSHOT_URL)
+    }
+    assert {"wifi", "rf-live", "luci-page"} <= shown
+    assert shown <= _screens()
+
+
 def test_every_sidebar_page_exists() -> None:
     pages = [t for t in _LINK.findall(_read(MANUAL / "_Sidebar.md")) if not t.startswith("http")]
     assert len(pages) >= 10

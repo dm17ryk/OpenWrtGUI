@@ -14,8 +14,22 @@ is connected, and how each router describes itself. It never disturbs a test run
 
 ![Dashboard: three routers, the 2.4 GHz air map and one station](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/dashboard.png)
 
-> v0.1 is the foundation: install, update, add routers, a read-only dashboard, Bench Guard, the
-> terminal and the audit log. Wi-Fi, network, firewall and LTE screens follow; see the [roadmap](ROADMAP.md).
+> v0.2 adds Wi-Fi: set a radio's modes, channels and TX power and see the result proven on air, watch
+> RF live, and open any LuCI page the app has no screen for yet. v0.1 laid the foundation: install,
+> update, add routers, the dashboard, Bench Guard, the terminal and the audit log. Network, firewall and
+> LTE screens follow; see the [roadmap](ROADMAP.md).
+
+## What v0.2 adds
+
+| Screen | What you get |
+|---|---|
+| **Wi-Fi** | Per radio: which modes (b, g, n 20/40) and rates go on air, which channels (one, a list, all, or none to park it), TX power, the SSIDs and their security. Every change shows the exact commands first; after Apply the app proves it on air (radio, channel, width, power, the TX rate mask, and real beacons). Stations with kick and block, and every radio and SSID option the router knows. |
+| **RF live** | Once a second: channel, TX power asked for and reported, channel busy time, and for each station RX and TX signal, rates, retries and drops, with one-minute to one-hour charts and CSV recording. It only reads, so it works during a harness run. |
+| **LuCI pages** | Any page in the router's LuCI menu that has no screen here opens inside the app, already logged in over SSH with only the rights that page needs. It is read-only during a harness run, and the app lists every option that changed. |
+
+| Wi-Fi | RF live | LuCI page |
+|---|---|---|
+| ![Wi-Fi](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/wifi.png) | ![RF live](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/rf-live.png) | ![LuCI page](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/luci-page.png) |
 
 ## What v0.1 does
 

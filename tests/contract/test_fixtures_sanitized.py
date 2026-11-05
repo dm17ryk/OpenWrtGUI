@@ -19,6 +19,22 @@ def test_no_secrets_in_recordings() -> None:
             assert re.search(r"\d{15}", blob) is None, name
 
 
+def _uci_secrets(text: str) -> list[str]:
+    from openwrtgui.guard.audit import SECRET_OPTIONS
+
+    options = "|".join(SECRET_OPTIONS)
+    return re.findall(rf"\.(?:{options})='(?!<hidden>')[^']*'", text)
+
+
+def test_no_uci_secrets_in_recordings() -> None:
+    assert _uci_secrets("wireless.default_radio0.key='lab key'\nx.y.ssid='OpenWrt'\n") == [".key='lab key'"]
+    for name, text in _texts():
+        recorded = json.loads(text)
+        for entry in recorded.values() if isinstance(recorded, dict) else ():
+            if isinstance(entry, dict):
+                assert _uci_secrets(str(entry.get("stdout", ""))) == [], name
+
+
 def test_ap2_recording_has_the_whole_probe_set() -> None:
     from openwrtgui.probe.commands import DESCRIBE_COMMANDS, STATUS_COMMANDS, wireless_validate
 

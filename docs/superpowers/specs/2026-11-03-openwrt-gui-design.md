@@ -197,7 +197,7 @@ Mockups for screens 1–12 are on the canvas (`docs/design/canvas/project/`). Sc
   - All: `channels='1-13'`
   - None: radio parked (`disabled=1`)
 - **TX power**: Auto (shows the actual maximum) / Fixed N / Cap N. Cap is shown only when the driver can use it. The actual value from `iw dev … info` is shown next to the requested one.
-- **Apply**: the router picks within the selection. The result is verified on air: radio up, channel, width, and beacon rates read through `mon0`.
+- **Apply**: the router picks within the selection. The result is verified on air: radio up, channel, width, and beacon rates read through a temporary monitor interface (`owgmon0`, see O4).
 - **Step-through**: every ticked mode × ticked channel × (optional) ticked power, one pure mode per step. Each step is proven on air before its dwell. Advance on a timer, manually, or when a station re-joins. AP restored at the end or on Stop. Blocked by Bench Guard.
 - **Stations**: MAC, name/IP (leases), signal, TX/RX rate, mode, connected time; actions: RF, Block, Deauth.
 - **Who may join**: one-line summary linking to Network & DHCP.
@@ -409,16 +409,16 @@ Each milestone gets its own implementation plan. The first plan covers v0.1 Foun
 | O1 | BM806C "reset to defaults" command. The D-Link firmware's `libusbmodem.so` resets its DWP-812 modem profile with `AT%SYSCMD="/etc/sysconfig/script/cus_restore_default.sh"`, but the BM806C answers `AT%SYSCMD=?` with ERROR. `usbmodem_set_defaults` references `AT+BMMODODR=17`. An earlier Claude Code session reportedly reset this modem over SSH; the command is not in the local transcripts | Ask Dmitry for the command, or disassemble `usbmodem_set_defaults`; then test on AP2's modem with Dmitry's OK |
 | O2 | Names for the `AT+BMMODODR` codes (17 now) | BroadMobi AT manual |
 | O3 | Operator name from QMI comes back garbled (encoding) | Decode per QMI spec, or `AT+COPS?` |
-| O4 | rt2800 noise floor and RX/TX air-time split are expected missing; confirm with the radio up | Check on AP2 during a planned radio-on window |
-| O5 | `txpower limit` on rt2800 is expected to equal fixed | Measure |
-| O6 | minstrel `rc_stats` path with a station associated | Check on AP2 |
+| O4 | rt2800 noise floor and RX/TX air-time split are expected missing; confirm with the radio up | **Done 2026-11-05 on AP2 (on air, ch 6):** `survey dump` has no `noise` line and no RX/TX time on any channel, only active, busy and extension busy time. rt2800 also marks every channel `[in use]`, so the RF sampler takes the entry of the radio's own frequency (`current_survey`). The radio's own beacons, read on a monitor interface of the same radio, come from the TX path: `6.0 Mb/s [bit 15] BSSID:…`, with no `<freq> MHz` (the beacon parser reads the rate after the timestamp). So the beacon check reads the rate the driver reports for the beacons it sent, not beacons heard over the air. The monitor interface goes only with `iw dev owgmon0 del`; `ip link del` answers "Not supported" |
+| O5 | `txpower limit` on rt2800 is expected to equal fixed | Open: not measured in the 2026-11-05 window |
+| O6 | minstrel `rc_stats` path with a station associated | Open: no station joined in the 2026-11-05 window (one-time key), so the RF rates table stays "not available" |
 | O7 | Authenticode signing certificate (SmartScreen, SentinelOne) | Dmitry / IT |
 | O8 | Runtime `deny_acl` combined with a saved `maclist` across reloads | Test on AP2 |
 | O9 | What the panel sees for each block method (auth reject vs no probe response) | `mon0` capture on AP2 |
 | O10 | Known-writer signatures for each harness | Collect from the harness sources |
 | O11 | Installing the app key on AP1 (live bench router) | Dmitry's go |
 | O12 | Claude Code GitHub Action (needs an API key secret) | Dmitry's call |
-| O13 | LuCI fallback login: LuCI accepts an rpcd session created over SSH (`session create` + `grant` + `set` user root) through its `sysauth` cookie; a read-only grant gives LuCI's read-only view; the session expires and is destroyed as planned | Test on AP2: open pages read-only, change nothing |
+| O13 | LuCI fallback login: LuCI accepts an rpcd session created over SSH (`session create` + `grant` + `set` user root) through its `sysauth` cookie; a read-only grant gives LuCI's read-only view; the session expires and is destroyed as planned | **Done 2026-11-05 on AP2:** a read-only session with only the page's own access groups (from acl.d) opened `admin/network/wireless` through the SSH forward: HTTP 200, no login form; the page's ubus calls (`iwinfo assoclist`, `uci get`) were allowed; `session destroy` left no session behind (`tests/hardware/test_ap2_luci.py`). No password and no "every group" retry needed |
 
 ## 14. Out of scope
 

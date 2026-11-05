@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import PurePosixPath
 from typing import Any, Literal
@@ -12,6 +12,7 @@ from typing import Any, Literal
 from openwrtgui.probe import commands as c
 from openwrtgui.probe.board import BoardInfo, parse_board_json
 from openwrtgui.probe.identity import Identity, build_identity, parse_release
+from openwrtgui.probe.luci_menu import LuciPage, parse_acl, parse_menu
 from openwrtgui.probe.ubus_list import parse_ubus_list
 from openwrtgui.transport.base import Transport, ubus_call
 
@@ -23,6 +24,8 @@ class LuciInfo:
     packages: tuple[str, ...]
     menu_entries: int
     acl_groups: tuple[str, ...]
+    pages: tuple[LuciPage, ...] = ()
+    acl: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -105,6 +108,8 @@ async def describe_router(t: Transport) -> SelfDescription:
             packages=tuple(sorted(menus)),
             menu_entries=sum(len(m) for m in menus.values()),
             acl_groups=tuple(sorted(g for acl in acls.values() for g in acl)),
+            pages=tuple(parse_menu(menus)),
+            acl=parse_acl(acls),
         )
         if menus
         else None

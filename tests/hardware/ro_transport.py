@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import re
+
 from openwrtgui.guard.readonly import is_read_only_command
 from openwrtgui.probe import commands
-from openwrtgui.transport.base import CommandResult, ShellChannel, Transport
+from openwrtgui.transport.base import CommandResult, Forwarder, LocalForward, ShellChannel, Transport
 
 # The probes' fixed command strings. Two of them (the LuCI menu and ACL loops) only read but are shell
 # loops, which the terminal's read-only check rejects on principle; exact matches are allowed here.
@@ -32,3 +34,36 @@ class ReadOnlyTransport:
 
     async def close(self) -> None:
         await self._inner.close()
+
+
+AP2 = "192.168.1.2"
+
+
+def write_refusal(router: str, *, allow_writes: bool, txctl_told: bool) -> str | None:
+    """Why a test that changes the router may not run, or None. Only AP2, and only when both flags say so."""
+    if router != AP2:
+        return f"tests that change a router run on AP2 ({AP2}) only, not {router}"
+    if not allow_writes:
+        return "pass --allow-writes: this test changes AP2's Wi-Fi and restores it"
+    if not txctl_told:
+        return "pass --txctl-told once the txctl session has given its OK for a radio-on window on AP2"
+    return None
+
+
+# rpcd sessions live in memory and change no config: one `ubus call session …` with one quoted JSON argument.
+_SESSION_CALL = re.compile(r"ubus call session (create|grant|set|destroy|list) '[^']*'")
+
+
+class LuciSessionTransport(ReadOnlyTransport):
+    """Read-only, plus the LuCI bridge's rpcd session calls and its SSH forward to the router's web server."""
+
+    async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
+        if _SESSION_CALL.fullmatch(command):
+            self.commands.append(command)
+            return await self._inner.run(command, timeout=timeout)
+        return await super().run(command, timeout=timeout)
+
+    async def forward_local(self, remote_host: str, remote_port: int) -> LocalForward:
+        if not isinstance(self._inner, Forwarder):
+            raise AssertionError("this connection cannot forward a port")
+        return await self._inner.forward_local(remote_host, remote_port)

@@ -62,3 +62,6 @@ is what the router reported when the app connected, read from the sources LuCI u
 ubus services, the typed Wi-Fi option lists, feature flags and the LuCI menu. **Ports** shows each
 internal switch port with its printed label and the label saved for this router. **Probe again** reads
 it all once more; **Open terminal** opens a shell on the router.
+
+The row of buttons under the title opens the router's other screens: [Wi-Fi](Wi-Fi), RF live and the
+terminal, then every LuCI page that has no screen in the app yet.

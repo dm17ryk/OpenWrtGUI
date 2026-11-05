@@ -20,6 +20,9 @@ class _Server(asyncssh.SSHServer):
     def validate_password(self, username: str, password: str) -> bool:
         return username == "root" and password == TEST_PASSWORD
 
+    def connection_requested(self, dest_host: str, dest_port: int, orig_host: str, orig_port: int) -> bool:
+        return True  # allow -L forwarding, as dropbear does for root
+
 
 class _NoLoginServer(_Server):
     """Like dropbear with an empty root password: anyone gets in without credentials."""

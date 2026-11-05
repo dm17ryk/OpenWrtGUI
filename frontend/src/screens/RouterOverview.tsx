@@ -5,6 +5,8 @@ import { ApiError, apiFetch, postJson } from '../api/client'
 import type { DescriptionSummary, RouterDetail } from '../api/types'
 import { Help } from '../help/Help'
 import { HELP } from '../help/topics'
+import { RouterSections } from '../shell/RouterSections'
+import { LuciPagesCard } from './luci/LuciPagesCard'
 
 const FEATURE_ORDER = ['sae', 'owe', 'wps', '11r', '11ax', 'swconfig', 'firewall4', 'apk', 'wep', '11be']
 
@@ -34,7 +36,7 @@ function Sources({ s }: { s: DescriptionSummary }) {
       <Source title="ubus -v list" drives="decides which features are available">
         {s.services} services with their method signatures
       </Source>
-      <Source title="network.wireless get_validate" drives="Wi-Fi › All options (v0.2)">
+      <Source title="network.wireless get_validate" drives="Wi-Fi › All options">
         {Object.entries(s.wireless_options).map(([radio, g]) => (
           <div key={radio}>
             {radio}: radio {g.device ?? 0} · SSID {g.interface ?? 0} · station {g.station ?? 0} · VLAN {g.vlan ?? 0}
@@ -55,7 +57,7 @@ function Sources({ s }: { s: DescriptionSummary }) {
           ))}
         </span>
       </Source>
-      <Source title="LuCI menu and ACL files" drives="LuCI parity check and fallback pages (v0.2)">
+      <Source title="LuCI menu and ACL files" drives="the LuCI pages that open inside the app">
         {s.luci_packages} LuCI packages, {s.luci_menu_entries} menu entries
       </Source>
     </div>
@@ -120,6 +122,7 @@ export function RouterOverview() {
           </>
         )}
       </div>
+      {d.record.auth === 'key' && <RouterSections routerId={d.record.id} name={d.record.name} current="overview" />}
       {probeError && <div className="note x">{probeError}</div>}
       {d.record.auth === 'none' ? (
         <div className="note w">
@@ -137,6 +140,7 @@ export function RouterOverview() {
           {s ? <Sources s={s} /> : <div className="muted">Not read yet.</div>}
         </section>
       )}
+      {d.record.auth === 'key' && <LuciPagesCard routerId={d.record.id} short={d.record.name.split(' · ')[0]} />}
       {s && Object.keys(s.port_labels).length > 0 && (
         <section className="card" aria-labelledby="ports-h">
           <h2 id="ports-h" style={{ marginBottom: 10 }}>

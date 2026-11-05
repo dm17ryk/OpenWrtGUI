@@ -15,11 +15,41 @@ from typing import Literal
 log = logging.getLogger(__name__)
 
 HIDDEN = "<hidden>"
-_SECRET_OPTIONS = r"key|password|pincode|psk|sae_password|auth_secret|acct_secret|priv_key_pwd|priv_key2_pwd"
-# uci set <cfg>.<section>.<option>=value, with the value quoted '…', "…" or bare.
-_UCI_SECRET = re.compile(rf"(\.(?:{_SECRET_OPTIONS})=)('[^']*'|\"[^\"]*\"|[^\s;&|'\"]+)")
+SECRET_OPTIONS = (
+    "key",
+    "key1",
+    "key2",
+    "key3",
+    "key4",  # WEP
+    "password",
+    "pincode",
+    "psk",
+    "sae_password",
+    "multi_ap_backhaul_key",  # a Wi-Fi passphrase
+    "auth_secret",
+    "acct_secret",
+    "dae_secret",
+    "auth_server_shared_secret",
+    "acct_server_shared_secret",
+    "priv_key_pwd",
+    "priv_key2_pwd",
+    "private_key_passwd",
+    "private_key2_passwd",
+    "wps_pin",
+    "ap_pin",
+    "r0kh",
+    "r1kh",  # FT key holders carry their keys
+    "private_key",
+    "preshared_key",  # WireGuard
+)
+_SECRET_OPTIONS = "|".join(SECRET_OPTIONS)
+# uci set <cfg>.<section>.<option>=value, with the value quoted '…' (a ' inside written as '\''),
+# "…" or bare.
+_UCI_SECRET = re.compile(
+    rf"(\.(?:{_SECRET_OPTIONS})=)('(?:[^']*'\\'')*[^']*'|\"(?:[^\"\\]|\\.)*\"|[^\s;&|'\"]+)"
+)
 # The same options in JSON (ubus call uci set / ubus call network …).
-_JSON_SECRET = re.compile(rf"(\"(?:{_SECRET_OPTIONS})\"\s*:\s*)\"[^\"]*\"")
+_JSON_SECRET = re.compile(rf"(\"(?:{_SECRET_OPTIONS})\"\s*:\s*)\"(?:[^\"\\]|\\.)*\"")
 
 
 def _hide_value(match: re.Match[str]) -> str:

@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from openwrtgui.guard.audit import AuditLog, Source, mask
 from openwrtgui.guard.bench_guard import BenchGuard
-from openwrtgui.transport.base import CommandResult, Transport
+from openwrtgui.transport.base import CommandResult, Transport, TransportError
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,46 @@ class WriteAction:
 
     def preview(self) -> list[str]:
         return [mask(c, self.secrets) for c in self.commands]
+
+
+async def run_audited(
+    transport: Transport,
+    command: str,
+    *,
+    router_id: str,
+    screen: str,
+    guard: BenchGuard,
+    audit: AuditLog,
+    source: Source = "user",
+    secrets: Sequence[str] = (),
+    stdin: str | None = None,
+    timeout: float = 15.0,
+    require_guard: bool = True,
+) -> CommandResult:
+    """One command: refused while Bench Guard is live, audited masked. The caller holds the write lock.
+
+    require_guard=False is for commands that change no router config (rpcd sessions in memory)."""
+    if require_guard:
+        guard.require_clear()
+    try:
+        if stdin is not None:
+            result = await transport.run_stdin(command, stdin, timeout=timeout)
+        else:
+            result = await transport.run(command, timeout=timeout)
+    except TransportError:
+        audit.record(
+            router=router_id, screen=screen, command=command, exit_status=None, source=source, secrets=secrets
+        )
+        raise
+    audit.record(
+        router=router_id,
+        screen=screen,
+        command=command,
+        exit_status=result.exit_status,
+        source=source,
+        secrets=secrets,
+    )
+    return result
 
 
 async def perform_write(
@@ -37,17 +78,16 @@ async def perform_write(
     results: list[CommandResult] = []
     async with lock:
         for command in action.commands:
-            if action.stdin is not None:
-                result = await transport.run_stdin(command, action.stdin)
-            else:
-                result = await transport.run(command)
-            audit.record(
-                router=action.router_id,
+            result = await run_audited(
+                transport,
+                command,
+                router_id=action.router_id,
                 screen=action.screen,
-                command=command,
-                exit_status=result.exit_status,
+                guard=guard,
+                audit=audit,
                 source=source,
                 secrets=action.secrets,
+                stdin=action.stdin,
             )
             results.append(result)
             if not result.ok:

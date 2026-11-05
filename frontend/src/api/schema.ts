@@ -396,6 +396,247 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/luci/bridges/{bridge_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Luci Bridge
+         * @description The bridge as it is now: `access` turns to read when Bench Guard sees a run.
+         */
+        get: operations["luci_bridge_api_routers__router_id__luci_bridges__bridge_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/luci/bridges/{bridge_id}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Luci Changes */
+        get: operations["luci_changes_api_routers__router_id__luci_bridges__bridge_id__changes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/luci/bridges/{bridge_id}/close": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Luci Close */
+        post: operations["luci_close_api_routers__router_id__luci_bridges__bridge_id__close_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/luci/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Luci Open */
+        post: operations["luci_open_api_routers__router_id__luci_open_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/luci/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Luci Pages */
+        get: operations["luci_pages_api_routers__router_id__luci_pages_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/wifi": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Wifi State */
+        get: operations["wifi_state_api_routers__router_id__wifi_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/wifi/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Wifi Apply */
+        post: operations["wifi_apply_api_routers__router_id__wifi_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/wifi/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Wifi Options */
+        get: operations["wifi_options_api_routers__router_id__wifi_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/wifi/options/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Wifi Options Apply */
+        post: operations["wifi_options_apply_api_routers__router_id__wifi_options_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/wifi/options/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Wifi Options Preview */
+        post: operations["wifi_options_preview_api_routers__router_id__wifi_options_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/wifi/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Wifi Preview */
+        post: operations["wifi_preview_api_routers__router_id__wifi_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/wifi/stations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Wifi Stations */
+        get: operations["wifi_stations_api_routers__router_id__wifi_stations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/wifi/stations/{mac}/block": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Wifi Block */
+        post: operations["wifi_block_api_routers__router_id__wifi_stations__mac__block_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/wifi/stations/{mac}/deauth": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Wifi Deauth */
+        post: operations["wifi_deauth_api_routers__router_id__wifi_stations__mac__deauth_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings": {
         parameters: {
             query?: never;
@@ -521,6 +762,21 @@ export interface components {
             /** Public Line */
             public_line: string;
         };
+        /** ApplyResult */
+        ApplyResult: {
+            /** Applied */
+            applied: boolean;
+            /** Checks */
+            checks: components["schemas"]["Check"][];
+            /** Error */
+            error: string | null;
+            /** Radio */
+            radio: string;
+            /** Router Id */
+            router_id: string;
+            /** Verified */
+            verified: boolean;
+        };
         /** AuditEntry */
         AuditEntry: {
             /** Command */
@@ -543,6 +799,76 @@ export interface components {
             ts: string;
             /** Verify */
             verify: string | null;
+        };
+        /** BlockIn */
+        BlockIn: {
+            /** Seconds */
+            seconds: number;
+        };
+        /** BridgeClosed */
+        BridgeClosed: {
+            /** Changes */
+            changes: components["schemas"]["UciChange"][];
+            /** Id */
+            id: string;
+        };
+        /** BridgeView */
+        BridgeView: {
+            /**
+             * Access
+             * @enum {string}
+             */
+            access: "read" | "write";
+            /** Id */
+            id: string;
+            /**
+             * Opened At
+             * Format: date-time
+             */
+            opened_at: string;
+            page: components["schemas"]["PageView"];
+            /** Router Id */
+            router_id: string;
+            /** Url */
+            url: string;
+        };
+        /** ChannelSelection */
+        ChannelSelection: {
+            /**
+             * Channels
+             * @default []
+             */
+            channels: number[];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "auto" | "all" | "none" | "set";
+        };
+        /** ChannelsIn */
+        ChannelsIn: {
+            /**
+             * Channels
+             * @default []
+             */
+            channels: number[];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "auto" | "all" | "none" | "set";
+        };
+        /** Check */
+        Check: {
+            /** Detail */
+            detail: string;
+            /**
+             * Name
+             * @enum {string}
+             */
+            name: "radio" | "channel" | "width" | "TX power" | "TX mask" | "beacon rate";
+            /** Ok */
+            ok: boolean | null;
         };
         /** DescriptionSummary */
         DescriptionSummary: {
@@ -578,6 +904,21 @@ export interface components {
                     [key: string]: number;
                 };
             };
+        };
+        /** Expectation */
+        Expectation: {
+            /** Beacon Mbps */
+            beacon_mbps: number | null;
+            /** Channels */
+            channels: number[] | null;
+            /** No Ht */
+            no_ht: boolean;
+            /** Radio Up */
+            radio_up: boolean;
+            /** Txpower Dbm */
+            txpower_dbm: number | null;
+            /** Widths */
+            widths: number[];
         };
         /** FinishIn */
         FinishIn: {
@@ -661,6 +1002,31 @@ export interface components {
             /** Up */
             up: boolean;
         };
+        /** IwDevInfo */
+        IwDevInfo: {
+            /** Addr */
+            addr: string | null;
+            /** Channel */
+            channel: number | null;
+            /** Freq Mhz */
+            freq_mhz: number | null;
+            /** Ifindex */
+            ifindex: number | null;
+            /** Ifname */
+            ifname: string;
+            /** No Ht */
+            no_ht: boolean;
+            /** Phy */
+            phy: number | null;
+            /** Ssid */
+            ssid: string | null;
+            /** Txpower Dbm */
+            txpower_dbm: number | null;
+            /** Type */
+            type: string | null;
+            /** Width Mhz */
+            width_mhz: number | null;
+        };
         /** LoginIn */
         LoginIn: {
             /** Key Path */
@@ -673,6 +1039,32 @@ export interface components {
              */
             username: string;
         };
+        /** ModeSelection */
+        ModeSelection: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "auto" | "set" | "custom";
+            /**
+             * Modes
+             * @default []
+             */
+            modes: ("b" | "g" | "n20" | "n40")[];
+        };
+        /** ModesIn */
+        ModesIn: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "auto" | "all" | "set";
+            /**
+             * Modes
+             * @default []
+             */
+            modes: ("b" | "g" | "n20" | "n40")[];
+        };
         /** Ok */
         Ok: {
             /**
@@ -681,15 +1073,192 @@ export interface components {
              */
             ok: boolean;
         };
+        /** OpenIn */
+        OpenIn: {
+            /** Path */
+            path: string;
+        };
+        /** OptionEditIn */
+        OptionEditIn: {
+            /** Name */
+            name: string;
+            /** Section */
+            section: string;
+            /** Value */
+            value?: string | string[] | null;
+        };
+        /** OptionRow */
+        OptionRow: {
+            /** Control */
+            control: string | null;
+            /**
+             * Editor
+             * @enum {string}
+             */
+            editor: "switch" | "number" | "text" | "list" | "secret" | "readonly";
+            /**
+             * Group
+             * @enum {string}
+             */
+            group: "device" | "interface";
+            /** Name */
+            name: string;
+            /** Section */
+            section: string;
+            /** Set In Config */
+            set_in_config: boolean;
+            /** Type */
+            type: string;
+            /** Value */
+            value: string | string[] | null;
+            /** Writer */
+            writer: string | null;
+        };
+        /** OptionsApplyIn */
+        OptionsApplyIn: {
+            /** Digest */
+            digest: string;
+            /** Edits */
+            edits: components["schemas"]["OptionEditIn"][];
+            /** Radio */
+            radio: string;
+        };
+        /** OptionsIn */
+        OptionsIn: {
+            /** Edits */
+            edits: components["schemas"]["OptionEditIn"][];
+            /** Radio */
+            radio: string;
+        };
+        /** PageView */
+        PageView: {
+            /**
+             * Label
+             * @default
+             */
+            label: string;
+            /** Native */
+            native: string | null;
+            /** Package */
+            package: string;
+            /** Path */
+            path: string;
+            /**
+             * Section
+             * @default
+             */
+            section: string;
+            /** Title */
+            title: string;
+        };
         /** PasswordIn */
         PasswordIn: {
             /** Password */
             password: string;
         };
+        /**
+         * PlanOut
+         * @description The preview: never the script itself, which can hold a Wi-Fi key.
+         */
+        PlanOut: {
+            /** Digest */
+            digest: string;
+            expect: components["schemas"]["Expectation"];
+            /** Lines */
+            lines: string[];
+            /** Radio */
+            radio: string;
+            /** Router Id */
+            router_id: string;
+            /** Warnings */
+            warnings: string[];
+        };
         /** Preview */
         Preview: {
             /** Commands */
             commands: string[];
+        };
+        /** RadioApplyIn */
+        RadioApplyIn: {
+            channels?: components["schemas"]["ChannelsIn"] | null;
+            /** Digest */
+            digest: string;
+            modes?: components["schemas"]["ModesIn"] | null;
+            /** Radio */
+            radio: string;
+            /**
+             * Ssids
+             * @default []
+             */
+            ssids: components["schemas"]["SsidIn"][];
+            txpower?: components["schemas"]["TxPowerIn"] | null;
+        };
+        /**
+         * RadioLimits
+         * @description What this radio allows here: from board.json, iwinfo and iw phy for the current country.
+         */
+        RadioLimits: {
+            /** Band */
+            band: string;
+            /** Channels */
+            channels: number[];
+            /** Country */
+            country: string;
+            /**
+             * Max Htmode
+             * @enum {string}
+             */
+            max_htmode: "HT20" | "HT40";
+            /** Mcs */
+            mcs: number[];
+            /** Phy */
+            phy: string;
+            /** Sae */
+            sae: boolean;
+            /** Txpower Dbm */
+            txpower_dbm: number[];
+        };
+        /** RadioRequestIn */
+        RadioRequestIn: {
+            channels?: components["schemas"]["ChannelsIn"] | null;
+            modes?: components["schemas"]["ModesIn"] | null;
+            /** Radio */
+            radio: string;
+            /**
+             * Ssids
+             * @default []
+             */
+            ssids: components["schemas"]["SsidIn"][];
+            txpower?: components["schemas"]["TxPowerIn"] | null;
+        };
+        /** RadioState */
+        RadioState: {
+            actual: components["schemas"]["IwDevInfo"] | null;
+            /** Band */
+            band: string;
+            channels: components["schemas"]["ChannelSelection"];
+            /** Disabled */
+            disabled: boolean;
+            /** Legacy Rates */
+            legacy_rates: boolean;
+            limits: components["schemas"]["RadioLimits"];
+            /**
+             * Mask
+             * @enum {string}
+             */
+            mask: "none" | "active" | "missing";
+            modes: components["schemas"]["ModeSelection"];
+            /** Name */
+            name: string;
+            /** Ssids */
+            ssids: components["schemas"]["SsidState"][];
+            txpower: components["schemas"]["TxPowerSetting"];
+            /** Up */
+            up: boolean;
+            /** Writers */
+            writers: {
+                [key: string]: string;
+            };
         };
         /** RadioStatus */
         RadioStatus: {
@@ -895,6 +1464,17 @@ export interface components {
              */
             update_channel: "stable" | "prerelease";
         };
+        /** SsidIn */
+        SsidIn: {
+            /** Key */
+            key?: string | null;
+            /** Section */
+            section: string;
+            /** Security */
+            security?: ("open" | "wpa2" | "wpa3" | "wpa2_wpa3") | null;
+            /** Ssid */
+            ssid?: string | null;
+        };
         /** SsidInfo */
         SsidInfo: {
             /** Encryption */
@@ -903,6 +1483,21 @@ export interface components {
             ifname: string | null;
             /** Name */
             name: string;
+        };
+        /** SsidState */
+        SsidState: {
+            /** Encryption */
+            encryption: string;
+            /** Ifname */
+            ifname: string | null;
+            /** Key Set */
+            key_set: boolean;
+            /** Section */
+            section: string;
+            /** Security */
+            security: ("open" | "wpa2" | "wpa3" | "wpa2_wpa3") | "other";
+            /** Ssid */
+            ssid: string;
         };
         /** StartIn */
         StartIn: {
@@ -913,6 +1508,33 @@ export interface components {
              * @default 22
              */
             port: number;
+        };
+        /** Station */
+        Station: {
+            /** Connected S */
+            connected_s: number | null;
+            /** Ifname */
+            ifname: string;
+            /** Inactive Ms */
+            inactive_ms: number | null;
+            /** Ip */
+            ip: string | null;
+            /** Mac */
+            mac: string;
+            /** Mode */
+            mode: string;
+            /** Name */
+            name: string | null;
+            /** Rx Mbps */
+            rx_mbps: number | null;
+            /** Signal Dbm */
+            signal_dbm: number | null;
+            /** Ssid */
+            ssid: string;
+            /** Tx Mbps */
+            tx_mbps: number | null;
+            /** Tx Mcs */
+            tx_mcs: number | null;
         };
         /** StationInfo */
         StationInfo: {
@@ -936,6 +1558,35 @@ export interface components {
         TrustIn: {
             /** Fingerprint */
             fingerprint: string;
+        };
+        /** TxPowerIn */
+        TxPowerIn: {
+            /** Dbm */
+            dbm?: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "auto" | "fixed";
+        };
+        /** TxPowerSetting */
+        TxPowerSetting: {
+            /** Dbm */
+            dbm?: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "auto" | "fixed" | "cap";
+        };
+        /** UciChange */
+        UciChange: {
+            /** After */
+            after: string | null;
+            /** Before */
+            before: string | null;
+            /** Option */
+            option: string;
         };
         /** UpdateOut */
         UpdateOut: {
@@ -972,6 +1623,18 @@ export interface components {
         VersionIn: {
             /** Version */
             version: string;
+        };
+        /** WifiState */
+        WifiState: {
+            /** Radios */
+            radios: components["schemas"]["RadioState"][];
+            /**
+             * Read At
+             * Format: date-time
+             */
+            read_at: string;
+            /** Router Id */
+            router_id: string;
         };
     };
     responses: never;
@@ -1633,6 +2296,471 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DescriptionSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    luci_bridge_api_routers__router_id__luci_bridges__bridge_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+                bridge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BridgeView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    luci_changes_api_routers__router_id__luci_bridges__bridge_id__changes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+                bridge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UciChange"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    luci_close_api_routers__router_id__luci_bridges__bridge_id__close_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+                bridge_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BridgeClosed"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    luci_open_api_routers__router_id__luci_open_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BridgeView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    luci_pages_api_routers__router_id__luci_pages_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    wifi_state_api_routers__router_id__wifi_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WifiState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    wifi_apply_api_routers__router_id__wifi_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RadioApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    wifi_options_api_routers__router_id__wifi_options_get: {
+        parameters: {
+            query: {
+                radio: string;
+            };
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OptionRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    wifi_options_apply_api_routers__router_id__wifi_options_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OptionsApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    wifi_options_preview_api_routers__router_id__wifi_options_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OptionsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    wifi_preview_api_routers__router_id__wifi_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RadioRequestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    wifi_stations_api_routers__router_id__wifi_stations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Station"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    wifi_block_api_routers__router_id__wifi_stations__mac__block_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+                mac: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BlockIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    wifi_deauth_api_routers__router_id__wifi_stations__mac__deauth_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+                mac: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
                 };
             };
             /** @description Validation Error */
