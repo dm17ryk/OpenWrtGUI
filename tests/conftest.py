@@ -18,7 +18,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group = parser.getgroup("hardware", "tests on a real router (pytest -m hardware)")
     group.addoption("--router", default="192.168.1.2", help="router address (default AP2, 192.168.1.2)")
     group.addoption("--identity", type=Path, help="an SSH private key the router accepts")
-    group.addoption("--allow-other", action="store_true", help="allow a router other than 192.168.1.2")
+    group.addoption(
+        "--allow-other", action="store_true", help="allow a router other than 192.168.1.2 (reads only)"
+    )
+    group.addoption("--allow-writes", action="store_true", help="allow tests that change AP2 and restore it")
+    group.addoption("--txctl-told", action="store_true", help="the txctl session gave its OK for this window")
 
 
 @pytest.fixture
