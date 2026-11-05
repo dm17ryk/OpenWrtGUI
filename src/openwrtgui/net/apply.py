@@ -24,7 +24,14 @@ from openwrtgui.guard.writes import run_audited
 from openwrtgui.luci_bridge.session import create_command, destroy_command
 from openwrtgui.net.commands import UCI_NETWORK
 from openwrtgui.store.routers import RouterRecord, RouterStore
-from openwrtgui.transport.base import CommandResult, HostKeyUnknown, Transport, TransportError, ubus_command
+from openwrtgui.transport.base import (
+    CommandResult,
+    HostKeyUnknown,
+    Transport,
+    TransportError,
+    ubus_call,
+    ubus_command,
+)
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.transport.ssh import HostKeyStore
 from openwrtgui.uci import UciOp, drop_unchanged, order_for_script, parse_uci_show, render_uci
@@ -151,6 +158,42 @@ def net_plan(
 
 def _reason(result: CommandResult) -> str:
     return (result.stderr or result.stdout).strip() or f"exit {result.exit_status}"
+
+
+def _holds(op: UciOp, shown: Mapping[str, str]) -> bool:
+    if op.op == "add":
+        return True
+    if "$" in op.path:  # an option of a section the script made: some section of the config has it
+        config, option = op.path.split(".", 1)[0], op.path.rsplit(".", 1)[-1]
+        return op.op == "delete" or any(
+            k.startswith(config + ".") and k.endswith("." + option) and v == op.value
+            for k, v in shown.items()
+        )
+    items = shown.get(op.path, "").split()
+    if op.op == "set":
+        return shown.get(op.path) == op.value
+    if op.op == "delete":
+        return op.path not in shown
+    if op.op == "add_list":
+        return op.value in items
+    return op.value not in items  # del_list
+
+
+async def saved_check(t: Transport, show_command: str, ops: Sequence[UciOp]) -> NetCheck:
+    """`saved`: the config read back holds every change of the plan."""
+    shown = parse_uci_show((await t.run(show_command)).stdout)
+    wrong = [op.path for op in ops if not _holds(op, shown)]
+    if wrong:
+        return NetCheck("saved", False, "not as asked: " + ", ".join(wrong))
+    return NetCheck("saved", True, "the router has the change")
+
+
+async def service_check(t: Transport, name: str) -> NetCheck:
+    """`<service>`: procd has a running instance of it."""
+    listed = await ubus_call(t, "service", "list", {"name": name}) or {}
+    instances = listed.get(name, {}).get("instances", {})
+    running = any(isinstance(i, dict) and i.get("running") for i in instances.values())
+    return NetCheck(name, running, "running" if running else f"{name} is not running")
 
 
 class ApplyRunner:

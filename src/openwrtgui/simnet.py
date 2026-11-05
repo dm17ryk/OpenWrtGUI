@@ -267,6 +267,8 @@ class SimNetwork:
     def _ubus(self, obj: str, method: str, args: dict[str, Any]) -> CommandResult | None:
         if obj == "uci" and method in ("apply", "confirm"):
             return self._apply(args) if method == "apply" else self._confirm(args)
+        if (obj, method) == ("uci", "get") and args.get("config") in CONFIGS:
+            return self._uci_get(str(args["config"]), args.get("section"))
         if (obj, method) == ("network.interface", "dump"):
             return _ok(json.dumps({"interface": self._dump()}, indent="\t") + "\n")
         if obj.startswith("network.interface.") and method == "status":
@@ -311,6 +313,17 @@ class SimNetwork:
         if network_changed:
             self._reset_switch()  # the network reload re-applies the switch config
         return _ok()
+
+    def _uci_get(self, config: str, section: Any) -> CommandResult:
+        """rpcd's `uci get`: one section's values (with .type and .name); the status poller reads dhcp.lan."""
+        name = f"{config}.{section}"
+        if name not in self._committed:
+            return _fail("Command failed: Not found\n", 4)
+        values: dict[str, Any] = {".type": self._committed[name], ".name": str(section)}
+        for key, value in self._committed.items():
+            if key.startswith(name + ".") and key.count(".") == 2:
+                values[key.rsplit(".", 1)[1]] = value
+        return _ok(json.dumps({"values": values}, indent="\t") + "\n")
 
     def _confirm(self, args: dict[str, Any]) -> CommandResult:
         if self._deadline is None or args.get("ubus_rpc_session") != self._apply_sid:

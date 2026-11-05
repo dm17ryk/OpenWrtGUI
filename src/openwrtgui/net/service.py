@@ -3,13 +3,32 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Callable, Mapping, MutableMapping
+from collections.abc import Awaitable, Callable, Mapping, MutableMapping, Sequence
+from dataclasses import replace
 from typing import Any
 
 from openwrtgui.forms import OptionRow
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
-from openwrtgui.net.apply import ApplyRunner, NetApplyResult, NetCheck, NetPlan, net_plan, rollback_warning
+from openwrtgui.net.apply import (
+    ApplyRunner,
+    NetApplyResult,
+    NetCheck,
+    NetPlan,
+    net_plan,
+    rollback_warning,
+    saved_check,
+    service_check,
+)
+from openwrtgui.net.commands import UCI_DHCP
+from openwrtgui.net.dhcp import (
+    DhcpRequest,
+    HostRequest,
+    compile_dhcp,
+    compile_hosts,
+    conflict_warnings,
+    reloads_for,
+)
 from openwrtgui.net.interfaces import (
     InterfaceRequest,
     compile_interface,
@@ -17,7 +36,8 @@ from openwrtgui.net.interfaces import (
     pc_warning,
     target_host,
 )
-from openwrtgui.net.model import Address, parse_cidr
+from openwrtgui.net.model import Address, Lease, parse_cidr
+from openwrtgui.net.parse import parse_host_hints, parse_leases
 from openwrtgui.net.state import NetworkState, protocols, read_network
 from openwrtgui.probe.describe import SelfDescription, describe_router
 from openwrtgui.probe.status import RouterStatus
@@ -141,6 +161,83 @@ class NetworkService:
             return [await self._interface_check(t2, req, state)]
 
         return await self._runner.run(rec, t, plan, verify, network_snapshot(uci))
+
+    # ---------------------------------------------------------------- DHCP server and fixed addresses
+    def _dhcp_plan(
+        self, rec: RouterRecord, state: NetworkState, uci: Mapping[str, str], req: DhcpRequest
+    ) -> NetPlan:
+        ops = compile_dhcp(req, state, uci)
+        current = next((d for d in state.dhcp if d.interface == req.interface), None)
+        conf = state.conf(req.interface)
+        warnings: list[str] = []
+        if req.enabled and not (current and current.enabled) and conf and conf.address:
+            warnings = conflict_warnings(rec, conf.address, self._statuses, self._routers)
+        return net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config="dhcp",
+            ops=ops,
+            current=uci,
+            reloads=reloads_for(ops),
+            warnings=warnings,
+        )
+
+    async def plan_dhcp(self, router_id: str, req: DhcpRequest) -> NetPlan:
+        rec, _t, state, uci, _desc = await self._read(router_id)
+        return self._dhcp_plan(rec, state, uci, req)
+
+    async def apply_dhcp(self, router_id: str, req: DhcpRequest, digest: str | None = None) -> NetApplyResult:
+        rec, t, state, uci, _desc = await self._read(router_id)
+        plan = as_previewed(rec, self._dhcp_plan(rec, state, uci, req), digest)
+        return await self._runner.run(rec, t, plan, self._dhcp_checks(plan))
+
+    def _hosts_plan(
+        self,
+        rec: RouterRecord,
+        state: NetworkState,
+        uci: Mapping[str, str],
+        upserts: Sequence[HostRequest],
+        deletes: Sequence[str],
+    ) -> NetPlan:
+        ops, warnings = compile_hosts(upserts, deletes, state, uci, rec.name)
+        return net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config="dhcp",
+            ops=ops,
+            current=uci,
+            reloads=reloads_for(ops),
+            warnings=warnings,
+        )
+
+    async def plan_hosts(
+        self, router_id: str, upserts: Sequence[HostRequest], deletes: Sequence[str]
+    ) -> NetPlan:
+        rec, _t, state, uci, _desc = await self._read(router_id)
+        return self._hosts_plan(rec, state, uci, upserts, deletes)
+
+    async def apply_hosts(
+        self,
+        router_id: str,
+        upserts: Sequence[HostRequest],
+        deletes: Sequence[str],
+        digest: str | None = None,
+    ) -> NetApplyResult:
+        rec, t, state, uci, _desc = await self._read(router_id)
+        plan = as_previewed(rec, self._hosts_plan(rec, state, uci, upserts, deletes), digest)
+        return await self._runner.run(rec, t, plan, self._dhcp_checks(plan))
+
+    def _dhcp_checks(self, plan: NetPlan) -> Callable[[Transport], Awaitable[list[NetCheck]]]:
+        async def verify(t: Transport) -> list[NetCheck]:
+            return [await saved_check(t, UCI_DHCP, plan.ops), await service_check(t, "dnsmasq")]
+
+        return verify
+
+    async def leases(self, router_id: str) -> list[Lease]:
+        _rec, t = await self._connect(router_id)
+        leases = parse_leases(await ubus_call(t, "luci-rpc", "getDHCPLeases") or {})
+        hints = parse_host_hints(await ubus_call(t, "luci-rpc", "getHostHints") or {})
+        return [replace(lease, hostname=lease.hostname or hints.get(lease.mac or "")) for lease in leases]
 
     async def _interface_check(self, t: Transport, req: InterfaceRequest, state: NetworkState) -> NetCheck:
         """The interface as asked, polled for up to 20 s: gone, there (no address), or up with its address."""
