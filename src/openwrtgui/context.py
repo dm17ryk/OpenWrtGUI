@@ -31,6 +31,7 @@ from openwrtgui.transport.ssh import HostKeyStore, SshTransport
 from openwrtgui.update.service import Updater
 from openwrtgui.update.versions import parse_version
 from openwrtgui.version import APP_VERSION
+from openwrtgui.wifi.service import WifiService
 
 
 @dataclass
@@ -47,6 +48,7 @@ class AppContext:
     updater: Updater
     hub: LiveHub
     poller: StatusPoller
+    wifi: WifiService
     token: str
     port: int
     mode: Literal["real", "simulator"]
@@ -150,6 +152,9 @@ def build_context(
     poller = StatusPoller(
         routers=routers, pool=pool, guard=guard, hub=hub, statuses=statuses, descriptions=descriptions
     )
+    wifi = WifiService(
+        pool=pool, routers=routers, guard=guard, audit=audit, descriptions=descriptions, statuses=statuses
+    )
     return AppContext(
         data=data,
         settings=settings,
@@ -163,6 +168,7 @@ def build_context(
         updater=updater,
         hub=hub,
         poller=poller,
+        wifi=wifi,
         token=token,
         port=port,
         mode="simulator" if simulator is not None else "real",
