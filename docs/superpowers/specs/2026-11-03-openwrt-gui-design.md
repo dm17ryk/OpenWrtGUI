@@ -418,7 +418,7 @@ Each milestone gets its own implementation plan. The first plan covers v0.1 Foun
 | O10 | Known-writer signatures for each harness | Collect from the harness sources |
 | O11 | Installing the app key on AP1 (live bench router) | Dmitry's go |
 | O12 | Claude Code GitHub Action (needs an API key secret) | Dmitry's call |
-| O13 | LuCI fallback login: LuCI accepts an rpcd session created over SSH (`session create` + `grant` + `set` user root) through its `sysauth` cookie; a read-only grant gives LuCI's read-only view; the session expires and is destroyed as planned | Test on AP2: open pages read-only, change nothing |
+| O13 | LuCI fallback login: LuCI accepts an rpcd session created over SSH (`session create` + `grant` + `set` user root) through its `sysauth` cookie; a read-only grant gives LuCI's read-only view; the session expires and is destroyed as planned | **Done 2026-11-05 on AP2:** a read-only session with only the page's own access groups (from acl.d) opened `admin/network/wireless` through the SSH forward: HTTP 200, no login form; the page's ubus calls (`iwinfo assoclist`, `uci get`) were allowed; `session destroy` left no session behind (`tests/hardware/test_ap2_luci.py`). No password and no "every group" retry needed |
 
 ## 14. Out of scope
 

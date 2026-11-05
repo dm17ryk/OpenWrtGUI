@@ -7,7 +7,10 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
+import pytest
+
 from openwrtgui.transport.base import CommandResult
+from openwrtgui.transport.ssh import HostKeyStore
 
 SCRIPT = Path(__file__).resolve().parents[2] / "tools" / "record_fixtures.py"
 
@@ -55,6 +58,9 @@ def test_wifi_parked_set_is_exactly_the_planned_commands() -> None:
         "iw phy phy0 info",
         "iw dev",
         "uci show",
+        # read_wifi's own reads, so the parked recording replays on its own
+        "ubus call network.wireless status",
+        'ubus call iwinfo phyname \'{"section":"radio0"}\'',
     )
 
 
@@ -118,3 +124,37 @@ def test_out_path_per_set() -> None:
 
 def test_refuses_other_hosts() -> None:
     assert rf.main(["--host", "192.168.1.1", "--identity", "k", "--out", "x", "--set", "wifi-parked"]) == 2
+
+
+async def test_record_trusts_only_the_known_hosts_it_is_given(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    known = tmp_path / "known_hosts"
+    known.write_text("192.168.1.2 ssh-ed25519 AAAA\n", encoding="utf-8")
+    seen: dict[str, Path] = {}
+
+    async def connect(
+        host: str, port: int, user: str, *, host_keys: HostKeyStore, key_paths: list[Path]
+    ) -> Replay:
+        seen["known_hosts"] = host_keys.path
+        return Replay({})
+
+    async def fetch(*args: object, **kwargs: object) -> None:
+        raise AssertionError("took the router's host key on trust")
+
+    monkeypatch.setattr(rf.SshTransport, "connect", staticmethod(connect))
+    monkeypatch.setattr(rf, "fetch_host_key", fetch, raising=False)
+    monkeypatch.setattr(Replay, "close", _close, raising=False)
+    await rf.record("192.168.1.2", Path("k"), known, "wifi-parked")
+    assert seen["known_hosts"] == known
+    assert known.read_text(encoding="utf-8") == "192.168.1.2 ssh-ed25519 AAAA\n"
+
+
+def test_known_hosts_option_defaults_to_the_users_file() -> None:
+    assert rf.parser().parse_args(["--identity", "k", "--out", "x"]).known_hosts == (
+        Path.home() / ".ssh" / "known_hosts"
+    )
+
+
+async def _close(self: Replay) -> None:
+    return None

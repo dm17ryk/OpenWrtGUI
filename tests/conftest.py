@@ -19,6 +19,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group.addoption("--router", default="192.168.1.2", help="router address (default AP2, 192.168.1.2)")
     group.addoption("--identity", type=Path, help="an SSH private key the router accepts")
     group.addoption(
+        "--known-hosts",
+        type=Path,
+        default=Path.home() / ".ssh" / "known_hosts",
+        help="known_hosts that already has the router's host key (never pinned by the tests)",
+    )
+    group.addoption(
         "--allow-other", action="store_true", help="allow a router other than 192.168.1.2 (reads only)"
     )
     group.addoption("--allow-writes", action="store_true", help="allow tests that change AP2 and restore it")

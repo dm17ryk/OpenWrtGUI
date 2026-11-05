@@ -6,6 +6,9 @@ unless --allow-other is given. Wi-Fi keys, passwords and IMEIs are replaced befo
     uv run python tools/record_fixtures.py --host 192.168.1.2 \
         --identity C:/Essence_SC/home/.ssh/id_rsa --set probe --out tests/fixtures/ap2
 
+The router's host key is checked against --known-hosts (default ~/.ssh/known_hosts) and never
+taken on trust: connect with ssh once and check the fingerprint first.
+
 Sets: probe (the self-description and status probes, commands.json), wifi-parked (the Wi-Fi
 config and limits, wifi_parked.json), wifi-on (the radio while it is on air, wifi_on.json; needs
 an AP interface up on phy0).
@@ -18,7 +21,6 @@ import asyncio
 import json
 import re
 import sys
-import tempfile
 from pathlib import Path
 from typing import Protocol
 
@@ -26,7 +28,7 @@ from openwrtgui.guard.audit import mask
 from openwrtgui.probe.commands import DESCRIBE_COMMANDS, STATUS_COMMANDS, wireless_validate
 from openwrtgui.rf.parse import parse_station_dump
 from openwrtgui.transport.base import CommandResult
-from openwrtgui.transport.ssh import HostKeyStore, SshTransport, fetch_host_key
+from openwrtgui.transport.ssh import HostKeyStore, SshTransport
 from openwrtgui.wifi.parse import parse_iw_dev
 
 AP2 = "192.168.1.2"
@@ -41,6 +43,9 @@ SETS: dict[str, tuple[str, ...]] = {
         f"iw phy {PHY} info",
         "iw dev",
         "uci show",
+        # read_wifi's own reads, so the parked recording replays on its own
+        "ubus call network.wireless status",
+        'ubus call iwinfo phyname \'{"section":"radio0"}\'',
     ),
 }
 FILES = {"probe": "commands.json", "wifi-parked": "wifi_parked.json", "wifi-on": "wifi_on.json"}
@@ -88,11 +93,10 @@ async def run_set(t: Runner, commands: tuple[str, ...]) -> dict[str, dict[str, o
 
 
 async def record(host: str, identity: Path, known_hosts: Path, name: str) -> dict[str, dict[str, object]]:
-    info = await fetch_host_key(host)
-    print(f"{host} host key {info.type} {info.fingerprint}")
-    keys = HostKeyStore(known_hosts)
-    keys.pin(host, 22, info)
-    t = await SshTransport.connect(host, 22, "root", host_keys=keys, key_paths=[identity])
+    # The router's key must already be in known_hosts (checked by the user); never pinned here.
+    t = await SshTransport.connect(
+        host, 22, "root", host_keys=HostKeyStore(known_hosts), key_paths=[identity]
+    )
     try:
         commands = await wifi_on_commands(t) if name == "wifi-on" else SETS[name]
         return await run_set(t, commands)
@@ -105,19 +109,23 @@ def out_file(out: Path, name: str) -> Path:
     return out if out.suffix == ".json" else out / FILES[name]
 
 
-def main(argv: list[str] | None = None) -> int:
+def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--host", default=AP2)
     ap.add_argument("--identity", type=Path, required=True)
+    ap.add_argument("--known-hosts", type=Path, default=Path.home() / ".ssh" / "known_hosts")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--set", dest="name", choices=sorted(FILES), default="probe")
     ap.add_argument("--allow-other", action="store_true")
-    args = ap.parse_args(argv)
+    return ap
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parser().parse_args(argv)
     if args.host != AP2 and not args.allow_other:
         print(f"refusing {args.host}: only AP2 ({AP2}) without --allow-other", file=sys.stderr)
         return 2
-    with tempfile.TemporaryDirectory() as tmp:
-        recorded = asyncio.run(record(args.host, args.identity, Path(tmp) / "known_hosts", args.name))
+    recorded = asyncio.run(record(args.host, args.identity, args.known_hosts, args.name))
     target = out_file(args.out, args.name)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(recorded, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

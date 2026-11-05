@@ -31,9 +31,11 @@ uv sync --extra dev                       # backend deps
 uv run ruff check src tests tools && uv run ruff format --check src tests tools
 uv run mypy
 uv run pytest                             # unit + contract; hardware tests are deselected
-uv run pytest -m hardware --router 192.168.1.2 --identity <key>   # AP2 only: reads (+ LuCI rpcd sessions)
+uv run pytest tests/hardware -m hardware --router 192.168.1.2 --identity <key>   # AP2 only: reads (+ LuCI rpcd sessions)
 uv run pytest -m hardware tests/hardware/test_ap2_wifi.py --router 192.168.1.2 --identity <key> \
     --allow-writes --txctl-told           # radio on air and restored: only in a window the txctl session agreed to
+# Hardware tests and tools/record_fixtures.py, tools/luci_spike.py trust only --known-hosts
+# (default ~/.ssh/known_hosts): AP2's host key must be there already; nothing pins a key on its own.
 cd frontend && npm ci && npm run lint && npx tsc -b && npm test
 npm run build && npm run e2e              # Playwright against the simulator
 uv run python tools/dump_openapi.py && npm run gen:api   # after any API change

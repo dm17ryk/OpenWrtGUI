@@ -19,12 +19,12 @@ from ro_transport import LuciSessionTransport, ReadOnlyTransport, write_refusal
 
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.store.settings import GuardWatchList
-from openwrtgui.transport.ssh import HostKeyStore, SshTransport, fetch_host_key
+from openwrtgui.transport.ssh import HostKeyStore, SshTransport
 
 AP2 = "192.168.1.2"
 
 
-async def _connect(request: pytest.FixtureRequest, tmp_path: Path) -> SshTransport:
+async def _connect(request: pytest.FixtureRequest) -> SshTransport:
     router: str = request.config.getoption("--router")
     identity: Path | None = request.config.getoption("--identity")
     if router != AP2 and not request.config.getoption("--allow-other"):
@@ -34,16 +34,14 @@ async def _connect(request: pytest.FixtureRequest, tmp_path: Path) -> SshTranspo
     state = BenchGuard(GuardWatchList()).check_local()
     if state.live:
         pytest.skip("Bench Guard sees a run: " + "; ".join(r.text for r in state.reasons))
-    host_keys = HostKeyStore(tmp_path / "known_hosts")
-    info = await fetch_host_key(router)
-    print(f"\n{router} host key {info.type} {info.fingerprint} (pinned for this run only)")
-    host_keys.pin(router, 22, info)
+    # The router's key must already be in known_hosts (checked by the user); never pinned here.
+    host_keys = HostKeyStore(request.config.getoption("--known-hosts"))
     return await SshTransport.connect(router, 22, "root", host_keys=host_keys, key_paths=[identity])
 
 
 @pytest.fixture
-async def ap2(request: pytest.FixtureRequest, tmp_path: Path) -> AsyncIterator[ReadOnlyTransport]:
-    transport = await _connect(request, tmp_path)
+async def ap2(request: pytest.FixtureRequest) -> AsyncIterator[ReadOnlyTransport]:
+    transport = await _connect(request)
     try:
         yield ReadOnlyTransport(transport)
     finally:
@@ -51,8 +49,8 @@ async def ap2(request: pytest.FixtureRequest, tmp_path: Path) -> AsyncIterator[R
 
 
 @pytest.fixture
-async def ap2_luci(request: pytest.FixtureRequest, tmp_path: Path) -> AsyncIterator[LuciSessionTransport]:
-    transport = await _connect(request, tmp_path)
+async def ap2_luci(request: pytest.FixtureRequest) -> AsyncIterator[LuciSessionTransport]:
+    transport = await _connect(request)
     try:
         yield LuciSessionTransport(transport)
     finally:
@@ -60,7 +58,7 @@ async def ap2_luci(request: pytest.FixtureRequest, tmp_path: Path) -> AsyncItera
 
 
 @pytest.fixture
-async def ap2_rw(request: pytest.FixtureRequest, tmp_path: Path) -> AsyncIterator[SshTransport]:
+async def ap2_rw(request: pytest.FixtureRequest) -> AsyncIterator[SshTransport]:
     refusal = write_refusal(
         request.config.getoption("--router"),
         allow_writes=request.config.getoption("--allow-writes"),
@@ -68,7 +66,7 @@ async def ap2_rw(request: pytest.FixtureRequest, tmp_path: Path) -> AsyncIterato
     )
     if refusal:
         pytest.skip(refusal)
-    transport = await _connect(request, tmp_path)
+    transport = await _connect(request)
     try:
         yield transport
     finally:

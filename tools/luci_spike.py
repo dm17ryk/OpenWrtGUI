@@ -7,6 +7,9 @@ once more with every access group (still read-only), as rpcd's own login does fo
 host but AP2 (192.168.1.2) unless --allow-other is given, and writes what it saw to build/o13.json.
 
     uv run python tools/luci_spike.py --host 192.168.1.2 --identity <key the router accepts>
+
+The router's host key is checked against --known-hosts (default ~/.ssh/known_hosts) and never
+taken on trust.
 """
 
 from __future__ import annotations
@@ -16,7 +19,6 @@ import asyncio
 import json
 import secrets
 import sys
-import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -32,7 +34,7 @@ from openwrtgui.luci_bridge.session import (
 )
 from openwrtgui.luci_bridge.upstream import ROUTER_WEB
 from openwrtgui.probe.describe import describe_router
-from openwrtgui.transport.ssh import HostKeyStore, SshTransport, fetch_host_key
+from openwrtgui.transport.ssh import HostKeyStore, SshTransport
 
 AP2 = "192.168.1.2"
 PAGE = "admin/network/wireless"
@@ -98,11 +100,9 @@ async def _attempt(
 
 
 async def spike(host: str, identity: Path, known_hosts: Path) -> dict[str, Any]:
-    info = await fetch_host_key(host)
-    print(f"{host} host key {info.type} {info.fingerprint} (pinned for this run only)")
-    keys = HostKeyStore(known_hosts)
-    keys.pin(host, 22, info)
-    t = await SshTransport.connect(host, 22, "root", host_keys=keys, key_paths=[identity])
+    t = await SshTransport.connect(
+        host, 22, "root", host_keys=HostKeyStore(known_hosts), key_paths=[identity]
+    )
     try:
         desc = await describe_router(t)
         if desc.luci is None:
@@ -127,18 +127,22 @@ async def spike(host: str, identity: Path, known_hosts: Path) -> dict[str, Any]:
     }
 
 
-def main(argv: list[str] | None = None) -> int:
+def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--host", default=AP2)
     ap.add_argument("--identity", type=Path, required=True)
+    ap.add_argument("--known-hosts", type=Path, default=Path.home() / ".ssh" / "known_hosts")
     ap.add_argument("--out", type=Path, default=OUT)
     ap.add_argument("--allow-other", action="store_true")
-    args = ap.parse_args(argv)
+    return ap
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parser().parse_args(argv)
     if args.host != AP2 and not args.allow_other:
         print(f"refusing {args.host}: only AP2 ({AP2}) without --allow-other", file=sys.stderr)
         return 2
-    with tempfile.TemporaryDirectory() as tmp:
-        result = asyncio.run(spike(args.host, args.identity, Path(tmp) / "known_hosts"))
+    result = asyncio.run(spike(args.host, args.identity, args.known_hosts))
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     for a in result["attempts"]:
