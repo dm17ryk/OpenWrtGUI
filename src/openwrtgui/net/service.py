@@ -25,6 +25,7 @@ from openwrtgui.net.apply import (
 )
 from openwrtgui.net.commands import UCI_DHCP
 from openwrtgui.net.dhcp import (
+    DNSMASQ_RELOAD,
     DhcpRequest,
     HostRequest,
     compile_dhcp,
@@ -32,6 +33,7 @@ from openwrtgui.net.dhcp import (
     conflict_warnings,
     reloads_for,
 )
+from openwrtgui.net.dns import DnsRequest, compile_dns
 from openwrtgui.net.interfaces import (
     InterfaceRequest,
     compile_interface,
@@ -41,6 +43,14 @@ from openwrtgui.net.interfaces import (
 )
 from openwrtgui.net.model import Address, Lease, parse_cidr
 from openwrtgui.net.parse import parse_host_hints, parse_leases
+from openwrtgui.net.routes import (
+    LiveTables,
+    RouteRequest,
+    RuleRequest,
+    compile_routes,
+    expectations,
+    read_live,
+)
 from openwrtgui.net.state import NetworkState, protocols, read_network
 from openwrtgui.probe.describe import SelfDescription, describe_router
 from openwrtgui.probe.status import RouterStatus
@@ -244,6 +254,100 @@ class NetworkService:
         leases = parse_leases(await ubus_call(t, "luci-rpc", "getDHCPLeases") or {})
         hints = parse_host_hints(await ubus_call(t, "luci-rpc", "getHostHints") or {})
         return [replace(lease, hostname=lease.hostname or hints.get(lease.mac or "")) for lease in leases]
+
+    # ---------------------------------------------------------------- DNS
+    def _dns_plan(
+        self, rec: RouterRecord, state: NetworkState, uci: Mapping[str, str], req: DnsRequest
+    ) -> NetPlan:
+        ops = compile_dns(req, state.dns)
+        return net_plan(
+            router_id=rec.id, screen=SCREEN, config="dhcp", ops=ops, current=uci, reloads=(DNSMASQ_RELOAD,)
+        )
+
+    async def plan_dns(self, router_id: str, req: DnsRequest) -> NetPlan:
+        rec, _t, state, uci, _desc = await self._read(router_id)
+        return self._dns_plan(rec, state, uci, req)
+
+    async def apply_dns(self, router_id: str, req: DnsRequest, digest: str | None = None) -> NetApplyResult:
+        rec, t, state, uci, _desc = await self._read(router_id)
+        plan = as_previewed(rec, self._dns_plan(rec, state, uci, req), digest)
+        return await self._runner.run(rec, t, plan, self._dhcp_checks(plan))
+
+    # ---------------------------------------------------------------- static routes and rules
+    def _routes_plan(
+        self,
+        rec: RouterRecord,
+        state: NetworkState,
+        uci: Mapping[str, str],
+        change: tuple[Sequence[RouteRequest], Sequence[str], Sequence[RuleRequest], Sequence[str]],
+    ) -> NetPlan:
+        return net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config="network",
+            ops=compile_routes(*change, state),
+            current=uci,
+            rollback=True,
+            warnings=[rollback_warning(rec.name, rec.host)],
+        )
+
+    async def plan_routes(
+        self,
+        router_id: str,
+        upserts: Sequence[RouteRequest],
+        deletes: Sequence[str],
+        rule_upserts: Sequence[RuleRequest],
+        rule_deletes: Sequence[str],
+    ) -> NetPlan:
+        rec, _t, state, uci, _desc = await self._read(router_id)
+        return self._routes_plan(rec, state, uci, (upserts, deletes, rule_upserts, rule_deletes))
+
+    async def apply_routes(
+        self,
+        router_id: str,
+        upserts: Sequence[RouteRequest],
+        deletes: Sequence[str],
+        rule_upserts: Sequence[RuleRequest],
+        rule_deletes: Sequence[str],
+        digest: str | None = None,
+    ) -> NetApplyResult:
+        rec, t, state, uci, _desc = await self._read(router_id)
+        change = (upserts, deletes, rule_upserts, rule_deletes)
+        plan = as_previewed(rec, self._routes_plan(rec, state, uci, change), digest)
+
+        async def verify(t2: Transport) -> list[NetCheck]:
+            return await self._route_checks(t2, state, *change)
+
+        return await self._runner.run(rec, t, plan, verify, network_snapshot(uci))
+
+    async def live_routes(self, router_id: str) -> LiveTables:
+        _rec, t = await self._connect(router_id)
+        return await read_live(t)
+
+    async def _route_checks(
+        self,
+        t: Transport,
+        state: NetworkState,
+        upserts: Sequence[RouteRequest],
+        deletes: Sequence[str],
+        rule_upserts: Sequence[RuleRequest],
+        rule_deletes: Sequence[str],
+    ) -> list[NetCheck]:
+        """Each route in the live table (same target, gateway and device) or gone; each rule by priority;
+        polled for up to 20 s."""
+        want = expectations(state, upserts, deletes, rule_upserts, rule_deletes)
+        live = await read_live(t)
+        for _ in range(int(self._settle_s / self._poll_s)):
+            if live.raw is not None or all(e.holds(live) for e in want):
+                break
+            await self._sleep(self._poll_s)
+            live = await read_live(t)
+        if live.raw is not None:
+            return [NetCheck(e.name, None, "not checked: this router's ip has no JSON output") for e in want]
+        return [
+            NetCheck(e.name, e.holds(live), "as asked" if e.holds(live) else "not in the live table as asked")
+            for e in want
+        ]
 
     # ---------------------------------------------------------------- Wi-Fi access by MAC
     async def _access_read(
