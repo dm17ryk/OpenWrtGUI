@@ -105,22 +105,25 @@ class AuditLog:
             verify=verify,
             source=source,
         )
-        line = json.dumps({**asdict(entry), "ts": entry.ts.isoformat()}, ensure_ascii=False)
         with (self.dir / f"{entry.ts.date().isoformat()}.jsonl").open("a", encoding="utf-8") as f:
-            f.write(line + "\n")
+            f.write(_line(entry))
         return entry
 
-    def _entries(self) -> list[AuditEntry]:
+    def _read(self, day: Path) -> list[AuditEntry]:
         out: list[AuditEntry] = []
-        for day in sorted(self.dir.glob("*.jsonl")):
-            for raw in day.read_text(encoding="utf-8").splitlines():
-                try:
-                    data = json.loads(raw)
-                    data["ts"] = datetime.fromisoformat(data["ts"])
-                    out.append(AuditEntry(**data))
-                except (ValueError, KeyError, TypeError):
-                    log.warning("skipped an unreadable audit line in %s", day.name)
+        for raw in day.read_text(encoding="utf-8").splitlines():
+            try:
+                data = json.loads(raw)
+                data["ts"] = datetime.fromisoformat(data["ts"])
+                # Masked again: an older version wrote its entries knowing fewer secret options.
+                data["command"] = mask(str(data["command"]), ())
+                out.append(AuditEntry(**data))
+            except (ValueError, KeyError, TypeError):
+                log.warning("skipped an unreadable audit line in %s", day.name)
         return out
+
+    def _entries(self) -> list[AuditEntry]:
+        return [e for day in sorted(self.dir.glob("*.jsonl")) for e in self._read(day)]
 
     def query(
         self,
@@ -155,7 +158,12 @@ class AuditLog:
         return removed
 
     def export_zip(self, dest: Path) -> Path:
+        """The entries as the viewer shows them: masked again, unreadable lines left out."""
         with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as z:
             for day in sorted(self.dir.glob("*.jsonl")):
-                z.write(day, day.name)
+                z.writestr(day.name, "".join(_line(e) for e in self._read(day)))
         return dest
+
+
+def _line(entry: AuditEntry) -> str:
+    return json.dumps({**asdict(entry), "ts": entry.ts.isoformat()}, ensure_ascii=False) + "\n"

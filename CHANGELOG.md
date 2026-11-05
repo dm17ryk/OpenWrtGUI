@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-05
+
 Wi-Fi and the LuCI fallback.
 
 ### Added
@@ -23,6 +25,13 @@ Wi-Fi and the LuCI fallback.
   tunnel, logged in with a session that may touch only that page's settings (read-only during a harness
   run). The app lists every option changed through LuCI and records the page in the audit log.
 - Router overview lists every LuCI page and where it lives in the app.
+
+### Security
+
+- More secrets are hidden in previews, the audit log and the LuCI change list: WEP keys, Wi-Fi backhaul
+  keys, RADIUS and DAE secrets, private key passwords, WPS and AP PINs, 802.11r keys and WireGuard keys.
+- Audit entries written by an earlier version are masked the same way when shown and when exported; the
+  export now holds what the audit log shows, so an unreadable line is left out instead of copied.
 
 ## [0.1.0] - 2026-11-04
 
@@ -51,5 +60,6 @@ The foundation: install, update, add routers, see them, and stay out of a runnin
 - Router simulator built from recorded router output, used for e2e tests, screenshots and demos.
 - CI, pre-release and release workflows, wiki sync, CodeQL and Dependabot.
 
-[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.2.0
 [0.1.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.1.0
