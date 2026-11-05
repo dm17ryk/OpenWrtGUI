@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from openwrtgui.transport.base import CommandResult, ShellChannel
 
 if TYPE_CHECKING:
+    from openwrtgui.simnet import SimNetwork
     from openwrtgui.simwifi import SimWifi
 
 INSTALL_KEY_PREFIX = "mkdir -p /etc/dropbear && "
@@ -26,6 +27,7 @@ class SimState:
     root_password: str | None = None
     password_login: str | None = None
     wifi: SimWifi | None = None
+    net: SimNetwork | None = None
 
 
 def load_commands(path: Path) -> dict[str, CommandResult]:
@@ -71,6 +73,9 @@ class ReplayTransport:
 
     def _simulate(self, command: str) -> CommandResult | None:
         assert self.state is not None
+        # The network first: it answers only commands it knows whole (the Wi-Fi one echoes any `echo`).
+        if self.state.net is not None and (answered := self.state.net.answer(command)) is not None:
+            return answered
         if self.state.wifi is not None and (answered := self.state.wifi.answer(command)) is not None:
             return answered
         if command == "true":

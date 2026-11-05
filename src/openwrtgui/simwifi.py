@@ -20,6 +20,7 @@ STATION_MAC = "f4:12:fa:f3:57:68"
 STATION_NAME = "panel"
 STATION_IP = "192.168.1.30"
 NO_DEVICE = "command failed: No such device (-19)\n"
+NO_HOSTAPD = "Failed to connect to hostapd - wpa_ctrl_open: No such file or directory\n"
 _UBUS = re.compile(r"^ubus call (\S+) (\S+)(?: '(.*)')?$")
 _BOOL_OPTIONS = {"disabled", "legacy_rates", "noscan"}
 _INT_OPTIONS = {"cell_density", "txpower"}
@@ -52,6 +53,7 @@ class SimWifi:
         self._away = 0  # samples the station stays away after del_client
         self._tick = 0
         self._sessions = 0
+        self._acl: dict[tuple[str, str], list[str]] = {}
 
     # ---------------------------------------------------------------- uci state
     def _radios(self) -> list[str]:
@@ -164,7 +166,27 @@ class SimWifi:
             return self._beacons(p)
         if p.startswith(f"cat /sys/kernel/debug/ieee80211/{self._phy}/statistics/dot11ACKFailureCount"):
             return _ok(f"{3 * self._tick}\n")
+        if m := re.fullmatch(r"hostapd_cli -i (\S+) (deny_acl|accept_acl) (ADD_MAC|DEL_MAC) (\S+)", p):
+            return self._acl_change(m.group(1), m.group(2), m.group(3), m.group(4).lower())
+        if m := re.fullmatch(r"hostapd_cli -i (\S+) (deny_acl|accept_acl) SHOW", p):
+            return self._acl_show(m.group(1), m.group(2))
         return None
+
+    # ---------------------------------------------------------------- runtime MAC lists (hostapd_cli)
+    def _acl_change(self, ifname: str, kind: str, action: str, mac: str) -> CommandResult:
+        if self._iface(ifname) is None:
+            return _fail(NO_HOSTAPD, 255)
+        macs = self._acl.setdefault((ifname, kind), [])
+        if action == "ADD_MAC" and mac not in macs:
+            macs.append(mac)
+        elif action == "DEL_MAC" and mac in macs:
+            macs.remove(mac)
+        return _ok("OK\n")
+
+    def _acl_show(self, ifname: str, kind: str) -> CommandResult:
+        if self._iface(ifname) is None:
+            return _fail(NO_HOSTAPD, 255)
+        return _ok("".join(f"{mac} VLAN_ID=0\n" for mac in self._acl.get((ifname, kind), [])))
 
     def _show(self) -> str:
         lines = []
@@ -195,6 +217,9 @@ class SimWifi:
     def _wifi(self, action: str, radio: str) -> CommandResult:
         if radio not in self._up:
             return _fail(f"Device {radio} not found\n")
+        for ifname, _ in self._ifaces(radio):  # a restart starts hostapd with empty runtime lists
+            self._acl.pop((ifname, "deny_acl"), None)
+            self._acl.pop((ifname, "accept_acl"), None)
         if action == "down":
             self._up[radio] = False
         else:

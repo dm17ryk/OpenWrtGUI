@@ -13,6 +13,7 @@ import asyncssh
 import httpx
 
 from openwrtgui.guard.bench_guard import ProcessInfo
+from openwrtgui.simnet import SimNetwork
 from openwrtgui.simwifi import SimWifi
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import (
@@ -97,40 +98,58 @@ def _public_lines(key_paths: Sequence[Path]) -> list[str]:
 
 
 class SimConnector:
-    """The wizard's Connector for simulated routers (looked up by host in routers.json)."""
+    """The wizard's Connector for simulated routers, found by the address they answer on now: the one in
+    routers.json, or lan's address once a change moved it. One host key per router, at any address."""
 
     def __init__(self, sim_dir: Path) -> None:
         self._sim_dir = sim_dir
-        self._entries = {e["host"]: e for e in sim_routers(sim_dir)}
+        self._entries = sim_routers(sim_dir)
         self._states: dict[str, SimState] = {}
         self._host_keys: dict[str, HostKeyInfo] = {}
 
+    def _address(self, entry: dict[str, Any]) -> str:
+        state = self._states.get(entry["id"])
+        if state is not None and state.net is not None:
+            return state.net.address() or entry["host"]
+        return str(entry["host"])
+
     def _entry(self, host: str) -> dict[str, Any]:
-        entry = self._entries.get(host)
-        if entry is None:
-            raise Unreachable(f"{host}:22: no simulated router at this address")
-        return entry
+        for entry in self._entries:
+            if self._address(entry) == host:
+                state = self._states.get(entry["id"])
+                if state is not None and state.net is not None and not state.net.reachable():
+                    raise Unreachable(f"{host}:22: No route to host")
+                return entry
+        raise Unreachable(f"{host}:22: no simulated router at this address")
+
+    def _new_state(self, entry: dict[str, Any]) -> SimState:
+        wifi = net = None
+        last = int(str(entry["host"]).rsplit(".", 1)[1])
+        if entry.get("wifi"):
+            text = (self._sim_dir / "wifi" / entry["wifi"]).read_text(encoding="utf-8")
+            wifi = SimWifi(text, bssid=f"02:00:00:00:00:{last:02x}")
+        if entry.get("net"):
+            text = (self._sim_dir / "net" / entry["net"]).read_text(encoding="utf-8")
+            leases = [tuple(lease) for lease in entry.get("leases", [])]
+            net = SimNetwork(text, leases=leases, wifi_mirror=bool(entry.get("wifi_mirror")))
+        return SimState(root_password=entry.get("password") or SIM_ROOT_PASSWORD, wifi=wifi, net=net)
 
     def state(self, host: str) -> SimState:
-        if host not in self._states:
-            entry = self._entry(host)
-            wifi = None
-            if entry.get("wifi"):
-                text = (self._sim_dir / "wifi" / entry["wifi"]).read_text(encoding="utf-8")
-                wifi = SimWifi(text, bssid=f"02:00:00:00:00:{int(host.rsplit('.', 1)[1]):02x}")
-            self._states[host] = SimState(root_password=entry.get("password") or SIM_ROOT_PASSWORD, wifi=wifi)
-        return self._states[host]
+        entry = self._entry(host)
+        if entry["id"] not in self._states:
+            self._states[entry["id"]] = self._new_state(entry)
+        return self._states[entry["id"]]
 
     async def fetch_host_key(self, host: str, port: int = 22) -> HostKeyInfo:
-        self._entry(host)
-        if host not in self._host_keys:
+        router_id = self._entry(host)["id"]
+        if router_id not in self._host_keys:
             key = asyncssh.generate_private_key("ssh-ed25519")
-            self._host_keys[host] = HostKeyInfo(
+            self._host_keys[router_id] = HostKeyInfo(
                 type="ssh-ed25519",
                 fingerprint=key.get_fingerprint("sha256"),
                 public=key.export_public_key("openssh").decode("ascii").strip(),
             )
-        return self._host_keys[host]
+        return self._host_keys[router_id]
 
     async def connect(
         self,
