@@ -29,8 +29,9 @@ from openwrtgui.wifi.compile import (
     tx_mask_args,
 )
 from openwrtgui.wifi.model import CCK_BASIC_KBPS, OFDM_BASIC_KBPS, ModeSelection, RadioRequest
+from openwrtgui.wifi.options import OptionEdit, OptionRow, compile_edits, option_rows
 from openwrtgui.wifi.parse import parse_beacon_rates, parse_iw_dev, parse_iw_dev_info
-from openwrtgui.wifi.state import RadioState, WifiState, modes_from_uci, read_uci, read_wifi
+from openwrtgui.wifi.state import RadioState, WifiState, modes_from_uci, read_uci, read_wifi, ssid_sections
 from openwrtgui.wifi.stations import Station, del_client_command, read_stations
 
 SCREEN = "Wi-Fi"
@@ -181,6 +182,23 @@ class WifiService:
 
     async def state(self, router_id: str) -> WifiState:
         return (await self._read(router_id))[2]
+
+    # ---------------------------------------------------------------- all options
+    async def options(self, router_id: str, radio: str) -> list[OptionRow]:
+        rec, t = await self._connect(router_id)
+        uci = await read_uci(t)
+        validate = (await self._description(rec, t)).wireless_options.get(radio)
+        if validate is None:
+            raise ValueError(f"{radio} is not a radio of {rec.name}")
+        return option_rows(radio, validate, uci, ssid_sections(uci, radio))
+
+    async def plan_options(self, router_id: str, radio: str, edits: Sequence[OptionEdit]) -> WifiPlan:
+        ops, secrets = compile_edits(edits, await self.options(router_id, radio))
+        return await self.plan_ops(router_id, radio, ops, secrets)
+
+    async def apply_options(self, router_id: str, radio: str, edits: Sequence[OptionEdit]) -> ApplyResult:
+        ops, secrets = compile_edits(edits, await self.options(router_id, radio))
+        return await self.apply_ops(router_id, radio, ops, secrets)
 
     # ---------------------------------------------------------------- stations
     async def stations(self, router_id: str) -> list[Station]:

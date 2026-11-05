@@ -15,7 +15,18 @@ from typing import Literal
 log = logging.getLogger(__name__)
 
 HIDDEN = "<hidden>"
-_SECRET_OPTIONS = r"key|password|pincode|psk|sae_password|auth_secret|acct_secret|priv_key_pwd|priv_key2_pwd"
+SECRET_OPTIONS = (
+    "key",
+    "password",
+    "pincode",
+    "psk",
+    "sae_password",
+    "auth_secret",
+    "acct_secret",
+    "priv_key_pwd",
+    "priv_key2_pwd",
+)
+_SECRET_OPTIONS = "|".join(SECRET_OPTIONS)
 # uci set <cfg>.<section>.<option>=value, with the value quoted '…' (a ' inside written as '\''),
 # "…" or bare.
 _UCI_SECRET = re.compile(
