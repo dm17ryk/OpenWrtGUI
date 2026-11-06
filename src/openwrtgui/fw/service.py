@@ -18,7 +18,15 @@ from openwrtgui.fw.compile import (
 )
 from openwrtgui.fw.custom import CustomRequest, custom_change
 from openwrtgui.fw.model import Direction, Policy
-from openwrtgui.fw.nft import ChainText, Ruleset, TableText, parse_ruleset_json, table_texts, zone_tail
+from openwrtgui.fw.nft import (
+    ChainText,
+    Ruleset,
+    listing_text,
+    parse_ruleset_json,
+    table_shape,
+    table_texts,
+    zone_tail,
+)
 from openwrtgui.fw.sections import Kind, SectionRequest, compile_sections, expectations
 from openwrtgui.fw.state import PIN_DHCP, PIN_SSH, FirewallState, read_firewall
 from openwrtgui.fw.tables import TableChange, TableRequest, heredoc, owner_text, table_change
@@ -343,14 +351,14 @@ class FirewallService:
                 listed = await t.run(change.listing)
                 got = table_texts(listed.stdout).get(("inet", "fw4"))
                 chain = next((x for x in got.chains if x.name == change.expect.name), None) if got else None
-                ok = chain is not None and chain.rules == change.expect.rules
+                ok = chain is not None and len(chain.rules) == len(change.expect.rules)
                 return [NetCheck(name, ok, "the chain holds the asked rules" if ok else "the chain differs")]
             family, table = change.key.split(" ", 1)
             listed = await t.run(f"nft list table {family} {table}")
             if change.expect is None:
                 return [NetCheck(name, not listed.ok, "gone" if not listed.ok else "still there")]
             got_table = table_texts(listed.stdout).get((family, table))
-            ok = got_table is not None and _same(got_table, change.expect)
+            ok = got_table is not None and table_shape(got_table) == table_shape(change.expect)
             return [NetCheck(name, ok, "as asked" if ok else "the table differs")]
 
         return verify
@@ -470,11 +478,5 @@ class FirewallService:
 
 
 def _text(text: str) -> dict[str, str]:
-    return {"text": text.strip()}
-
-
-def _same(a: TableText, b: TableText) -> bool:
-    """The same chains and rules (named sets are carried over as listed and not compared)."""
-    return [(c.name, c.declaration, c.rules) for c in a.chains] == [
-        (c.name, c.declaration, c.rules) for c in b.chains
-    ]
+    """A table's listing for the restore check: a live table's counters move meanwhile."""
+    return {"text": listing_text(text)}

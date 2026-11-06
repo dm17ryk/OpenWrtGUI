@@ -4,7 +4,17 @@ from __future__ import annotations
 
 import json
 
-from openwrtgui.fw.nft import parse_ruleset_json, render_table, rule_texts, table_texts, zone_tail
+from openwrtgui.fw.nft import (
+    ChainText,
+    TableText,
+    listing_text,
+    parse_ruleset_json,
+    render_table,
+    rule_texts,
+    table_shape,
+    table_texts,
+    zone_tail,
+)
 
 TEXT = """table inet fw4 { # handle 1
 \tchain input { # handle 1
@@ -149,3 +159,29 @@ def test_zone_tail() -> None:
     assert zone_tail("input", "wan", "REJECT") == "reject_from_wan"
     assert zone_tail("output", "lan", "ACCEPT") == "accept_to_lan"
     assert zone_tail("forward", "lan", "DROP") == "drop_to_lan"
+
+
+def _table(rule: str) -> str:
+    return f"table bridge voipdscp {{\n\tchain post {{\n\t\t{rule}\n\t}}\n}}\n"
+
+
+def test_a_listing_compares_without_its_moving_counters() -> None:
+    # a live table counts packets between the snapshot and the restore check (final review, Important 1)
+    before = _table("udp dport 5004 counter packets 3 bytes 120")
+    after = _table("udp dport 5004 counter packets 97 bytes 4100").rstrip()
+    assert listing_text(before) == listing_text(after)
+    assert listing_text(before) != listing_text(_table("udp dport 5006 counter packets 3 bytes 120"))
+
+
+def test_table_shape_ignores_how_nft_prints_a_rule() -> None:
+    # nft lists `ip saddr 10.0.0.1/32` as `ip saddr 10.0.0.1` and `{22,80}` as `{ 22, 80 }` (Important 2)
+    rules = ("ip saddr 10.0.0.1/32 counter", "tcp dport {22,80} accept")
+    typed = TableText("ip", "owg_t", (), (ChainText("c", "type filter hook input priority 0;", rules),))
+    listing = (
+        "table ip owg_t {\n\tchain c {\n\t\ttype filter hook input priority filter; policy accept;\n"
+        "\t\tip saddr 10.0.0.1 counter packets 0 bytes 0\n\t\ttcp dport { 22, 80 } accept\n\t}\n}\n"
+    )
+    listed = table_texts(listing)[("ip", "owg_t")]
+    assert table_shape(listed) == table_shape(typed) == (("c", 2),)
+    fewer = TableText("ip", "owg_t", (), (ChainText("c", None, ("ip saddr 10.0.0.1 counter",)),))
+    assert table_shape(fewer) != table_shape(listed)

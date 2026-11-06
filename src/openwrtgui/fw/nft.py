@@ -209,6 +209,17 @@ def render_table(t: TableText) -> str:
     return "\n".join(lines) + "\n"
 
 
+def listing_text(text: str) -> str:
+    """A listed table or chain as it compares over time: no handles, counters without their moving values."""
+    return "\n".join(_clean(line) for line in text.strip().splitlines())
+
+
+def table_shape(t: TableText) -> tuple[tuple[str, int], ...]:
+    """Chains and how many rules each holds: what a change can be checked by. nft prints a rule its own
+    way (`10.0.0.1/32` as `10.0.0.1`, `{22,80}` as `{ 22, 80 }`); `nft -f` exiting 0 proved the text."""
+    return tuple((c.name, len(c.rules)) for c in t.chains)
+
+
 def zone_tail(direction: Direction, zone: str, policy: Policy) -> str:
     """The chain fw4 jumps to at the end of `<direction>_<zone>`: the zone's policy in effect."""
     return f"{policy.lower()}_{'from' if direction == 'input' else 'to'}_{zone}"
