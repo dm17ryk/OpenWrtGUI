@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from openwrtgui.fw import commands as c
+from openwrtgui.fw.custom import CustomFile, parse_custom
 from openwrtgui.fw.model import Direction, FirewallConf, FwRuleConf
 from openwrtgui.fw.nft import Ruleset, parse_ruleset_json
 from openwrtgui.fw.owners import NftObject, TcHook, nft_objects, tc_hooks
@@ -59,6 +60,7 @@ class FirewallState:
     objects: tuple[NftObject, ...]
     tc: tuple[TcHook, ...]
     counters: dict[str, int]
+    custom: tuple[CustomFile, ...] = ()
 
 
 def target_class(target: str) -> TargetClass:
@@ -177,5 +179,6 @@ async def read_firewall(
         objects=tuple(nft_objects(ruleset, known)),
         tc=tuple(tc_hooks(qdiscs, app_devices)),
         counters=packets,
+        custom=tuple(parse_custom((await t.run(c.CUSTOM_FILES)).stdout, (await t.run(c.ROM_CUSTOM)).stdout)),
     )
     return state, uci, ruleset

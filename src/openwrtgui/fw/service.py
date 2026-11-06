@@ -16,6 +16,7 @@ from openwrtgui.fw.compile import (
     compile_zones,
     zone_policies,
 )
+from openwrtgui.fw.custom import CustomRequest, custom_change
 from openwrtgui.fw.model import Direction, Policy
 from openwrtgui.fw.nft import ChainText, Ruleset, TableText, parse_ruleset_json, table_texts, zone_tail
 from openwrtgui.fw.sections import Kind, SectionRequest, compile_sections, expectations
@@ -414,6 +415,58 @@ class FirewallService:
             error,
             first.host,
         )
+
+    # ---------------------------------------------------------------- custom rule files
+    def _custom_plan(self, rec: RouterRecord, state: FirewallState, req: CustomRequest) -> NetPlan:
+        if not state.available:
+            raise ValueError(state.reason or "fw4 is not running")
+        backup, restore, commands = custom_change(req, state.custom)
+        return net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config=None,
+            ops=[],
+            current={},
+            commands=commands,
+            rollback=True,
+            backup=backup,
+            restore=restore,
+            warnings=[rollback_warning(rec.name, rec.host, "rules files")],
+        )
+
+    async def plan_custom(self, router_id: str, req: CustomRequest) -> NetPlan:
+        rec = self._record(router_id)
+        state = (await self._read_on(rec, await self._pool.get(rec)))[0]
+        return self._custom_plan(rec, state, req)
+
+    async def apply_custom(
+        self, router_id: str, req: CustomRequest, digest: str | None = None
+    ) -> NetApplyResult:
+        rec = self._record(router_id)
+        path = f"/etc/nftables.d/{req.name}.nft"
+
+        async def verify(t: Transport) -> list[NetCheck]:
+            shown = await t.run(f"cat {path}")
+            if req.content is None:
+                file = NetCheck(f"file {path}", not shown.ok, "gone" if not shown.ok else "still there")
+            else:
+                same = shown.ok and shown.stdout.rstrip("\n") == req.content.rstrip("\n")
+                file = NetCheck(f"file {path}", same, "holds the rules" if same else "differs")
+            printed = await t.run(c.FW4_PRINT)
+            fw4 = NetCheck(
+                "fw4",
+                printed.ok,
+                "fw4 renders its ruleset with the file" if printed.ok else printed.stderr.strip(),
+            )
+            return [file, fw4]
+
+        async def make(t: Transport) -> Planned:
+            state = (await self._read_on(rec, t))[0]
+            before = await t.run(c.CUSTOM_FILES)
+            snapshot = Snapshot(c.CUSTOM_FILES, {"text": before.stdout.strip()}, parse=_text)
+            return Planned(self._custom_plan(rec, state, req), verify, snapshot)
+
+        return await self._runner.run_planned(rec, make, digest)
 
 
 def _text(text: str) -> dict[str, str]:

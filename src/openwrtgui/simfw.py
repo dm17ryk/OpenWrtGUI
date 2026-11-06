@@ -17,6 +17,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from openwrtgui.fw.commands import CUSTOM_FILES
 from openwrtgui.fw.model import FirewallConf, FwRuleConf, ZoneConf
 from openwrtgui.fw.nft import zone_tail
 from openwrtgui.fw.parse import firewall_conf
@@ -121,8 +122,24 @@ class NftError(Exception):
 
 
 # ------------------------------------------------------------------ a small nft script parser
+def _uncomment(text: str) -> str:
+    """Each line up to a `#` outside quotes (an nft comment)."""
+    lines = []
+    for line in text.split("\n"):
+        quoted = False
+        for i, ch in enumerate(line):
+            if ch == '"':
+                quoted = not quoted
+            elif ch == "#" and not quoted:
+                line = line[:i]
+                break
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def _split(text: str) -> list[str]:
     """Statements of an nft script: split at newlines and `;` outside braces and quotes."""
+    text = _uncomment(text)
     out: list[str] = []
     cur: list[str] = []
     depth, quoted = 0, False
@@ -234,6 +251,8 @@ class SimFirewall:
     def answer(self, command: str) -> CommandResult | None:
         if m := _HEREDOC.fullmatch(command):
             return self._heredoc(command, m.group(1).strip(), m.group(2))
+        if command == CUSTOM_FILES:  # one command, though it holds ; and &&
+            return self._plain(command)
         parts = _parts(command)
         if len(parts) == 1 and parts[0][0] == command.strip():
             return self._one(command.strip())
