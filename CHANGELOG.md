@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-06
+
 Network, DHCP, ports and VLANs.
 
 ### Added
@@ -17,7 +19,8 @@ Network, DHCP, ports and VLANs.
   knows, or add one.
 - Changes that can cut the app off (addresses, bridges, routes, rules, VLANs, the switch mirror) apply with a
   60 s rollback, as LuCI does: the router restores its previous network settings by itself unless the app
-  reaches it again and confirms. The app then follows the router to its new address.
+  reaches it again, sees the change in effect and confirms. The app then follows the router to its new
+  address.
 - DHCP server per interface (pool, lease time, options by code, DHCPv6 and RA), with a warning when another
   router already serves DHCP on the subnet; fixed addresses by MAC; active IPv4 and IPv6 leases with
   **Make fixed**.
@@ -83,6 +86,7 @@ The foundation: install, update, add routers, see them, and stay out of a runnin
 - Router simulator built from recorded router output, used for e2e tests, screenshots and demos.
 - CI, pre-release and release workflows, wiki sync, CodeQL and Dependabot.
 
-[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.3.0
 [0.2.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.2.0
 [0.1.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.1.0
