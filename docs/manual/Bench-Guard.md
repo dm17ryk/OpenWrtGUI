@@ -12,9 +12,18 @@ The watch list is in [Settings](Settings) → Bench Guard. A run counts as live 
 
 | Watch | Default entries | Live when |
 |---|---|---|
-| **Lock files** | `D:\Essence_SC\wifi_ref\iperf_txsweep\voip.lock.own` | the file exists |
+| **Lock files** | `D:\Essence_SC\wifi_ref\iperf_txsweep\voip.lock.own` | a `.own` file: a running harness holds its lock; any other file: it exists |
 | **Processes on this PC** | `dima_night.py`, `rh_soak.py`, `overnight_wifi*`, `txlab_*.py`, `voip_chain.py` | a running process matches (`*` is a wildcard) |
 | **SSIDs on air on a router** | `OpenWrtB`, `OpenWrtC` | a router broadcasts that SSID |
+
+A file ending in `.own` (for example `voip.lock.own`, `dima_night.lock.own`) is a harness's lock sidecar. It
+stays on disk after a run on purpose, and the next run opens it again, so its being there says nothing. A
+live run holds a lock on its first byte, and Windows drops that lock when the run's process ends. The guard
+tries to take the lock and gives it back at once: when it is refused, a run is live and the banner says
+"Lock file … held by a live run". When the guard gets the lock, the file is a leftover and does not count.
+The guard only opens the file for reading: it never writes, creates or deletes a harness's file. A `.own`
+file it cannot open still counts as a run. Any other lock file, such as a PID file like `voip.lock`, counts
+while it exists.
 
 Add or remove entries with the fields and the **×** on each chip. Changes are saved at once; the guard
 checks every 2 seconds.

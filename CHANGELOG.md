@@ -7,6 +7,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Bench Guard no longer counts a harness's leftover `.own` lock file (for example `voip.lock.own` after a
+  finished `dima_night` run) as a live run, which left every router read-only. A `.own` file now counts
+  only while a running harness holds its lock; the guard checks without changing the file. Other lock
+  files still count while they exist.
+
 ## [0.2.0] - 2026-11-05
 
 Wi-Fi and the LuCI fallback.
