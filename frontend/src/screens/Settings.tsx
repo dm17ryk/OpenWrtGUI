@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
 import { ApiError, apiFetch, downloadFile, postJson, putJson } from '../api/client'
-import type { AppInfo, AppKeyOut, GuardWatchList, Settings, UpdateOut } from '../api/types'
+import type { AppInfo, AppKeyOut, GuardWatchList, KnownDevice, KnownTable, Settings, UpdateOut } from '../api/types'
 import { Help, HelpTip } from '../help/Help'
 import { HELP } from '../help/topics'
 
@@ -51,6 +51,99 @@ function WatchGroup({ title, noun, items, onChange }: { title: string; noun: str
         <input id={id} aria-label={`Add a ${noun}`} className="in mono" style={{ flex: '1 1 220px' }} value={value} onChange={(e) => setValue(e.target.value)} />
         <button className="btn" type="submit">
           Add {noun}
+        </button>
+      </form>
+    </div>
+  )
+}
+
+const MAC = /^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/
+
+/** Devices by name with every MAC they use: the Faults screen finds a panel by either of its MACs. */
+function KnownDevices({ devices, onChange }: { devices: KnownDevice[]; onChange: (next: KnownDevice[]) => void }) {
+  const [name, setName] = useState('')
+  const [macs, setMacs] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const add = (e: FormEvent): void => {
+    e.preventDefault()
+    const list = macs.toLowerCase().split(/[\s,]+/).filter(Boolean)
+    const bad = list.find((m) => !MAC.test(m))
+    if (!name.trim() || list.length === 0) return setError('A device needs a name and at least one MAC address.')
+    if (bad) return setError(`${bad} is not a MAC address`)
+    setError(null)
+    setName('')
+    setMacs('')
+    onChange([...devices.filter((d) => d.name !== name.trim()), { name: name.trim(), macs: list }])
+  }
+  return (
+    <div className="stack" style={{ gap: 8 }}>
+      {devices.length === 0 && <span className="muted">none yet</span>}
+      {devices.map((d) => (
+        <div key={d.name} className="row" style={{ gap: 6 }}>
+          <strong>{d.name}</strong>
+          <span className="mono muted">{d.macs.join(', ')}</span>
+          <button type="button" className="btn" aria-label={`Remove ${d.name}`} onClick={() => onChange(devices.filter((x) => x !== d))}>
+            ×
+          </button>
+        </div>
+      ))}
+      <form className="row" style={{ gap: 8 }} onSubmit={add}>
+        <input aria-label="Device name" className="in" style={{ flex: '1 1 120px' }} value={name} onChange={(e) => setName(e.target.value)} />
+        <input aria-label="MAC addresses" className="in mono" style={{ flex: '2 1 220px' }} value={macs} onChange={(e) => setMacs(e.target.value)} />
+        <button className="btn" type="submit">
+          Add device
+        </button>
+      </form>
+      {error && <div className="note x">{error}</div>}
+    </div>
+  )
+}
+
+/** Tables and fw4 chains a harness writes: the Firewall screen locks them and names who relies on them. */
+function KnownTables({ tables, onChange }: { tables: KnownTable[]; onChange: (next: KnownTable[]) => void }) {
+  const [row, setRow] = useState<KnownTable>({ match: '', owner: '', depends: '' })
+  const add = (e: FormEvent): void => {
+    e.preventDefault()
+    if (!row.match.trim() || !row.owner.trim()) return
+    onChange([...tables.filter((t) => t.match !== row.match.trim()), { match: row.match.trim(), owner: row.owner.trim(), depends: row.depends.trim() }])
+    setRow({ match: '', owner: '', depends: '' })
+  }
+  return (
+    <div className="stack" style={{ gap: 8 }}>
+      <div className="scroll-x">
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>Table or chain</th>
+              <th>Owner</th>
+              <th>What depends on it</th>
+              <th>
+                <span className="sr-only">Remove</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {tables.map((t) => (
+              <tr key={t.match}>
+                <td className="mono">{t.match}</td>
+                <td>{t.owner}</td>
+                <td>{t.depends}</td>
+                <td>
+                  <button type="button" className="btn" aria-label={`Remove ${t.match}`} onClick={() => onChange(tables.filter((x) => x !== t))}>
+                    ×
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <form className="row" style={{ gap: 8 }} onSubmit={add}>
+        <input aria-label="Table or chain" placeholder="bridge voipdscp" className="in mono" style={{ flex: '1 1 180px' }} value={row.match} onChange={(e) => setRow({ ...row, match: e.target.value })} />
+        <input aria-label="Owner" className="in" style={{ flex: '1 1 120px' }} value={row.owner} onChange={(e) => setRow({ ...row, owner: e.target.value })} />
+        <input aria-label="What depends on it" className="in" style={{ flex: '2 1 240px' }} value={row.depends} onChange={(e) => setRow({ ...row, depends: e.target.value })} />
+        <button className="btn" type="submit">
+          Add table
         </button>
       </form>
     </div>
@@ -246,6 +339,23 @@ export function SettingsScreen() {
           </div>
         )}
       </section>
+
+      <div className="cards">
+        <section className="card stack" aria-labelledby="kd-h">
+          <div className="hrow">
+            <h2 id="kd-h">Known devices</h2>
+            <Help topic={HELP.knownDevices} />
+          </div>
+          {s && <KnownDevices devices={s.known_devices ?? []} onChange={(known_devices) => void save({ known_devices })} />}
+        </section>
+        <section className="card stack" aria-labelledby="kt-h">
+          <div className="hrow">
+            <h2 id="kt-h">Known tables</h2>
+            <Help topic={HELP.knownTables} />
+          </div>
+          {s && <KnownTables tables={s.known_tables ?? []} onChange={(known_tables) => void save({ known_tables })} />}
+        </section>
+      </div>
 
       <div className="cards">
         <section className="card stack" aria-labelledby="key-h">

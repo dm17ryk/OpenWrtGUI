@@ -31,6 +31,11 @@ const SETTINGS: Settings = {
   last_check: null,
   audit_retention_days: 90,
   guard: { lock_files: [], processes: ['dima_night.py'], router_ssids: ['OpenWrtB'], router_processes: [] },
+  known_devices: [],
+  known_tables: [
+    { match: 'inet fw4 chain BENCHSIPGUARD', owner: 'dima_night', depends: 'dima_night expects BENCHSIPGUARD.' },
+    { match: 'bridge voipdscp', owner: 'voip_chain', depends: 'VoIP chain runs expect RTP and SIP marked EF.' },
+  ],
 }
 
 const UPDATE: UpdateOut = {
@@ -122,4 +127,19 @@ test('update status names the last check when up to date', () => {
   renderSettings({ ...UPDATE, latest: null, available: false, last_check: '2026-11-04T09:30:00Z' })
   const updates = screen.getByRole('region', { name: 'Updates' })
   expect(within(updates).getByText(/^You are up to date \(checked .+\)\.$/)).toBeInTheDocument()
+})
+
+test('Known devices adds a name with its MACs, and Known tables lists the harness tables', async () => {
+  const user = userEvent.setup()
+  renderSettings()
+  const card = screen.getByRole('region', { name: 'Known devices' })
+  await user.type(within(card).getByLabelText('Device name'), 'panel')
+  await user.type(within(card).getByLabelText('MAC addresses'), 'F4:12:FA:F3:57:68, e4:5f:01:aa:bb:01')
+  await user.click(within(card).getByRole('button', { name: 'Add device' }))
+  expect(puts.at(-1)?.body.known_devices).toEqual([{ name: 'panel', macs: ['f4:12:fa:f3:57:68', 'e4:5f:01:aa:bb:01'] }])
+  expect(within(card).getByText('panel')).toBeInTheDocument()
+  const tables = screen.getByRole('region', { name: 'Known tables' })
+  expect(within(tables).getByText('bridge voipdscp')).toBeInTheDocument()
+  expect(within(tables).getByText('voip_chain')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Help: Known devices' })).toBeInTheDocument()
 })

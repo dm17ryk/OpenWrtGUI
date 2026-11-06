@@ -103,3 +103,11 @@ test('only the 2.4 GHz block is drawn for 2g-only routers', () => {
   expect(screen.getByRole('heading', { name: '2.4 GHz air' })).toBeInTheDocument()
   expect(screen.queryByRole('heading', { name: '5 GHz air' })).toBeNull()
 })
+
+test('a router card shows the faults armed on it and links to them', () => {
+  const armed = { ...AP1, status: AP1.status && { ...AP1.status, faults_armed: 1 } }
+  renderWith([armed, AP2])
+  const card = screen.getByRole('article', { name: 'AP1 · bench' })
+  expect(within(card).getByRole('link', { name: '1 fault armed' })).toHaveAttribute('href', '/routers/ap1/faults')
+  expect(within(screen.getByRole('article', { name: 'AP2 · office' })).queryByText(/armed/)).toBeNull()
+})

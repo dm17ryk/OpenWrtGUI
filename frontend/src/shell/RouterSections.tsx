@@ -19,6 +19,7 @@ export function RouterSections({ routerId, name, current, luciPath }: Props) {
     ['network', 'Network & DHCP', `${base}/network`],
     ['ports', 'Ports & VLANs', `${base}/ports`],
     ['firewall', 'Firewall', `${base}/firewall`],
+    ['faults', 'Faults & capture', `${base}/faults`],
     ['terminal', 'Terminal', `/terminal/${routerId}`],
   ]
   const fallback = (pages.data ?? []).filter((p) => p.native === null)
