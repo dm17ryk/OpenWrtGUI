@@ -58,6 +58,8 @@ test('the LuCI pages card links each page to its screen here or to LuCI', () => 
   const wireless = within(card).getByRole('row', { name: /Wireless/ })
   expect(within(wireless).getByText('luci-mod-network')).toBeInTheDocument()
   expect(within(wireless).getByRole('link', { name: 'Wi-Fi' })).toHaveAttribute('href', '/routers/ap2/wifi')
+  const zones = within(card).getByRole('row', { name: /General Settings/ })
+  expect(within(zones).getByRole('link', { name: 'Firewall' })).toHaveAttribute('href', '/routers/ap2/firewall')
   const dhcp = within(card).getByRole('row', { name: /DHCP/ })
   expect(within(dhcp).getByText('Network › DHCP')).toBeInTheDocument()
   expect(within(dhcp).getByText('no screen here yet')).toBeInTheDocument()

@@ -823,6 +823,67 @@ h2 {
   align-self: flex-start;
 }
 
+/* Firewall: model cells, policies, pins, flagged rules, editors */
+.seg button.onblock {
+  background: var(--bad);
+  color: #ffffff;
+}
+.pol {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.pol.acc {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.pol.rej {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+.pol.neu {
+  background: var(--neu-soft);
+  color: var(--ink2);
+}
+.pin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface2);
+}
+.tbl tr.flag td {
+  background: var(--warn-soft);
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+.small {
+  font-size: 12px;
+}
+.nowrap {
+  white-space: nowrap;
+}
+fieldset.editor {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  margin: 0;
+  min-width: 0;
+}
+fieldset.editor legend {
+  font-weight: 600;
+  padding: 0 6px;
+}
+
 @media (max-width: 600px) {
   .top {
     padding: 10px 16px;

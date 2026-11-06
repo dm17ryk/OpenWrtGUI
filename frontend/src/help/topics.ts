@@ -56,6 +56,18 @@ export const HELP = {
   portsVlans: 'Ports-and-VLANs#vlans',
   portsMirror: 'Ports-and-VLANs#switch-port-mirror',
   portsWifiMirror: 'Ports-and-VLANs#wi-fi-mirror',
+  // Firewall
+  firewall: 'Firewall',
+  fwModel: 'Firewall#filtering-model',
+  fwPins: 'Firewall#pinned-rules',
+  fwZones: 'Firewall#zones',
+  fwRules: 'Firewall#traffic-rules',
+  fwForwards: 'Firewall#port-forwards',
+  fwNat: 'Firewall#nat-rules',
+  fwIpsets: 'Firewall#ip-sets',
+  fwCustom: 'Firewall#custom-rules',
+  fwTables: 'Firewall#other-nftables-tables',
+  fwRaw: 'Firewall#raw-ruleset',
   // LuCI pages
   luci: 'LuCI-pages',
   luciWhich: 'LuCI-pages#which-pages-open-here',

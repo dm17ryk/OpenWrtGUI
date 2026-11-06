@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
 import { luciPageLink, useLuciPages } from '../screens/luci/pages'
 
-export type Section = 'overview' | 'wifi' | 'rf' | 'network' | 'ports' | 'luci'
+export type Section = 'overview' | 'wifi' | 'rf' | 'network' | 'ports' | 'firewall' | 'faults' | 'luci'
 
 type Props = { routerId: string; name: string; current: Section; luciPath?: string }
 
@@ -18,6 +18,7 @@ export function RouterSections({ routerId, name, current, luciPath }: Props) {
     ['rf', 'RF live', `${base}/rf`],
     ['network', 'Network & DHCP', `${base}/network`],
     ['ports', 'Ports & VLANs', `${base}/ports`],
+    ['firewall', 'Firewall', `${base}/firewall`],
     ['terminal', 'Terminal', `/terminal/${routerId}`],
   ]
   const fallback = (pages.data ?? []).filter((p) => p.native === null)
