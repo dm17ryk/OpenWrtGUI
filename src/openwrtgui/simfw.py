@@ -508,8 +508,8 @@ class SimFirewall:
                     raise NftError(NO_SUCH)
                 chain.rules.clear()
             elif chain is None:
-                block = _body(s.split(f" {table.name} ", 1)[1], "") if "{" in s else None
-                c = _chain_from(cname, block[1]) if block else _Chain(cname)
+                block = re.fullmatch(r"\S+\s*\{(.*)\}", s.split(f" {table.name} ", 1)[1], re.S)
+                c = _chain_from(cname, block.group(1)) if block else _Chain(cname)
                 self._check_decl(table.family, c)
                 table.chains.append(c)
             return

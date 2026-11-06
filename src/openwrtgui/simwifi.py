@@ -264,6 +264,13 @@ class SimWifi:
             if int(args.get("ban_time", 0)) > 0:
                 self._bans.setdefault(obj, set()).add(str(args.get("addr", "")).lower())
             return _ok("{}\n")
+        if obj.startswith("hostapd.") and method == "get_clients":
+            ifname = obj.removeprefix("hostapd.")
+            if self._iface(ifname) is None:
+                return _fail("Command failed: Not found\n", 4)
+            here = ifname not in self._disabled and self._present()
+            clients = {STATION_MAC: {"auth": True, "assoc": True, "authorized": True}} if here else {}
+            return _ok(json.dumps({"freq": 2437, "clients": clients}) + "\n")
         if obj.startswith("hostapd.") and method == "list_bans":
             if self._iface(obj.removeprefix("hostapd.")) is None:
                 return _fail("Command failed: Not found\n", 4)

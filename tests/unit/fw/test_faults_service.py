@@ -1,0 +1,149 @@
+"""Faults armed, proven, held by a router-side timer and cleared, against the simulated routers."""
+
+from __future__ import annotations
+
+from datetime import timedelta
+
+import pytest
+from fwenv import FwEnv
+
+from openwrtgui.faults.model import FaultRequest, NetemParams, TargetRef
+from openwrtgui.faults.service import FaultsService
+from openwrtgui.fw.nft import parse_ruleset_json
+from openwrtgui.guard.bench_guard import GuardLocked
+from openwrtgui.probe.status import read_status
+
+PANEL = TargetRef(None, "192.168.1.30")
+FAR = TargetRef("02:00:00:00:00:01", "192.168.1.250")
+
+
+def _faults(env: FwEnv) -> FaultsService:
+    return FaultsService(
+        pool=env.pool,
+        routers=env.routers,
+        guard=env.guard,
+        audit=env.audit,
+        settings=env.settings,
+        descriptions=env.descriptions,
+        runner=env.runner,
+        clock=env.clock.now,
+        sleep=env.clock.sleep,
+    )
+
+
+async def _arm(env: FwEnv, faults: FaultsService, router_id: str, req: FaultRequest):  # type: ignore[no-untyped-def]
+    plan = await faults.plan_fault(router_id, req)
+    return plan, await faults.apply_fault(router_id, req, plan.digest)
+
+
+async def test_state_ap1(env: FwEnv) -> None:
+    state = await _faults(env).state("ap1")
+    assert (state.caps.family, state.caps.ifb, state.caps.conntrack) == ("netdev", True, True)
+    assert state.caps.distributions == frozenset({"normal", "pareto", "paretonormal"})
+    assert state.armed == () and state.unavailable == {}
+    assert [(w.ifname, w.up) for w in state.wifi] == [("phy0-ap0", True)]
+    assert any(t.ip == "192.168.1.30" for t in state.targets)
+
+
+async def test_apply_l3_verified_in_sim(env: FwEnv) -> None:
+    faults = _faults(env)
+    plan, result = await _arm(env, faults, "ap1", FaultRequest("block", PANEL, flow="rtp_in", loss=30))
+    assert "nft -f /dev/stdin <<'OWG'" in plan.lines and "add table netdev benchfault" in plan.lines
+    assert any(line.startswith("printf '%s\"armed_at\":%s}\\n' ") for line in plan.lines)
+    assert result.applied and result.verified, result
+    (armed,) = (await faults.state("ap1")).armed
+    assert {c.name for c in result.checks} >= {f"fault {armed.id}", "record"}
+    assert armed.kind == "block" and armed.until is None and "rtp_in" in armed.summary
+    t = await env.sim("ap1")
+    rules = parse_ruleset_json((await t.run("nft -j list table netdev benchfault")).stdout).rules
+    assert len(rules) == 1 and rules[0].comment == f"owg:{armed.id}"
+
+
+async def test_held_fault_cleared_by_router_timer_in_sim(env: FwEnv) -> None:
+    faults = _faults(env)
+    _, result = await _arm(env, faults, "ap1", FaultRequest("isolate", PANEL, hold_s=60))
+    assert result.verified and ("timer", True) in [(c.name, c.ok) for c in result.checks]
+    (armed,) = (await faults.state("ap1")).armed
+    assert armed.until is not None and armed.until - env.clock.now() == timedelta(seconds=60)
+    env.clock.t += timedelta(seconds=61)
+    assert (await faults.state("ap1")).armed == ()
+    t = await env.sim("ap1")
+    assert parse_ruleset_json((await t.run("nft -j list table netdev benchfault")).stdout).chains == ()
+
+
+async def test_armed_listed_after_app_restart(env: FwEnv) -> None:
+    _, result = await _arm(env, _faults(env), "ap1", FaultRequest("block", PANEL, flow="all_in", hold_s=600))
+    assert result.verified
+    env.clock.t += timedelta(seconds=100)
+    (armed,) = (await _faults(env).state("ap1")).armed  # a new service: nothing in memory
+    assert armed.until is not None and armed.until - env.clock.now() == timedelta(seconds=500)
+
+
+async def test_netem_and_ap_down_in_sim(env: FwEnv) -> None:
+    faults = _faults(env)
+    _, netem = await _arm(
+        env, faults, "ap1", FaultRequest("netem", PANEL, netem=NetemParams(delay_ms=100, loss_pct=1))
+    )
+    assert netem.verified, netem
+    assert ("netem phy0-ap0", True) in [(c.name, c.ok) for c in netem.checks]
+    _, down = await _arm(env, faults, "ap1", FaultRequest("ap_down", PANEL))
+    assert down.verified and ("ap down phy0-ap0", True) in [(c.name, c.ok) for c in down.checks]
+    t = await env.sim("ap1")
+    plan = await faults.plan_clear("ap1", None)
+    assert (await faults.apply_clear("ap1", None, plan.digest)).verified
+    assert "state=ENABLED" in (await t.run("hostapd_cli -i phy0-ap0 status")).stdout
+
+
+async def test_link_down_held_in_sim(env: FwEnv) -> None:
+    faults = _faults(env)
+    _, result = await _arm(env, faults, "ap2", FaultRequest("link_down", FAR, port=2, hold_s=10))
+    assert result.verified, result
+    t = await env.sim("ap2")
+    shown = (await t.run("swconfig dev switch0 show")).stdout
+    assert "enable: 0" in shown.split("Port 2:")[1].split("Port 3:")[0]
+    env.clock.t += timedelta(seconds=11)
+    shown = (await t.run("swconfig dev switch0 show")).stdout
+    assert "enable: 1" in shown.split("Port 2:")[1].split("Port 3:")[0]
+
+
+async def test_clear_everything_removes_table_ifb_and_records(env: FwEnv) -> None:
+    faults = _faults(env)
+    await _arm(env, faults, "ap1", FaultRequest("block", PANEL, flow="all_out"))
+    _, ifb = await _arm(
+        env, faults, "ap1", FaultRequest("netem", PANEL, netem=NetemParams(delay_ms=50, direction="from"))
+    )
+    assert ifb.verified, ifb
+    plan = await faults.plan_clear("ap1", None)
+    assert "nft delete table netdev benchfault" in plan.lines
+    result = await faults.apply_clear("ap1", None, plan.digest)
+    assert result.applied and result.verified, result
+    t = await env.sim("ap1")
+    assert not (await t.run("nft list table netdev benchfault")).ok
+    assert "owgifb0" not in (await t.run("tc qdisc show")).stdout
+    assert (await faults.state("ap1")).armed == ()
+
+
+async def test_clear_allowed_while_guard_live(env: FwEnv) -> None:
+    faults = _faults(env)
+    await _arm(env, faults, "ap1", FaultRequest("isolate", PANEL))
+    env.go_live()
+    plan = await faults.plan_clear("ap1", None)
+    result = await faults.apply_clear("ap1", None, plan.digest)
+    assert result.applied
+    assert result.error is not None and result.error.startswith(
+        "Cleared although Bench Guard is live (dima_night.py"
+    )
+
+
+async def test_arm_refused_while_guard_live(env: FwEnv) -> None:
+    faults = _faults(env)
+    plan = await faults.plan_fault("ap1", FaultRequest("isolate", PANEL))
+    env.go_live()
+    with pytest.raises(GuardLocked):
+        await faults.apply_fault("ap1", FaultRequest("isolate", PANEL), plan.digest)
+
+
+async def test_status_counts_armed_faults(env: FwEnv) -> None:
+    await _arm(env, _faults(env), "ap1", FaultRequest("isolate", PANEL, hold_s=600))
+    assert (await read_status(await env.sim("ap1"))).faults_armed == 1
+    assert (await read_status(await env.sim("ap2"))).faults_armed == 0

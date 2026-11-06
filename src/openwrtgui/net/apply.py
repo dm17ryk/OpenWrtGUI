@@ -401,26 +401,33 @@ class ApplyRunner:
             )
         return NetApplyResult(rec.id, applied, verified, tuple(checks), error, host)
 
-    async def run_planned(self, rec: RouterRecord, make: Planner, digest: str | None) -> NetApplyResult:
+    async def run_planned(
+        self, rec: RouterRecord, make: Planner, digest: str | None, *, guarded: bool = True
+    ) -> NetApplyResult:
         """Plan and apply under the router's write lock: a change made between the preview's digest check and
-        the lock would otherwise slip through. A digest that differs sends nothing (PreviewChanged)."""
-        self._guard.require_clear()
+        the lock would otherwise slip through. A digest that differs sends nothing (PreviewChanged).
+        `guarded=False` only for a plain change that undoes what the app set up (clearing faults)."""
+        if guarded:
+            self._guard.require_clear()
         async with self._pool.write_lock(rec.id):
             t = await self._pool.get(rec)
             planned = await make(t)
             if digest is not None and digest != planned.plan.digest:
                 raise PreviewChanged(rec.name)
-            return await self.run_locked(rec, t, planned)
+            return await self.run_locked(rec, t, planned, guarded=guarded)
 
-    async def run_locked(self, rec: RouterRecord, t: Transport, planned: Planned) -> NetApplyResult:
+    async def run_locked(
+        self, rec: RouterRecord, t: Transport, planned: Planned, *, guarded: bool = True
+    ) -> NetApplyResult:
         """The apply itself; the caller holds the router's write lock and checked the digest."""
         if planned.plan.rollback:
+            assert guarded, "a rollback change is always checked by Bench Guard"
             return await self._with_rollback(rec, t, planned.plan, planned.verify, planned.snapshot)
-        return await self._plain(rec, t, planned.plan, planned.verify)
+        return await self._plain(rec, t, planned.plan, planned.verify, guarded)
 
     # ------------------------------------------------------------------ plain
     async def _plain(
-        self, rec: RouterRecord, t: Transport, plan: NetPlan, verify: Verifier
+        self, rec: RouterRecord, t: Transport, plan: NetPlan, verify: Verifier, guarded: bool = True
     ) -> NetApplyResult:
         applied = False
         try:
@@ -433,6 +440,7 @@ class ApplyRunner:
                         _script(plan.ops, plan.config, None),
                         secrets=plan.secrets,
                         timeout=SCRIPT_TIMEOUT_S,
+                        require_guard=guarded,
                     )
                 except TransportError as exc:
                     lost = (
@@ -445,7 +453,15 @@ class ApplyRunner:
                     )
                 applied = True
             for command in plan.commands:
-                done = await self._run(t, rec, plan, command, secrets=plan.secrets)
+                done = await self._run(
+                    t,
+                    rec,
+                    plan,
+                    command,
+                    secrets=plan.secrets,
+                    timeout=SCRIPT_TIMEOUT_S,
+                    require_guard=guarded,
+                )
                 if not done.ok:
                     return self._finish(
                         rec, plan, applied, (), f"{command} failed: {_reason(done)}", rec.host
