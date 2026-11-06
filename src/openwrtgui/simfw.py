@@ -17,6 +17,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from openwrtgui.faults.commands import TOOLS as TOOLS_READ
 from openwrtgui.fw.commands import CUSTOM_FILES
 from openwrtgui.fw.model import FirewallConf, FwRuleConf, ZoneConf
 from openwrtgui.fw.nft import zone_tail
@@ -251,7 +252,7 @@ class SimFirewall:
     def answer(self, command: str) -> CommandResult | None:
         if m := _HEREDOC.fullmatch(command):
             return self._heredoc(command, m.group(1).strip(), m.group(2))
-        if command == CUSTOM_FILES:  # one command, though it holds ; and &&
+        if command in (CUSTOM_FILES, TOOLS_READ):  # one command each, though they hold ; and &&
             return self._plain(command)
         parts = _parts(command)
         if len(parts) == 1 and parts[0][0] == command.strip():
@@ -319,8 +320,10 @@ class SimFirewall:
             return _ok(p, "\n".join(MODULES) + "\n")
         if p == "ls /rom/etc/nftables.d":
             return _ok(p, "".join(name.rsplit("/", 1)[1] + "\n" for name in self._rom_custom))
-        if p.startswith("command -v "):
-            return _ok(p, TOOLS)
+        if m := re.fullmatch(r'for c in ([\w -]+); do command -v "\$c"; done', p):
+            # busybox ash: one name per `command -v`, a found tool prints its path
+            paths = {line.rsplit("/", 1)[1]: line for line in TOOLS.splitlines()}
+            return _ok(p, "".join(f"{paths[n]}\n" for n in m.group(1).split() if n in paths))
         if p == 'for f in /etc/nftables.d/*.nft; do [ -e "$f" ] && { echo "=== $f"; cat "$f"; }; done':
             files = sorted(f for f in self._files if fnmatch.fnmatch(f, "/etc/nftables.d/*.nft"))
             return _ok(p, "".join(f"=== {f}\n{self._files[f]}" for f in files))
@@ -423,6 +426,9 @@ class SimFirewall:
         return next((t for t in tables if (t.family, t.name) == (family, name)), None)
 
     def _script(self, text: str, tables: list[_Table], fw4: list[_Chain] | None = None) -> None:
+        # nft wants a newline or ';' after a block's '}' before the next '}' (AP2, 2026-11-07)
+        if any(re.search(r"\}\s*\}", line) for line in text.splitlines()):
+            raise NftError("Error: syntax error, unexpected '}', expecting newline or semicolon\n")
         for s in _split(text):
             self._statement(s, tables, fw4 if fw4 is not None else self._fw4_chains)
 

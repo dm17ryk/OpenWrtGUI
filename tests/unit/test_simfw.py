@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from openwrtgui.faults.commands import TOOLS
 from openwrtgui.fw.nft import parse_ruleset_json, rule_texts
 from openwrtgui.fw.tc import u32_match
 from openwrtgui.simfw import SimFirewall
@@ -127,11 +128,35 @@ async def test_harness_objects_on_ap1() -> None:
 
 async def test_family_without_support_refused() -> None:
     t, _net, _fw, _clock = _sim(families=frozenset({"bridge"}))
-    netdev = 'table netdev owgcheck { chain c { type filter hook egress device "br-lan" priority -500; } }'
+    netdev = 'table netdev owgcheck { chain c { type filter hook egress device "br-lan" priority -500; }; }'
     r = await t.run(_nft(netdev, check=True))
     assert r.exit_status == 1 and "Error: Could not process rule: No such file or directory" in r.stderr
-    bridge = "table bridge owgcheck { chain c { type filter hook prerouting priority -300; } }"
+    bridge = "table bridge owgcheck { chain c { type filter hook prerouting priority -300; }; }"
     assert (await t.run(_nft(bridge, check=True))).ok
+
+
+async def test_a_block_closed_twice_on_one_line_is_a_syntax_error() -> None:
+    # AP2 2026-11-07: nft wants a newline or ';' between a chain's '}' and the table's
+    t, _net, _fw, _clock = _sim()
+    r = await t.run(
+        _nft("table bridge owgcheck { chain c { type filter hook prerouting priority -300; } }", check=True)
+    )
+    assert r.exit_status == 1
+    assert "syntax error, unexpected '}', expecting newline or semicolon" in r.stderr
+
+
+async def test_tools_are_looked_up_one_by_one() -> None:
+    # busybox ash's `command -v a b` prints the first name only; the read asks for each tool
+    t, _net, _fw, _clock = _sim()
+    out = await _ok(t, TOOLS)
+    assert [line.rsplit("/", 1)[1] for line in out.splitlines()] == [
+        "start-stop-daemon",
+        "setsid",
+        "timeout",
+        "tcpdump",
+        "conntrack",
+        "fw4",
+    ]
 
 
 async def test_timer_fires_and_cancel_stops_it() -> None:
