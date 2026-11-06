@@ -179,3 +179,29 @@ async def test_access_saved_checks_digest_under_lock(net: NetEnv) -> None:
     plan = await net.service.plan_access("ap1", change)
     result = await net.service.apply_access("ap1", change, plan.digest)
     assert result.applied and result.verified, result
+
+
+async def test_timed_block_checked_with_list_bans(net: NetEnv) -> None:
+    """#29: a ban for N s is proven by reading hostapd's ban list back."""
+    change = AccessChange("block", ("default_radio0",), mac=PANEL, method="timed", seconds=60)
+    plan = await net.service.plan_access("ap1", change)
+    result = await net.service.apply_access("ap1", change, plan.digest)
+    assert [(c.name, c.ok) for c in result.checks] == [("ban phy0-ap0", True)]
+    assert result.verified
+
+
+class NoBans:
+    async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
+        if "list_bans" in command:
+            return CommandResult(command, "", "Command failed: Method not found", 4)
+        return CommandResult(command, "", "", 0)
+
+
+async def test_timed_block_unread_is_not_verified(net: NetEnv) -> None:
+    """#29: without a read-back the ban is "not verified", never shown as proven."""
+    change = AccessChange("block", ("default_radio0",), mac=PANEL, method="timed", seconds=60)
+    plan = await net.service.plan_access("ap1", change)
+    checks = await net.service._runtime_checks(plan)(NoBans())  # type: ignore[arg-type]
+    assert [(c.name, c.ok, c.detail) for c in checks] == [
+        ("ban phy0-ap0", None, "hostapd took the request; not read back")
+    ]

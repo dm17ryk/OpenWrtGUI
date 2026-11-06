@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import pytest
 from netenv import NetEnv
 
+from openwrtgui.net import dhcp, dns, interfaces
 from openwrtgui.net.interfaces import InterfaceRequest
 
 SESSION_SET = "uci -P /var/run/rpcd/uci-<session> set"
@@ -150,3 +153,31 @@ async def test_known_router_at_target_warns(net: NetEnv) -> None:
         "AP3 · QA stands is at 192.168.1.3 in this app's router list; two routers at one address clash."
         in plan.warnings
     )
+
+
+@pytest.mark.parametrize(
+    ("check", "good"),
+    [
+        (interfaces.check_name, "lan"),
+        (dhcp.check_name, "panel"),
+        (dns.check_option, "cachesize"),
+        (dhcp.check_option, "3,192.168.1.1"),
+    ],
+)
+def test_names_refuse_trailing_newline(check: Callable[[str], None], good: str) -> None:
+    """#30: `$` also matches before a trailing newline; every check matches the whole text."""
+    check(good)
+    with pytest.raises(ValueError):
+        check(good + "\n")
+
+
+async def test_unknown_protocol_refused(net: NetEnv) -> None:
+    """#31: a protocol the router has no handler for never reaches the config."""
+    with pytest.raises(ValueError) as exc:
+        await net.service.plan_interface("ap2", InterfaceRequest("wg0", create=True, proto="wireguard"))
+    assert str(exc.value) == (
+        "AP2 · office has no handler for protocol 'wireguard'. "
+        "It has: dhcp, dhcpv6, none, ppp, pppoe, qmi, static, wwan."
+    )
+    with pytest.raises(ValueError, match="has no handler for protocol 'wireguard'"):
+        await net.service.plan_interface("ap2", InterfaceRequest("wan", proto="wireguard"))

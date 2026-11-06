@@ -50,24 +50,23 @@ async def test_compile_edits(env: WifiEnv) -> None:
     ops, secrets = compile_edits(
         [
             OptionEdit("radio0", "beacon_int", "200"),
-            OptionEdit("radio0", "channels", ["1", "6", "11"]),
+            OptionEdit("radio0", "hostapd_options", ["ap_max_inactivity=600", "skip_inactivity_poll=1"]),
             OptionEdit("radio0", "rts", None),
-            OptionEdit("radio0", "noscan", "1"),
-            OptionEdit("default_radio0", "key", "new-lab-key"),
+            OptionEdit("radio0", "doth", "1"),
+            OptionEdit("default_radio0", "auth_secret", "new-lab-secret"),
         ],
         rows,
     )
     assert render_uci(ops) == [
         "uci set wireless.radio0.beacon_int='200'",
-        "uci -q delete wireless.radio0.channels",
-        "uci add_list wireless.radio0.channels='1'",
-        "uci add_list wireless.radio0.channels='6'",
-        "uci add_list wireless.radio0.channels='11'",
+        "uci -q delete wireless.radio0.hostapd_options",
+        "uci add_list wireless.radio0.hostapd_options='ap_max_inactivity=600'",
+        "uci add_list wireless.radio0.hostapd_options='skip_inactivity_poll=1'",
         "uci -q delete wireless.radio0.rts",
-        "uci set wireless.radio0.noscan='1'",
-        "uci set wireless.default_radio0.key='new-lab-key'",
+        "uci set wireless.radio0.doth='1'",
+        "uci set wireless.default_radio0.auth_secret='new-lab-secret'",
     ]
-    assert secrets == ["new-lab-key"]
+    assert secrets == ["new-lab-secret"]
 
 
 async def test_refusals(env: WifiEnv) -> None:
@@ -76,7 +75,10 @@ async def test_refusals(env: WifiEnv) -> None:
         (OptionEdit("radio0", "nope", "1"), "nope is not an option of radio0"),
         (OptionEdit("radio0", "path", "x"), "path is read-only"),
         (OptionEdit("radio0", "beacon_int", "fast"), "beacon_int takes a whole number"),
-        (OptionEdit("radio0", "noscan", "yes"), "noscan is on or off"),
+        (OptionEdit("radio0", "doth", "yes"), "doth is on or off"),
+        # #26: options with their own control link to it; edited there, never as a plain row
+        (OptionEdit("radio0", "noscan", "1"), r"noscan has its own control \(Modes\); change it there\."),
+        (OptionEdit("default_radio0", "key", "k"), r"key has its own control \(Security \(hidden\)\)"),
     ]
     for edit, message in cases:
         with pytest.raises(ValueError, match=message):
@@ -101,6 +103,6 @@ async def test_plan_and_apply_options_run_reload_and_verify_radio(env: WifiEnv) 
 
 async def test_secret_option_is_hidden_in_the_preview(env: WifiEnv) -> None:
     plan = await env.service.plan_options(
-        "ap1", "radio0", [OptionEdit("default_radio0", "key", "x'y-lab-key")]
+        "ap1", "radio0", [OptionEdit("default_radio0", "auth_secret", "x'y-lab-secret")]
     )
-    assert plan.lines[1] == "uci set wireless.default_radio0.key='<hidden>'"
+    assert plan.lines[1] == "uci set wireless.default_radio0.auth_secret='<hidden>'"

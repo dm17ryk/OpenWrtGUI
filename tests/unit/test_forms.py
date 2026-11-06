@@ -63,3 +63,17 @@ def test_writer_and_read_only_hooks() -> None:
     assert by_name["mtu"].editor == "readonly" and by_name["ipaddr"].writer == "harness"
     with pytest.raises(ValueError, match="mtu is read-only"):
         compile_edits("network", [OptionEdit("wan", "mtu", "1")], rows)
+
+
+def test_controlled_row_refused() -> None:
+    """#26: an option with its own control is changed there, never as a plain row (which would skip the
+    control's checks, e.g. the address prefix rule and the address follow)."""
+    rows = option_rows(
+        "network",
+        [("interface", "lan")],
+        {"interface": {"ipaddr": "list(ipaddr)"}},
+        {},
+        controlled={"interface": {"ipaddr": "Address"}},
+    )
+    with pytest.raises(ValueError, match=r"^ipaddr has its own control \(Address\); change it there\.$"):
+        compile_edits("network", [OptionEdit("lan", "ipaddr", ["10.0.0.1/24"])], rows)

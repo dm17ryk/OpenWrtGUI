@@ -51,6 +51,7 @@ class SimWifi:
         self._ifindex = 12
         self._monitor = False
         self._away = 0  # samples the station stays away after del_client
+        self._bans: dict[str, set[str]] = {}  # hostapd object -> banned MACs (list_bans)
         self._tick = 0
         self._sessions = 0
         self._acl: dict[tuple[str, str], list[str]] = {}
@@ -244,7 +245,13 @@ class SimWifi:
                 return _fail("Command failed: Not found\n", 4)
             if str(args.get("addr", "")).lower() == STATION_MAC:
                 self._away = max(3, int(args.get("ban_time", 0)) // 1000)
+            if int(args.get("ban_time", 0)) > 0:
+                self._bans.setdefault(obj, set()).add(str(args.get("addr", "")).lower())
             return _ok("{}\n")
+        if obj.startswith("hostapd.") and method == "list_bans":
+            if self._iface(obj.removeprefix("hostapd.")) is None:
+                return _fail("Command failed: Not found\n", 4)
+            return _ok(json.dumps({"clients": sorted(self._bans.get(obj, set()))}) + "\n")
         if obj == "session":
             return self._session(method, args)
         return None

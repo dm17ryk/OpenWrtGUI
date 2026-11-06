@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import re
 from collections.abc import Awaitable, Callable, Mapping, MutableMapping, Sequence
 from dataclasses import replace
@@ -57,7 +58,7 @@ from openwrtgui.net.state import NetworkState, protocols, read_network
 from openwrtgui.probe.describe import SelfDescription, describe_router
 from openwrtgui.probe.status import RouterStatus
 from openwrtgui.store.routers import RouterRecord, RouterStore
-from openwrtgui.transport.base import Transport, ubus_call
+from openwrtgui.transport.base import Transport, TransportError, ubus_call, ubus_command
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.uci import UciOp, drop_unchanged
 from openwrtgui.wifi.service import ApplyResult, PreviewChanged, WifiService
@@ -67,6 +68,7 @@ SCREEN = "Network"
 SETTLE_S = 20.0  # "Link up: polled for up to 20 s"
 POLL_S = 1.0
 _ACL = re.compile(r"hostapd_cli -i (\S+) (deny_acl|accept_acl) (ADD_MAC|DEL_MAC) (\S+)")
+_DEL_CLIENT = re.compile(r"ubus call hostapd\.(\S+) del_client '(.*)'")
 
 
 def network_snapshot(uci: Mapping[str, str]) -> Snapshot:
@@ -87,6 +89,19 @@ def radio_results(
     checks = tuple(NetCheck(c.name, c.ok, c.detail) for r in done for c in r.checks)
     verified = bool(done) and not not_tried and all(r.applied and r.verified for r in done)
     return NetApplyResult(router_id, bool(took), verified, checks, ". ".join(parts) or None, host)
+
+
+async def _ban_check(t: Transport, ifname: str, args: Mapping[str, Any]) -> NetCheck:
+    """A ban for N s is proven only by hostapd's ban list (#29): not read back is not verified."""
+    mac = str(args.get("addr", "")).lower()
+    name = f"ban {ifname}"
+    try:
+        listed = await t.run(ubus_command(f"hostapd.{ifname}", "list_bans"))
+    except TransportError:
+        listed = None
+    if listed is not None and listed.ok and mac in listed.stdout.lower():
+        return NetCheck(name, True, f"{mac} banned for {int(args.get('ban_time', 0)) // 1000} s")
+    return NetCheck(name, None, "hostapd took the request; not read back")
 
 
 class NetworkService:
@@ -503,7 +518,9 @@ class NetworkService:
                     want = verb == "ADD_MAC"
                     where = "in" if want else "off"
                     checks.append(NetCheck(f"runtime list {ifname}", listed == want, f"{mac} {where} {kind}"))
-            return checks or [NetCheck("hostapd", True, "hostapd took the request")]
+                elif (d := _DEL_CLIENT.fullmatch(command)) and json.loads(d.group(2)).get("ban_time"):
+                    checks.append(await _ban_check(t, d.group(1), json.loads(d.group(2))))
+            return checks or [NetCheck("hostapd", None, "hostapd took the request; not read back")]
 
         return verify
 

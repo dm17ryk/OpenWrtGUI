@@ -52,7 +52,7 @@ def _server(text: str) -> str:
     rest = value
     if value.startswith("/"):
         _, domain, rest = (value.split("/", 2) + ["", ""])[:3]
-        if not _DOMAIN.match(domain):
+        if not _DOMAIN.fullmatch(domain):
             rest = ""
     ip, _, port = rest.partition("#")
     if not _ip(ip) or (port and not (port.isdigit() and 0 < int(port) < 65536)):
@@ -60,8 +60,13 @@ def _server(text: str) -> str:
     return value
 
 
+def check_option(name: str) -> None:
+    if not _OPTION.fullmatch(name):
+        raise ValueError(f"{name} is not an option name")
+
+
 def _domain(text: str) -> str:
-    if not _DOMAIN.match(text):
+    if not _DOMAIN.fullmatch(text):
         raise ValueError(f"{text} is not a domain name")
     return text
 
@@ -105,8 +110,7 @@ def compile_dns(req: DnsRequest, dns: DnsConf | None) -> list[UciOp]:
             raise ValueError(f"Cache size is 0 to {CACHE_MAX}")
         ops.append(UciOp("set", f"{p}.cachesize", str(req.cachesize)))
     for name, value in req.others.items():
-        if not _OPTION.match(name):
-            raise ValueError(f"{name} is not an option name")
+        check_option(name)
         if name in HAND_LAID:
             raise ValueError(f"Use the {name} control for {name}")
         ops.append(UciOp("delete", f"{p}.{name}") if value is None else UciOp("set", f"{p}.{name}", value))

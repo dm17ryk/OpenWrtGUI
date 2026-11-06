@@ -52,8 +52,19 @@ class HostRequest:
     gets_address: bool = True
 
 
+def check_name(name: str) -> None:
+    if not _NAME.fullmatch(name):
+        raise ValueError("A name is letters, digits and -, up to 63")
+
+
+def check_option(text: str) -> None:
+    m = _OPTION.fullmatch(text)
+    if not m or not 1 <= int(m.group(1)) <= 254:
+        raise ValueError("DHCP option codes are 1 to 254")
+
+
 def _leasetime(value: str) -> str:
-    if not _LEASE.match(value):
+    if not _LEASE.fullmatch(value):
         raise ValueError(LEASE_REFUSAL)
     return value
 
@@ -91,9 +102,7 @@ def compile_dhcp(req: DhcpRequest, state: NetworkState, uci: Mapping[str, str]) 
         ops.append(UciOp("set", f"{p}.leasetime", _leasetime(req.leasetime)))
     if req.options is not None:
         for option in req.options:
-            m = _OPTION.match(option.strip())
-            if not m or not 1 <= int(m.group(1)) <= 254:
-                raise ValueError("DHCP option codes are 1 to 254")
+            check_option(option)
         ops += [
             UciOp("delete", f"{p}.dhcp_option"),
             *(UciOp("add_list", f"{p}.dhcp_option", o) for o in req.options),
@@ -145,7 +154,7 @@ def conflict_warnings(
 
 def _mac(text: str) -> str:
     mac = text.strip().lower().replace("-", ":")
-    if not _MAC.match(mac):
+    if not _MAC.fullmatch(mac):
         raise ValueError(f"{text} is not a MAC address")
     return mac
 
@@ -188,8 +197,9 @@ def compile_hosts(
     for req in upserts:
         mac = _mac(req.mac)
         ip = _ipv4(req.ip) if req.ip else None
-        if req.name is not None and req.name and not _NAME.match(req.name):
-            raise ValueError("A name is letters, digits and -, up to 63")
+        was = known.get(req.section) if req.section else None
+        if req.name and (was is None or was.name != req.name):  # a name the router has already stays
+            check_name(req.name)
         if mac in taken_macs:
             raise ValueError(f"{mac} already has a fixed address ({taken_macs[mac]})")
         if ip is not None and ip in taken_ips:
