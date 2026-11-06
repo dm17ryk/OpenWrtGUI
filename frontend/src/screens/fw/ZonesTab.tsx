@@ -6,6 +6,8 @@ import { usePlanApply } from '../../components/usePlanApply'
 import { Help, HelpTip } from '../../help/Help'
 import { HELP } from '../../help/topics'
 import { NetChange } from '../net/NetChange'
+import { OtherOptions } from './OtherOptions'
+import { othersChange } from './sections'
 
 const POLICIES: readonly Policy[] = ['ACCEPT', 'REJECT', 'DROP']
 const POLICY_FIELDS = [
@@ -32,10 +34,7 @@ function draftOf(state: FirewallState, z: ZoneConf | null): Draft {
 function zonesRequest(state: FirewallState, was: ZoneConf | null, d: Draft): ZonesIn | null {
   if (d.remove && was) return { upserts: [], deletes: [was.section] }
   if (!d.zone.name) return null
-  const before = was?.others ?? {}
-  const others: Record<string, string | null> = {}
-  for (const [k, v] of d.others) if (k && before[k] !== v) others[k] = v
-  for (const k of Object.keys(before)) if (!d.others.some(([n]) => n === k)) others[k] = null
+  const others = othersChange(was?.others, d.others)
   const fwdBefore = was ? forwardsOf(state, was.name) : []
   const fwdChanged = [...fwdBefore].sort().join() !== [...d.forwardsTo].sort().join() || (was !== null && was.name !== d.zone.name && fwdBefore.length > 0)
   const forwardings = fwdChanged
@@ -196,21 +195,9 @@ export function ZonesTab({ routerId, short, state, onApplied }: Props) {
                 </label>
               ))}
           </div>
+          <OtherOptions rows={draft.others} onChange={(others) => edit({ others })} />
           <div className="stack" style={{ gap: 6 }}>
-            <span className="muted">Other options</span>
-            {draft.others.map(([k, v], i) => (
-              <div key={i} className="row">
-                <input className="in mono" aria-label={`Option ${i + 1} name`} value={k} onChange={(e) => edit({ others: draft.others.map((o, j) => (j === i ? [e.target.value, o[1]] : o)) })} />
-                <input className="in mono" aria-label={`Option ${i + 1} value`} value={v} onChange={(e) => edit({ others: draft.others.map((o, j) => (j === i ? [o[0], e.target.value] : o)) })} />
-                <button className="btn" type="button" onClick={() => edit({ others: draft.others.filter((_, j) => j !== i) })}>
-                  Remove
-                </button>
-              </div>
-            ))}
             <div className="row">
-              <button className="btn" type="button" onClick={() => edit({ others: [...draft.others, ['', '']] })}>
-                + Option
-              </button>
               {open.was && (
                 <button className="btn danger" type="button" onClick={() => edit({ remove: !draft.remove })} aria-pressed={draft.remove}>
                   {draft.remove ? 'Keep this zone' : 'Delete zone'}

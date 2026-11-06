@@ -128,3 +128,77 @@ export const LAN_BLOCK_PLAN = plan(
 export const WAN_ALLOW_PLAN = plan([`${S} set firewall.cfg03dc81.input='ACCEPT'`])
 
 export const ZONE_PLAN = plan([`${S} set firewall.cfg03dc81.masq='0'`])
+
+/** AP1's `nft -a list ruleset` from the simulator, shortened to the tables the Tables tab edits. */
+export const AP1_RULESET = [
+  'table inet fw4 { # handle 1',
+  '\tchain input_wan { # handle 20',
+  '\t\tmeta nfproto ipv4 udp dport 68 counter packets 0 bytes 0 accept comment "!fw4: Allow-DHCP-Renew" # handle 21',
+  '\t\ticmp type echo-request counter packets 12 bytes 1008 accept comment "!fw4: Allow-Ping" # handle 22',
+  '\t\tjump reject_from_wan # handle 23',
+  '\t}',
+  'chain BENCHSIPGUARD { # handle 54',
+  '\t\toifname { "eth0.2", "wwan0" } udp dport { 5060, 5061 } counter packets 0 bytes 0 reject # handle 55',
+  '\t\toifname { "eth0.2", "wwan0" } tcp dport { 5060, 5061 } counter packets 7 bytes 420 reject # handle 56',
+  '\t}',
+  '}',
+  'table bridge voipdscp { # handle 1',
+  '\tset rtp { # handle 5',
+  '\t\ttype inet_service',
+  '\t\telements = { 5004 }',
+  '\t}',
+  '\tchain post { # handle 2',
+  '\t\ttype filter hook postrouting priority 0; policy accept;',
+  '\t\tudp dport 5004 ip dscp set ef counter packets 31 bytes 6200 # handle 3',
+  '\t\tudp dport { 5060, 5061 } ip dscp set ef counter packets 0 bytes 0 # handle 4',
+  '\t}',
+  '}',
+  'table ip lab_scratch { # handle 1',
+  '\tchain pre { # handle 2',
+  '\t\ttype filter hook prerouting priority 0; policy accept;',
+  '\t\tip saddr 192.168.1.30 counter packets 0 bytes 0 # handle 3',
+  '\t}',
+  '}',
+  '',
+].join('\n')
+
+const ROLLBACK = "mkdir -p /tmp/owg && start-stop-daemon -S -b -m -p /tmp/owg/rb-<rollback>.pid -x /bin/sh -- -c 'sleep 60; …'"
+
+/** A new traffic rule (compile_sections): the uci add, its options, and the apply with rollback. */
+export const RULE_ADD_PLAN = plan([
+  'set -e',
+  `r1=$(${S} add firewall rule)`,
+  `${S} set firewall.$r1.name='Block-panel-ping'`,
+  `${S} set firewall.$r1.target='DROP'`,
+  'ubus call uci apply \'{"rollback":true,"timeout":60,"ubus_rpc_session":"<session>"}\'',
+])
+
+/** A custom rules file edit: backup, timer, the file, fw4's check, reload. */
+export const CUSTOM_PLAN = plan([
+  'set -e',
+  'cp /etc/nftables.d/10-custom-filter-chains.nft /tmp/owg/rb-<rollback>.bak',
+  ROLLBACK,
+  "cat > /etc/nftables.d/10-custom-filter-chains.nft <<'OWG'",
+  '# nothing',
+  'OWG',
+  'fw4 print > /tmp/owg/rb-<rollback>.check && nft -c -f /tmp/owg/rb-<rollback>.check',
+  'fw4 reload',
+])
+
+/** voipdscp edited with the override (table_change): checked with nft -c, then applied. */
+export const TABLE_EDIT_PLAN = plan(
+  [
+    'set -e',
+    'nft list table bridge voipdscp > /tmp/owg/rb-<rollback>.nft',
+    ROLLBACK,
+    "nft -c -f /dev/stdin <<'OWG'",
+    'delete table bridge voipdscp',
+    'table bridge voipdscp {',
+    'OWG',
+    "nft -f /dev/stdin <<'OWG'",
+  ],
+  ['bridge voipdscp belongs to voip_chain: the change is written to the audit log as an override.'],
+)
+
+/** A new table (tables._add): nft's own `table inet owg_test { }`, checked, then loaded. */
+export const TABLE_ADD_PLAN = plan([ROLLBACK, "nft -c -f /dev/stdin <<'OWG'", 'table inet owg_test {', '}', 'OWG'])

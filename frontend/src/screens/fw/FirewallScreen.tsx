@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router'
 import { ApiError, apiFetch } from '../../api/client'
 import type { FirewallState, RouterDetail } from '../../api/types'
@@ -7,7 +8,12 @@ import { HELP } from '../../help/topics'
 import { RouterSections } from '../../shell/RouterSections'
 import { luciPageLink } from '../luci/pages'
 import { shortName } from '../net/rows'
+import { CustomTab } from './CustomTab'
 import { ModelCard } from './ModelCard'
+import { RawTab } from './RawTab'
+import { SectionTab } from './SectionTab'
+import type { Kind } from './sections'
+import { TablesTab } from './TablesTab'
 import { ZonesTab } from './ZonesTab'
 
 const TABS = [
@@ -21,6 +27,9 @@ const TABS = [
   ['raw', 'Raw ruleset'],
 ] as const
 type Tab = (typeof TABS)[number][0]
+const SECTION_TABS: Partial<Record<Tab, Kind>> = { rules: 'rule', forwards: 'redirect', nat: 'nat', ipsets: 'ipset' }
+// tabs whose tables show live packet counters
+const LIVE: readonly Tab[] = ['rules', 'forwards', 'nat']
 
 /** Firewall (spec 7.6): the filtering model, zones, and fw4's other sections and nftables tables, as tabs. */
 export function FirewallScreen() {
@@ -28,10 +37,18 @@ export function FirewallScreen() {
   const [params, setParams] = useSearchParams()
   const client = useQueryClient()
   const detail = useQuery({ queryKey: ['router', id], queryFn: () => apiFetch<RouterDetail>(`/api/routers/${id}`) })
-  const fw = useQuery({ queryKey: ['firewall', id], queryFn: () => apiFetch<FirewallState>(`/api/routers/${id}/firewall`) })
-  const name = detail.data?.record.name ?? id
   const asked = params.get('tab')
   const tab: Tab = TABS.find(([key]) => key === asked)?.[0] ?? 'zones'
+  const fw = useQuery({
+    queryKey: ['firewall', id],
+    queryFn: () => apiFetch<FirewallState>(`/api/routers/${id}/firewall`),
+    refetchInterval: LIVE.includes(tab) ? 5000 : false,
+  })
+  // Unlocked tables stay unlocked until Lock or until the user leaves this router.
+  const [unlocked, setUnlocked] = useState<{ router: string; keys: string[] }>({ router: id, keys: [] })
+  const keys = unlocked.router === id ? unlocked.keys : []
+  const name = detail.data?.record.name ?? id
+  const pick = (key: Tab): void => setParams(key === 'zones' ? {} : { tab: key }, { replace: true })
   const refresh = (): void => {
     void client.invalidateQueries({ queryKey: ['firewall', id] })
     void client.invalidateQueries({ queryKey: ['firewall-ruleset', id] })
@@ -75,7 +92,7 @@ export function FirewallScreen() {
                 role="tab"
                 className={`tab${key === tab ? ' on' : ''}`}
                 aria-selected={key === tab}
-                onClick={() => setParams(key === 'zones' ? {} : { tab: key }, { replace: true })}
+                onClick={() => pick(key)}
               >
                 {label}
               </button>
@@ -87,6 +104,19 @@ export function FirewallScreen() {
               <ZonesTab {...cards} state={state} />
             </>
           )}
+          {SECTION_TABS[tab] && <SectionTab key={tab} kind={SECTION_TABS[tab]} {...cards} state={state} />}
+          {tab === 'custom' && <CustomTab {...cards} state={state} />}
+          {tab === 'tables' && (
+            <TablesTab
+              {...cards}
+              state={state}
+              unlocked={keys}
+              onUnlock={(key) => setUnlocked({ router: id, keys: [...keys, key] })}
+              onLock={(key) => setUnlocked({ router: id, keys: keys.filter((k) => k !== key) })}
+              onZones={() => pick('zones')}
+            />
+          )}
+          {tab === 'raw' && <RawTab routerId={id} />}
         </>
       )}
     </main>

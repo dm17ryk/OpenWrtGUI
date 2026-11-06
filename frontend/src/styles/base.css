@@ -883,6 +883,22 @@ fieldset.editor legend {
   font-weight: 600;
   padding: 0 6px;
 }
+.note.h {
+  background: var(--har-soft);
+  border: 1px solid var(--har);
+}
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+.facts dt {
+  color: var(--muted);
+}
+.facts dd {
+  margin: 0;
+}
 
 @media (max-width: 600px) {
   .top {
