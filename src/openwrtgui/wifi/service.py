@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import contextvars
 import hashlib
 from collections.abc import Awaitable, Callable, Mapping, MutableMapping, Sequence
@@ -368,14 +369,16 @@ class WifiService:
         *,
         digest: str | None = None,
         screen: str = SCREEN,
+        hold_lock: bool = True,
     ) -> ApplyResult:
-        """`screen` names the screen in the audit log: Network & DHCP applies its saved MAC lists here."""
+        """`screen` names the screen in the audit log: Network & DHCP applies its saved MAC lists here.
+        `hold_lock=False`: the caller holds the router's write lock already."""
         token = _AUDIT_SCREEN.set(screen)
         try:
             rec, t, state, uci = await self._read(router_id)
             radio = self._radio(state, rec, radio_name)
             plan = self._plan(rec, radio, uci, ops, secrets, _mask_after(uci, ops, radio), full_verify=False)
-            return await self._execute(rec, t, _as_previewed(rec, plan, digest))
+            return await self._execute(rec, t, _as_previewed(rec, plan, digest), hold_lock=hold_lock)
         finally:
             _AUDIT_SCREEN.reset(token)
 
@@ -390,11 +393,14 @@ class WifiService:
             **kw,
         )
 
-    async def _execute(self, rec: RouterRecord, t: Transport, plan: WifiPlan) -> ApplyResult:
+    async def _execute(
+        self, rec: RouterRecord, t: Transport, plan: WifiPlan, *, hold_lock: bool = True
+    ) -> ApplyResult:
         checks: list[Check] = []
         applied = False
         reload_error: str | None = None
-        async with self._pool.write_lock(rec.id):
+        lock = self._pool.write_lock(rec.id) if hold_lock else contextlib.nullcontext()
+        async with lock:
             try:
                 if plan.script:
                     try:

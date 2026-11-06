@@ -23,10 +23,10 @@ from openwrtgui.guard.audit import AuditLog, Source, mask
 from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked
 from openwrtgui.guard.writes import run_audited
 from openwrtgui.luci_bridge.session import create_command, destroy_command
-from openwrtgui.net.commands import UCI_NETWORK
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import (
     CommandResult,
+    HostKeyChanged,
     HostKeyInfo,
     HostKeyUnknown,
     Transport,
@@ -37,12 +37,14 @@ from openwrtgui.transport.base import (
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.transport.ssh import HostKeyStore, fetch_host_key
 from openwrtgui.uci import UciOp, drop_unchanged, order_for_script, parse_uci_show, render_uci
+from openwrtgui.wifi.service import PreviewChanged
 
 ROLLBACK_S = 60
 RECONNECT_WINDOW_S = 40.0
 RECONNECT_EVERY_S = 2.0
 SETTLE_S = 5.0  # before the first reconnect; LuCI holds off 4 s (apply_holdoff)
 RESTORE_CHECK_S = 65.0
+RESTORE_RETRY_S = 20.0  # the router may still be coming back at 65 s
 SCRIPT_TIMEOUT_S = 60.0
 SERVICE_WAIT_S = 10.0
 SESSION = "<session>"
@@ -88,6 +90,25 @@ class NetApplyResult:
 
 
 Verifier = Callable[[Transport], Awaitable[list[NetCheck]]]
+
+
+@dataclass(frozen=True)
+class Snapshot:
+    """What the router held before the change: read back with `command` after a rollback to prove it."""
+
+    command: str
+    before: Mapping[str, str]
+    parse: Callable[[str], dict[str, str]] = parse_uci_show
+
+
+@dataclass(frozen=True)
+class Planned:
+    plan: NetPlan
+    verify: Verifier
+    snapshot: Snapshot | None = None
+
+
+Planner = Callable[[Transport], Awaitable[Planned]]
 
 
 def savedir(sid: str) -> str:
@@ -339,19 +360,22 @@ class ApplyRunner:
             )
         return NetApplyResult(rec.id, applied, verified, tuple(checks), error, host)
 
-    async def run(
-        self,
-        rec: RouterRecord,
-        t: Transport,
-        plan: NetPlan,
-        verify: Verifier,
-        snapshot: Mapping[str, str] | None = None,
-    ) -> NetApplyResult:
+    async def run_planned(self, rec: RouterRecord, make: Planner, digest: str | None) -> NetApplyResult:
+        """Plan and apply under the router's write lock: a change made between the preview's digest check and
+        the lock would otherwise slip through. A digest that differs sends nothing (PreviewChanged)."""
         self._guard.require_clear()
         async with self._pool.write_lock(rec.id):
-            if plan.rollback:
-                return await self._with_rollback(rec, t, plan, verify, snapshot)
-            return await self._plain(rec, t, plan, verify)
+            t = await self._pool.get(rec)
+            planned = await make(t)
+            if digest is not None and digest != planned.plan.digest:
+                raise PreviewChanged(rec.name)
+            return await self.run_locked(rec, t, planned)
+
+    async def run_locked(self, rec: RouterRecord, t: Transport, planned: Planned) -> NetApplyResult:
+        """The apply itself; the caller holds the router's write lock and checked the digest."""
+        if planned.plan.rollback:
+            return await self._with_rollback(rec, t, planned.plan, planned.verify, planned.snapshot)
+        return await self._plain(rec, t, planned.plan, planned.verify)
 
     # ------------------------------------------------------------------ plain
     async def _plain(
@@ -388,9 +412,14 @@ class ApplyRunner:
                 applied = True
             error: str | None = None
             for reload in plan.reloads:
-                done = await self._run(t, rec, plan, reload, timeout=SCRIPT_TIMEOUT_S)
+                # the change is committed: a run that starts now must not leave it saved but not in effect
+                done = await self._run(t, rec, plan, reload, timeout=SCRIPT_TIMEOUT_S, require_guard=False)
                 if not done.ok:
                     error = f"The reload failed after the change was saved: {_reason(done)}"
+            state = self._guard.state()
+            if error is None and plan.reloads and state.live:
+                run = state.reasons[0].text if state.reasons else "a harness run"
+                error = f"Saved and reloaded although Bench Guard went live ({run})"
             return self._finish(rec, plan, applied, await verify(t), error, rec.host)
         except GuardLocked as exc:
             if not applied:
@@ -406,7 +435,7 @@ class ApplyRunner:
         t: Transport,
         plan: NetPlan,
         verify: Verifier,
-        snapshot: Mapping[str, str] | None,
+        snapshot: Snapshot | None,
     ) -> NetApplyResult:
         assert plan.config is not None
         created = await self._run(t, rec, plan, create_command(), source="app")
@@ -479,6 +508,9 @@ class ApplyRunner:
                     carried = True
                     continue  # the same router at its new address: connect again with the key pinned
                 return None, f"{target} answers with a different host key, so it is not {rec.name}"
+            except HostKeyChanged:
+                pinned = f"the one pinned for {rec.name}"
+                return None, f"{target} answers with a host key that differs from {pinned}"
             except TransportError:
                 await self._sleep(self._every_s)
         return None, None
@@ -531,7 +563,7 @@ class ApplyRunner:
         target: str,
         why: str | None,
         applied_at: datetime,
-        snapshot: Mapping[str, str] | None,
+        snapshot: Snapshot | None,
     ) -> NetApplyResult:
         reason = why or f"{rec.name} did not answer at {target} within {self._window_s:g} s"
         error = (
@@ -550,7 +582,7 @@ class ApplyRunner:
         target: str,
         seen: Sequence[NetCheck],
         applied_at: datetime,
-        snapshot: Mapping[str, str] | None,
+        snapshot: Snapshot | None,
     ) -> NetApplyResult:
         """Reached, but the change is not in effect: no confirm, so rpcd's rollback undoes it."""
         failed = "; ".join(f"{c.name}: {c.detail}" for c in seen if c.ok is False)
@@ -563,18 +595,30 @@ class ApplyRunner:
         return self._finish(rec, plan, False, [reached, *seen, restored], error, rec.host)
 
     async def _restore_check(
-        self, rec: RouterRecord, plan: NetPlan, applied_at: datetime, snapshot: Mapping[str, str] | None
+        self, rec: RouterRecord, plan: NetPlan, applied_at: datetime, snapshot: Snapshot | None
     ) -> NetCheck:
-        """`restored`: after rpcd's rollback the router answers at its old address with its old settings."""
+        """`restored`: after the rollback the router answers at its old address with its old settings. It may
+        still be coming back at 65 s, so connecting is tried again for a while; a read that fails is "could
+        not read", never "differs"."""
         await self._sleep(max(0.0, self._restore_s - self._elapsed(applied_at)))
-        try:
-            t = await self._connect(rec, rec.host)
-            shown = await self._run(t, rec, plan, UCI_NETWORK, source="app", require_guard=False)
-        except TransportError as exc:
-            return NetCheck("restored", False, f"{rec.name} does not answer at {rec.host} either: {exc}")
-        now = {k: v for k, v in parse_uci_show(shown.stdout).items() if k.startswith("network.")}
+        started = self._clock()
+        while True:
+            try:
+                t = await self._connect(rec, rec.host)
+                break
+            except TransportError as exc:
+                if self._elapsed(started) >= RESTORE_RETRY_S:
+                    gone = f"{rec.name} does not answer at {rec.host} either: {exc}"
+                    return NetCheck("restored", False, gone)
+                await self._sleep(self._every_s)
         if snapshot is None:
             return NetCheck("restored", None, f"{rec.name} answers again at {rec.host}")
-        if now == dict(snapshot):
-            return NetCheck("restored", True, "the router is back on its previous network settings")
-        return NetCheck("restored", False, "the network settings differ from before the change")
+        try:
+            shown = await self._run(t, rec, plan, snapshot.command, source="app", require_guard=False)
+        except TransportError as exc:
+            return NetCheck("restored", None, f"could not read the settings back: {exc}")
+        if not shown.ok:
+            return NetCheck("restored", None, f"could not read the settings back: {_reason(shown)}")
+        if snapshot.parse(shown.stdout) == dict(snapshot.before):
+            return NetCheck("restored", True, "the router is back on its previous settings")
+        return NetCheck("restored", False, "the settings differ from before the change")

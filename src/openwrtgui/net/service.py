@@ -18,6 +18,8 @@ from openwrtgui.net.apply import (
     NetApplyResult,
     NetCheck,
     NetPlan,
+    Planned,
+    Snapshot,
     net_plan,
     rollback_warning,
     saved_check,
@@ -67,15 +69,9 @@ POLL_S = 1.0
 _ACL = re.compile(r"hostapd_cli -i (\S+) (deny_acl|accept_acl) (ADD_MAC|DEL_MAC) (\S+)")
 
 
-def as_previewed(rec: RouterRecord, plan: NetPlan, digest: str | None) -> NetPlan:
-    """Apply runs only the lines the user saw: a router changed since the preview gives other lines."""
-    if digest is not None and digest != plan.digest:
-        raise PreviewChanged(rec.name)
-    return plan
-
-
-def network_snapshot(uci: Mapping[str, str]) -> dict[str, str]:
-    return {k: v for k, v in uci.items() if k.startswith("network.")}
+def network_snapshot(uci: Mapping[str, str]) -> Snapshot:
+    """`network` as it was before a change, to prove the rollback put it back."""
+    return Snapshot(UCI_NETWORK, {k: v for k, v in uci.items() if k.startswith("network.")})
 
 
 def radio_results(
@@ -122,10 +118,14 @@ class NetworkService:
         self._poll_s = poll_s
 
     # ---------------------------------------------------------------- reading
-    async def _connect(self, router_id: str) -> tuple[RouterRecord, Transport]:
+    def _record(self, router_id: str) -> RouterRecord:
         rec = self._routers.get(router_id)
         if rec is None:
             raise ValueError(f"Unknown router {router_id}")
+        return rec
+
+    async def _connect(self, router_id: str) -> tuple[RouterRecord, Transport]:
+        rec = self._record(router_id)
         return rec, await self._pool.get(rec)
 
     async def _description(self, rec: RouterRecord, t: Transport) -> SelfDescription:
@@ -135,12 +135,18 @@ class NetworkService:
             self._descriptions[rec.id] = desc
         return desc
 
+    async def _read_on(
+        self, rec: RouterRecord, t: Transport
+    ) -> tuple[NetworkState, dict[str, str], SelfDescription]:
+        desc = await self._description(rec, t)
+        state, uci = await read_network(t, rec.id, desc)
+        return state, uci, desc
+
     async def _read(
         self, router_id: str
     ) -> tuple[RouterRecord, Transport, NetworkState, dict[str, str], SelfDescription]:
         rec, t = await self._connect(router_id)
-        desc = await self._description(rec, t)
-        state, uci = await read_network(t, rec.id, desc)
+        state, uci, desc = await self._read_on(rec, t)
         return rec, t, state, uci, desc
 
     async def state(self, router_id: str) -> NetworkState:
@@ -162,6 +168,12 @@ class NetworkService:
         ops, secrets, warnings = compile_interface(req, state, uci, protocols(desc), rec.name)
         target = target_host(req, state, rec)
         own_address = req.address if req.name == state.own_interface else None
+        address = target or (parse_cidr(req.address).ip if req.address else None)
+        clash = [
+            f"{other.name} is at {address} in this app's router list; two routers at one address clash."
+            for other in self._routers.list()
+            if address and other.id != rec.id and other.host == address
+        ]
         return net_plan(
             router_id=rec.id,
             screen=SCREEN,
@@ -172,6 +184,7 @@ class NetworkService:
             target_host=target,
             warnings=[
                 *warnings,
+                *clash,
                 rollback_warning(rec.name, target or rec.host),
                 *pc_warning(state, own_address),
             ],
@@ -185,18 +198,23 @@ class NetworkService:
     async def apply_interface(
         self, router_id: str, req: InterfaceRequest, digest: str | None = None
     ) -> NetApplyResult:
-        rec, t, state, uci, desc = await self._read(router_id)
-        plan = as_previewed(rec, self._interface_plan(rec, state, uci, desc, req), digest)
+        rec = self._record(router_id)
 
-        async def verify(t2: Transport) -> list[NetCheck]:
-            # "up with its address" says nothing about an MTU, gateway, DNS or bridge edit: the saved
-            # config must hold every field asked for too
-            return [
-                await self._interface_check(t2, req, state),
-                await saved_check(t2, UCI_NETWORK, plan.ops, uci),
-            ]
+        async def make(t: Transport) -> Planned:
+            state, uci, desc = await self._read_on(rec, t)
+            plan = self._interface_plan(rec, state, uci, desc, req)
 
-        return await self._runner.run(rec, t, plan, verify, network_snapshot(uci))
+            async def verify(t2: Transport) -> list[NetCheck]:
+                # "up with its address" says nothing about an MTU, gateway, DNS or bridge edit: the saved
+                # config must hold every field asked for too
+                return [
+                    await self._interface_check(t2, req, state),
+                    await saved_check(t2, UCI_NETWORK, plan.ops, uci),
+                ]
+
+            return Planned(plan, verify, network_snapshot(uci))
+
+        return await self._runner.run_planned(rec, make, digest)
 
     # ---------------------------------------------------------------- DHCP server and fixed addresses
     def _dhcp_plan(
@@ -223,9 +241,14 @@ class NetworkService:
         return self._dhcp_plan(rec, state, uci, req)
 
     async def apply_dhcp(self, router_id: str, req: DhcpRequest, digest: str | None = None) -> NetApplyResult:
-        rec, t, state, uci, _desc = await self._read(router_id)
-        plan = as_previewed(rec, self._dhcp_plan(rec, state, uci, req), digest)
-        return await self._runner.run(rec, t, plan, self._dhcp_checks(plan, uci))
+        rec = self._record(router_id)
+
+        async def make(t: Transport) -> Planned:
+            state, uci, _desc = await self._read_on(rec, t)
+            plan = self._dhcp_plan(rec, state, uci, req)
+            return Planned(plan, self._dhcp_checks(plan, uci))
+
+        return await self._runner.run_planned(rec, make, digest)
 
     def _hosts_plan(
         self,
@@ -259,9 +282,14 @@ class NetworkService:
         deletes: Sequence[str],
         digest: str | None = None,
     ) -> NetApplyResult:
-        rec, t, state, uci, _desc = await self._read(router_id)
-        plan = as_previewed(rec, self._hosts_plan(rec, state, uci, upserts, deletes), digest)
-        return await self._runner.run(rec, t, plan, self._dhcp_checks(plan, uci))
+        rec = self._record(router_id)
+
+        async def make(t: Transport) -> Planned:
+            state, uci, _desc = await self._read_on(rec, t)
+            plan = self._hosts_plan(rec, state, uci, upserts, deletes)
+            return Planned(plan, self._dhcp_checks(plan, uci))
+
+        return await self._runner.run_planned(rec, make, digest)
 
     def _dhcp_checks(
         self, plan: NetPlan, uci: Mapping[str, str]
@@ -291,9 +319,14 @@ class NetworkService:
         return self._dns_plan(rec, state, uci, req)
 
     async def apply_dns(self, router_id: str, req: DnsRequest, digest: str | None = None) -> NetApplyResult:
-        rec, t, state, uci, _desc = await self._read(router_id)
-        plan = as_previewed(rec, self._dns_plan(rec, state, uci, req), digest)
-        return await self._runner.run(rec, t, plan, self._dhcp_checks(plan, uci))
+        rec = self._record(router_id)
+
+        async def make(t: Transport) -> Planned:
+            state, uci, _desc = await self._read_on(rec, t)
+            plan = self._dns_plan(rec, state, uci, req)
+            return Planned(plan, self._dhcp_checks(plan, uci))
+
+        return await self._runner.run_planned(rec, make, digest)
 
     # ---------------------------------------------------------------- static routes and rules
     def _routes_plan(
@@ -333,14 +366,19 @@ class NetworkService:
         rule_deletes: Sequence[str],
         digest: str | None = None,
     ) -> NetApplyResult:
-        rec, t, state, uci, _desc = await self._read(router_id)
+        rec = self._record(router_id)
         change = (upserts, deletes, rule_upserts, rule_deletes)
-        plan = as_previewed(rec, self._routes_plan(rec, state, uci, change), digest)
 
-        async def verify(t2: Transport) -> list[NetCheck]:
-            return await self._route_checks(t2, state, *change)
+        async def make(t: Transport) -> Planned:
+            state, uci, _desc = await self._read_on(rec, t)
+            plan = self._routes_plan(rec, state, uci, change)
 
-        return await self._runner.run(rec, t, plan, verify, network_snapshot(uci))
+            async def verify(t2: Transport) -> list[NetCheck]:
+                return await self._route_checks(t2, state, *change)
+
+            return Planned(plan, verify, network_snapshot(uci))
+
+        return await self._runner.run_planned(rec, make, digest)
 
     async def live_routes(self, router_id: str) -> LiveTables:
         _rec, t = await self._connect(router_id)
@@ -372,14 +410,18 @@ class NetworkService:
         ]
 
     # ---------------------------------------------------------------- Wi-Fi access by MAC
+    async def _access_read_on(self, t: Transport) -> tuple[AccessState, dict[str, str]]:
+        uci = await read_uci(t)
+        status = await ubus_call(t, "network.wireless", "status") or {}
+        hints = parse_host_hints(await ubus_call(t, "luci-rpc", "getHostHints") or {})
+        return await read_access(t, uci, status, hints), uci
+
     async def _access_read(
         self, router_id: str
     ) -> tuple[RouterRecord, Transport, AccessState, dict[str, str]]:
         rec, t = await self._connect(router_id)
-        uci = await read_uci(t)
-        status = await ubus_call(t, "network.wireless", "status") or {}
-        hints = parse_host_hints(await ubus_call(t, "luci-rpc", "getHostHints") or {})
-        return rec, t, await read_access(t, uci, status, hints), uci
+        state, uci = await self._access_read_on(t)
+        return rec, t, state, uci
 
     async def access(self, router_id: str) -> AccessState:
         return (await self._access_read(router_id))[2]
@@ -423,24 +465,32 @@ class NetworkService:
     async def apply_access(
         self, router_id: str, change: AccessChange, digest: str | None = None
     ) -> NetApplyResult:
-        rec, t, state, uci = await self._access_read(router_id)
-        plan, by_radio = await self._access_plan(rec, state, uci, change)
-        as_previewed(rec, plan, digest)
-        if not by_radio:
-            return await self._runner.run(rec, t, plan, self._runtime_checks(plan))
-        radios = list(by_radio)
-        done: list[ApplyResult] = []
-        for n, radio in enumerate(radios):
-            try:
-                result = await self._wifi.apply_ops(rec.id, radio, by_radio[radio], screen=SCREEN)
-            except GuardLocked as exc:
-                if not done:
-                    raise
-                result = ApplyResult(rec.id, radio, False, False, (), str(exc))
-            done.append(result)
-            if not result.applied:  # stop: say what the earlier radios took, and what was not tried
-                return radio_results(rec.id, rec.host, done, radios[n + 1 :])
-        return radio_results(rec.id, rec.host, done, [])
+        rec = self._record(router_id)
+        self._guard.require_clear()
+        # planned, checked against the preview and applied under one hold of the write lock (#32)
+        async with self._pool.write_lock(rec.id):
+            t = await self._pool.get(rec)
+            state, uci = await self._access_read_on(t)
+            plan, by_radio = await self._access_plan(rec, state, uci, change)
+            if digest is not None and digest != plan.digest:
+                raise PreviewChanged(rec.name)
+            if not by_radio:
+                return await self._runner.run_locked(rec, t, Planned(plan, self._runtime_checks(plan)))
+            radios = list(by_radio)
+            done: list[ApplyResult] = []
+            for n, radio in enumerate(radios):
+                try:
+                    result = await self._wifi.apply_ops(
+                        rec.id, radio, by_radio[radio], screen=SCREEN, hold_lock=False
+                    )
+                except GuardLocked as exc:
+                    if not done:
+                        raise
+                    result = ApplyResult(rec.id, radio, False, False, (), str(exc))
+                done.append(result)
+                if not result.applied:  # stop: say what the earlier radios took, and what was not tried
+                    return radio_results(rec.id, rec.host, done, radios[n + 1 :])
+            return radio_results(rec.id, rec.host, done, [])
 
     def _runtime_checks(self, plan: NetPlan) -> Callable[[Transport], Awaitable[list[NetCheck]]]:
         async def verify(t: Transport) -> list[NetCheck]:

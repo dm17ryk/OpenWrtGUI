@@ -9,7 +9,7 @@ from openwrtgui.net.access import AccessChange, AccessState, SsidAccess, compile
 from openwrtgui.net.service import radio_results
 from openwrtgui.transport.base import CommandResult
 from openwrtgui.uci import UciOp, parse_uci_show
-from openwrtgui.wifi.service import ApplyResult, Check
+from openwrtgui.wifi.service import ApplyResult, Check, PreviewChanged
 
 PANEL = "f4:12:fa:f3:57:68"
 OTHER = "aa:bb:cc:dd:ee:01"
@@ -158,3 +158,24 @@ async def test_unknown_ssid_and_bad_mac_refused(net: NetEnv) -> None:
         await net.service.plan_access(
             "ap1", AccessChange("block", ("default_radio0",), mac="f4:12", method="now")
         )
+
+
+async def test_access_saved_checks_digest_under_lock(net: NetEnv) -> None:
+    """#32: a saved access change is planned and its digest checked while the write lock is held, and the
+    Wi-Fi apply then runs under that same hold."""
+    seen: list[bool] = []
+    plan_ops = net.wifi.plan_ops
+
+    async def watched(*args, **kw):  # type: ignore[no-untyped-def]
+        seen.append(net.pool.write_lock("ap1").locked())
+        return await plan_ops(*args, **kw)
+
+    net.wifi.plan_ops = watched  # type: ignore[method-assign]
+    change = AccessChange("block", ("default_radio0",), mac=OTHER, method="saved")
+    with pytest.raises(PreviewChanged):
+        await net.service.apply_access("ap1", change, "0000000000000000")
+    assert seen == [True]
+    assert not any("uci add_list wireless" in line for line in net.audit_lines())
+    plan = await net.service.plan_access("ap1", change)
+    result = await net.service.apply_access("ap1", change, plan.digest)
+    assert result.applied and result.verified, result

@@ -141,3 +141,12 @@ async def test_apply_refused_while_guard_live(net: NetEnv) -> None:
     net.go_live()
     with pytest.raises(GuardLocked):
         await net.service.apply_interface("ap2", InterfaceRequest("lan", mtu=1400))
+
+
+async def test_known_router_at_target_warns(net: NetEnv) -> None:
+    """#28: lan's new address is another router's in this app's list."""
+    plan = await net.service.plan_interface("ap2", InterfaceRequest("lan", address="192.168.1.3/24"))
+    assert (
+        "AP3 · QA stands is at 192.168.1.3 in this app's router list; two routers at one address clash."
+        in plan.warnings
+    )

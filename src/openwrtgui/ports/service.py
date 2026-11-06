@@ -10,8 +10,16 @@ from typing import Any
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.net import commands as c
-from openwrtgui.net.apply import ApplyRunner, NetApplyResult, NetCheck, NetPlan, net_plan, rollback_warning
-from openwrtgui.net.service import as_previewed, network_snapshot
+from openwrtgui.net.apply import (
+    ApplyRunner,
+    NetApplyResult,
+    NetCheck,
+    NetPlan,
+    Planned,
+    net_plan,
+    rollback_warning,
+)
+from openwrtgui.net.service import network_snapshot
 from openwrtgui.net.state import read_network
 from openwrtgui.ports.compile import (
     MirrorRequest,
@@ -60,17 +68,25 @@ class PortsService:
         self._settle_s = settle_s
         self._poll_s = poll_s
 
-    async def _read(self, router_id: str) -> tuple[RouterRecord, Transport, PortsState, dict[str, str]]:
+    def _record(self, router_id: str) -> RouterRecord:
         rec = self._routers.get(router_id)
         if rec is None:
             raise ValueError(f"Unknown router {router_id}")
+        return rec
+
+    async def _read(self, router_id: str) -> tuple[RouterRecord, Transport, PortsState, dict[str, str]]:
+        rec = self._record(router_id)
         t = await self._pool.get(rec)
+        state, uci = await self._read_on(rec, t)
+        return rec, t, state, uci
+
+    async def _read_on(self, rec: RouterRecord, t: Transport) -> tuple[PortsState, dict[str, str]]:
         desc = self._descriptions.get(rec.id)
         if desc is None:
             desc = await describe_router(t)
             self._descriptions[rec.id] = desc
         net, uci = await read_network(t, rec.id, desc)
-        return rec, t, await read_ports(t, rec, desc, net, uci), uci
+        return await read_ports(t, rec, desc, net, uci), uci
 
     async def state(self, router_id: str) -> PortsState:
         return (await self._read(router_id))[2]
@@ -129,8 +145,18 @@ class PortsService:
         *,
         all_on: bool = False,
     ) -> NetApplyResult:
-        rec, t, state, uci = await self._read(router_id)
-        plan = as_previewed(rec, self._ports_plan(rec, state, uci, port, on, all_on), digest)
+        rec = self._record(router_id)
+
+        async def make(t: Transport) -> Planned:
+            state, uci = await self._read_on(rec, t)
+            plan = self._ports_plan(rec, state, uci, port, on, all_on)
+            return Planned(plan, self._enable_checks(state, plan))
+
+        return await self._runner.run_planned(rec, make, digest)
+
+    def _enable_checks(
+        self, state: PortsState, plan: NetPlan
+    ) -> Callable[[Transport], Awaitable[list[NetCheck]]]:
         asked = {int(cmd.split()[4]): cmd.endswith(" 1") for cmd in plan.commands}
 
         async def verify(t2: Transport) -> list[NetCheck]:
@@ -151,7 +177,7 @@ class PortsService:
                 checks.append(NetCheck(f"port {label}", good, detail))
             return checks
 
-        return await self._runner.run(rec, t, plan, verify)
+        return verify
 
     # ---------------------------------------------------------------- VLANs (rollback)
     def _vlans_plan(
@@ -186,8 +212,18 @@ class PortsService:
         deletes: Sequence[str],
         digest: str | None = None,
     ) -> NetApplyResult:
-        rec, t, state, uci = await self._read(router_id)
-        plan = as_previewed(rec, self._vlans_plan(rec, state, uci, upserts, deletes), digest)
+        rec = self._record(router_id)
+
+        async def make(t: Transport) -> Planned:
+            state, uci = await self._read_on(rec, t)
+            plan = self._vlans_plan(rec, state, uci, upserts, deletes)
+            return Planned(plan, self._vlan_checks(state, upserts, deletes), network_snapshot(uci))
+
+        return await self._runner.run_planned(rec, make, digest)
+
+    def _vlan_checks(
+        self, state: PortsState, upserts: Sequence[VlanRequest], deletes: Sequence[str]
+    ) -> Callable[[Transport], Awaitable[list[NetCheck]]]:
         want = {
             u.vlan: parse_members(
                 " ".join(f"{p}{'t' if cell == 't' else ''}" for p, cell in u.members.items())
@@ -206,7 +242,7 @@ class PortsService:
                 NetCheck("switch", ok, "the switch has the VLANs as asked" if ok else "the switch differs")
             ]
 
-        return await self._runner.run(rec, t, plan, verify, network_snapshot(uci))
+        return verify
 
     # ---------------------------------------------------------------- switch port mirror (rollback)
     def _mirror_plan(
@@ -234,8 +270,18 @@ class PortsService:
     async def apply_mirror(
         self, router_id: str, req: MirrorRequest, digest: str | None = None
     ) -> NetApplyResult:
-        rec, t, state, uci = await self._read(router_id)
-        plan = as_previewed(rec, self._mirror_plan(rec, state, uci, req), digest)
+        rec = self._record(router_id)
+
+        async def make(t: Transport) -> Planned:
+            state, uci = await self._read_on(rec, t)
+            plan = self._mirror_plan(rec, state, uci, req)
+            return Planned(plan, self._mirror_checks(state, req), network_snapshot(uci))
+
+        return await self._runner.run_planned(rec, make, digest)
+
+    def _mirror_checks(
+        self, state: PortsState, req: MirrorRequest
+    ) -> Callable[[Transport], Awaitable[list[NetCheck]]]:
         sources = {p: f for p, f in req.sources.items() if f[0] or f[1]} if req.monitor is not None else {}
 
         def holds(live: SwitchLive) -> bool:
@@ -247,4 +293,4 @@ class PortsService:
             ok = holds(await self._poll(t2, state, holds))
             return [NetCheck("switch", ok, "the switch mirrors as asked" if ok else "the switch differs")]
 
-        return await self._runner.run(rec, t, plan, verify, network_snapshot(uci))
+        return verify
