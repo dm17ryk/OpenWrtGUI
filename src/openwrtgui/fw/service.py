@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable, Mapping, MutableMapping, Sequence
+from dataclasses import replace
 from typing import Any
 
 from openwrtgui.fw import commands as c
@@ -16,9 +17,10 @@ from openwrtgui.fw.compile import (
     zone_policies,
 )
 from openwrtgui.fw.model import Direction, Policy
-from openwrtgui.fw.nft import Ruleset, parse_ruleset_json, zone_tail
+from openwrtgui.fw.nft import ChainText, Ruleset, TableText, parse_ruleset_json, table_texts, zone_tail
 from openwrtgui.fw.sections import Kind, SectionRequest, compile_sections, expectations
 from openwrtgui.fw.state import PIN_DHCP, PIN_SSH, FirewallState, read_firewall
+from openwrtgui.fw.tables import TableChange, TableRequest, heredoc, owner_text, table_change
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.net.apply import (
@@ -38,7 +40,8 @@ from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.store.settings import SettingsStore
 from openwrtgui.transport.base import Transport
 from openwrtgui.transport.pool import ConnectionPool
-from openwrtgui.uci import UciOp
+from openwrtgui.uci import UciOp, parse_uci_show
+from openwrtgui.wifi.service import PreviewChanged
 
 SCREEN = "Firewall"
 SETTLE_S = 10.0
@@ -282,3 +285,143 @@ class FirewallService:
             return Planned(plan, self._verifier(plan, uci, [], rules, sets), firewall_snapshot(uci))
 
         return await self._runner.run_planned(rec, make, digest)
+
+    # ---------------------------------------------------------------- other nftables tables
+    def _table_change(
+        self, state: FirewallState, uci: Mapping[str, str], text: str, req: TableRequest
+    ) -> TableChange:
+        obj = next((o for o in state.objects if o.key == req.key), None) if req.action != "add" else None
+        tables = table_texts(text)
+        current = tables.get((obj.family, obj.table)) if obj is not None else None
+        included = frozenset(k.split(".")[1] for k, v in uci.items() if k.count(".") == 1 and v == "include")
+        return table_change(req, obj, current, included)
+
+    def _table_plans(
+        self, rec: RouterRecord, uci: Mapping[str, str], change: TableChange
+    ) -> tuple[NetPlan, NetPlan | None]:
+        """The runtime change (timer rollback) and, when saved, the include written once it is confirmed. The
+        preview shows both, so its digest covers both."""
+        runtime = net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config=None,
+            ops=[],
+            current={},
+            commands=(
+                heredoc("nft -c -f /dev/stdin", change.script),
+                heredoc("nft -f /dev/stdin", change.script),
+            ),
+            rollback=True,
+            backup=change.backup,
+            restore=change.restore,
+            warnings=[*change.warnings, rollback_warning(rec.name, rec.host, "nftables tables")],
+        )
+        if not change.include_ops and not change.include_commands:
+            return runtime, None
+        include = net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config="firewall",
+            ops=change.include_ops,
+            current=uci,
+            commands=change.include_commands,
+        )
+        return replace(runtime, lines=(*runtime.lines, *include.lines)), include
+
+    async def plan_table(self, router_id: str, req: TableRequest) -> NetPlan:
+        rec = self._record(router_id)
+        t = await self._pool.get(rec)
+        state, uci, _, _ = await self._read_on(rec, t)
+        change = self._table_change(state, uci, (await t.run(c.NFT_TEXT)).stdout, req)
+        return self._table_plans(rec, uci, change)[0]
+
+    def _table_check(self, change: TableChange) -> Callable[[Transport], Awaitable[list[NetCheck]]]:
+        async def verify(t: Transport) -> list[NetCheck]:
+            name = f"table {change.key}"
+            if isinstance(change.expect, ChainText):
+                listed = await t.run(change.listing)
+                got = table_texts(listed.stdout).get(("inet", "fw4"))
+                chain = next((x for x in got.chains if x.name == change.expect.name), None) if got else None
+                ok = chain is not None and chain.rules == change.expect.rules
+                return [NetCheck(name, ok, "the chain holds the asked rules" if ok else "the chain differs")]
+            family, table = change.key.split(" ", 1)
+            listed = await t.run(f"nft list table {family} {table}")
+            if change.expect is None:
+                return [NetCheck(name, not listed.ok, "gone" if not listed.ok else "still there")]
+            got_table = table_texts(listed.stdout).get((family, table))
+            ok = got_table is not None and _same(got_table, change.expect)
+            return [NetCheck(name, ok, "as asked" if ok else "the table differs")]
+
+        return verify
+
+    async def apply_table(
+        self, router_id: str, req: TableRequest, digest: str | None = None
+    ) -> NetApplyResult:
+        rec = self._record(router_id)
+        found: dict[str, Any] = {}
+
+        async def make(t: Transport) -> Planned:
+            state, uci, _, _ = await self._read_on(rec, t)
+            change = self._table_change(state, uci, (await t.run(c.NFT_TEXT)).stdout, req)
+            plan, include = self._table_plans(rec, uci, change)
+            if digest is not None and digest != plan.digest:
+                raise PreviewChanged(rec.name)
+            obj = next((o for o in state.objects if o.key == req.key), None)
+            if obj is not None and obj.owner != "app":  # the override, before the change runs
+                self._audit.record(
+                    router=rec.id,
+                    screen=SCREEN,
+                    command=f"override {obj.key} (owner {owner_text(obj)})",
+                    exit_status=None,
+                    source="user",
+                )
+            found.update(change=change, include=include)
+            before = await t.run(change.listing)
+            snapshot = Snapshot(change.listing, {"text": before.stdout.strip()}, parse=_text)
+            return Planned(plan, self._table_check(change), snapshot)
+
+        first = await self._runner.run_planned(rec, make, digest)
+        include: NetPlan | None = found.get("include")
+        if not first.applied or include is None:
+            return first
+        change: TableChange = found["change"]
+
+        async def make_include(t: Transport) -> Planned:
+            uci = parse_uci_show((await t.run(c.UCI_FIREWALL)).stdout)
+            plan = self._table_plans(rec, uci, change)[1]
+            assert plan is not None
+
+            async def verify(t2: Transport) -> list[NetCheck]:
+                checks = [await saved_check(t2, c.UCI_FIREWALL, plan.ops, uci)]
+                if change.include_file is not None:
+                    path, content = change.include_file
+                    shown = await t2.run(f"cat {path}")
+                    ok = shown.ok and shown.stdout.rstrip("\n") == content
+                    checks.append(NetCheck(f"file {path}", ok, "saved" if ok else "differs"))
+                return checks
+
+            return Planned(plan, verify)
+
+        second = await self._runner.run_planned(rec, make_include, None)
+        error = first.error
+        if not second.applied:
+            error = f"Applied at runtime; saving it as an fw4 include failed: {second.error}"
+        return NetApplyResult(
+            rec.id,
+            True,
+            first.verified and second.verified,
+            (*first.checks, *second.checks),
+            error,
+            first.host,
+        )
+
+
+def _text(text: str) -> dict[str, str]:
+    return {"text": text.strip()}
+
+
+def _same(a: TableText, b: TableText) -> bool:
+    """The same chains and rules (named sets are carried over as listed and not compared)."""
+    return [(c.name, c.declaration, c.rules) for c in a.chains] == [
+        (c.name, c.declaration, c.rules) for c in b.chains
+    ]

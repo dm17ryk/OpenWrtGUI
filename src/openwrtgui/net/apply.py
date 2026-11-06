@@ -184,18 +184,19 @@ def net_plan(
     kept = order_for_script(drop_unchanged(ops, current), current)
     if not kept and not commands:
         raise ValueError(NOTHING)
+    shown = [line for command in commands for line in command.splitlines()]  # a heredoc, line by line
     if rollback and restore:
         armed, cancel = timer_lines(backup, restore, ROLLBACK_ID)
         script = _script(kept, config, None).splitlines() if kept else []
-        lines = [*armed.splitlines(), *script, *commands, cancel]
+        lines = [*armed.splitlines(), *script, *shown, cancel]
     elif rollback:
         if config is None:
             raise ValueError("a rollback change names its config")
         create, grant, apply, confirm, destroy = session_commands(SESSION, config)
         script = _script(kept, config, SESSION).splitlines()
-        lines = [create, grant, *script, apply, *commands, confirm, destroy]
+        lines = [create, grant, *script, apply, *shown, confirm, destroy]
     else:
-        lines = [*(_script(kept, config, None).splitlines() if kept else []), *commands, *reloads]
+        lines = [*(_script(kept, config, None).splitlines() if kept else []), *shown, *reloads]
     return NetPlan(
         router_id=router_id,
         screen=screen,

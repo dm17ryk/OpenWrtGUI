@@ -165,6 +165,8 @@ class SimNetwork:
         """The PC reaches lan: its address is in lan's subnet, its switch port is on and in lan's VLAN,
         and the firewall lets its SSH in."""
         self._expire()
+        if self.fw is not None:
+            self.fw.fire(self.fw.dispatch)  # a rollback timer that came due runs, reachable or not
         if self.fw is not None and not self.fw.admits_ssh(self.pc_ip):
             return False
         lan = self._lan()

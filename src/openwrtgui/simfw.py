@@ -286,7 +286,7 @@ class SimFirewall:
             return self._daemon(p)
         if p == "fw4 print":
             return _ok(p, self._fw4_print())
-        if p in ("fw4 reload", "fw4 -q reload", "mkdir -p /tmp/owg"):
+        if p in ("fw4 reload", "fw4 -q reload") or (p.startswith("mkdir -p ") and p[9:].startswith(OWNED)):
             return _ok(p)
         if p == "conntrack -L -p udp":
             n = len(self._conntrack)
@@ -361,6 +361,8 @@ class SimFirewall:
 
     # ---------------------------------------------------------------- nft
     def _nft(self, p: str) -> CommandResult | None:
+        if p == "nft list tables":
+            return _ok(p, "".join(f"table {t.family} {t.name}\n" for t in [self._fw4(), *self._tables]))
         if p in ("nft -j list ruleset", "nft -a list ruleset", "nft list ruleset"):
             tables = [self._fw4(), *self._tables]
             if p.startswith("nft -j"):
