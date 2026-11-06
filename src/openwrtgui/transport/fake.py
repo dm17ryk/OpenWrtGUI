@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from openwrtgui.transport.base import CommandResult, ShellChannel
 
 if TYPE_CHECKING:
+    from openwrtgui.simfw import SimFirewall
     from openwrtgui.simnet import SimNetwork
     from openwrtgui.simwifi import SimWifi
 
@@ -28,6 +29,7 @@ class SimState:
     password_login: str | None = None
     wifi: SimWifi | None = None
     net: SimNetwork | None = None
+    fw: SimFirewall | None = None
 
 
 def load_commands(path: Path) -> dict[str, CommandResult]:
@@ -73,10 +75,20 @@ class ReplayTransport:
 
     def _simulate(self, command: str) -> CommandResult | None:
         assert self.state is not None
-        # The network first: it answers only commands it knows whole (the Wi-Fi one echoes any `echo`).
+        if self.state.fw is not None:
+            self.state.fw.dispatch = self._dispatch
+            self.state.fw.fire(self._dispatch)  # router-side timers that came due run first
+        return self._dispatch(command)
+
+    def _dispatch(self, command: str) -> CommandResult | None:
+        assert self.state is not None
+        # The network first: it answers only commands it knows whole (the Wi-Fi one echoes any `echo`); the
+        # firewall last, since it splits compound commands and hands their parts back here.
         if self.state.net is not None and (answered := self.state.net.answer(command)) is not None:
             return answered
         if self.state.wifi is not None and (answered := self.state.wifi.answer(command)) is not None:
+            return answered
+        if self.state.fw is not None and (answered := self.state.fw.answer(command)) is not None:
             return answered
         if command == "true":
             return CommandResult(command, "", "", 0)

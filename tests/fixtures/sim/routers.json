@@ -7,9 +7,16 @@
     "overlay": "ap1.overlay.json",
     "wifi": "ap1.uci",
     "net": "ap1.uci",
-    "leases": [["panel", "f4:12:fa:f3:57:68", "192.168.1.30"]],
+    "leases": [
+      [
+        "panel",
+        "f4:12:fa:f3:57:68",
+        "192.168.1.30"
+      ]
+    ],
     "wifi_mirror": true,
-    "auth": "key"
+    "auth": "key",
+    "fw": "ap1.json"
   },
   {
     "id": "ap2",

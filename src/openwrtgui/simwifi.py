@@ -55,6 +55,7 @@ class SimWifi:
         self._tick = 0
         self._sessions = 0
         self._acl: dict[tuple[str, str], list[str]] = {}
+        self._disabled: set[str] = set()  # BSSes stopped with `hostapd_cli disable` (AP down)
 
     # ---------------------------------------------------------------- uci state
     def _radios(self) -> list[str]:
@@ -171,7 +172,22 @@ class SimWifi:
             return self._acl_change(m.group(1), m.group(2), m.group(3), m.group(4).lower())
         if m := re.fullmatch(r"hostapd_cli -i (\S+) (deny_acl|accept_acl) SHOW", p):
             return self._acl_show(m.group(1), m.group(2))
+        if m := re.fullmatch(r"hostapd_cli -i (\S+) (disable|enable|status)", p):
+            return self._bss(m.group(1), m.group(2))
         return None
+
+    def _bss(self, ifname: str, action: str) -> CommandResult:
+        """AP down and back: hostapd stops the BSS (no beacons, every station gone) and starts it again."""
+        if self._iface(ifname) is None:
+            return _fail(NO_HOSTAPD, 255)
+        if action == "disable":
+            self._disabled.add(ifname)
+        elif action == "enable":
+            self._disabled.discard(ifname)
+        else:
+            state = "DISABLED" if ifname in self._disabled else "ENABLED"
+            return _ok(f"state={state}\nphy={self._phy}\nfreq={2407 + 5 * 6}\nssid[0]=OpenWrt\n")
+        return _ok("OK\n")
 
     # ---------------------------------------------------------------- runtime MAC lists (hostapd_cli)
     def _acl_change(self, ifname: str, kind: str, action: str, mac: str) -> CommandResult:

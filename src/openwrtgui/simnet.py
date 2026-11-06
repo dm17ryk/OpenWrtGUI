@@ -24,7 +24,7 @@ from openwrtgui.transport.base import CommandResult
 from openwrtgui.uci import parse_uci_show, shell_quote
 
 PC_MAC = "08:3a:88:5c:a8:39"
-CONFIGS = ("network", "dhcp")
+CONFIGS = ("network", "dhcp", "firewall")
 DEFAULT = ""  # the default staging folder (/tmp/.uci)
 SWITCH = "switch0"
 EXTERNAL = (0, 1, 2, 3, 4)
@@ -138,6 +138,7 @@ class SimNetwork:
         self._wifi_mirror = wifi_mirror
         self.arl = dict(arl or {})  # MAC → port in `get arl_table` (empty, as on AP2's mt7620)
         self.extra_links: set[int] = set()  # more switch ports with a link than the PC's
+        self.fw: Any = None  # the SimFirewall of the same router, which may cut the PC's SSH
 
     # ---------------------------------------------------------------- what the connector asks
     def _expire(self) -> None:
@@ -155,9 +156,17 @@ class SimNetwork:
         lan = self._lan()
         return lan.address.ip if lan is not None and lan.proto == "static" and lan.address else None
 
-    def reachable(self) -> bool:
-        """The PC reaches lan: its address is in lan's subnet, and its switch port is on and in lan's VLAN."""
+    def uci(self) -> dict[str, str]:
+        """Every config as committed now (after a rollback that came due)."""
         self._expire()
+        return dict(self._committed)
+
+    def reachable(self) -> bool:
+        """The PC reaches lan: its address is in lan's subnet, its switch port is on and in lan's VLAN,
+        and the firewall lets its SSH in."""
+        self._expire()
+        if self.fw is not None and not self.fw.admits_ssh(self.pc_ip):
+            return False
         lan = self._lan()
         if lan is None or lan.address is None or not self._enabled.get(self.pc_port, True):
             return False

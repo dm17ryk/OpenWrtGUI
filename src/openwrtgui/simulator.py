@@ -13,6 +13,7 @@ import asyncssh
 import httpx
 
 from openwrtgui.guard.bench_guard import ProcessInfo
+from openwrtgui.simfw import SimFirewall
 from openwrtgui.simnet import SimNetwork
 from openwrtgui.simwifi import SimWifi
 from openwrtgui.store.routers import RouterRecord, RouterStore
@@ -132,7 +133,15 @@ class SimConnector:
             text = (self._sim_dir / "net" / entry["net"]).read_text(encoding="utf-8")
             leases = [tuple(lease) for lease in entry.get("leases", [])]
             net = SimNetwork(text, leases=leases, wifi_mirror=bool(entry.get("wifi_mirror")))
-        return SimState(root_password=entry.get("password") or SIM_ROOT_PASSWORD, wifi=wifi, net=net)
+        fw = None
+        if net is not None:
+            runtime = (
+                json.loads((self._sim_dir / "fw" / entry["fw"]).read_text(encoding="utf-8"))
+                if entry.get("fw")
+                else {}
+            )
+            fw = SimFirewall(net, runtime)
+        return SimState(root_password=entry.get("password") or SIM_ROOT_PASSWORD, wifi=wifi, net=net, fw=fw)
 
     def state(self, host: str) -> SimState:
         entry = self._entry(host)
