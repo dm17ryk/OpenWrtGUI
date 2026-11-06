@@ -130,6 +130,26 @@ class _Shell:
         await self._process.wait_closed()
 
 
+class _ByteStream:
+    """A binary exec channel (tcpdump -w -): bytes as they come; exit status and stderr after close."""
+
+    def __init__(self, process: asyncssh.SSHClientProcess[bytes]) -> None:
+        self._process = process
+        self.exit_status: int | None = None
+        self.stderr = ""
+
+    async def read(self, n: int = 65536) -> bytes:
+        return await self._process.stdout.read(n)
+
+    async def close(self) -> None:
+        if self._process.exit_status is None:
+            self._process.close()  # stops the command (tcpdump gets SIGPIPE / the channel goes)
+        done = await self._process.wait(check=False)
+        self.exit_status = done.exit_status
+        err = done.stderr or b""
+        self.stderr = err.decode(errors="replace") if isinstance(err, bytes) else str(err)
+
+
 class SshTransport:
     def __init__(self, conn: asyncssh.SSHClientConnection, host: str) -> None:
         self._conn = conn
@@ -199,6 +219,13 @@ class SshTransport:
             raise Unreachable(f"{self.host}: {why or type(exc).__name__}") from exc
         status = done.exit_status if done.exit_status is not None else -1
         return CommandResult(command, str(done.stdout or ""), str(done.stderr or ""), status)
+
+    async def stream(self, command: str) -> _ByteStream:
+        try:
+            process = await self._conn.create_process(command, encoding=None)
+        except (OSError, asyncssh.Error) as exc:
+            raise Unreachable(f"{self.host}: {exc}") from exc
+        return _ByteStream(process)
 
     async def open_shell(self, cols: int, rows: int) -> ShellChannel:
         process = await self._conn.create_process(term_type="xterm-256color", term_size=(cols, rows))

@@ -79,6 +79,20 @@ class ShellChannel(Protocol):
     async def close(self) -> None: ...
 
 
+class ByteStream(Protocol):
+    """A command's stdout as bytes, as it comes (a capture); its exit status and stderr once closed."""
+
+    exit_status: int | None
+    stderr: str
+
+    async def read(self, n: int = 65536) -> bytes: ...  # b"" at the end
+    async def close(self) -> None: ...
+
+
+class Streamer(Protocol):
+    async def stream(self, command: str) -> ByteStream: ...
+
+
 class Transport(Protocol):
     async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult: ...
     async def run_stdin(self, command: str, stdin: str, *, timeout: float = 15.0) -> CommandResult: ...

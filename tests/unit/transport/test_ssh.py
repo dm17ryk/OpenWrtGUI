@@ -322,3 +322,27 @@ def test_host_key_store_port_format_and_forget(tmp_path: Path) -> None:
     assert store.path.read_text(encoding="utf-8").count("192.168.1.2 ") == 1
     store.forget("192.168.1.2", 22)
     assert store.get("192.168.1.2", 22) is None and store.get("192.168.1.9", 2222) == info.fingerprint
+
+
+async def test_stream_reads_bytes_and_exit_status(ssh_server: SshServer, tmp_path: Path) -> None:
+    """A capture's binary exec stream: bytes as they come, then the command's exit status and stderr."""
+    t = await SshTransport.connect(
+        "127.0.0.1",
+        ssh_server.port,
+        "root",
+        host_keys=await _pinned(ssh_server, tmp_path),
+        password=TEST_PASSWORD,
+    )
+    try:
+        s = await t.stream("echo hi")
+        data = b""
+        while chunk := await s.read(4):
+            data += chunk
+        await s.close()
+        assert data == b"hi\n" and s.exit_status == 0
+        failed = await t.stream("nope")
+        assert await failed.read() == b""
+        await failed.close()
+        assert failed.exit_status == 127 and "unknown" in failed.stderr
+    finally:
+        await t.close()

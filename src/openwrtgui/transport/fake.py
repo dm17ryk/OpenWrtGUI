@@ -40,6 +40,27 @@ def load_commands(path: Path) -> dict[str, CommandResult]:
     }
 
 
+class BytesStream:
+    """A finished capture's bytes, read back in chunks (the simulator's tcpdump)."""
+
+    def __init__(self, data: bytes, exit_status: int = 0, stderr: str = "") -> None:
+        self._data = data
+        self._closed = False
+        self._final = (exit_status, stderr)
+        self.exit_status: int | None = None
+        self.stderr = ""
+
+    async def read(self, n: int = 65536) -> bytes:
+        if self._closed:
+            return b""
+        chunk, self._data = self._data[:n], self._data[n:]
+        return chunk
+
+    async def close(self) -> None:
+        self._closed = True
+        self.exit_status, self.stderr = self._final
+
+
 class ReplayTransport:
     def __init__(self, commands: Mapping[str, CommandResult], state: SimState | None = None) -> None:
         self._commands = dict(commands)
@@ -69,6 +90,13 @@ class ReplayTransport:
 
     async def open_shell(self, cols: int, rows: int) -> ShellChannel:
         raise NotImplementedError("simulator has no shell")
+
+    async def stream(self, command: str) -> BytesStream:
+        self.calls.append(command)
+        data = self.state.fw.stream(command) if self.state is not None and self.state.fw is not None else None
+        if data is None:
+            return BytesStream(b"", 1, "tcpdump: no such device\n")
+        return BytesStream(data, 124)  # `timeout` ends it
 
     async def close(self) -> None:
         return None
