@@ -12,7 +12,18 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from openwrtgui.api import errors, luci_api, misc_api, onboard_api, routers_api, update_api, wifi_api, ws_api
+from openwrtgui.api import (
+    errors,
+    luci_api,
+    misc_api,
+    net_api,
+    onboard_api,
+    ports_api,
+    routers_api,
+    update_api,
+    wifi_api,
+    ws_api,
+)
 from openwrtgui.context import AppContext
 from openwrtgui.version import APP_VERSION
 
@@ -65,7 +76,7 @@ def create_app(ctx: AppContext) -> FastAPI:
     app.state.ctx = ctx
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
     errors.install(app)
-    for module in (misc_api, routers_api, onboard_api, update_api, wifi_api, luci_api):
+    for module in (misc_api, routers_api, onboard_api, update_api, wifi_api, luci_api, net_api, ports_api):
         app.include_router(module.router)
     app.include_router(misc_api.public)
     app.include_router(ws_api.router)

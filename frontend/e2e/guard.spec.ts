@@ -25,6 +25,16 @@ test('Wi-Fi Apply is refused during a run and nothing changes', async ({ page })
   await expect(page.getByText('Applied and proven on air')).toHaveCount(0)
 })
 
+test('a Network Apply is refused during a run', async ({ page }) => {
+  await open(page, '/routers/ap2/network')
+  const dns = page.getByRole('region', { name: 'DNS' })
+  await dns.getByRole('textbox', { name: 'Cache size' }).fill('2000')
+  await expect(dns.getByRole('region', { name: 'Command preview' })).toContainText("cachesize='2000'")
+  await dns.getByRole('button', { name: 'Apply', exact: true }).click()
+  await expect(dns.getByRole('alert')).toContainText('dima_night.py started 21:04 (PID 18244)')
+  await expect(dns.getByText('Applied and checked')).toHaveCount(0)
+})
+
 test('a LuCI page opens read-only during a run', async ({ page }) => {
   await open(page, '/routers/ap1/luci?page=admin%2Fnetwork%2Fdhcp')
   await expect(page.getByRole('note')).toContainText('A harness run is in progress, so the session can only read')

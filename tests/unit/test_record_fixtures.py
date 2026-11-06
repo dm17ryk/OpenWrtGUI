@@ -64,6 +64,31 @@ def test_wifi_parked_set_is_exactly_the_planned_commands() -> None:
     )
 
 
+def test_network_set_is_exactly_the_reads_of_the_network_rules() -> None:
+    assert rf.SETS["network"] == (
+        "uci -X show network",
+        "uci -X show dhcp",
+        "ubus call network.interface dump",
+        "ubus call network.device status",
+        "ubus call luci-rpc getDHCPLeases",
+        "ubus call luci-rpc getHostHints",
+        'echo "$SSH_CONNECTION"',
+        "cat /proc/net/arp",
+        "ip -j -4 route show table all",
+        "ip -j -6 route show table all",
+        "ip -j -4 rule show",
+        "ip -j -6 rule show",
+        "swconfig dev switch0 show",
+        "swconfig dev switch0 help",
+        "swconfig dev switch0 get arl_table",
+        'ubus call luci getSwconfigFeatures \'{"switch":"switch0"}\'',
+        'ubus call service list \'{"name":"dnsmasq"}\'',
+        'ubus call service list \'{"name":"odhcpd"}\'',
+        'ubus call service list \'{"name":"wifi-mirror"}\'',
+    )
+    assert rf.out_file(Path("tests/fixtures/ap2"), "network") == Path("tests/fixtures/ap2/network.json")
+
+
 def test_uci_show_secrets_are_hidden() -> None:
     text = (
         "wireless.default_radio0.ssid='OpenWrt'\n"

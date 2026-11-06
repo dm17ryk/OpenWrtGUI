@@ -12,7 +12,8 @@ from typing import Literal
 from openwrtgui.probe.board import BoardInfo
 from openwrtgui.probe.describe import SelfDescription
 from openwrtgui.transport.base import Transport, ubus_call
-from openwrtgui.wifi.compile import UciOp, compile_modes
+from openwrtgui.uci import UciOp
+from openwrtgui.wifi.compile import compile_modes
 from openwrtgui.wifi.model import (
     ENCRYPTION,
     MODES,

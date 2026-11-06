@@ -65,6 +65,10 @@ pwsh -File tools/build_windows.ps1        # PyInstaller build + self-check (vers
   allowed (one `authorized_keys` line, nothing restarts).
 - **Tell the txctl session before any Wi-Fi or network reload on AP2** (`wifi`, `wifi reload`, network
   restart, a uci commit that triggers either). Do not change AP2's `country`, `legacy_rates` or `cell_density`.
+- **A network change on AP2** (its address, a VLAN, a route, a port) runs only in a window the owner
+  approved in this session and the txctl session agreed to, never while a harness run is live, and always
+  with the 60 s rollback. AP2 ends as found: lan `192.168.1.2/24`, radio parked, its DHCP server off (AP1
+  is the only DHCP server), every port on.
 - While Bench Guard reports a live run (`dima_night`, `rh_soak`, `overnight_wifi`, `txlab_*`,
   `voip_chain`, lock files, run SSIDs), every router is read-only. Do not work around it.
 - Agents **never type router passwords**. Where a password is needed, the owner types it.

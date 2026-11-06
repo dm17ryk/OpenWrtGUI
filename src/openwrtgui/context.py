@@ -16,10 +16,13 @@ from openwrtgui.guard.bench_guard import BenchGuard, psutil_lister
 from openwrtgui.live import LiveHub
 from openwrtgui.luci_bridge.service import LuciBridgeService, UpstreamFactory
 from openwrtgui.luci_bridge.upstream import Upstream, sim_upstream, ssh_upstream
+from openwrtgui.net.apply import ApplyRunner
+from openwrtgui.net.service import NetworkService
 from openwrtgui.onboard.pc_keys import find_pc_keys, ssh_dirs
 from openwrtgui.onboard.wizard import Connector, OnboardService, SshConnector
 from openwrtgui.paths import DataDir
 from openwrtgui.poller import StatusPoller
+from openwrtgui.ports.service import PortsService
 from openwrtgui.probe.describe import SelfDescription
 from openwrtgui.probe.status import RouterStatus
 from openwrtgui.rf.sampler import RfHub
@@ -54,6 +57,8 @@ class AppContext:
     wifi: WifiService
     rf: RfHub
     luci: LuciBridgeService
+    net: NetworkService
+    ports: PortsService
     token: str
     port: int
     mode: Literal["real", "simulator"]
@@ -184,6 +189,20 @@ def build_context(
         descriptions=descriptions,
         upstream_factory=_sim_upstream(descriptions) if simulator is not None else _ssh_upstream,
     )
+    runner = ApplyRunner(pool=pool, routers=routers, guard=guard, audit=audit, host_keys=host_keys)
+    net = NetworkService(
+        pool=pool,
+        routers=routers,
+        guard=guard,
+        audit=audit,
+        descriptions=descriptions,
+        statuses=statuses,
+        runner=runner,
+        wifi=wifi,
+    )
+    ports = PortsService(
+        pool=pool, routers=routers, guard=guard, audit=audit, descriptions=descriptions, runner=runner
+    )
     return AppContext(
         data=data,
         settings=settings,
@@ -203,6 +222,8 @@ def build_context(
             pool=pool, routers=routers, recordings=data.root / "recordings" if simulator is not None else None
         ),
         luci=luci,
+        net=net,
+        ports=ports,
         token=token,
         port=port,
         mode="simulator" if simulator is not None else "real",

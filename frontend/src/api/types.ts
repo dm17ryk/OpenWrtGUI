@@ -37,6 +37,43 @@ export type BridgeClosed = S['BridgeClosed']
 export type UciChange = S['UciChange']
 export type Mode = ModesIn['modes'][number]
 
+// Network & DHCP, Ports (v0.3)
+export type NetworkState = S['NetworkState']
+export type InterfaceView = S['InterfaceView']
+export type InterfaceConf = S['InterfaceConf']
+export type ProtoView = S['ProtoView']
+export type NetPlan = S['NetPlanOut']
+export type NetApplyResult = S['NetApplyResult']
+export type NetCheck = S['NetCheck']
+export type DhcpConf = S['DhcpConf']
+export type HostConf = S['HostConf']
+export type Lease = S['Lease']
+export type AccessState = S['AccessState']
+export type SsidAccess = S['SsidAccess']
+export type AccessDevice = S['AccessDevice']
+export type DnsConf = S['DnsConf']
+export type RouteConf = S['RouteConf']
+export type RuleConf = S['RuleConf']
+export type LiveTables = S['LiveTables']
+export type PortsState = S['PortsState']
+export type PortView = S['PortView']
+export type VlanView = S['VlanView']
+export type WifiMirror = S['WifiMirror']
+// Request bodies: the schema marks fields that have a default as required; the server fills them in.
+type Body<T, Required extends keyof T> = Partial<T> & Pick<T, Required>
+export type InterfaceIn = Body<S['InterfaceIn'], 'name'>
+export type DhcpIn = Body<S['DhcpIn'], 'interface'>
+export type HostIn = Body<S['HostIn'], 'mac'>
+export type HostsIn = { upserts: HostIn[]; deletes: string[] }
+export type DnsIn = Partial<S['DnsIn']>
+export type RouteIn = Body<S['RouteIn'], 'interface' | 'target'>
+export type RuleIn = Partial<S['RuleIn']>
+export type AccessIn = Body<S['AccessIn'], 'kind' | 'sections'>
+export type VlanIn = Body<S['VlanIn'], 'vlan' | 'members'>
+export type VlansIn = { upserts: VlanIn[]; deletes: string[] }
+export type MirrorIn = Partial<S['MirrorIn']>
+export type PortEnableIn = Partial<S['PortEnableIn']>
+
 // RF live (/ws/rf/{id}); WebSocket messages are not in the OpenAPI schema (src/openwrtgui/rf/sample.py).
 export type Bitrate = { mbps: number; mcs: number | null; width_mhz: number; short_gi: boolean; mode: Mode }
 export type RadioSample = {

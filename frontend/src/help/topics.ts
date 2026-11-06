@@ -39,6 +39,23 @@ export const HELP = {
   rfCharts: 'RF-live#charts',
   rfRates: 'RF-live#which-rates-reach-the-station',
   rfRecord: 'RF-live#record-to-csv',
+  // Network and DHCP
+  network: 'Network-and-DHCP',
+  netAddresses: 'Network-and-DHCP#router-addresses',
+  netRollback: 'Network-and-DHCP#rollback',
+  netDhcp: 'Network-and-DHCP#dhcp-server',
+  netHosts: 'Network-and-DHCP#fixed-addresses',
+  netLeases: 'Network-and-DHCP#active-leases',
+  netAccess: 'Network-and-DHCP#wi-fi-access-by-mac',
+  netDns: 'Network-and-DHCP#dns',
+  netRoutes: 'Network-and-DHCP#static-routes-and-rules',
+  // Ports, VLANs, mirroring
+  ports: 'Ports-and-VLANs',
+  portsPanel: 'Ports-and-VLANs#front-panel',
+  portsOwn: 'Ports-and-VLANs#this-apps-port',
+  portsVlans: 'Ports-and-VLANs#vlans',
+  portsMirror: 'Ports-and-VLANs#switch-port-mirror',
+  portsWifiMirror: 'Ports-and-VLANs#wi-fi-mirror',
   // LuCI pages
   luci: 'LuCI-pages',
   luciWhich: 'LuCI-pages#which-pages-open-here',

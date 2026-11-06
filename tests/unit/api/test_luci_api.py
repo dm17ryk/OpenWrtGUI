@@ -11,7 +11,7 @@ async def test_luci_api_open_list_close(authed: httpx.AsyncClient, ctx: AppConte
         "path": "admin/network/dhcp",
         "title": "DHCP",
         "package": "luci-mod-network",
-        "native": None,
+        "native": "network",  # it has a screen now, and still opens in LuCI on request
         "section": "Network",
         "label": "Network › DHCP",
     }

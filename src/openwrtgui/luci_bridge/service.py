@@ -29,7 +29,7 @@ from openwrtgui.probe.luci_menu import LuciPage
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import Transport, TransportError
 from openwrtgui.transport.pool import ConnectionPool
-from openwrtgui.wifi.parse import parse_uci_show
+from openwrtgui.uci import parse_uci_show
 
 log = logging.getLogger(__name__)
 

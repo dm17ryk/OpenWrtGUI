@@ -92,7 +92,10 @@ async def _fetch(url: str) -> httpx.Response:
 
 async def test_pages_list_with_native_marks(env: Env) -> None:
     pages = {p.path: p for p in await env.service.pages("ap1")}
-    assert pages["admin/network/wireless"].native == "wifi" and pages["admin/network/dhcp"].native is None
+    assert (
+        pages["admin/network/wireless"].native == "wifi" and pages["admin/network/dhcp"].native == "network"
+    )
+    assert pages["admin/network/firewall/zones"].native is None
 
 
 async def test_open_and_close_record_changes(env: Env) -> None:

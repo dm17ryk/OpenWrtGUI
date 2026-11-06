@@ -44,9 +44,12 @@ def write_refusal(router: str, *, allow_writes: bool, txctl_told: bool) -> str |
     if router != AP2:
         return f"tests that change a router run on AP2 ({AP2}) only, not {router}"
     if not allow_writes:
-        return "pass --allow-writes: this test changes AP2's Wi-Fi and restores it"
+        return "pass --allow-writes: this test changes AP2 (its Wi-Fi or its network) and restores it"
     if not txctl_told:
-        return "pass --txctl-told once the txctl session has given its OK for a radio-on window on AP2"
+        return (
+            "pass --txctl-told once the txctl session has been told of the window on AP2 "
+            "(a radio-on window, or a network window: lan briefly at 192.168.1.12)"
+        )
     return None
 
 
