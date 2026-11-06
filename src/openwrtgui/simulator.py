@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import os
-from collections.abc import Sequence
+import time
+from collections.abc import Callable, Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -102,8 +103,9 @@ class SimConnector:
     """The wizard's Connector for simulated routers, found by the address they answer on now: the one in
     routers.json, or lan's address once a change moved it. One host key per router, at any address."""
 
-    def __init__(self, sim_dir: Path) -> None:
+    def __init__(self, sim_dir: Path, clock: Callable[[], float] = time.monotonic) -> None:
         self._sim_dir = sim_dir
+        self._clock = clock
         self._entries = sim_routers(sim_dir)
         self._states: dict[str, SimState] = {}
         self._host_keys: dict[str, HostKeyInfo] = {}
@@ -132,7 +134,9 @@ class SimConnector:
         if entry.get("net"):
             text = (self._sim_dir / "net" / entry["net"]).read_text(encoding="utf-8")
             leases = [tuple(lease) for lease in entry.get("leases", [])]
-            net = SimNetwork(text, leases=leases, wifi_mirror=bool(entry.get("wifi_mirror")))
+            net = SimNetwork(
+                text, leases=leases, wifi_mirror=bool(entry.get("wifi_mirror")), clock=self._clock
+            )
         fw = None
         if net is not None:
             runtime = (
@@ -140,7 +144,7 @@ class SimConnector:
                 if entry.get("fw")
                 else {}
             )
-            fw = SimFirewall(net, runtime)
+            fw = SimFirewall(net, runtime, clock=self._clock)
         return SimState(root_password=entry.get("password") or SIM_ROOT_PASSWORD, wifi=wifi, net=net, fw=fw)
 
     def state(self, host: str) -> SimState:

@@ -28,6 +28,33 @@ class GuardWatchList(BaseModel):
     router_processes: list[str] = Field(default_factory=list)
 
 
+class KnownTable(BaseModel):
+    """A known writer of an nft table, or of a chain inside fw4's table (spec 7.12, known writers)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    match: str  # "<family> <table>" or "inet fw4 chain <name>"
+    owner: str
+    depends: str
+
+
+DEFAULT_KNOWN_TABLES = (
+    KnownTable(
+        match="inet fw4 chain BENCHSIPGUARD",
+        owner="dima_night",
+        depends=(
+            "dima_night expects BENCHSIPGUARD. Without it, SIP from the panels leaves the bench "
+            "during soak runs."
+        ),
+    ),
+    KnownTable(
+        match="bridge voipdscp",
+        owner="voip_chain",
+        depends="VoIP chain runs expect RTP and SIP marked EF. Changing it changes their results.",
+    ),
+)
+
+
 class Settings(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -38,6 +65,7 @@ class Settings(BaseModel):
     last_check: datetime | None = None
     audit_retention_days: Literal[30, 90, 365, 0] = 90
     guard: GuardWatchList = Field(default_factory=GuardWatchList)
+    known_tables: list[KnownTable] = Field(default_factory=lambda: list(DEFAULT_KNOWN_TABLES))
 
 
 class SettingsStore:

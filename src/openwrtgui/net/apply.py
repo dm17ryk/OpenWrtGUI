@@ -157,10 +157,10 @@ def timer_lines(backup: Sequence[str], restore: Sequence[str], rid: str) -> tupl
     return "\n".join(["set -e", *(line.replace(ROLLBACK_ID, rid) for line in backup), arm]), cancel
 
 
-def rollback_warning(router_name: str, target: str) -> str:
+def rollback_warning(router_name: str, target: str, what: str = "network settings") -> str:
     return (
         f"Applies with a {ROLLBACK_S} s rollback: if the app cannot reach {router_name} at {target} again "
-        "and confirm, the router restores its previous network settings by itself."
+        f"and confirm, the router restores its previous {what} by itself."
     )
 
 
