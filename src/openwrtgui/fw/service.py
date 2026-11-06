@@ -17,6 +17,7 @@ from openwrtgui.fw.compile import (
 )
 from openwrtgui.fw.model import Direction, Policy
 from openwrtgui.fw.nft import Ruleset, parse_ruleset_json, zone_tail
+from openwrtgui.fw.sections import Kind, SectionRequest, compile_sections, expectations
 from openwrtgui.fw.state import PIN_DHCP, PIN_SSH, FirewallState, read_firewall
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
@@ -121,8 +122,10 @@ class FirewallService:
         t: Transport,
         zones: Sequence[tuple[str, Direction, Policy]],
         rules: Sequence[tuple[str, bool]],
+        sets: Sequence[tuple[str, bool]] = (),
     ) -> list[NetCheck]:
-        """The zone policies and fw4 rules as asked in `nft -j list ruleset`, polled for up to 10 s."""
+        """The zone policies, fw4 rules and IP sets as asked in `nft -j list ruleset`, polled for up to
+        10 s."""
 
         def tails(ruleset: Ruleset) -> dict[str, str | None]:
             last: dict[str, str | None] = {}
@@ -146,6 +149,12 @@ class FirewallService:
                         if got == want
                         else f"fw4 ends {direction}_{zone} with {got}",
                     )
+                )
+            names = {x.name for x in ruleset.sets if (x.family, x.table) == ("inet", "fw4")}
+            for name, present in sets:
+                there = name in names
+                out.append(
+                    NetCheck(f"ipset {name}", there == present, "in fw4's ruleset" if there else "gone")
                 )
             for name, present in rules:
                 there = f"!fw4: {name}" in comments
@@ -171,9 +180,11 @@ class FirewallService:
         uci: Mapping[str, str],
         zones: Sequence[tuple[str, Direction, Policy]],
         rules: Sequence[tuple[str, bool]] = (),
+        sets: Sequence[tuple[str, bool]] = (),
     ) -> Callable[[Transport], Awaitable[list[NetCheck]]]:
         async def verify(t: Transport) -> list[NetCheck]:
-            return [*await self._effect(t, zones, rules), await saved_check(t, c.UCI_FIREWALL, plan.ops, uci)]
+            effect = await self._effect(t, zones, rules, sets)
+            return [*effect, await saved_check(t, c.UCI_FIREWALL, plan.ops, uci)]
 
         return verify
 
@@ -243,5 +254,31 @@ class FirewallService:
             state, uci, _, net = await self._read_on(rec, t)
             plan = self._zones_plan(rec, state, net, uci, (upserts, deletes, forwardings))
             return Planned(plan, self._verifier(plan, uci, zone_policies(upserts)), firewall_snapshot(uci))
+
+        return await self._runner.run_planned(rec, make, digest)
+
+    # ---------------------------------------------------------------- rules, port forwards, NAT, IP sets
+    async def plan_sections(
+        self, router_id: str, kind: Kind, upserts: Sequence[SectionRequest], deletes: Sequence[str]
+    ) -> NetPlan:
+        rec = self._record(router_id)
+        state, uci, _, _ = await self._read_on(rec, await self._pool.get(rec))
+        return self._plan(rec, uci, compile_sections(kind, upserts, deletes, state), [])
+
+    async def apply_sections(
+        self,
+        router_id: str,
+        kind: Kind,
+        upserts: Sequence[SectionRequest],
+        deletes: Sequence[str],
+        digest: str | None = None,
+    ) -> NetApplyResult:
+        rec = self._record(router_id)
+
+        async def make(t: Transport) -> Planned:
+            state, uci, _, _ = await self._read_on(rec, t)
+            plan = self._plan(rec, uci, compile_sections(kind, upserts, deletes, state), [])
+            rules, sets = expectations(kind, upserts, deletes, state)
+            return Planned(plan, self._verifier(plan, uci, [], rules, sets), firewall_snapshot(uci))
 
         return await self._runner.run_planned(rec, make, digest)

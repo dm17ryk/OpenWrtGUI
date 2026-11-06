@@ -736,3 +736,16 @@ async def test_timer_rollback_change_refused_restores_at_once(env: Env) -> None:
     ]
     assert not result.applied
     assert result.error == "The router refused the change: Error: syntax error, unexpected newline"
+
+
+async def test_saved_check_finds_a_list_item_of_a_new_section() -> None:
+    """An add_list on a section the script made is one item of the list the router shows."""
+    shown = Shown(
+        "firewall.cfg0aa001=ipset\nfirewall.cfg0aa001.entry='aa:bb:cc:dd:ee:01' 'aa:bb:cc:dd:ee:02'\n"
+    )
+    ops = [
+        UciOp("add", "firewall.$s1", "ipset"),
+        UciOp("add_list", "firewall.$s1.entry", "aa:bb:cc:dd:ee:02"),
+    ]
+    check = await saved_check(shown, "uci -X show firewall", ops, {})  # type: ignore[arg-type]
+    assert check == NetCheck("saved", True, "the router has the change")

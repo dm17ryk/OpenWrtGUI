@@ -65,6 +65,8 @@ async def test_unpinned_block_all_rolls_back_in_sim(env: FwEnv) -> None:
     assert not result.applied and not result.verified
     checks = {c.name: c.ok for c in result.checks}
     assert checks["reconnected"] is False and checks["restored"] is True
+    assert result.error is not None
+    assert result.error.endswith("The router restores its previous firewall settings 60 s after the change.")
     assert next(z for z in (await env.fw.state("ap2")).conf.zones if z.name == "lan").input == "ACCEPT"
 
 

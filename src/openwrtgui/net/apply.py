@@ -213,6 +213,11 @@ def net_plan(
     )
 
 
+def _settings(plan: NetPlan) -> str:
+    """What a rollback puts back, in the result's words."""
+    return {"network": "network settings", "firewall": "firewall settings"}.get(plan.config or "", "settings")
+
+
 def _reason(result: CommandResult) -> str:
     return (result.stderr or result.stdout).strip() or f"exit {result.exit_status}"
 
@@ -223,7 +228,9 @@ def _holds(op: UciOp, shown: Mapping[str, str]) -> bool:
     if "$" in op.path:  # an option of a section the script made: some section of the config has it
         config, option = op.path.split(".", 1)[0], op.path.rsplit(".", 1)[-1]
         return op.op == "delete" or any(
-            k.startswith(config + ".") and k.endswith("." + option) and v == op.value
+            k.startswith(config + ".")
+            and k.endswith("." + option)
+            and (op.value in v.split() if op.op == "add_list" else v == op.value)
             for k, v in shown.items()
         )
     items = shown.get(op.path, "").split()
@@ -664,7 +671,7 @@ class ApplyRunner:
     ) -> NetApplyResult:
         reason = why or f"{rec.name} did not answer at {target} within {self._window_s:g} s"
         error = (
-            f"Not applied: {reason}. The router restores its previous network settings "
+            f"Not applied: {reason}. The router restores its previous {_settings(plan)} "
             f"{self._rollback_s:g} s after the change."
         )
         restored = await self._restore_check(rec, plan, applied_at, snapshot)
@@ -685,7 +692,7 @@ class ApplyRunner:
         failed = "; ".join(f"{c.name}: {c.detail}" for c in seen if c.ok is False)
         error = (
             f"Not applied: the change was not seen in effect ({failed}). The router restores its previous "
-            f"network settings {self._rollback_s:g} s after the change."
+            f"{_settings(plan)} {self._rollback_s:g} s after the change."
         )
         reached = NetCheck("reconnected", True, f"{rec.name} answered at {target}")
         restored = await self._restore_check(rec, plan, applied_at, snapshot)
