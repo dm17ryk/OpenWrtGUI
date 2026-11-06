@@ -323,6 +323,7 @@ class ApplyRunner:
         self._every_s = every_s
         self._restore_s = restore_s
         self._fetch_key = fetch_key
+        self._holds: dict[str, object] = {}  # router id -> the pool hold a rollback apply has
 
     async def _run(
         self, t: Transport, rec: RouterRecord, plan: NetPlan, command: str, source: Source = "user", **kw: Any
@@ -437,6 +438,21 @@ class ApplyRunner:
         verify: Verifier,
         snapshot: Snapshot | None,
     ) -> NetApplyResult:
+        async with self._pool.hold(rec.id) as token:
+            self._holds[rec.id] = token
+            try:
+                return await self._rpcd_rollback(rec, t, plan, verify, snapshot)
+            finally:
+                del self._holds[rec.id]
+
+    async def _rpcd_rollback(
+        self,
+        rec: RouterRecord,
+        t: Transport,
+        plan: NetPlan,
+        verify: Verifier,
+        snapshot: Snapshot | None,
+    ) -> NetApplyResult:
         assert plan.config is not None
         created = await self._run(t, rec, plan, create_command(), source="app")
         sid = str(json.loads(created.stdout)["ubus_rpc_session"])
@@ -492,7 +508,7 @@ class ApplyRunner:
 
     async def _connect(self, rec: RouterRecord, host: str) -> Transport:
         await self._pool.drop(rec.id)  # no backoff between the attempts of a reconnect window
-        return await self._pool.get(rec.model_copy(update={"host": host}))
+        return await self._pool.get(rec.model_copy(update={"host": host}), token=self._holds.get(rec.id))
 
     async def _reconnect(
         self, rec: RouterRecord, target: str, applied_at: datetime, settle_s: float

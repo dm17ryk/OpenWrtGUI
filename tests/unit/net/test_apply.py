@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
@@ -63,6 +64,7 @@ class Clock:
 
     async def sleep(self, seconds: float) -> None:
         self.t += timedelta(seconds=seconds)
+        await asyncio.sleep(0)  # let other tasks (the status poller, a screen's read) run meanwhile
 
 
 @dataclass
@@ -594,3 +596,27 @@ async def test_restore_unreadable_is_not_differs(env: Env) -> None:
     restored = next(c for c in result.checks if c.name == "restored")
     assert restored.ok is None
     assert restored.detail == "could not read the settings back: uci: I/O error"
+
+
+async def test_rollback_reconnect_not_queued_behind_reads(env: Env) -> None:
+    """#33: a read issued while the router is changing waits until the apply confirmed; it never takes the
+    connection the runner needs to reach the router and confirm."""
+    events: list[str] = []
+    reads: list[asyncio.Task[Transport]] = []
+
+    async def poll() -> Transport:
+        t = await env.pool.get(env.rec)
+        events.append("read")
+        return t
+
+    def note(command: str) -> None:
+        if command.startswith("ubus call uci apply"):
+            reads.append(asyncio.ensure_future(poll()))
+        if command.startswith("ubus call uci confirm"):
+            events.append("confirm")
+
+    env.bench.on_command = note
+    result = await _apply(env, _lan_plan(target=None))
+    await asyncio.wait_for(reads[0], 1.0)
+    assert result.applied
+    assert events == ["confirm", "read"]
