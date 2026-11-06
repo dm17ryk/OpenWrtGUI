@@ -14,6 +14,7 @@ import contextlib
 import hashlib
 import json
 import re
+import secrets as tokens
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -24,6 +25,7 @@ from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked
 from openwrtgui.guard.writes import run_audited
 from openwrtgui.luci_bridge.session import create_command, destroy_command
 from openwrtgui.store.routers import RouterRecord, RouterStore
+from openwrtgui.timer import TIMER_DIR, arm_command, cancel_command
 from openwrtgui.transport.base import (
     CommandResult,
     HostKeyChanged,
@@ -48,6 +50,7 @@ RESTORE_RETRY_S = 20.0  # the router may still be coming back at 65 s
 SCRIPT_TIMEOUT_S = 60.0
 SERVICE_WAIT_S = 10.0
 SESSION = "<session>"
+ROLLBACK_ID = "<rollback>"  # the router-side rollback timer's id in a preview; a fresh one at apply
 NOTHING = "Nothing to apply: the router already has these settings."
 _ANONYMOUS = re.compile(r"cfg[0-9a-f]{6}")  # libuci's name for an unnamed section
 
@@ -72,6 +75,14 @@ class NetPlan:
     target_host: str | None
     warnings: tuple[str, ...]
     secrets: tuple[str, ...] = field(repr=False)
+    # A change outside uci rolls back by a router-side timer: `backup` runs before it is armed, `restore` is
+    # what the timer runs if the app does not cancel it (both may name /tmp/owg/rb-<rollback>.* files).
+    backup: tuple[str, ...] = ()
+    restore: tuple[str, ...] = ()
+
+    @property
+    def timer(self) -> bool:
+        return self.rollback and bool(self.restore)
 
     @property
     def digest(self) -> str:
@@ -133,6 +144,19 @@ def _script(ops: Sequence[UciOp], config: str | None, sid: str | None) -> str:
     return "\n".join(["set -e", *render_uci(ops), *([f"uci commit {config}"] if config else [])])
 
 
+def _timer_name(rid: str) -> str:
+    return f"rb-{rid}"
+
+
+def timer_lines(backup: Sequence[str], restore: Sequence[str], rid: str) -> tuple[str, str]:
+    """The exec that backs up and arms the rollback timer, and the line that cancels it (the confirm)."""
+    name = _timer_name("000000")  # a valid timer name, then the id goes in
+    restore = [line.replace(ROLLBACK_ID, rid) for line in restore]
+    arm = arm_command(name, ROLLBACK_S, restore).replace(name, _timer_name(rid))
+    cancel = f"{cancel_command(name)}; rm -f {TIMER_DIR}/{name}*".replace(name, _timer_name(rid))
+    return "\n".join(["set -e", *(line.replace(ROLLBACK_ID, rid) for line in backup), arm]), cancel
+
+
 def rollback_warning(router_name: str, target: str) -> str:
     return (
         f"Applies with a {ROLLBACK_S} s rollback: if the app cannot reach {router_name} at {target} again "
@@ -153,12 +177,18 @@ def net_plan(
     target_host: str | None = None,
     warnings: Sequence[str] = (),
     secrets: Sequence[str] = (),
+    backup: Sequence[str] = (),
+    restore: Sequence[str] = (),
 ) -> NetPlan:
     """The exact preview: only changes, section deletes last; nothing left is refused with NOTHING."""
     kept = order_for_script(drop_unchanged(ops, current), current)
     if not kept and not commands:
         raise ValueError(NOTHING)
-    if rollback:
+    if rollback and restore:
+        armed, cancel = timer_lines(backup, restore, ROLLBACK_ID)
+        script = _script(kept, config, None).splitlines() if kept else []
+        lines = [*armed.splitlines(), *script, *commands, cancel]
+    elif rollback:
         if config is None:
             raise ValueError("a rollback change names its config")
         create, grant, apply, confirm, destroy = session_commands(SESSION, config)
@@ -178,6 +208,8 @@ def net_plan(
         target_host=target_host,
         warnings=tuple(warnings),
         secrets=tuple(secrets),
+        backup=tuple(backup),
+        restore=tuple(restore),
     )
 
 
@@ -441,9 +473,45 @@ class ApplyRunner:
         async with self._pool.hold(rec.id) as token:
             self._holds[rec.id] = token
             try:
+                if plan.timer:
+                    return await self._timer_rollback(rec, t, plan, verify, snapshot)
                 return await self._rpcd_rollback(rec, t, plan, verify, snapshot)
             finally:
                 del self._holds[rec.id]
+
+    async def _timer_rollback(
+        self,
+        rec: RouterRecord,
+        t: Transport,
+        plan: NetPlan,
+        verify: Verifier,
+        snapshot: Snapshot | None,
+    ) -> NetApplyResult:
+        """A change outside uci: back up, arm a router-side timer that restores the backup, change, then
+        reconnect and cancel the timer once the change is seen in effect."""
+        rid = tokens.token_hex(3)
+        armed, cancel = timer_lines(plan.backup, plan.restore, rid)
+        try:
+            done = await self._run(t, rec, plan, armed, source="app", timeout=SCRIPT_TIMEOUT_S)
+        except TransportError as exc:
+            error = f"Lost the connection to {rec.name} before the change was applied: {exc}"
+            return self._finish(rec, plan, False, (), error, rec.host)
+        if not done.ok:
+            error = f"Could not arm the rollback timer on {rec.name}: {_reason(done)}"
+            return self._finish(rec, plan, False, (), error, rec.host)
+        try:
+            steps = [_script(plan.ops, plan.config, None)] if plan.ops else []
+            for command in [*steps, *(c.replace(ROLLBACK_ID, rid) for c in plan.commands)]:
+                done = await self._run(t, rec, plan, command, secrets=plan.secrets, timeout=SCRIPT_TIMEOUT_S)
+                if not done.ok:  # put the previous state back now, not in 60 s
+                    restore = "; ".join(plan.restore).replace(ROLLBACK_ID, rid)
+                    await self._run(t, rec, plan, restore, source="app", require_guard=False)
+                    await self._run(t, rec, plan, cancel, source="app", require_guard=False)
+                    error = f"The router refused the change: {_reason(done)}"
+                    return self._finish(rec, plan, False, (), error, rec.host)
+        except TransportError:
+            pass  # the change may have cut this connection: reconnect and confirm decides
+        return await self._settle(rec, plan, verify, snapshot, cancel, None)
 
     async def _rpcd_rollback(
         self,
@@ -486,6 +554,18 @@ class ApplyRunner:
                 await self._run(t, rec, plan, command, secrets=plan.secrets)
         except TransportError:
             pass  # the change may have cut this connection: reconnect and confirm decides
+        return await self._settle(rec, plan, verify, snapshot, confirm, destroy)
+
+    async def _settle(
+        self,
+        rec: RouterRecord,
+        plan: NetPlan,
+        verify: Verifier,
+        snapshot: Snapshot | None,
+        confirm: str,
+        destroy: str | None,
+    ) -> NetApplyResult:
+        """After the change: reconnect, see it in effect, confirm; or report the rollback."""
         applied_at = self._clock()
         target = plan.target_host or rec.host
         t2, why = await self._reconnect(rec, target, applied_at, SETTLE_S)
@@ -549,7 +629,7 @@ class ApplyRunner:
         t: Transport,
         target: str,
         confirm: str,
-        destroy: str,
+        destroy: str | None,
         seen: Sequence[NetCheck],
     ) -> NetApplyResult:
         checks = [NetCheck("reconnected", True, f"{rec.name} answered at {target}")]
@@ -559,8 +639,9 @@ class ApplyRunner:
             gone = f"Not applied: the router no longer held the change to confirm ({_reason(done)})"
             return self._finish(rec, plan, False, checks, gone, rec.host)
         checks.append(NetCheck("confirmed", True, "the router keeps the change"))
-        with contextlib.suppress(TransportError):  # an unreached destroy: the session times out by itself
-            await self._run(t, rec, plan, destroy, source="app", require_guard=False)
+        if destroy is not None:
+            with contextlib.suppress(TransportError):  # an unreached destroy: the session times out by itself
+                await self._run(t, rec, plan, destroy, source="app", require_guard=False)
         host = rec.host
         if target != rec.host:
             self._routers.upsert(rec.model_copy(update={"host": target}))

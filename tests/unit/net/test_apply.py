@@ -620,3 +620,119 @@ async def test_rollback_reconnect_not_queued_behind_reads(env: Env) -> None:
     await asyncio.wait_for(reads[0], 1.0)
     assert result.applied
     assert events == ["confirm", "read"]
+
+
+# ---------------------------------------------------------------- timer rollback (changes outside uci)
+CHANGE = "nft -f /tmp/owg/new.nft"
+LISTING = "nft list table inet owg_t"
+TABLE_BEFORE = "table inet owg_t {\n}"
+
+
+def _timer_plan() -> NetPlan:
+    return net_plan(
+        router_id="ap2",
+        screen="Firewall",
+        config=None,
+        ops=[],
+        current={},
+        commands=(CHANGE,),
+        rollback=True,
+        backup=(f"{LISTING} > /tmp/owg/rb-<rollback>.nft",),
+        restore=("nft delete table inet owg_t", "nft -f /tmp/owg/rb-<rollback>.nft"),
+    )
+
+
+def _cancel(rid: str) -> str:
+    pid = f"/tmp/owg/rb-{rid}.pid"
+    return f"start-stop-daemon -K -q -p {pid}; rm -f {pid}; rm -f /tmp/owg/rb-{rid}*"
+
+
+def _table_snapshot() -> Snapshot:
+    return Snapshot(LISTING, {"text": TABLE_BEFORE}, parse=lambda text: {"text": text.strip()})
+
+
+async def _apply_timer(env: Env, verify: Verifier = _verify_ok) -> NetApplyResult:
+    async def make(t: Transport) -> Planned:
+        return Planned(_timer_plan(), verify, _table_snapshot())
+
+    return await env.runner.run_planned(env.rec, make, None)
+
+
+def test_timer_rollback_preview_names_the_timer_with_a_placeholder() -> None:
+    lines = _timer_plan().lines
+    assert lines[0] == "set -e"
+    assert lines[1] == f"{LISTING} > /tmp/owg/rb-<rollback>.nft"
+    assert lines[2].startswith(
+        "mkdir -p /tmp/owg && start-stop-daemon -S -b -m -p /tmp/owg/rb-<rollback>.pid "
+        "-x /bin/sh -- -c 'sleep 60; "
+    )
+    assert "nft delete table inet owg_t; nft -f /tmp/owg/rb-<rollback>.nft" in lines[2]
+    assert lines[3:] == (
+        CHANGE,
+        "start-stop-daemon -K -q -p /tmp/owg/rb-<rollback>.pid; rm -f /tmp/owg/rb-<rollback>.pid; "
+        "rm -f /tmp/owg/rb-<rollback>*",
+    )
+
+
+async def test_timer_rollback_confirms_after_reconnect(env: Env) -> None:
+    result = await _apply_timer(env)
+    log = env.bench.log
+    armed = log[0][2]
+    rid = armed.split("/tmp/owg/rb-", 1)[1][:6]
+    assert all(c in "0123456789abcdef" for c in rid)
+    assert armed.startswith(
+        f"set -e\n{LISTING} > /tmp/owg/rb-{rid}.nft\nmkdir -p /tmp/owg && start-stop-daemon"
+    )
+    assert "<rollback>" not in armed
+    assert log[1][2] == CHANGE
+    cancel = next(entry for entry in log if entry[2].startswith("start-stop-daemon -K"))
+    assert cancel[0] == 2  # from a new connection, once the change is seen in effect
+    assert cancel[2] == _cancel(rid)
+    assert result.applied and result.verified
+    assert [(c.name, c.ok) for c in result.checks] == [
+        ("reconnected", True),
+        ("confirmed", True),
+        ("interface lan", True),
+    ]
+
+
+async def test_timer_rollback_unconfirmed_reports_restored(env: Env) -> None:
+    changed_at: list[datetime] = []
+
+    def note(command: str) -> None:
+        if command == CHANGE:
+            changed_at.append(env.clock.t)
+
+    def respond(command: str) -> CommandResult | None:
+        if command == LISTING:
+            return CommandResult(command, TABLE_BEFORE + "\n", "", 0)
+        return None
+
+    env.bench.on_command = note
+    env.bench.respond = respond
+    env.bench.answers_at = lambda host, now: (
+        host == "192.168.1.2" and (not changed_at or now >= changed_at[0] + timedelta(seconds=64))
+    )
+    result = await _apply_timer(env)
+    assert not any(c.startswith("start-stop-daemon -K") for c in env.commands())
+    assert not result.applied
+    assert {c.name: c.ok for c in result.checks} == {"reconnected": False, "restored": True}
+    assert result.error is not None and result.error.startswith("Not applied: AP2 · office did not answer")
+
+
+async def test_timer_rollback_change_refused_restores_at_once(env: Env) -> None:
+    def refuse(command: str) -> CommandResult | None:
+        if command == CHANGE:
+            return CommandResult(command, "", "Error: syntax error, unexpected newline\n", 1)
+        return None
+
+    env.bench.respond = refuse
+    result = await _apply_timer(env)
+    commands = env.commands()
+    rid = commands[0].split("/tmp/owg/rb-", 1)[1][:6]
+    assert commands[2:] == [
+        f"nft delete table inet owg_t; nft -f /tmp/owg/rb-{rid}.nft",
+        _cancel(rid),
+    ]
+    assert not result.applied
+    assert result.error == "The router refused the change: Error: syntax error, unexpected newline"
