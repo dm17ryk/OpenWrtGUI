@@ -97,7 +97,11 @@ def test_page_views_mark_native() -> None:
     assert views["admin/status/routes"].native == "network"
     assert views["admin/status/routesj"].native == "network"  # LuCI shows this or routes, by dependencies
     assert views["admin/network/switch"].native == "ports"
-    assert views["admin/network/firewall/zones"].native is None
+    for path in ("/zones", "/forwards", "/rules", "/snats", "/ipsets", "/custom"):
+        assert views[f"admin/network/firewall{path}"].native == "firewall"
+    assert views["admin/status/nftables"].native == "firewall"
+    iptables = views.get("admin/status/nftables/iptables")  # the legacy iptables view stays a fallback
+    assert iptables is None or iptables.native is None
 
 
 def test_page_groups_fall_back_to_the_package() -> None:

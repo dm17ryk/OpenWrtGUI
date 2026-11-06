@@ -14,6 +14,8 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from openwrtgui.api import (
     errors,
+    faults_api,
+    fw_api,
     luci_api,
     misc_api,
     net_api,
@@ -76,7 +78,19 @@ def create_app(ctx: AppContext) -> FastAPI:
     app.state.ctx = ctx
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost"])
     errors.install(app)
-    for module in (misc_api, routers_api, onboard_api, update_api, wifi_api, luci_api, net_api, ports_api):
+    modules = (
+        misc_api,
+        routers_api,
+        onboard_api,
+        update_api,
+        wifi_api,
+        luci_api,
+        net_api,
+        ports_api,
+        fw_api,
+        faults_api,
+    )
+    for module in modules:
         app.include_router(module.router)
     app.include_router(misc_api.public)
     app.include_router(ws_api.router)

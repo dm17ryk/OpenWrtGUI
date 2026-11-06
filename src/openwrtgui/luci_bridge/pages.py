@@ -19,6 +19,14 @@ NATIVE: dict[str, str] = {
     "admin/status/routes": "network",
     "admin/status/routesj": "network",  # the JSON variant; LuCI shows one of the two
     "admin/network/switch": "ports",
+    "admin/network/firewall": "firewall",
+    "admin/network/firewall/zones": "firewall",
+    "admin/network/firewall/forwards": "firewall",
+    "admin/network/firewall/rules": "firewall",
+    "admin/network/firewall/snats": "firewall",
+    "admin/network/firewall/ipsets": "firewall",
+    "admin/network/firewall/custom": "firewall",
+    "admin/status/nftables": "firewall",
 }
 
 
