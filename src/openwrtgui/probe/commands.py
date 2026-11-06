@@ -16,6 +16,8 @@ IFACE_DUMP = ubus_command("network.interface", "dump")
 DHCP_LAN = ubus_command("uci", "get", {"config": "dhcp", "section": "lan"})
 LUCI_MENU = 'for f in /usr/share/luci/menu.d/*.json; do [ -e "$f" ] && { echo "=== $f"; cat "$f"; }; done'
 LUCI_ACL = 'for f in /usr/share/rpcd/acl.d/*.json; do [ -e "$f" ] && { echo "=== $f"; cat "$f"; }; done'
+# The app's fault records (spec 7.7): one JSON line per armed fault, gone at reboot like the faults
+FAULT_RECORDS = "cat /tmp/owg/fault-*.json 2>/dev/null"
 ROOT_PASSWORD_STATE = 'awk -F: \'$1=="root"{print ($2=="" ? "none" : "set")}\' /etc/shadow'
 
 

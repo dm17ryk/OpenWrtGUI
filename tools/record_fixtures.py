@@ -11,7 +11,8 @@ taken on trust: connect with ssh once and check the fingerprint first.
 
 Sets: probe (the self-description and status probes, commands.json), wifi-parked (the Wi-Fi
 config and limits, wifi_parked.json), wifi-on (the radio while it is on air, wifi_on.json; needs
-an AP interface up on phy0), network (interfaces, DHCP, leases, routes and the switch, network.json).
+an AP interface up on phy0), network (interfaces, DHCP, leases, routes and the switch, network.json),
+firewall (fw4's config, the nft ruleset, tc, and what the router can do for faults, firewall.json).
 """
 
 from __future__ import annotations
@@ -24,9 +25,11 @@ import sys
 from pathlib import Path
 from typing import Protocol
 
+from openwrtgui.faults.commands import CAPABILITY_READS, FAMILY_CHECKS
+from openwrtgui.fw.commands import FIREWALL_READS, FW4_PRINT
 from openwrtgui.guard.audit import mask
 from openwrtgui.net.commands import network_reads
-from openwrtgui.probe.commands import DESCRIBE_COMMANDS, STATUS_COMMANDS, wireless_validate
+from openwrtgui.probe.commands import DESCRIBE_COMMANDS, FAULT_RECORDS, STATUS_COMMANDS, wireless_validate
 from openwrtgui.rf.parse import parse_station_dump
 from openwrtgui.transport.base import CommandResult
 from openwrtgui.transport.ssh import HostKeyStore, SshTransport
@@ -50,12 +53,15 @@ SETS: dict[str, tuple[str, ...]] = {
     ),
     # The Network & DHCP and Ports screens' reads (AP2's switch is switch0)
     "network": network_reads("switch0"),
+    # The Firewall screen's reads and what the router can do for faults (reads; `nft -c` commits nothing)
+    "firewall": (*FIREWALL_READS, *CAPABILITY_READS, FW4_PRINT, FAULT_RECORDS, *FAMILY_CHECKS.values()),
 }
 FILES = {
     "probe": "commands.json",
     "wifi-parked": "wifi_parked.json",
     "wifi-on": "wifi_on.json",
     "network": "network.json",
+    "firewall": "firewall.json",
 }
 _IMEI = re.compile(r"\b\d{15}\b")
 

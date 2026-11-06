@@ -183,3 +183,36 @@ def test_known_hosts_option_defaults_to_the_users_file() -> None:
 
 async def _close(self: Replay) -> None:
     return None
+
+
+NETDEV_CHECK = (
+    "nft -c -f /dev/stdin <<'OWG'\n"
+    'table netdev owgcheck { chain c { type filter hook egress device "br-lan" priority -500; } }\n'
+    "OWG"
+)
+BRIDGE_CHECK = (
+    "nft -c -f /dev/stdin <<'OWG'\n"
+    "table bridge owgcheck { chain c { type filter hook prerouting priority -300; } }\n"
+    "OWG"
+)
+
+
+def test_firewall_set_is_exactly_the_firewall_and_fault_reads() -> None:
+    """Reads only: `nft -c` is nft's check mode and commits nothing; `fw4 print` renders, never loads."""
+    assert rf.SETS["firewall"] == (
+        "uci -X show firewall",
+        "nft -j list ruleset",
+        "nft -a list ruleset",
+        'for f in /etc/nftables.d/*.nft; do [ -e "$f" ] && { echo "=== $f"; cat "$f"; }; done',
+        "ls /rom/etc/nftables.d",
+        "tc qdisc show",
+        "conntrack -L -p udp",
+        "ls /usr/lib/tc",
+        "ls /lib/modules/$(uname -r)",
+        "command -v start-stop-daemon setsid timeout tcpdump conntrack fw4",
+        "fw4 print",
+        "cat /tmp/owg/fault-*.json 2>/dev/null",
+        NETDEV_CHECK,
+        BRIDGE_CHECK,
+    )
+    assert rf.out_file(Path("tests/fixtures/ap2"), "firewall") == Path("tests/fixtures/ap2/firewall.json")
