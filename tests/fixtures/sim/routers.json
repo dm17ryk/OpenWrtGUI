@@ -6,6 +6,9 @@
     "base": "ap2",
     "overlay": "ap1.overlay.json",
     "wifi": "ap1.uci",
+    "net": "ap1.uci",
+    "leases": [["panel", "f4:12:fa:f3:57:68", "192.168.1.30"]],
+    "wifi_mirror": true,
     "auth": "key"
   },
   {
@@ -15,6 +18,7 @@
     "base": "ap2",
     "overlay": null,
     "wifi": "ap2.uci",
+    "net": "ap2.uci",
     "auth": "key"
   },
   {
@@ -24,6 +28,7 @@
     "base": "ap2",
     "overlay": "ap3.overlay.json",
     "wifi": "ap3.uci",
+    "net": "ap3.uci",
     "auth": "none"
   },
   {

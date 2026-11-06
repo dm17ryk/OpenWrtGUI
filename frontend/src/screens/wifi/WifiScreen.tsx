@@ -15,6 +15,7 @@ import { ModeCard } from './ModeCard'
 import { RadioFields } from './RadioFields'
 import { StationsTable } from './StationsTable'
 import { usePreview } from './usePreview'
+import { WhoMayJoin } from './WhoMayJoin'
 
 const BANDS: ReadonlyArray<readonly [string, string]> = [
   ['2g', '2.4 GHz'],
@@ -170,13 +171,7 @@ export function WifiScreen() {
             onResult={setResult}
             onApplied={refresh}
           />
-          <section className="card stack" aria-labelledby="who-h">
-            <div className="hrow">
-              <h2 id="who-h">Who may join</h2>
-              <Help topic={HELP.wifiWho} />
-            </div>
-            <div className="muted">Lists of allowed or blocked devices (MAC access control) come with Network &amp; DHCP.</div>
-          </section>
+          <WhoMayJoin routerId={id} />
           <StationsTable routerId={id} short={short} />
           <AllOptions key={radio.name} routerId={id} radio={radio} short={short} onApplied={refresh} />
         </>

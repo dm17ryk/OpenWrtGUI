@@ -56,11 +56,29 @@ class HostKeyStore:
                 return str(asyncssh.import_public_key(key_text).get_fingerprint("sha256"))
         return None
 
+    def key_type(self, host: str, port: int) -> str | None:
+        """The type of the key pinned for `host` (ssh-ed25519, ecdsa-sha2-nistp256, ...)."""
+        pattern = _host_pattern(host, port)
+        for line in self._lines():
+            name, _, key_text = line.partition(" ")
+            if name == pattern:
+                return key_text.split()[0]
+        return None
+
     def pin(self, host: str, port: int, info: HostKeyInfo) -> None:
         pattern = _host_pattern(host, port)
         kept = [ln for ln in self._lines() if ln.partition(" ")[0] != pattern]
         kept.append(f"{pattern} {info.public}")
         write_atomic(self.path, "\n".join(kept) + "\n")
+
+    def carry(self, old_host: str, new_host: str, port: int, actual: HostKeyInfo) -> bool:
+        """Pin `actual` for `new_host` only when it is the key pinned for `old_host`: the same router at a
+        new address. Any other key is not trusted here."""
+        pinned = self.get(old_host, port)
+        if pinned is None or pinned != actual.fingerprint:
+            return False
+        self.pin(new_host, port, actual)
+        return True
 
     def forget(self, host: str, port: int) -> None:
         pattern = _host_pattern(host, port)
@@ -68,9 +86,14 @@ class HostKeyStore:
         write_atomic(self.path, "\n".join(kept) + ("\n" if kept else ""))
 
 
-async def fetch_host_key(host: str, port: int = 22, timeout: float = 10.0) -> HostKeyInfo:
+async def fetch_host_key(
+    host: str, port: int = 22, timeout: float = 10.0, algs: Sequence[str] = ()
+) -> HostKeyInfo:
+    """The router's host key; of the types in `algs` when given (a router has several, one per type)."""
     try:
-        key = await asyncio.wait_for(asyncssh.get_server_host_key(host, port), timeout)
+        key = await asyncio.wait_for(
+            asyncssh.get_server_host_key(host, port, server_host_key_algs=list(algs) or ()), timeout
+        )
     except (OSError, TimeoutError, asyncssh.Error) as exc:
         raise Unreachable(f"{host}:{port} did not answer: {exc}") from exc
     if key is None:

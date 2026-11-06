@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import re
-import shlex
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
+
+from openwrtgui.uci import parse_uci_show as parse_uci_show  # the Wi-Fi tests import it from here
 
 _CHANNEL = re.compile(r"channel (\d+) \((\d+) MHz\)(?:, width: (\d+) MHz( \(no HT\))?)?")
 _MCS = re.compile(r"HT TX/RX MCS rate indexes supported:\s*(.+)")
@@ -35,20 +36,6 @@ class IwIface:
     phy: int
     type: str
     addr: str | None
-
-
-def parse_uci_show(text: str) -> dict[str, str]:
-    """`uci show` lines to {path: value}; a list's items are joined with spaces."""
-    out: dict[str, str] = {}
-    for line in text.splitlines():
-        path, sep, raw = line.partition("=")
-        if not sep or not path:
-            continue
-        try:
-            out[path] = " ".join(shlex.split(raw))
-        except ValueError:
-            out[path] = raw
-    return out
 
 
 def parse_iw_dev_info(text: str) -> IwDevInfo:

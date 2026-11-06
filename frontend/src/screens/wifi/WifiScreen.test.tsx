@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, expect, test, vi } from 'vitest'
 import type { WifiState } from '../../api/types'
 import { AP2 } from '../../testing/fixtures'
+import { ACCESS } from '../../testing/net'
 import { AP2_RADIO, AP2_WIFI, N20_CH6_PLAN, OPTIONS, PANEL, PROVEN } from '../../testing/wifi'
 import { WifiScreen } from './WifiScreen'
 
@@ -22,6 +23,7 @@ vi.mock('../../api/client', async (orig) => {
     if (path === '/api/routers/ap2/wifi/stations') return [PANEL]
     if (path.startsWith('/api/routers/ap2/wifi/options?')) return OPTIONS
     if (path === '/api/routers/ap2/luci/pages') return []
+    if (path === '/api/routers/ap2/network/access') return ACCESS
     if (path === '/api/routers/ap2/wifi/preview') return N20_CH6_PLAN
     if (path === '/api/routers/ap2/wifi/options/preview') return OPTIONS_PLAN
     if (path === '/api/routers/ap2/wifi/options/apply') return PROVEN
@@ -74,6 +76,15 @@ test('the screen and its sections offer help from the manual', async () => {
   expect(screen.getByText('parked')).toBeInTheDocument()
   expect(screen.getByRole('tab', { name: '2.4 GHz · radio0' })).toHaveAttribute('aria-selected', 'true')
   expect(screen.getByRole('tab', { name: '5 GHz · no radio on this router' })).toBeDisabled()
+})
+
+test('Who may join sums up each SSID and links to Wi-Fi access by MAC', async () => {
+  renderWifi()
+  const who = await screen.findByRole('region', { name: 'Who may join' })
+  expect(await within(who).findByText('Block listed · 1 device')).toBeInTheDocument()
+  expect(within(who).getByText('Everyone')).toBeInTheDocument()
+  expect(within(who).getByRole('link', { name: 'Change on Network & DHCP › Wi-Fi access by MAC' })).toHaveAttribute('href', '/routers/ap2/network#wifi-access')
+  expect(within(who).queryByText(/come with Network/)).toBeNull()
 })
 
 test('ticking modes and a channel previews the exact commands', async () => {

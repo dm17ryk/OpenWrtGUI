@@ -14,10 +14,23 @@ is connected, and how each router describes itself. It never disturbs a test run
 
 ![Dashboard: three routers, the 2.4 GHz air map and one station](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/dashboard.png)
 
-> v0.2 adds Wi-Fi: set a radio's modes, channels and TX power and see the result proven on air, watch
-> RF live, and open any LuCI page the app has no screen for yet. v0.1 laid the foundation: install,
-> update, add routers, the dashboard, Bench Guard, the terminal and the audit log. Network, firewall and
-> LTE screens follow; see the [roadmap](ROADMAP.md).
+> v0.3 adds the network: router addresses with a router-side rollback, DHCP, fixed addresses, who may join
+> each SSID, DNS, routes, and the switch's ports, VLANs and port mirror. v0.2 added Wi-Fi with proof on
+> air, RF live and the LuCI fallback; v0.1 laid the foundation: install, update, add routers, the
+> dashboard, Bench Guard, the terminal and the audit log. Firewall and LTE screens follow; see the
+> [roadmap](ROADMAP.md).
+
+## What v0.3 adds
+
+| Screen | What you get |
+|---|---|
+| **Network & DHCP** | Every interface with its protocol, address, gateway and DNS; the one carrying this app is marked. Changing an address, a bridge or a route applies with a 60 s rollback: the router puts its old settings back by itself unless the app reaches it again and confirms. The DHCP server (pool, lease time, options, IPv6), fixed addresses by MAC, active leases with **Make fixed**, DNS (forwarders, local domain, rebind protection, overrides), static routes and rules with the live routing table. |
+| **Wi-Fi access by MAC** | Per SSID: Everyone, Block listed or Only listed, and blocking one device now (no Wi-Fi restart), for 10 to 3600 s, or saved. The Wi-Fi screen sums up who may join each SSID. |
+| **Ports, VLANs, mirroring** | The front panel as printed on the case, with link and speed; turn a socket off or on (the one carrying this app's SSH is locked). The VLAN matrix (— / U / T per port, CPU last), the switch port mirror (monitor port, RX/TX sources) and the Wi-Fi mirror status. |
+
+| Network & DHCP | Ports, VLANs, mirroring |
+|---|---|
+| ![Network and DHCP](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/network.png) | ![Ports, VLANs, mirroring](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/ports.png) |
 
 ## What v0.2 adds
 

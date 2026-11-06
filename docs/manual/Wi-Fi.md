@@ -79,7 +79,9 @@ refused during a harness run.
 
 ## Who may join
 
-Lists of allowed or blocked devices (MAC access control) come with Network & DHCP.
+One line per SSID: **Everyone**, **Block listed** or **Only listed**, with how many devices are on its saved list
+(for example "Block listed · 2 devices"). The lists, and blocking one device now, for N seconds or saved, are
+changed on Network & DHCP › Wi-Fi access by MAC; the link under the summary opens it.
 
 ## All options
 

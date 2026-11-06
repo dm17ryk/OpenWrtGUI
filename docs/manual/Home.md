@@ -1,9 +1,10 @@
 # OpenWrtGUI user manual
 
 OpenWrtGUI lets you see and operate the OpenWrt routers of a Wi-Fi test bench from one Windows window,
-instead of SSH sessions. This manual covers **v0.2 (Wi-Fi and LuCI fallback)**: install, update, add
-routers, the dashboard, the [Wi-Fi](Wi-Fi) screen, [RF live](RF-live), [LuCI pages](LuCI-pages), Bench Guard,
-the terminal and the audit log. Later versions add network, firewall and LTE screens (see the
+instead of SSH sessions. This manual covers **v0.3 (Network)**: install, update, add routers, the
+dashboard, the [Wi-Fi](Wi-Fi) screen, [RF live](RF-live), [Network and DHCP](Network-and-DHCP),
+[Ports, VLANs, mirroring](Ports-and-VLANs), [LuCI pages](LuCI-pages), Bench Guard, the terminal and the audit
+log. Later versions add firewall and LTE screens (see the
 [roadmap](https://github.com/dm17ryk/OpenWrtGUI/blob/master/ROADMAP.md)).
 
 ![The dashboard with three routers](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/dashboard.png)
@@ -20,6 +21,7 @@ the terminal and the audit log. Later versions add network, firewall and LTE scr
 - [Install](Install) · [Updating](Updating)
 - [First router](First-router) · [Dashboard](Dashboard)
 - [Wi-Fi](Wi-Fi) · [RF live](RF-live) · [LuCI pages](LuCI-pages)
+- [Network and DHCP](Network-and-DHCP) · [Ports, VLANs, mirroring](Ports-and-VLANs)
 - [Bench Guard](Bench-Guard) · [Terminal and audit log](Terminal-and-audit-log) · [Settings](Settings)
 - [Troubleshooting](Troubleshooting) · [FAQ](FAQ)
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import hashlib
 from collections.abc import Awaitable, Callable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass, field
@@ -17,17 +18,16 @@ from openwrtgui.probe.status import RouterStatus, ssids_on_air
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import CommandResult, Transport, TransportError, ubus_call
 from openwrtgui.transport.pool import ConnectionPool
+from openwrtgui.uci import UciOp, drop_unchanged, render_uci
+from openwrtgui.uci import after as after_ops
 from openwrtgui.wifi.compile import (
-    UciOp,
     apply_script,
     compile_channels,
     compile_modes,
     compile_ssid,
     compile_txpower,
-    drop_unchanged,
     mask_command,
     reload_command,
-    render_uci,
     tx_mask_args,
 )
 from openwrtgui.wifi.model import CCK_BASIC_KBPS, OFDM_BASIC_KBPS, ModeSelection, RadioRequest
@@ -37,6 +37,7 @@ from openwrtgui.wifi.state import RadioState, WifiState, modes_from_uci, read_uc
 from openwrtgui.wifi.stations import Station, del_client_command, read_stations
 
 SCREEN = "Wi-Fi"
+_AUDIT_SCREEN: contextvars.ContextVar[str] = contextvars.ContextVar("wifi_audit_screen", default=SCREEN)
 NOTHING = "Nothing to apply: the router already has these settings."
 MONITOR = "owgmon0"
 SCRIPT_TIMEOUT_S = 60.0
@@ -98,24 +99,12 @@ class ApplyResult:
     error: str | None
 
 
-def _after(uci: Mapping[str, str], ops: Sequence[UciOp]) -> dict[str, str]:
-    out = dict(uci)
-    for op in ops:
-        if op.op == "set":
-            out[op.path] = op.value or ""
-        elif op.op == "delete":
-            out.pop(op.path, None)
-        else:
-            out[op.path] = f"{out.get(op.path, '')} {op.value}".strip()
-    return out
-
-
 def _mask_after(
     uci: Mapping[str, str], ops: Sequence[UciOp], radio: RadioState, modes: ModeSelection | None = None
 ) -> str | None:
     """The TX mask that goes with the radio's modes after `ops`: every reload the app makes drops the
     runtime mask, so it is set again. None for modes set outside the selector (custom)."""
-    chosen = modes or modes_from_uci(_after(uci, ops), radio.name, radio.limits.max_htmode)
+    chosen = modes or modes_from_uci(after_ops(uci, ops), radio.name, radio.limits.max_htmode)
     return None if chosen.kind == "custom" else tx_mask_args(chosen, radio.limits.mcs)
 
 
@@ -305,7 +294,7 @@ class WifiService:
         full_verify: bool,
     ) -> WifiPlan:
         ops = drop_unchanged(ops, uci)
-        after = _after(uci, ops)
+        after = after_ops(uci, ops)
         expect = _expectation(after, radio, _chosen_channels(after, radio.name))
         if not expect.radio_up:
             mask_args = None
@@ -378,15 +367,27 @@ class WifiService:
         secrets: Sequence[str] = (),
         *,
         digest: str | None = None,
+        screen: str = SCREEN,
     ) -> ApplyResult:
-        rec, t, state, uci = await self._read(router_id)
-        radio = self._radio(state, rec, radio_name)
-        plan = self._plan(rec, radio, uci, ops, secrets, _mask_after(uci, ops, radio), full_verify=False)
-        return await self._execute(rec, t, _as_previewed(rec, plan, digest))
+        """`screen` names the screen in the audit log: Network & DHCP applies its saved MAC lists here."""
+        token = _AUDIT_SCREEN.set(screen)
+        try:
+            rec, t, state, uci = await self._read(router_id)
+            radio = self._radio(state, rec, radio_name)
+            plan = self._plan(rec, radio, uci, ops, secrets, _mask_after(uci, ops, radio), full_verify=False)
+            return await self._execute(rec, t, _as_previewed(rec, plan, digest))
+        finally:
+            _AUDIT_SCREEN.reset(token)
 
     async def _run(self, t: Transport, rec: RouterRecord, command: str, **kw: Any) -> Any:
         return await run_audited(
-            t, command, router_id=rec.id, screen=SCREEN, guard=self._guard, audit=self._audit, **kw
+            t,
+            command,
+            router_id=rec.id,
+            screen=_AUDIT_SCREEN.get(),
+            guard=self._guard,
+            audit=self._audit,
+            **kw,
         )
 
     async def _execute(self, rec: RouterRecord, t: Transport, plan: WifiPlan) -> ApplyResult:
@@ -446,7 +447,7 @@ class WifiService:
         verified = error is None and not failed and any(c.ok for c in checks)
         self._audit.record(
             router=rec.id,
-            screen=SCREEN,
+            screen=_AUDIT_SCREEN.get(),
             command=f"verify {plan.radio}",
             exit_status=None,
             verify="pass" if verified else f"fail: {error or ', '.join(failed) or 'not verified'}",
