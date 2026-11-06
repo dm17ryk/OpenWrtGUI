@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
 import fnmatch
+import os
+import sys
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -13,7 +16,10 @@ import psutil
 
 from openwrtgui.store.settings import GuardWatchList
 
-ReasonKind = Literal["lock_file", "process", "router_ssid", "router_process"]
+ReasonKind = Literal["lock_file", "lock_held", "process", "router_ssid", "router_process"]
+LockProbe = Literal["absent", "present", "held", "free"]
+
+SIDECAR_SUFFIX = ".own"
 
 
 @dataclass(frozen=True)
@@ -38,6 +44,8 @@ class GuardReason:
             return f"{self.detail} started {since} (PID {self.pid})"
         if self.kind == "lock_file":
             return f"Lock file {self.detail} present since {since}"
+        if self.kind == "lock_held":
+            return f"Lock file {self.detail} held by a live run"
         if self.kind == "router_ssid":
             return f"SSID {self.detail} on air on {self.router}"
         return f"{self.detail} running on {self.router}"
@@ -86,6 +94,38 @@ def scan_processes(patterns: Sequence[str], lister: ProcessLister = psutil_liste
     return found
 
 
+def probe_lock_file(path: Path) -> LockProbe:
+    """What a watched lock file says about a run.
+
+    dima_night's sidecars (`*.own`) stay on disk between runs on purpose: a live run holds a 1-byte msvcrt
+    lock on byte 0, and Windows drops it when the process dies. A sidecar is tested by taking that lock
+    without waiting and giving it back at once; the file is only opened for reading, never written, created
+    or removed. Any other lock file (a PID file such as `voip.lock`) counts while it exists.
+    """
+    if not path.exists():
+        return "absent"
+    if path.suffix.lower() != SIDECAR_SUFFIX or sys.platform != "win32":
+        return "present"
+    import msvcrt
+
+    try:
+        fd = os.open(path, os.O_RDONLY)
+    except FileNotFoundError:
+        return "absent"
+    except OSError:
+        return "present"  # it cannot be tested: count it, as for any lock file
+    try:
+        try:
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        except OSError:
+            return "held"
+        with contextlib.suppress(OSError):  # closing the file drops the lock anyway
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        return "free"
+    finally:
+        os.close(fd)
+
+
 @dataclass
 class _RouterSigns:
     ssids: tuple[str, ...] = ()
@@ -125,13 +165,20 @@ class BenchGuard:
                         reasons.append(GuardReason("router_process", pattern, None, router_id))
         return reasons
 
-    def check_local(self) -> GuardState:
+    def _lock_reasons(self) -> list[GuardReason]:
         reasons: list[GuardReason] = []
         for lock in self.watch.lock_files if self.use_lock_files else ():
             path = Path(lock)
-            if path.exists():
+            probe = probe_lock_file(path)
+            if probe == "held":
+                reasons.append(GuardReason("lock_held", lock, None, None))
+            elif probe == "present":
                 since = datetime.fromtimestamp(path.stat().st_mtime)
                 reasons.append(GuardReason("lock_file", lock, since, None))
+        return reasons
+
+    def check_local(self) -> GuardState:
+        reasons = self._lock_reasons()
         reasons.extend(scan_processes(self.watch.processes, self.lister))
         reasons.extend(self._router_reasons())
         self._state = GuardState(bool(reasons), tuple(reasons), self.clock())

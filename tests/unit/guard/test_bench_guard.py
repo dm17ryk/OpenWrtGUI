@@ -27,8 +27,8 @@ def no_processes() -> list[ProcessInfo]:
 
 
 def test_lock_file_makes_guard_live(tmp_path: Path) -> None:
-    lock = tmp_path / "voip.lock.own"
-    lock.write_text("", encoding="utf-8")
+    lock = tmp_path / "voip.lock"  # a PID file counts while it exists; `*.own` sidecars: test_lock_sidecar.py
+    lock.write_text("18244", encoding="utf-8")
     g = BenchGuard(watch(lock_files=[str(lock)]), lister=no_processes)
     state = g.check_local()
     assert state.live
