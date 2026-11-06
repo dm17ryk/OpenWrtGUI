@@ -103,9 +103,9 @@ export function CustomTab({ routerId, short, state, onApplied }: Props) {
               Cancel
             </button>
           </div>
-          <NetChange change={change} short={short} helpTopic={HELP.fwCustom} show={body !== null} />
         </fieldset>
       )}
+      <NetChange change={change} short={short} helpTopic={HELP.fwCustom} show={body !== null} />
     </section>
   )
 }

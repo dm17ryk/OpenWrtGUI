@@ -3,11 +3,22 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, expect, test, vi } from 'vitest'
-import type { FirewallState, GuardOut } from '../../api/types'
+import type { FirewallState, GuardOut, NetApplyResult } from '../../api/types'
 import { AP1 } from '../../testing/fixtures'
 import { AP1_FW, AP1_RULESET, CUSTOM_PLAN, RULE_ADD_PLAN, TABLE_ADD_PLAN, TABLE_EDIT_PLAN } from '../../testing/fw'
 import { FirewallScreen } from './FirewallScreen'
 
+const CONFIRMED: NetApplyResult = {
+  router_id: 'ap1',
+  applied: true,
+  verified: true,
+  error: null,
+  host: null,
+  checks: [
+    { name: 'reconnected', ok: true, detail: 'AP1 · bench answered at 192.168.1.1' },
+    { name: 'confirmed', ok: true, detail: 'the router keeps the change' },
+  ],
+}
 const CLEAR: GuardOut = { live: false, reasons: [], checked_at: '2026-11-06T21:00:00' }
 const LIVE: GuardOut = {
   live: true,
@@ -31,6 +42,7 @@ vi.mock('../../api/client', async (orig) => {
     if (path === '/api/routers/ap1/firewall/rules/preview') return RULE_ADD_PLAN
     if (path === '/api/routers/ap1/firewall/custom/preview') return CUSTOM_PLAN
     if (path === '/api/routers/ap1/firewall/tables/preview') return (body as { action: string }).action === 'add' ? TABLE_ADD_PLAN : TABLE_EDIT_PLAN
+    if (path.endsWith('/apply')) return CONFIRMED
     throw new Error(`unexpected ${path}`)
   }
   return {
@@ -187,4 +199,37 @@ test('the raw ruleset shows the text and Copy puts it on the clipboard', async (
   await user.click(screen.getByRole('button', { name: 'Copy' }))
   expect(await navigator.clipboard.readText()).toBe(AP1_RULESET)
   expect(screen.getByRole('button', { name: 'Help: Raw ruleset' })).toBeInTheDocument()
+})
+
+test('the result of a table edit, a new table and a rules file stays after Apply', async () => {
+  const user = renderTab('tables')
+  const tables = await screen.findByRole('table', { name: 'nftables tables' })
+  await user.click(within(within(tables).getByRole('row', { name: /bridge voipdscp/ })).getByRole('button', { name: 'Unlock…' }))
+  await user.click(within(screen.getByRole('group', { name: 'Unlock bridge voipdscp?' })).getByRole('button', { name: 'Unlock' }))
+  const editor = await screen.findByRole('group', { name: 'Table bridge voipdscp' })
+  await user.click(within(within(editor).getAllByRole('row')[1]).getByRole('button', { name: 'Delete' }))
+  await screen.findByRole('region', { name: 'Command preview' })
+  await user.click(screen.getByRole('button', { name: /^Apply/ }))
+  expect(await screen.findByText('Applied and confirmed')).toBeInTheDocument()
+  // the table stays unlocked and open for the next edit
+  expect(screen.getByRole('group', { name: 'Table bridge voipdscp' })).toBeInTheDocument()
+
+  await user.click(screen.getByRole('button', { name: '+ Add table' }))
+  await user.type(within(screen.getByRole('group', { name: 'New table' })).getByLabelText('Name'), 'test')
+  await screen.findByRole('region', { name: 'Command preview' })
+  await user.click(screen.getByRole('button', { name: /^Apply/ }))
+  await vi.waitFor(() => expect(screen.queryByRole('group', { name: 'New table' })).toBeNull())
+  // the edit's result and the new table's
+  expect(screen.getAllByText('Applied and confirmed')).toHaveLength(2)
+})
+
+test('the result of a rules file Apply stays after the editor closes', async () => {
+  const user = renderTab('custom')
+  const row = within(await screen.findByRole('table', { name: 'Custom rules files' })).getByRole('row', { name: /10-custom-filter-chains/ })
+  await user.click(within(row).getByRole('button', { name: 'Edit' }))
+  await user.type(screen.getByRole('textbox', { name: 'Rules in 10-custom-filter-chains' }), '# more')
+  await screen.findByRole('region', { name: 'Command preview' })
+  await user.click(screen.getByRole('button', { name: /^Apply/ }))
+  await vi.waitFor(() => expect(screen.queryByRole('group', { name: 'File 10-custom-filter-chains' })).toBeNull())
+  expect(screen.getByText('Applied and confirmed')).toBeInTheDocument()
 })

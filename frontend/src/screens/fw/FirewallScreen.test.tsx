@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, expect, test, vi } from 'vitest'
-import type { FirewallState } from '../../api/types'
+import type { FirewallState, NetApplyResult } from '../../api/types'
 import { AP1 } from '../../testing/fixtures'
 import { AP1_FW, LAN_BLOCK_PLAN, NOT_FW4, WAN_ALLOW_PLAN, ZONE_PLAN } from '../../testing/fw'
 import { AP2_NET } from '../../testing/net'
@@ -12,6 +12,9 @@ import { FirewallScreen } from './FirewallScreen'
 const calls: Array<{ path: string; body: unknown }> = []
 let fw: FirewallState = AP1_FW
 let guardLive = false
+let modelApplies = 0
+const CONFIRMED: NetApplyResult = { router_id: 'ap1', applied: true, verified: true, error: null, host: null, checks: [{ name: 'confirmed', ok: true, detail: 'the router keeps the change' }] }
+const NOT_APPLIED: NetApplyResult = { router_id: 'ap1', applied: false, verified: false, error: 'The router restored its previous firewall.', host: null, checks: [{ name: 'restored', ok: true, detail: 'as before' }] }
 
 vi.mock('../../api/client', async (orig) => {
   const actual = await orig<typeof import('../../api/client')>()
@@ -27,9 +30,11 @@ vi.mock('../../api/client', async (orig) => {
     }
     if (path === '/api/routers/ap1/firewall/model/apply') {
       if (guardLive) throw new actual.ApiError(423, 'dima_night.py started 21:04 (PID 18244)', {})
-      throw new Error('apply not expected')
+      modelApplies += 1
+      return modelApplies === 1 ? NOT_APPLIED : new Promise(() => {}) // the second one is still waiting
     }
     if (path === '/api/routers/ap1/firewall/zones/preview') return ZONE_PLAN
+    if (path === '/api/routers/ap1/firewall/zones/apply') return CONFIRMED
     throw new Error(`unexpected ${path}`)
   }
   return {
@@ -43,6 +48,7 @@ beforeEach(() => {
   calls.length = 0
   fw = AP1_FW
   guardLive = false
+  modelApplies = 0
 })
 
 function renderFirewall(at = '/routers/ap1/firewall') {
@@ -168,4 +174,26 @@ test('help buttons are next to the heading and the cards', async () => {
   for (const name of ['Help: Firewall', 'Help: Filtering model', 'Help: Zones']) {
     expect(screen.getByRole('button', { name })).toBeInTheDocument()
   }
+})
+
+test('a zone edit Apply shows its result after the editor closes', async () => {
+  const user = renderFirewall()
+  const zones = await screen.findByRole('table', { name: 'Zones' })
+  await user.click(within(within(zones).getByRole('row', { name: /^wan/ })).getByRole('button', { name: 'Edit' }))
+  await user.click(within(screen.getByRole('group', { name: 'Zone wan' })).getByRole('checkbox', { name: 'Masquerade' }))
+  await screen.findByRole('region', { name: 'Command preview' })
+  await user.click(screen.getByRole('button', { name: /^Apply/ }))
+  await vi.waitFor(() => expect(screen.queryByRole('group', { name: 'Zone wan' })).toBeNull())
+  expect(screen.getByText('Applied and confirmed')).toBeInTheDocument()
+})
+
+test('a new Apply hides the last result while it runs', async () => {
+  const user = renderFirewall()
+  await user.click(within(await cell('wan To this router')).getByRole('button', { name: 'Allow all' }))
+  await screen.findByRole('region', { name: 'Command preview' })
+  await user.click(screen.getByRole('button', { name: 'Apply with rollback' }))
+  expect(await screen.findByText(/^Not applied/)).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Apply with rollback' }))
+  expect(screen.queryByText(/^Not applied/)).toBeNull()
+  expect(screen.getByRole('button', { name: 'Applying…' })).toBeDisabled()
 })

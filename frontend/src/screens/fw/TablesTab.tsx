@@ -96,7 +96,8 @@ export function TablesTab({ routerId, short, state, unlocked, onUnlock, onLock, 
   })()
   const addBody: TableIn | null = add && add.name.trim() ? { action: 'add', family: add.family, name: add.name.trim(), keep: add.keep } : null
   const changeEdit = usePlanApply(`/api/routers/${routerId}/firewall/tables`, editBody, () => {
-    setEdit(null)
+    // an edited table stays open (and unlocked) for the next change; a deleted one is gone
+    setEdit(edit && !edit.remove ? { ...edit, rows: null, chains: [], keep: 'runtime' } : null)
     onApplied()
   })
   const changeAdd = usePlanApply(`/api/routers/${routerId}/firewall/tables`, addBody, () => {
@@ -332,9 +333,9 @@ export function TablesTab({ routerId, short, state, unlocked, onUnlock, onLock, 
             <KeepSeg keep={edit.keep} onChange={(keep) => setEdit({ ...edit, keep })} />
             <span className="muted small">{keepHint(open, edit.keep)}</span>
           </div>
-          <NetChange change={changeEdit} short={short} helpTopic={HELP.fwTables} show={editBody !== null} />
         </fieldset>
       )}
+      <NetChange change={changeEdit} short={short} helpTopic={HELP.fwTables} show={editBody !== null} />
       {add && (
         <fieldset className="stack editor" aria-label="New table">
           <legend>New table</legend>
@@ -356,9 +357,9 @@ export function TablesTab({ routerId, short, state, unlocked, onUnlock, onLock, 
             <span>Keep the change</span>
             <KeepSeg keep={add.keep} onChange={(keep) => setAdd({ ...add, keep })} />
           </div>
-          <NetChange change={changeAdd} short={short} helpTopic={HELP.fwTables} show={addBody !== null} />
         </fieldset>
       )}
+      <NetChange change={changeAdd} short={short} helpTopic={HELP.fwTables} show={addBody !== null} />
     </section>
   )
 }

@@ -208,9 +208,9 @@ export function ZonesTab({ routerId, short, state, onApplied }: Props) {
               </button>
             </div>
           </div>
-          <NetChange change={change} short={short} helpTopic={HELP.fwZones} show={body !== null} />
         </fieldset>
       )}
+      <NetChange change={change} short={short} helpTopic={HELP.fwZones} show={body !== null} />
     </section>
   )
 }

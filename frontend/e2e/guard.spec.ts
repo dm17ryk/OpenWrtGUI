@@ -50,3 +50,25 @@ test('the terminal refuses writes during a run', async ({ page }) => {
   await page.getByRole('button', { name: 'Run', exact: true }).click()
   await expect(page.getByText(/only read-only commands run during a harness run/).last()).toBeVisible()
 })
+
+test('a Firewall Apply is refused during a run and nothing unlocks', async ({ page }) => {
+  await open(page, '/routers/ap2/firewall')
+  const model = page.getByRole('region', { name: 'Filtering model' })
+  await page.getByRole('group', { name: 'wan To this router' }).getByRole('button', { name: 'Allow all' }).click()
+  await expect(model.getByRole('region', { name: 'Command preview' })).toContainText("input='ACCEPT'")
+  await model.getByRole('button', { name: 'Apply with rollback', exact: true }).click()
+  await expect(model.getByRole('alert')).toContainText('dima_night.py started 21:04 (PID 18244)')
+  await page.getByRole('tab', { name: 'All nftables tables' }).click()
+  await expect(page.getByRole('button', { name: '+ Add table' })).toBeDisabled()
+})
+
+test('arming a fault is refused during a run', async ({ page }) => {
+  await open(page, '/routers/ap1/faults')
+  await page.getByRole('button', { name: /^panel · 192\.168\.1\.30/ }).click()
+  await page.getByRole('article', { name: 'Isolate' }).getByRole('button', { name: 'Isolate target' }).click()
+  const run = page.getByRole('region', { name: /Will run on AP1/ })
+  await expect(run.getByRole('region', { name: 'Command preview' })).toContainText('benchfault')
+  await run.getByRole('button', { name: 'Arm', exact: true }).click()
+  await expect(run.getByRole('alert')).toContainText('dima_night.py started 21:04 (PID 18244)')
+  await expect(page.getByText('nothing armed')).toBeVisible()
+})

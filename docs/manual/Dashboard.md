@@ -40,6 +40,10 @@ A card lists model and firmware, then:
 - **Network**: LAN address and whether this router runs the DHCP server.
 - **Login**: "app key · host key pinned" when all is set.
 
+When the app has faults armed on a router, the card also shows **N faults armed**, which opens
+[Faults and capture](Faults-and-capture). The count comes from the fault records on the router, so it stays
+right after the app restarts.
+
 **Open** goes to the router's overview; **Terminal** opens a shell on it.
 
 ## Needs attention
@@ -64,5 +68,6 @@ internal switch port with its printed label and the label saved for this router.
 it all once more; **Open terminal** opens a shell on the router.
 
 The row of buttons under the title opens the router's other screens: [Wi-Fi](Wi-Fi), RF live,
-[Network & DHCP](Network-and-DHCP), [Ports & VLANs](Ports-and-VLANs) and the terminal, then every LuCI page
+[Network & DHCP](Network-and-DHCP), [Ports & VLANs](Ports-and-VLANs), [Firewall](Firewall),
+[Faults & capture](Faults-and-capture) and the terminal, then every LuCI page
 that has no screen in the app yet.

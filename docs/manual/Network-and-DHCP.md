@@ -9,7 +9,8 @@ app reports it done only once the router proves it.
 ## Router addresses
 
 Every interface the router has (lan, wan, lte, VLAN interfaces), with its protocol, address, gateway and DNS,
-and whether it is up. The one this app talks to the router through is marked **this app's connection**.
+and whether it is up (with how long, for example **up · 2 h 14 min**). The one this app talks to the router
+through is marked **this app's connection**.
 Interfaces the router makes by itself while running (such as `lte_4`, made by `lte`) are listed read-only.
 
 **Edit** opens the interface: choose its protocol (Static, DHCP client, No address, and whatever else the router
@@ -18,8 +19,8 @@ prefix, for example `192.168.1.2/24`: a bare address means /32 on this firmware,
 bridge (`br-lan`) you also choose its members. **Show all options** lists every other option the router's own
 protocol list knows, so a protocol a newer image brings is editable at once.
 
-**+ Interface** adds one (name, protocol, device). Put a new interface in a firewall zone afterwards: Firewall
-comes with v0.4; until then use LuCI › Network › Firewall.
+**+ Interface** adds one (name, protocol, device). Put a new interface in a firewall zone afterwards: the
+preview links the [Firewall](Firewall#zones) screen's Zones.
 
 ## Rollback
 
@@ -36,7 +37,8 @@ route, otherwise the change rolls back. The app refuses to delete that interface
 away (DHCP client, No address), since it would have no address to reconnect to.
 
 If a harness run starts while a change waits for its confirm, the app still confirms it and says so: a rollback
-during the run would be a second change.
+during the run would be a second change. While the app waits for the router, the card says "Applying with a 60 s rollback:
+waiting for … to answer". [Firewall](Firewall) changes apply the same way.
 
 ## DHCP server
 
