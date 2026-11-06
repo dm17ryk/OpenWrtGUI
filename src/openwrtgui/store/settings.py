@@ -38,6 +38,15 @@ class KnownTable(BaseModel):
     depends: str
 
 
+class KnownDevice(BaseModel):
+    """A device by name and its MACs (spec 7.12): the panel's Ethernet and Wi-Fi MACs are unrelated."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    macs: list[str]
+
+
 DEFAULT_KNOWN_TABLES = (
     KnownTable(
         match="inet fw4 chain BENCHSIPGUARD",
@@ -66,6 +75,7 @@ class Settings(BaseModel):
     audit_retention_days: Literal[30, 90, 365, 0] = 90
     guard: GuardWatchList = Field(default_factory=GuardWatchList)
     known_tables: list[KnownTable] = Field(default_factory=lambda: list(DEFAULT_KNOWN_TABLES))
+    known_devices: list[KnownDevice] = Field(default_factory=list)
 
 
 class SettingsStore:
