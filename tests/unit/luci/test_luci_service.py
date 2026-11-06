@@ -95,7 +95,7 @@ async def test_pages_list_with_native_marks(env: Env) -> None:
     assert (
         pages["admin/network/wireless"].native == "wifi" and pages["admin/network/dhcp"].native == "network"
     )
-    assert pages["admin/network/firewall/zones"].native is None
+    assert pages["admin/network/firewall/zones"].native == "firewall"  # native since v0.4
 
 
 async def test_open_and_close_record_changes(env: Env) -> None:
