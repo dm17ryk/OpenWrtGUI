@@ -9,6 +9,7 @@ import { PreviewApply } from '../../components/PreviewApply'
 import { usePlanApply } from '../../components/usePlanApply'
 import { HELP } from '../../help/topics'
 import { interfaceDraft, interfaceRequest } from './draft'
+import { RollbackWait } from './NetChange'
 import { words } from './rows'
 
 type Props = {
@@ -115,11 +116,7 @@ export function InterfaceEditor({ routerId, routerName, host, view, state, onApp
             onApply={() => void change.apply()}
             helpTopic={HELP.netRollback}
           />
-          {change.isBusy && (
-            <div className="note" role="status">
-              Applying with a 60 s rollback: waiting for {routerName} to answer at {target}…
-            </div>
-          )}
+          {change.isBusy && <RollbackWait router={routerName} target={target} />}
           {change.result && (
             <div className="stack" style={{ gap: 8 }}>
               <CheckList result={change.result} provenText="Applied and confirmed" />

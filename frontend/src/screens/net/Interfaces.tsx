@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router'
 import type { InterfaceIn, InterfaceView, NetApplyResult, NetworkState } from '../../api/types'
 import { CheckList } from '../../components/CheckList'
 import { PreviewApply } from '../../components/PreviewApply'
@@ -6,6 +7,8 @@ import { usePlanApply } from '../../components/usePlanApply'
 import { Help } from '../../help/Help'
 import { HELP } from '../../help/topics'
 import { InterfaceEditor } from './InterfaceEditor'
+import { RollbackWait } from './NetChange'
+import { uptimeText } from './rows'
 
 type Props = { routerId: string; routerName: string; host: string; state: NetworkState; onApplied: () => void }
 
@@ -16,7 +19,10 @@ function address(v: InterfaceView): string {
   return a ? `${a.ip}/${a.prefix}` : '—'
 }
 
-function NewInterface({ routerId, state, onApplied }: { routerId: string; state: NetworkState; onApplied: (r: NetApplyResult) => void }) {
+// net/interfaces.py: a new interface still needs a firewall zone, which the Firewall screen sets
+const ZONE_NOTE = /^Put (\S+) in a firewall zone on the Firewall screen \(Zones\)\.$/
+
+function NewInterface({ routerId, routerName, state, onApplied }: { routerId: string; routerName: string; state: NetworkState; onApplied: (r: NetApplyResult) => void }) {
   const [draft, setDraft] = useState({ name: '', proto: 'static', device: '', address: '' })
   const body: InterfaceIn | null = draft.name
     ? {
@@ -28,6 +34,8 @@ function NewInterface({ routerId, state, onApplied }: { routerId: string; state:
       }
     : null
   const change = usePlanApply(`/api/routers/${routerId}/network/interfaces`, body, onApplied)
+  const warnings = body ? (change.plan?.warnings ?? []) : []
+  const zoneNote = warnings.map((w) => ZONE_NOTE.exec(w)?.[1]).find(Boolean)
   return (
     <div className="card stack" aria-label="New interface">
       <div className="grid">
@@ -56,11 +64,16 @@ function NewInterface({ routerId, state, onApplied }: { routerId: string; state:
           </label>
         )}
       </div>
+      {zoneNote && (
+        <div className="note w">
+          Put {zoneNote} in a firewall zone on the <Link to={`/routers/${routerId}/firewall?tab=zones`}>Firewall screen (Zones)</Link>.
+        </div>
+      )}
       {body && (
         <PreviewApply
           heading="Commands that will run"
           lines={change.plan?.lines ?? []}
-          warnings={change.plan?.warnings ?? []}
+          warnings={warnings.filter((w) => !ZONE_NOTE.test(w))}
           error={change.error}
           isBusy={change.isBusy}
           applyLabel="Add with rollback"
@@ -68,6 +81,7 @@ function NewInterface({ routerId, state, onApplied }: { routerId: string; state:
           helpTopic={HELP.netRollback}
         />
       )}
+      {body && change.isBusy && <RollbackWait router={routerName} target={change.plan?.target_host ?? null} />}
       {change.result && <CheckList result={change.result} provenText="Applied and confirmed" />}
     </div>
   )
@@ -122,7 +136,9 @@ export function Interfaces({ routerId, routerName, host, state, onApplied }: Pro
                     {v.dynamic_parent ? (
                       <span className="muted">made by {v.dynamic_parent} at run time</span>
                     ) : (
-                      <span className={v.live?.up ? 'b air' : 'b park'}>{v.live?.up ? 'up' : 'down'}</span>
+                      <span className={v.live?.up ? 'b air' : 'b park'}>
+                        {v.live?.up ? (v.live.uptime_s != null ? `up · ${uptimeText(v.live.uptime_s)}` : 'up') : 'down'}
+                      </span>
                     )}
                   </td>
                   <td>
@@ -138,7 +154,7 @@ export function Interfaces({ routerId, routerName, host, state, onApplied }: Pro
           </tbody>
         </table>
       </div>
-      {adding && <NewInterface routerId={routerId} state={state} onApplied={onApplied} />}
+      {adding && <NewInterface routerId={routerId} routerName={routerName} state={state} onApplied={onApplied} />}
       {open && <InterfaceEditor key={editing} routerId={routerId} routerName={routerName} host={host} view={open} state={state} onApplied={onApplied} />}
     </section>
   )

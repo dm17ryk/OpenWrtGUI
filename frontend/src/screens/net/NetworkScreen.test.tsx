@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { AP2 } from '../../testing/fixtures'
-import { AP2_NET, LAN_12_DONE, LAN_12_PLAN, LAN_OPTIONS } from '../../testing/net'
+import { ADD_IOT_PLAN, AP2_NET, LAN_12_DONE, LAN_12_PLAN, LAN_OPTIONS } from '../../testing/net'
 import { NetworkScreen } from './NetworkScreen'
 
 const calls: Array<{ path: string; body: unknown }> = []
@@ -23,6 +23,7 @@ vi.mock('../../api/client', async (orig) => {
     if (path === '/api/routers/ap2/network/routes/live') return { routes: [], rules: [], raw: null }
     if (path.endsWith('/preview')) {
       if (refuse) throw new actual.ApiError(refuse.status, refuse.detail, {})
+      if ((body as { create?: boolean }).create) return ADD_IOT_PLAN
       return LAN_12_PLAN
     }
     if (path === '/api/routers/ap2/network/interfaces/apply') {
@@ -113,4 +114,21 @@ test('All options come from the router and feed the same preview', async () => {
   await screen.findByRole('region', { name: 'Command preview' })
   const body = calls.filter((c) => c.path.endsWith('/interfaces/preview')).at(-1)?.body
   expect(body).toEqual({ name: 'lan', edits: [{ section: 'lan', name: 'ip6addr', value: 'fd00::1/64' }] })
+})
+
+test('the State column shows how long an interface has been up', async () => {
+  renderNetwork()
+  const table = await screen.findByRole('table', { name: 'Router addresses' })
+  expect(within(within(table).getByRole('row', { name: /^lan/ })).getByText('up · 20 d 16 h')).toBeInTheDocument()
+  expect(within(within(table).getByRole('row', { name: /^wan/ })).getByText('down')).toBeInTheDocument()
+})
+
+test('a new interface points to the Firewall zones for its zone', async () => {
+  const user = userEvent.setup()
+  renderNetwork()
+  await user.click(await screen.findByRole('button', { name: '+ Interface' }))
+  await user.type(screen.getByRole('textbox', { name: 'New interface name' }), 'iot')
+  const link = await screen.findByRole('link', { name: 'Firewall screen (Zones)' })
+  expect(link).toHaveAttribute('href', '/routers/ap2/firewall?tab=zones')
+  expect(link.closest('.note')).toHaveTextContent('Put iot in a firewall zone on the Firewall screen (Zones).')
 })

@@ -40,6 +40,7 @@ vi.mock('../../api/client', async (orig) => {
       return PLANS[card]
     }
     if (path === '/api/routers/ap2/network/hosts/apply') return NOT_APPLIED
+    if (path === '/api/routers/ap2/network/routes/apply') return new Promise(() => {}) // still waiting for the router
     throw new Error(`unexpected ${path}`)
   }
   return {
@@ -154,4 +155,16 @@ test('the live routing table shows the main table', async () => {
   const row = within(live).getByRole('row', { name: /192\.168\.1\.0\/24/ })
   expect(row).toHaveTextContent('br-lan')
   expect(within(live).queryByText('fd12:3456::/64')).toBeNull()
+})
+
+test('a routes apply says it is waiting for the router while the rollback runs', async () => {
+  const user = renderNetwork()
+  const card = await screen.findByRole('region', { name: 'Static routes and rules' })
+  await user.click(within(card).getByRole('button', { name: '+ Route' }))
+  await user.type(within(card).getByRole('textbox', { name: 'Target of new route 1' }), '10.8.0.0/24')
+  await within(card).findByText(/Applies with a 60 s rollback/)
+  await user.click(within(card).getByRole('button', { name: 'Apply with rollback' }))
+  expect(await within(card).findByRole('status', { name: 'Waiting for the router' })).toHaveTextContent(
+    'Applying with a 60 s rollback: waiting for AP2 to answer at 192.168.1.2…',
+  )
 })

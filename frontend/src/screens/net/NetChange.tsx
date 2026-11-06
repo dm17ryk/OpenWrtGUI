@@ -3,6 +3,15 @@ import { PreviewApply } from '../../components/PreviewApply'
 import type { PlanApply } from '../../components/usePlanApply'
 import { HELP } from '../../help/topics'
 
+/** While a change with rollback applies: the app reconnects and confirms, or the router restores itself. */
+export function RollbackWait({ router, target }: { router: string; target: string | null }) {
+  return (
+    <div className="note" role="status" aria-label="Waiting for the router">
+      Applying with a 60 s rollback: waiting for {router} to answer{target ? ` at ${target}` : ''}…
+    </div>
+  )
+}
+
 type Props = { change: PlanApply; short: string; helpTopic: string; show: boolean; applyLabel?: string; provenText?: string }
 
 /**
@@ -27,6 +36,7 @@ export function NetChange({ change, short, helpTopic, show, applyLabel, provenTe
           helpTopic={rollback ? HELP.netRollback : helpTopic}
         />
       )}
+      {show && rollback && change.isBusy && <RollbackWait router={short} target={change.plan?.target_host ?? null} />}
       {change.result && <CheckList result={change.result} provenText={provenText ?? (confirmed ? 'Applied and confirmed' : 'Applied and checked')} />}
     </div>
   )

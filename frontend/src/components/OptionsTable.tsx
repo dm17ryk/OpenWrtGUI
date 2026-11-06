@@ -11,7 +11,8 @@ function valueText(v: OptionRow['value']): string {
 
 function Editor({ row, edit, onEdit }: { row: OptionRow; edit: string | undefined; onEdit: (value: string) => void }) {
   const current = edit ?? valueText(row.value)
-  if (row.editor === 'readonly') return <span className="mono">{current || '—'}</span>
+  // an option with its own control above is changed there (#26: the backend refuses it here)
+  if (row.editor === 'readonly' || row.control) return <span className="mono">{current || '—'}</span>
   if (row.editor === 'switch') {
     return (
       <select className="in" aria-label={row.name} value={current} onChange={(e) => onEdit(e.target.value)}>

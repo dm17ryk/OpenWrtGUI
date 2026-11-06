@@ -132,6 +132,15 @@ export const ROUTE_PLAN = plan(
   true,
 )
 
+export const ADD_IOT_PLAN = plan(
+  ["ubus call session create '{\"timeout\":300}'", 'set -e', `uci -P ${SESSION} set network.iot='interface'`],
+  [
+    'Put iot in a firewall zone on the Firewall screen (Zones).',
+    'Applies with a 60 s rollback: if the app cannot reach AP2 · office at 192.168.1.2 again and confirm, the router restores its previous network settings by itself.',
+  ],
+  true,
+)
+
 /** Two SSIDs (made up): one on air for everyone, one parked that blocks a listed device. */
 export const ACCESS: AccessState = {
   ssids: [
