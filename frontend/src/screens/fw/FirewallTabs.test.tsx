@@ -202,6 +202,26 @@ test('+ Add table previews the new owg_ table', async () => {
   expect(lastBody('tables')).toEqual({ action: 'add', family: 'inet', name: 'test', keep: 'runtime' })
 })
 
+test('benchfault is left to the Faults screen; a table the app added is edited here', async () => {
+  // an edit of benchfault would leave the fault records and their timers on chains that changed
+  fw = {
+    ...AP1_FW,
+    objects: [
+      ...AP1_FW.objects,
+      { key: 'netdev benchfault', family: 'netdev', table: 'benchfault', chain: null, owner: 'app', writer: 'this app', depends: null, rules: 2 },
+      { key: 'inet owg_test', family: 'inet', table: 'owg_test', chain: null, owner: 'app', writer: 'this app', depends: null, rules: 1 },
+    ],
+  }
+  renderTab('tables')
+  const tables = await screen.findByRole('table', { name: 'nftables tables' })
+  const bench = within(tables).getByRole('row', { name: /netdev benchfault/ })
+  expect(within(bench).getByRole('link', { name: 'Open faults' })).toHaveAttribute('href', '/routers/ap1/faults')
+  expect(within(bench).queryByRole('button', { name: 'Edit' })).toBeNull()
+  const own = within(tables).getByRole('row', { name: /inet owg_test/ })
+  expect(within(own).getByRole('button', { name: 'Edit' })).toBeEnabled()
+  expect(within(own).queryByRole('link', { name: 'Open faults' })).toBeNull()
+})
+
 test('while Bench Guard is live nothing unlocks', async () => {
   guard = LIVE
   renderTab('tables')

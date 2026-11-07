@@ -10,6 +10,8 @@ from fwenv import FwEnv
 
 from openwrtgui.capture.service import CaptureRequest, CaptureService, capture_command
 from openwrtgui.capture.wireshark import find_wireshark
+from openwrtgui.transport.base import TransportError
+from openwrtgui.transport.fake import BytesStream, ReplayTransport
 
 PCAP_MAGIC = bytes.fromhex("d4c3b2a1")
 
@@ -121,6 +123,75 @@ async def test_mon0_created_and_removed(env: FwEnv, tmp_path: Path) -> None:
     assert lines.index("iw dev owgmon0 del") > next(
         i for i, line in enumerate(lines) if line.startswith("capture owgmon0")
     )
+
+
+class _HeldStream:
+    """A capture that runs until the test ends it."""
+
+    exit_status: int | None = 124
+    stderr = ""
+
+    def __init__(self) -> None:
+        self.ended = asyncio.Event()
+
+    async def read(self, n: int) -> bytes:
+        await self.ended.wait()
+        return b""
+
+    async def close(self) -> None:
+        self.ended.set()
+
+
+async def test_mon0_writes_wait_for_the_router_write_lock(
+    env: FwEnv, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # a Wi-Fi or firewall apply in flight holds it: the monitor interface must not interleave with it
+    held = _HeldStream()
+
+    async def stream(self: ReplayTransport, command: str) -> _HeldStream:
+        return held
+
+    monkeypatch.setattr(ReplayTransport, "stream", stream)
+    service = _captures(env, tmp_path)
+    lock = env.pool.write_lock("ap1")
+    async with lock:
+        start = asyncio.create_task(service.start("ap1", CaptureRequest("mon0", "", 3)))
+        for _ in range(50):
+            await asyncio.sleep(0)
+        assert not any("interface add owgmon0" in line for line in env.audit_lines())
+    view = await start
+    async with lock:
+        held.ended.set()
+        for _ in range(50):
+            await asyncio.sleep(0)
+        assert "iw dev owgmon0 del" not in env.audit_lines()
+    await _done(service, view.id)
+    assert "iw dev owgmon0 del" in env.audit_lines()
+
+
+async def test_a_capture_that_cannot_start_leaves_nothing(
+    env: FwEnv, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def refused(self: ReplayTransport, command: str) -> BytesStream:
+        raise TransportError("SSH channel open failed")
+
+    monkeypatch.setattr(ReplayTransport, "stream", refused)
+    service = _captures(env, tmp_path)
+    with pytest.raises(TransportError):
+        await service.start("ap1", CaptureRequest("mon0", "", 3))
+    assert "iw dev owgmon0 del" in env.audit_lines()  # the monitor interface it made is gone again
+    folder = tmp_path / "Documents" / "OpenWrtGUI" / "captures"
+    assert not folder.exists() or not list(folder.iterdir())  # no empty .pcap, no open file
+
+
+async def test_captures_in_the_same_second_keep_both_files(env: FwEnv, tmp_path: Path) -> None:
+    service = _captures(env, tmp_path)  # the simulated clock does not move between them
+    first = await service.start("ap1", CaptureRequest("br-lan", "", 3))
+    await _done(service, first.id)
+    second = await service.start("ap1", CaptureRequest("br-lan", "", 3))
+    await _done(service, second.id)
+    paths = {v.path for v in service.list("ap1")}
+    assert len(paths) == 2 and all(p is not None and Path(p).stat().st_size for p in paths)
 
 
 async def test_stops_at_size_cap(env: FwEnv, tmp_path: Path) -> None:

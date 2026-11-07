@@ -42,6 +42,9 @@ def test_l3_rtp_in_netdev_plan() -> None:
     assert c.clear == (
         "nft flush chain netdev benchfault fa1b2c3_to",
         "nft delete chain netdev benchfault fa1b2c3_to",
+        # the last fault to go takes the table with it, so `nft list tables` is as before
+        "nft list table netdev benchfault 2>/dev/null | grep -q chain "
+        "|| nft delete table netdev benchfault 2>/dev/null",
     )
 
 
@@ -55,10 +58,12 @@ def test_full_loss_is_a_plain_drop_and_flows_match_as_specified() -> None:
         in nft
     )
     sip = _compile(FaultRequest("block", REF, flow="sip_in")).nft
-    assert any(
-        "ip daddr 192.168.1.30 meta l4proto { tcp, udp } th sport { 5060, 5061 } counter drop" in s
-        for s in sip
-    )
+    # a server's requests come from 5060 or 5061; a peer's come from any port to the panel's 5060 or 5061
+    for port in ("sport", "dport"):
+        assert any(
+            f"ip daddr 192.168.1.30 meta l4proto {{ tcp, udp }} th {port} {{ 5060, 5061 }} counter drop" in s
+            for s in sip
+        )
     out = _compile(FaultRequest("block", REF, flow="rtp_out", loss=50), rtp=(4000, 4002)).nft
     assert any(
         "ip saddr 192.168.1.30 udp sport { 4000, 4002 } numgen random mod 100 < 50 counter drop" in s
@@ -190,6 +195,8 @@ def test_ban_deauth_and_ap_down() -> None:
     assert deauth.clear == () and not deauth.record
     ban = _compile(FaultRequest("ban", REF, ban_s=60))
     assert '"ban_time":60000' in ban.commands[0] and ban.hold_s == 60 and ban.record
+    # cleared early, ban_time 0 lifts the ban; on time hostapd lifts it itself, so the timer sends nothing
+    assert ban.clear == deauth.commands and ban.timer == ()
     down = _compile(FaultRequest("ap_down", REF))
     assert (down.commands, down.clear) == (
         ("hostapd_cli -i phy0-ap0 disable",),

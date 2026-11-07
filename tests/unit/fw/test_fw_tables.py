@@ -9,6 +9,8 @@ from fwenv import FwEnv
 from openwrtgui.fw.nft import render_table, table_texts
 from openwrtgui.fw.tables import ChainEdit, TableRequest
 from openwrtgui.guard.bench_guard import GuardLocked
+from openwrtgui.simfw import SimFirewall
+from openwrtgui.transport.base import CommandResult
 
 VOIP = "bridge voipdscp"
 SIP = "inet fw4 chain BENCHSIPGUARD"
@@ -32,6 +34,34 @@ async def test_locked_object_refused_without_override(env: FwEnv) -> None:
         await env.fw.plan_table("ap1", TableRequest("ip lab_scratch", "delete"))
     with pytest.raises(ValueError, match="^inet fw4 is fw4's own table: change it on the other tabs.$"):
         await env.fw.plan_table("ap1", TableRequest("inet fw4", "delete", override=True))
+
+
+async def test_benchfault_is_left_to_the_faults_screen(env: FwEnv) -> None:
+    # an edit here would leave the fault records and their timers pointing at chains that changed
+    assert (await (await env.sim("ap1")).run("nft add table netdev benchfault")).ok
+    text = "^netdev benchfault holds the faults this app armed: clear them on the Faults screen.$"
+    with pytest.raises(ValueError, match=text):
+        await env.fw.plan_table("ap1", TableRequest("netdev benchfault", "delete"))
+    with pytest.raises(ValueError, match=text):
+        await env.fw.plan_table("ap1", TableRequest("netdev benchfault", "edit", override=True))
+
+
+async def test_include_that_fails_to_save_is_reported(env: FwEnv, monkeypatch: pytest.MonkeyPatch) -> None:
+    real = SimFirewall._heredoc
+
+    def no_write(self: SimFirewall, command: str, head: str, text: str) -> CommandResult | None:
+        if head.startswith("cat > /etc/owg/"):
+            return CommandResult(command, "", "sh: can't create /etc/owg/nft: Read-only file system\n", 1)
+        return real(self, command, head, text)
+
+    monkeypatch.setattr(SimFirewall, "_heredoc", no_write)
+    req = TableRequest(VOIP, "edit", override=True, rules=VOIP_RULES, keep="include")
+    plan = await env.fw.plan_table("ap1", req)
+    result = await env.fw.apply_table("ap1", req, plan.digest)
+    assert result.applied and not result.verified
+    assert result.error is not None and result.error.startswith(
+        "Applied at runtime; saving it as an fw4 include failed: "
+    ), result
 
 
 async def test_unchanged_table_round_trips(env: FwEnv) -> None:

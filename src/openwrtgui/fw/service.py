@@ -413,7 +413,7 @@ class FirewallService:
 
         second = await self._runner.run_planned(rec, make_include, None)
         error = first.error
-        if not second.applied:
+        if not second.applied or second.error:  # the uci part may be saved while the file is not
             error = f"Applied at runtime; saving it as an fw4 include failed: {second.error}"
         return NetApplyResult(
             rec.id,

@@ -147,12 +147,16 @@ def _count(n: int, what: str) -> str | None:
     return None if n == 0 else f"1 {what}" if n == 1 else f"{n} {what}s"
 
 
-def in_use(conf: FirewallConf, name: str) -> str | None:
+def in_use(
+    conf: FirewallConf, name: str, forwardings: Sequence[ForwardingRequest] | None = None
+) -> str | None:
+    """What refers to zone `name`; `forwardings` are the ones a request puts in place of the current ones."""
+    fwd = conf.forwardings if forwardings is None else forwardings
     parts = [
         p
         for p in (
             _count(sum(1 for r in conf.rules if name in (r.src, r.dest)), "rule"),
-            _count(sum(1 for f in conf.forwardings if name in (f.src, f.dest)), "forwarding"),
+            _count(sum(1 for f in fwd if name in (f.src, f.dest)), "forwarding"),
             _count(sum(1 for r in conf.redirects if name in (r.src, r.dest)), "port forward"),
             _count(sum(1 for n in conf.nats if n.src == name), "NAT rule"),
         )
@@ -163,8 +167,10 @@ def in_use(conf: FirewallConf, name: str) -> str | None:
     return parts[0] if len(parts) == 1 else f"{', '.join(parts[:-1])} and {parts[-1]}"
 
 
-def _refuse_in_use(conf: FirewallConf, name: str) -> None:
-    if used := in_use(conf, name):
+def _refuse_in_use(
+    conf: FirewallConf, name: str, forwardings: Sequence[ForwardingRequest] | None = None
+) -> None:
+    if used := in_use(conf, name, forwardings):
         raise ValueError(f"Zone {name} is used by {used}; delete or move them first.")
 
 
@@ -218,8 +224,8 @@ def compile_zones(
         check_zone_name(req.name)
         if (zone is None or req.name != zone.name) and req.name in names:
             raise ValueError(f"There is already a zone named {req.name}")
-        if zone is not None and req.name != zone.name:
-            _refuse_in_use(conf, zone.name)
+        if zone is not None and req.name != zone.name:  # forwardings sent along may move to the new name
+            _refuse_in_use(conf, zone.name, forwardings)
         own = net.own_interface
         if zone is not None and zone.name == state.own_zone and own and own not in req.networks:
             raise ValueError(f"{own} carries this app's connection; it stays in zone {zone.name}.")

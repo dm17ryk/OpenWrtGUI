@@ -75,6 +75,8 @@ and tables named `owg_…`), a known harness from [Settings](Settings) (such as 
 `voipdscp` for the VoIP chain) or **unknown**. Tables owned by someone else are locked: **Unlock** says who relies
 on them first. An unlocked table's rules can be edited, the table deleted, or a new table added. Each change is
 runtime-only or kept as an fw4 include, and is applied atomically with a 60 s restore timer on the router.
+`benchfault` is changed only on the [Faults](Faults-and-capture) screen (**Open faults**), so the faults listed
+there stay true.
 
 ## Raw ruleset
 

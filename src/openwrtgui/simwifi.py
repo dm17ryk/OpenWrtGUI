@@ -263,6 +263,8 @@ class SimWifi:
                 self._away = max(3, int(args.get("ban_time", 0)) // 1000)
             if int(args.get("ban_time", 0)) > 0:
                 self._bans.setdefault(obj, set()).add(str(args.get("addr", "")).lower())
+            else:  # hostapd: ban_time 0 lifts a ban
+                self._bans.get(obj, set()).discard(str(args.get("addr", "")).lower())
             return _ok("{}\n")
         if obj.startswith("hostapd.") and method == "get_clients":
             ifname = obj.removeprefix("hostapd.")

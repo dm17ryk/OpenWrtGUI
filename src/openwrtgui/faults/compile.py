@@ -37,6 +37,7 @@ class CompiledFault:
     device: str | None
     hold_s: int | None
     record: bool  # a fault that lasts gets a record in /tmp/owg (a deauth is over at once)
+    timer: tuple[str, ...] | None = None  # what the router-side timer runs, when not `clear`
 
 
 def fault_id(req: FaultRequest, armed: Sequence[str]) -> str:
@@ -82,7 +83,10 @@ def _nft(req: FaultRequest, t: FaultTarget, caps: FaultCaps, rtp: Sequence[int],
         rules = {
             "rtp_in": [("to", f"ip daddr {ip} udp dport {ports}")],
             "rtp_out": [("from", f"ip saddr {ip} udp sport {ports}")],
-            "sip_in": [("to", f"ip daddr {ip} meta l4proto {{ tcp, udp }} th sport {SIP_PORTS}")],
+            "sip_in": [  # from a server's 5060/5061, or from any port to the target's 5060/5061
+                ("to", f"ip daddr {ip} meta l4proto {{ tcp, udp }} th {port} {SIP_PORTS}")
+                for port in ("sport", "dport")
+            ],
             "all_in": [("to", f"ip daddr {ip}")],
             "all_out": [("from", f"ip saddr {ip}")],
             "blackout": [("to", f"ip daddr {ip}"), ("from", f"ip saddr {ip}")],
@@ -107,10 +111,15 @@ def _nft(req: FaultRequest, t: FaultTarget, caps: FaultCaps, rtp: Sequence[int],
             nft.append(f"add chain bridge {TABLE} {name} {{ type filter hook {hook} priority -300; }}")
     for way, match in rules:
         nft.append(f"add rule {family} {TABLE} f{fid}_{way} {match} {drop}")
-    clear = tuple(
-        line
-        for c in chains
-        for line in (f"nft flush chain {family} {TABLE} {c}", f"nft delete chain {family} {TABLE} {c}")
+    clear = (
+        *(
+            line
+            for c in chains
+            for line in (f"nft flush chain {family} {TABLE} {c}", f"nft delete chain {family} {TABLE} {c}")
+        ),
+        # the last fault to go takes the table with it, so `nft list tables` is as before
+        f"nft list table {family} {TABLE} 2>/dev/null | grep -q chain "
+        f"|| nft delete table {family} {TABLE} 2>/dev/null",
     )
     return CompiledFault(tuple(nft), (), tuple(chains), clear, summary, t.device, req.hold_s, True)
 
@@ -262,8 +271,10 @@ def compile_fault(
         if not BAN_MIN <= seconds <= BAN_MAX:
             raise ValueError(f"Block for {BAN_MIN} to {BAN_MAX} seconds")
         command = del_client_command(ifname, mac, seconds * 1000)
+        # cleared early, ban_time 0 lifts the ban; on time hostapd lifts it itself, so the timer sends nothing
+        unban = del_client_command(ifname, mac, 0)
         return CompiledFault(
-            (), (command,), (), (), f"Block {_who(target)} for {seconds} s", ifname, seconds, True
+            (), (command,), (), (unban,), f"Block {_who(target)} for {seconds} s", ifname, seconds, True, ()
         )
     return CompiledFault(
         (),

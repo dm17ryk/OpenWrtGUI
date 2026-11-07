@@ -263,7 +263,7 @@ class SimFirewall:
         out: list[str] = []
         status = 0
         for part, joiner in parts:
-            if part == "set -e":
+            if part == "set -e" or (joiner == "||" and status == 0):
                 continue
             r = self.dispatch(part)
             if r is None:
@@ -283,6 +283,11 @@ class SimFirewall:
         return None
 
     def _one(self, p: str) -> CommandResult | None:
+        if m := re.fullmatch(r"(.+?) \| grep -q (\S+)", p):
+            r = self.dispatch(m.group(1))
+            if r is None:
+                return None
+            return CommandResult(p, "", "", 0 if m.group(2) in r.stdout else 1)
         quiet = p.endswith(" 2>/dev/null")
         if quiet:
             p = p.removesuffix(" 2>/dev/null")
@@ -700,7 +705,8 @@ def _ok(command: str, stdout: str = "") -> CommandResult:
 
 
 def _parts(command: str) -> list[tuple[str, str]]:
-    """Shell statements joined by newlines, `;` or `&&` outside single quotes: (statement, joiner before)."""
+    """Shell statements joined by newlines, `;`, `&&` or `||` outside single quotes: (statement, joiner
+    before)."""
     out: list[tuple[str, str]] = []
     cur: list[str] = []
     quoted = False
@@ -710,12 +716,12 @@ def _parts(command: str) -> list[tuple[str, str]]:
         ch = command[i]
         if ch == "'":
             quoted = not quoted
-        if not quoted and (ch in ";\n" or command.startswith("&&", i)):
+        if not quoted and (ch in ";\n" or command.startswith(("&&", "||"), i)):
             if "".join(cur).strip():
                 out.append(("".join(cur).strip(), joiner))
-            joiner = "&&" if ch == "&" else ";"
+            joiner = ";" if ch in ";\n" else ch * 2
             cur = []
-            i += 2 if ch == "&" else 1
+            i += 1 if ch in ";\n" else 2
             continue
         cur.append(ch)
         i += 1

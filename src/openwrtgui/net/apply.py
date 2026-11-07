@@ -529,9 +529,15 @@ class ApplyRunner:
                 done = await self._run(t, rec, plan, command, secrets=plan.secrets, timeout=SCRIPT_TIMEOUT_S)
                 if not done.ok:  # put the previous state back now, not in 60 s
                     restore = "; ".join(plan.restore).replace(ROLLBACK_ID, rid)
-                    await self._run(t, rec, plan, restore, source="app", require_guard=False)
-                    await self._run(t, rec, plan, cancel, source="app", require_guard=False)
+                    back = await self._run(t, rec, plan, restore, source="app", require_guard=False)
                     error = f"The router refused the change: {_reason(done)}"
+                    if back.ok:
+                        await self._run(t, rec, plan, cancel, source="app", require_guard=False)
+                    else:  # the timer is the last chance to put it back: it stays armed
+                        error += (
+                            f". Putting the previous state back failed too ({_reason(back)}); "
+                            f"the router's timer tries again within {ROLLBACK_S} s"
+                        )
                     return self._finish(rec, plan, False, (), error, rec.host)
         except TransportError:
             pass  # the change may have cut this connection: reconnect and confirm decides

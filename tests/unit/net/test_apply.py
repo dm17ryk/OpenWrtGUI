@@ -738,6 +738,25 @@ async def test_timer_rollback_change_refused_restores_at_once(env: Env) -> None:
     assert result.error == "The router refused the change: Error: syntax error, unexpected newline"
 
 
+async def test_timer_rollback_failed_restore_leaves_the_timer_armed(env: Env) -> None:
+    def refuse(command: str) -> CommandResult | None:
+        if command == CHANGE:
+            return CommandResult(command, "", "Error: syntax error, unexpected newline\n", 1)
+        if command.startswith("nft delete table inet owg_t; "):
+            return CommandResult(command, "", 'Error: Could not open file "/tmp/owg/rb.nft"\n', 1)
+        return None
+
+    env.bench.respond = refuse
+    result = await _apply_timer(env)
+    assert not any(c.startswith("start-stop-daemon -K") for c in env.commands())  # its last chance
+    assert not result.applied
+    assert result.error == (
+        "The router refused the change: Error: syntax error, unexpected newline. Putting the previous "
+        'state back failed too (Error: Could not open file "/tmp/owg/rb.nft"); the router\'s timer '
+        "tries again within 60 s"
+    )
+
+
 async def test_saved_check_finds_a_list_item_of_a_new_section() -> None:
     """An add_list on a section the script made is one item of the list the router shows."""
     shown = Shown(

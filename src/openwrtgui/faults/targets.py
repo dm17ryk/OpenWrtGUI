@@ -119,7 +119,11 @@ def resolve(
     ip = check_ipv4(ref.ip) if ref.ip else None
     if mac is None and ip is None:
         raise ValueError("Pick a target, or enter its IP or MAC")
-    found = next((x for x in targets if (mac and x.mac == mac) or (ip and x.ip == ip)), None)
+    by_ip = next((x for x in targets if ip and x.ip == ip), None)
+    if mac and by_ip is not None and by_ip.mac and by_ip.mac != mac:
+        # its port and Wi-Fi link would be taken while the fault matches another device's MAC
+        raise ValueError(f"{ip} is {by_ip.mac}, not {mac}: enter a matching pair, or only one of them")
+    found = next((x for x in targets if mac and x.mac == mac), None) or by_ip
     target = FaultTarget(
         found.name if found else None,
         mac or (found.mac if found else None),

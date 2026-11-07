@@ -64,7 +64,7 @@ async def test_held_l3_fault_cleared_by_router_timer(fw_window: FwWindow) -> Non
     t = await fw_window.connect()
     try:
         listed = await t.run(f"nft list table {family} benchfault")
-        assert "chain f" not in listed.stdout, listed.stdout
+        assert not listed.ok, listed.stdout  # the last fault's timer took the table along
         assert not (await t.run("ls /tmp/owg/fault-*.json")).ok
     finally:
         await t.close()

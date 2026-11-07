@@ -150,11 +150,33 @@ class CaptureService:
             f"iw dev {MONITOR} del 2>/dev/null; "
             f"iw phy {phy} interface add {MONITOR} type monitor && ip link set {MONITOR} up"
         )
-        done = await run_audited(
-            t, command, router_id=rec.id, screen=SCREEN, guard=self._guard, audit=self._audit, source="app"
-        )
+        async with self._pool.write_lock(rec.id):  # not in the middle of a Wi-Fi or firewall apply
+            done = await run_audited(
+                t,
+                command,
+                router_id=rec.id,
+                screen=SCREEN,
+                guard=self._guard,
+                audit=self._audit,
+                source="app",
+            )
         if not done.ok:
             raise ValueError(f"Could not create mon0 on {rec.name}: {(done.stderr or done.stdout).strip()}")
+
+    async def _monitor_gone(self, rec: RouterRecord, t: Transport) -> None:
+        """Remove the monitor interface; allowed during a run, as it only undoes what the capture made."""
+        with contextlib.suppress(TransportError):
+            async with self._pool.write_lock(rec.id):
+                await run_audited(
+                    t,
+                    f"iw dev {MONITOR} del",
+                    router_id=rec.id,
+                    screen=SCREEN,
+                    guard=self._guard,
+                    audit=self._audit,
+                    source="app",
+                    require_guard=False,
+                )
 
     async def start(self, router_id: str, req: CaptureRequest) -> CaptureView:
         rec = self._record(router_id)
@@ -175,22 +197,33 @@ class CaptureService:
         mon0 = req.device == "mon0"
         device = MONITOR if mon0 else req.device
         command = capture_command(req, net.pc_ip, rec.port, device)
-        sink: Sink
-        path: Path | None = None
-        if req.output == "wireshark":
-            exe = self._wireshark()
-            if exe is None:
-                raise ValueError("Wireshark is not installed on this PC")
-            sink = open_live(exe)
-        else:
-            folder = self._documents / "OpenWrtGUI" / "captures"
-            folder.mkdir(parents=True, exist_ok=True)
-            path = folder / f"{rec.id}-{req.device}-{self._clock():%Y%m%d-%H%M%S}.pcap"
-            sink = path.open("wb")
+        exe = self._wireshark() if req.output == "wireshark" else None
+        if req.output == "wireshark" and exe is None:
+            raise ValueError("Wireshark is not installed on this PC")
+        capture_id = secrets.token_hex(4)
         t = await self._pool.get(rec)
         if mon0:
             await self._monitor(rec, t)
-        stream = await t.stream(command)  # type: ignore[attr-defined]
+        sink: Sink | None = None
+        path: Path | None = None
+        try:  # nothing is left behind when the capture cannot start: no monitor interface, no file
+            if exe is not None:
+                sink = open_live(exe)
+            else:
+                folder = self._documents / "OpenWrtGUI" / "captures"
+                folder.mkdir(parents=True, exist_ok=True)
+                # the id too: a second capture in the same second must not overwrite the first
+                path = folder / f"{rec.id}-{req.device}-{self._clock():%Y%m%d-%H%M%S}-{capture_id}.pcap"
+                sink = path.open("xb")
+            stream = await t.stream(command)  # type: ignore[attr-defined]
+        except BaseException:
+            if sink is not None:
+                sink.close()
+            if path is not None:
+                path.unlink(missing_ok=True)
+            if mon0:
+                await self._monitor_gone(rec, t)
+            raise
         self._audit.record(
             router=rec.id,
             screen=SCREEN,
@@ -199,7 +232,7 @@ class CaptureService:
             source="user",
         )
         view = CaptureView(
-            secrets.token_hex(4),
+            capture_id,
             rec.id,
             req.device,
             req.filter,
@@ -248,17 +281,7 @@ class CaptureService:
                 source="app",
             )
             if mon0:
-                with contextlib.suppress(TransportError):
-                    await run_audited(
-                        t,
-                        f"iw dev {MONITOR} del",
-                        router_id=rec.id,
-                        screen=SCREEN,
-                        guard=self._guard,
-                        audit=self._audit,
-                        source="app",
-                        require_guard=False,
-                    )
+                await self._monitor_gone(rec, t)
             self._views[capture_id] = replace(
                 self._views[capture_id], bytes=total, running=False, error=error
             )

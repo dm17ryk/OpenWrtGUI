@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from openwrtgui.fw.nft import ChainText, TableText, render_table
-from openwrtgui.fw.owners import APP_PREFIX, NftObject
+from openwrtgui.fw.owners import APP_PREFIX, APP_TABLE, NftObject
 from openwrtgui.net.apply import ROLLBACK_ID
 from openwrtgui.uci import UciOp
 
@@ -66,6 +66,8 @@ def owner_text(obj: NftObject) -> str:
 def refuse_locked(req: TableRequest, obj: NftObject) -> None:
     if obj.owner == "fw4":
         raise ValueError(f"{obj.key} is fw4's own table: change it on the other tabs.")
+    if obj.table == APP_TABLE:  # an edit here would leave the fault records and timers on chains that changed
+        raise ValueError(f"{obj.key} holds the faults this app armed: clear them on the Faults screen.")
     if obj.owner != "app" and not req.override:
         raise ValueError(f"{obj.key} belongs to {owner_text(obj)}; unlock it first.")
 

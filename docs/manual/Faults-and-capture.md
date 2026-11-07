@@ -30,9 +30,9 @@ own chains in the nftables table `benchfault`, bound to the port or Wi-Fi interf
 ## Block flows
 
 Drops some of the target's traffic: **rtp_in** / **rtp_out** (the RTP ports of its calls, read from the router's
-connection tracking, so start the call first), **sip_in** (SIP 5060 and 5061 to it), **all_in**, **all_out** or
-**blackout** (both ways). **Loss** below 100 % drops that share of the packets at random. The rules sit ahead of
-fw4's `ct state established accept`, so they also hit a call already in progress.
+connection tracking, so start the call first), **sip_in** (SIP to it, from or to port 5060 or 5061),
+**all_in**, **all_out** or **blackout** (both ways). **Loss** below 100 % drops that share of the packets at
+random. The rules sit ahead of fw4's `ct state established accept`, so they also hit a call already in progress.
 
 ## Impair (netem)
 
@@ -45,8 +45,9 @@ refused, never replaced.
 ## Wi-Fi faults
 
 **Deauth** kicks one station, which then re-joins: the Wi-Fi equivalent of pulling a cable. **Block** keeps it out
-for the given seconds (10 to 3600; hostapd ends it by itself). **AP down** stops the access point the station is
-on, which drops every station on it. These need a Wi-Fi station as the target and an SSID on air.
+for the given seconds (10 to 3600; hostapd ends it by itself, and **Clear** ends it early). **AP down** stops the
+access point the station is on, which drops every station on it. These need a Wi-Fi station as the target and an
+SSID on air.
 
 ## Duration
 
@@ -57,7 +58,9 @@ time left.
 ## Clear everything
 
 Clears every fault this app armed on the router: its chains, the `benchfault` table, netem, switch ports and
-access points it took down, and its records. **Clear** on a row clears one fault. Clearing works during a run too,
+access points it took down, Wi-Fi blocks, and its records. **Clear** on a row clears one fault. A fault's record
+goes only once the router shows the fault gone; a fault still there stays listed, with what is left, so it can be
+cleared again. The last fault to go also removes the `benchfault` table. Clearing works during a run too,
 because a fault left in place disturbs the run more; it then says "Cleared although Bench Guard is live". It never
 touches anything the app did not arm.
 

@@ -52,6 +52,25 @@ async def test_add_zone_and_forwarding_plan(env: FwEnv) -> None:
     assert not any("cfg04ad58" in line for line in plan.lines)  # lan→wan stays as it is
 
 
+async def test_zone_rename_moves_its_forwardings_in_the_same_change(env: FwEnv) -> None:
+    upserts = [_zone(None, "guest")]
+    added = [ForwardingRequest("lan", "wan"), ForwardingRequest("guest", "wan")]
+    plan = await env.fw.plan_zones("ap2", upserts, [], added)
+    assert (await env.fw.apply_zones("ap2", upserts, [], added, plan.digest)).verified
+    guest = next(z for z in (await env.fw.state("ap2")).conf.zones if z.name == "guest")
+    renamed = [_zone(guest.section, "visitor")]
+    with pytest.raises(ValueError, match="^Zone guest is used by 1 forwarding; delete or move them first.$"):
+        await env.fw.plan_zones("ap2", renamed, [], None)
+    moved = [ForwardingRequest("lan", "wan"), ForwardingRequest("visitor", "wan")]
+    plan = await env.fw.plan_zones("ap2", renamed, [], moved)
+    assert f"{P} set firewall.{guest.section}.name='visitor'" in plan.lines
+    result = await env.fw.apply_zones("ap2", renamed, [], moved, plan.digest)
+    assert result.verified, result
+    conf = (await env.fw.state("ap2")).conf
+    assert ("visitor", "wan") in [(f.src, f.dest) for f in conf.forwardings]
+    assert "guest" not in [z.name for z in conf.zones]
+
+
 async def test_add_zone_verified_in_sim(env: FwEnv) -> None:
     upserts, forwardings = [_zone(None, "guest")], [ForwardingRequest("lan", "wan")]
     plan = await env.fw.plan_zones("ap2", upserts, [], forwardings)

@@ -49,6 +49,16 @@ async def test_other_ip_fills_mac_from_hints_and_arp(env: FwEnv) -> None:
     )
 
 
+async def test_ip_and_mac_of_two_devices_refused(env: FwEnv) -> None:
+    # the fault would take the IP's port and Wi-Fi link while matching the other device's MAC
+    targets, net = await _targets(env, "ap1")
+    text = rf"^192\.168\.1\.30 is {PANEL_WIFI}, not {PANEL_ETH}: enter a matching pair, or only one of them$"
+    with pytest.raises(ValueError, match=text):
+        resolve(TargetRef(PANEL_ETH, "192.168.1.30"), targets, net, "AP1 · bench", "both")
+    same = resolve(TargetRef(PANEL_WIFI.upper(), "192.168.1.30"), targets, net, "AP1 · bench", "both")
+    assert (same.mac, same.via) == (PANEL_WIFI, "phy0-ap0")
+
+
 async def test_target_is_pc_refused(env: FwEnv) -> None:
     targets, net = await _targets(env, "ap1")
     text = r"^192\.168\.1\.10 is this PC \(the app's connection to AP1 · bench\)$"

@@ -157,15 +157,16 @@ export function TablesTab({ routerId, short, state, unlocked, onUnlock, onLock, 
                         Zones and rules
                       </button>
                     )}
-                    {o.owner === 'app' && (
-                      <>
-                        <Link className="btn" to={`/routers/${routerId}/faults`}>
-                          Open faults
-                        </Link>{' '}
-                        <button className="btn" type="button" disabled={live} onClick={() => openEditor(o.key)}>
-                          Edit
-                        </button>
-                      </>
+                    {/* benchfault belongs to the Faults screen: an edit here would leave its records and timers behind */}
+                    {o.owner === 'app' && o.table === 'benchfault' && (
+                      <Link className="btn" to={`/routers/${routerId}/faults`}>
+                        Open faults
+                      </Link>
+                    )}
+                    {o.owner === 'app' && o.table !== 'benchfault' && (
+                      <button className="btn" type="button" disabled={live} onClick={() => openEditor(o.key)}>
+                        Edit
+                      </button>
                     )}
                     {(o.owner === 'known' || o.owner === 'unknown') &&
                       (isOpen ? (

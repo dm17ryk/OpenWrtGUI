@@ -94,13 +94,21 @@ def _wifi(status: dict[str, Any]) -> list[WifiIf]:
 
 _DELETE_CHAIN = re.compile(rf"delete chain \S+ {TABLE} (\S+)")
 _DELETE_ROOT = re.compile(r"tc qdisc del dev (\S+) root")
+_DELETE_INGRESS = re.compile(r"tc qdisc del dev (\S+) ingress")
+_PORT_ON = re.compile(r"swconfig dev (\S+) port (\d+) set enable 1")
+_AP_ON = re.compile(r"hostapd_cli -i (\S+) enable")
+_UNBAN = re.compile(r"ubus call hostapd\.(\S+) del_client '(\{.*\})'")
 
 
-def clear_line(fid: str, clear: Sequence[str]) -> str:
-    """One fault's clear lines and its record removal as one command joined by `;`: a part already gone (the
-    table deleted elsewhere, a half-armed netem) must not stop the rest, or the record would stay and the
-    fault be listed forever. What is left is checked afterwards (`_gone_check`)."""
-    return "; ".join([*clear, f"rm -f {RECORD_DIR}/fault-{fid}.*"])
+def clear_line(clear: Sequence[str]) -> str:
+    """One fault's clear lines as one command joined by `;`: a part already gone (the table deleted
+    elsewhere, a half-armed netem) must not stop the rest. Whether the fault is gone is then checked by
+    effect (`_gone_check`); only then is its record removed, so a fault that is still there stays listed."""
+    return "; ".join([*clear, "true"])
+
+
+def record_line(fid: str) -> str:
+    return f"rm -f {RECORD_DIR}/fault-{fid}.*"
 
 
 def caps_from(family: str | None, tc_tables: str, modules: str, tools: str) -> FaultCaps:
@@ -265,7 +273,8 @@ class FaultsService:
         if c.record:
             commands.append(record_command(fid, req, c, target))
             if c.hold_s:
-                commands.append(arm_command(f"fault-{fid}", c.hold_s, list(c.clear)))
+                lines = c.clear if c.timer is None else c.timer
+                commands.append(arm_command(f"fault-{fid}", c.hold_s, list(lines)))
         plan = net_plan(router_id=rec.id, screen=SCREEN, config=None, ops=[], current={}, commands=commands)
         return plan, c, fid, target, state
 
@@ -308,10 +317,10 @@ class FaultsService:
     async def _remove(
         self, rec: RouterRecord, faults: Sequence[tuple[str, tuple[str, ...]]], family: str | None
     ) -> NetApplyResult:
-        """Run each fault's clear lines and drop its record, whatever is still there (see `clear_line`)."""
+        """Run the clear lines of faults that have no record, whatever is still there (see `clear_line`)."""
 
         async def make(t: Transport) -> Planned:
-            commands = [clear_line(fid, clear) for fid, clear in faults]
+            commands = [clear_line(clear) for _, clear in faults]
             plan = net_plan(
                 router_id=rec.id, screen=SCREEN, config=None, ops=[], current={}, commands=commands
             )
@@ -324,7 +333,7 @@ class FaultsService:
         return await self._runner.run_planned(rec, make, None, guarded=False)
 
     async def _gone_check(self, t: Transport, fid: str, clear: Sequence[str], family: str | None) -> NetCheck:
-        """A cleared fault by effect: its chains, its qdiscs, its ifb and its record are gone."""
+        """A cleared fault by effect: its chains, qdiscs, ifb, switch port, AP and ban are gone."""
         left: list[str] = []
         chains = [m.group(1) for line in clear if (m := _DELETE_CHAIN.search(line))]
         if chains and family is not None:
@@ -333,17 +342,37 @@ class FaultsService:
             left += [f"chain {name}" for name in chains if name in have]
         qdiscs = parse_qdiscs((await t.run("tc qdisc show")).stdout)
         for line in clear:
-            if (m := _DELETE_ROOT.fullmatch(line)) and any(
-                q.dev == m.group(1) and q.root and q.handle == APP_ROOT for q in qdiscs
-            ):
-                left.append(f"netem on {m.group(1)}")
-            if line == f"ip link del {APP_IFB}" and any(q.dev == APP_IFB for q in qdiscs):
-                left.append(APP_IFB)
-        if (await t.run(f"cat {RECORD_DIR}/fault-{fid}.json")).ok:
-            left.append("its record")
+            left += await self._left_by(t, line, qdiscs)
         return NetCheck(
             f"cleared {fid}", not left, "nothing left" if not left else f"left: {', '.join(left)}"
         )
+
+    async def _left_by(self, t: Transport, line: str, qdiscs: Sequence[Qdisc]) -> list[str]:
+        """What one clear line should have undone and is still there."""
+        if (m := _DELETE_ROOT.fullmatch(line)) and any(
+            q.dev == m.group(1) and q.root and q.handle == APP_ROOT for q in qdiscs
+        ):
+            return [f"netem on {m.group(1)}"]
+        if (m := _DELETE_INGRESS.fullmatch(line)) and any(
+            q.dev == m.group(1) and q.kind == "ingress" for q in qdiscs
+        ):
+            return [f"ingress on {m.group(1)}"]
+        if line == f"ip link del {APP_IFB}" and any(q.dev == APP_IFB for q in qdiscs):
+            return [APP_IFB]
+        if m := _PORT_ON.fullmatch(line):
+            live = parse_swconfig_show(m.group(1), (await t.run(pc.swconfig_show(m.group(1)))).stdout)
+            if any(p.num == int(m.group(2)) and p.enabled is False for p in live.ports):
+                return [f"port {m.group(2)} off"]
+        if (m := _AP_ON.fullmatch(line)) and "state=DISABLED" in (
+            await t.run(f"hostapd_cli -i {m.group(1)} status")
+        ).stdout:
+            return [f"{m.group(1)} down"]
+        if m := _UNBAN.fullmatch(line):
+            mac = str(json.loads(m.group(2)).get("addr", "")).lower()
+            bans = await ubus_call(t, f"hostapd.{m.group(1)}", "list_bans")
+            if mac and mac in json.dumps(bans or {}).lower():
+                return [f"ban on {mac}"]
+        return []
 
     # ---------------------------------------------------------------- proof by effect
     async def _checks(
@@ -449,19 +478,18 @@ class FaultsService:
         chosen = [a for a in state.armed if ids is None or a.id in ids]
         if ids is not None and len(chosen) != len(set(ids)):
             raise ValueError("A fault to clear is no longer armed")
-        commands: list[str] = []
-        for a in chosen:
-            if a.until is not None:
-                commands.append(cancel_command(f"fault-{a.id}"))
-            commands.append(clear_line(a.id, a.clear))
-        if ids is None:
-            family = state.caps.family
-            if family is not None and (await t.run(f"nft list table {family} {TABLE}")).ok:
-                commands.append(f"nft delete table {family} {TABLE}")
-            if any(q.dev == APP_IFB for q in qdiscs) and not any(
-                "ip link del owgifb0" in c for c in commands
-            ):
-                commands.append(f"ip link del {APP_IFB}")
+        commands = [cancel_command(f"fault-{a.id}") for a in chosen if a.until is not None]
+        family = state.caps.family
+        # the whole table first: a fault's own clear deletes the table when it is the last one there
+        if ids is None and family is not None and (await t.run(f"nft list table {family} {TABLE}")).ok:
+            commands.append(f"nft delete table {family} {TABLE}")
+        commands += [clear_line(a.clear) for a in chosen if a.clear]
+        if (
+            ids is None
+            and any(q.dev == APP_IFB for q in qdiscs)
+            and not any(f"ip link del {APP_IFB}" in c for c in commands)
+        ):
+            commands.append(f"ip link del {APP_IFB}")
         if not commands:
             raise ValueError("Nothing is armed on this router.")
         plan = net_plan(router_id=rec.id, screen=SCREEN, config=None, ops=[], current={}, commands=commands)
@@ -477,9 +505,11 @@ class FaultsService:
         """Allowed while Bench Guard is live: it only removes what this app armed, and a fault left in place
         disturbs a run more (scope note, v0.4 plan)."""
         rec = self._record(router_id)
+        found: dict[str, list[ArmedFault]] = {}
 
         async def make(t: Transport) -> Planned:
             plan, chosen, state = await self._clear_plan(rec, t, ids)
+            found["chosen"] = chosen
 
             async def verify(t2: Transport) -> list[NetCheck]:
                 checks = [await self._gone_check(t2, a.id, a.clear, state.caps.family) for a in chosen]
@@ -491,8 +521,48 @@ class FaultsService:
             return Planned(plan, verify)
 
         result = await self._runner.run_planned(rec, make, digest, guarded=False)
+        result = await self._drop_records(rec, result, found.get("chosen", []))
         live = self._guard.state()
         if live.live and result.applied:
             run = live.reasons[0].text if live.reasons else "a harness run"
             result = replace(result, error=f"Cleared although Bench Guard is live ({run})")
+        return result
+
+    async def _drop_records(
+        self, rec: RouterRecord, result: NetApplyResult, chosen: Sequence[ArmedFault]
+    ) -> NetApplyResult:
+        """Remove the record of each fault seen gone; one still there keeps its record and stays listed."""
+        checks = {c.name: c for c in result.checks}
+        gone = [a for a in chosen if (c := checks.get(f"cleared {a.id}")) is not None and c.ok]
+        if gone:
+
+            async def make(t: Transport) -> Planned:
+                commands = [record_line(a.id) for a in gone]
+                plan = net_plan(
+                    router_id=rec.id, screen=SCREEN, config=None, ops=[], current={}, commands=commands
+                )
+
+                async def verify(t2: Transport) -> list[NetCheck]:
+                    out = []
+                    for a in gone:
+                        left = (await t2.run(f"cat {RECORD_DIR}/fault-{a.id}.json")).ok
+                        out.append(NetCheck(f"record {a.id}", not left, "still there" if left else "removed"))
+                    return out
+
+                return Planned(plan, verify)
+
+            dropped = await self._runner.run_planned(rec, make, None, guarded=False)
+            result = replace(
+                result,
+                verified=result.verified and dropped.verified,
+                checks=(*result.checks, *dropped.checks),
+                error=result.error or dropped.error,
+            )
+        kept = [
+            f"{a.summary} is not cleared ({c.detail}); it stays listed to clear again"
+            for a in chosen
+            if (c := checks.get(f"cleared {a.id}")) is not None and c.ok is False
+        ]
+        if kept:
+            result = replace(result, error="; ".join([*([result.error] if result.error else []), *kept]))
         return result

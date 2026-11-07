@@ -22,12 +22,14 @@ Firewall and faults.
 - Every other nftables table and traffic-control hook with its owner (fw4, this app, a known harness such as
   `BENCHSIPGUARD` or `voipdscp`, or unknown). Tables owned by someone else are locked: **Unlock** says who
   relies on them, and the override is audited. Edit rules and chains, delete a table or add one, runtime only
-  or saved as an fw4 include; applied atomically with `nft -f` under a router-side restore timer.
+  or saved as an fw4 include; applied atomically with `nft -f` under a router-side restore timer. The faults
+  table `benchfault` is changed only on the Faults screen.
 - Faults and capture screen: link down (switch port), isolate (L2), block flows (`rtp_in`, `sip_in`,
   `rtp_out`, `all_in`, `all_out`, `blackout`, with loss), netem impair scoped to the target, and Wi-Fi deauth,
   block for N s and AP down. A fault is held until cleared or for N s, cleared by a timer on the router itself;
   armed faults are listed from their records on the router, also after a restart of the app, and the router
-  card shows "N faults armed". Clear everything works during a run.
+  card shows "N faults armed". A fault still there after Clear stays listed, with what is left. Clear
+  everything works during a run.
 - Capture on a router interface (`br-lan`, Wi-Fi, `mon0`, LTE) to a `.pcap` in Documents or live in
   Wireshark; the app's own SSH is never captured.
 - Settings: known devices (a name and all its MACs) and known tables (who writes which nft table).
