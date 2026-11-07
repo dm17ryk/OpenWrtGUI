@@ -150,3 +150,18 @@ async def test_edit_existing_host(net: NetEnv) -> None:
 async def test_leases_named_from_hints(net: NetEnv) -> None:
     leases = await net.service.leases("ap1")
     assert [(lease.mac, lease.ip, lease.hostname) for lease in leases] == [(PANEL, "192.168.1.30", "panel")]
+
+
+async def test_existing_host_name_kept_when_other_field_changes(net: NetEnv) -> None:
+    """#35: a name the router already has (LuCI allows _ and .) is not refused when another field of the row
+    is edited; a new or changed name still follows the rule."""
+    host = (await net.service.state("ap1")).hosts[0]
+    t = await net.sim("ap1")
+    await t.run(f"set -e\nuci set dhcp.{host.section}.name='ap_1.lab'\nuci commit dhcp")
+    host = (await net.service.state("ap1")).hosts[0]
+    assert host.name == "ap_1.lab"
+    edit = HostRequest(host.section, mac=host.macs[0], name="ap_1.lab", ip="192.168.1.31")
+    plan = await net.service.plan_hosts("ap1", [edit], [])
+    assert f"uci set dhcp.{host.section}.ip='192.168.1.31'" in plan.lines
+    with pytest.raises(ValueError, match="A name is letters, digits and -, up to 63"):
+        await net.service.plan_hosts("ap1", [HostRequest(None, mac="aa:bb:cc:dd:ee:02", name="ap_2.lab")], [])

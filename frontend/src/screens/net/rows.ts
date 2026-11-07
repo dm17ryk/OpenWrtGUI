@@ -41,3 +41,13 @@ export function expiresIn(seconds: number | null): string {
   if (minutes < 60) return `${minutes} min`
   return `${Math.floor(minutes / 60)} h ${minutes % 60} min`
 }
+
+/** How long an interface has been up: "< 1 min", "14 min", "2 h 14 min", "20 d 16 h". */
+export function uptimeText(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  if (m < 1) return '< 1 min'
+  if (m < 60) return `${m} min`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h} h ${m % 60} min`
+  return `${Math.floor(h / 24)} d ${h % 24} h`
+}

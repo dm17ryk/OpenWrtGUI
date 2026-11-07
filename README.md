@@ -14,11 +14,23 @@ is connected, and how each router describes itself. It never disturbs a test run
 
 ![Dashboard: three routers, the 2.4 GHz air map and one station](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/dashboard.png)
 
-> v0.3 adds the network: router addresses with a router-side rollback, DHCP, fixed addresses, who may join
-> each SSID, DNS, routes, and the switch's ports, VLANs and port mirror. v0.2 added Wi-Fi with proof on
-> air, RF live and the LuCI fallback; v0.1 laid the foundation: install, update, add routers, the
-> dashboard, Bench Guard, the terminal and the audit log. Firewall and LTE screens follow; see the
-> [roadmap](ROADMAP.md).
+> v0.4 adds the firewall and faults: both filtering models per zone with the rules that keep the app's own
+> path open, every nftables table with its owner, and faults from a pulled cable to netem, held by a timer
+> on the router, plus capture to Wireshark. v0.3 added the network (addresses with a router-side rollback,
+> DHCP, DNS, routes, ports and VLANs); v0.2 Wi-Fi with proof on air, RF live and the LuCI fallback; v0.1
+> the foundation: install, update, add routers, the dashboard, Bench Guard, the terminal and the audit
+> log. LTE and image import follow; see the [roadmap](ROADMAP.md).
+
+## What v0.4 adds
+
+| Screen | What you get |
+|---|---|
+| **Firewall** | Per zone and direction **Allow all** or **Block all**, with what each of your rules does in that model and the ones that would stop doing anything flagged. Blocking the zone that carries this app keeps "Allow SSH from this PC" (and DHCP and DNS) open, so the app cannot lock itself out; every firewall change applies with the 60 s rollback. Zones, traffic rules with live packet counters, port forwards, NAT rules, IP sets, custom rule files and the raw ruleset, as LuCI has them. Every other nftables table shows its owner (a harness, this app, unknown); tables owned by someone else stay locked until you unlock one. |
+| **Faults and capture** | Pick a device (by any of its MACs), then take its switch port down, isolate it, block its RTP, SIP or all traffic with a loss %, delay or jitter it with netem, or deauth, block or drop its Wi-Fi. Hold a fault for N seconds and a timer on the router clears it, even if this PC goes away; armed faults show on the router's card. Capture on any router interface to a `.pcap` or live in Wireshark. |
+
+| Firewall | Faults and capture |
+|---|---|
+| ![Firewall](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/firewall.png) | ![Faults and capture](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/faults.png) |
 
 ## What v0.3 adds
 

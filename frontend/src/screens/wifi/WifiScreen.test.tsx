@@ -164,3 +164,16 @@ test('All options shows the router options with their writer and control', async
   expect(within(table).getByRole('row', { name: /cell_density/ })).toHaveTextContent('set by dima_night')
   expect(within(table).getByRole('row', { name: /htmode/ })).toHaveTextContent('set above: Modes')
 })
+
+test('All options shows options that have their own control read-only', async () => {
+  const user = userEvent.setup()
+  renderWifi()
+  await user.click(await screen.findByRole('button', { name: 'Show all options' }))
+  await user.click(within(await screen.findByRole('group', { name: 'Show' })).getByRole('button', { name: 'All' }))
+  const table = await screen.findByRole('table', { name: 'All options' })
+  const htmode = within(table).getByRole('row', { name: /htmode/ })
+  expect(within(htmode).queryByRole('textbox')).toBeNull()
+  expect(within(htmode).getByText('HT40')).toBeInTheDocument()
+  expect(within(within(table).getByRole('row', { name: /noscan/ })).queryByRole('combobox')).toBeNull()
+  expect(within(within(table).getByRole('row', { name: /beacon_int/ })).getByRole('textbox', { name: 'beacon_int' })).toBeInTheDocument()
+})

@@ -51,9 +51,11 @@ class SimWifi:
         self._ifindex = 12
         self._monitor = False
         self._away = 0  # samples the station stays away after del_client
+        self._bans: dict[str, set[str]] = {}  # hostapd object -> banned MACs (list_bans)
         self._tick = 0
         self._sessions = 0
         self._acl: dict[tuple[str, str], list[str]] = {}
+        self._disabled: set[str] = set()  # BSSes stopped with `hostapd_cli disable` (AP down)
 
     # ---------------------------------------------------------------- uci state
     def _radios(self) -> list[str]:
@@ -170,7 +172,22 @@ class SimWifi:
             return self._acl_change(m.group(1), m.group(2), m.group(3), m.group(4).lower())
         if m := re.fullmatch(r"hostapd_cli -i (\S+) (deny_acl|accept_acl) SHOW", p):
             return self._acl_show(m.group(1), m.group(2))
+        if m := re.fullmatch(r"hostapd_cli -i (\S+) (disable|enable|status)", p):
+            return self._bss(m.group(1), m.group(2))
         return None
+
+    def _bss(self, ifname: str, action: str) -> CommandResult:
+        """AP down and back: hostapd stops the BSS (no beacons, every station gone) and starts it again."""
+        if self._iface(ifname) is None:
+            return _fail(NO_HOSTAPD, 255)
+        if action == "disable":
+            self._disabled.add(ifname)
+        elif action == "enable":
+            self._disabled.discard(ifname)
+        else:
+            state = "DISABLED" if ifname in self._disabled else "ENABLED"
+            return _ok(f"state={state}\nphy={self._phy}\nfreq={2407 + 5 * 6}\nssid[0]=OpenWrt\n")
+        return _ok("OK\n")
 
     # ---------------------------------------------------------------- runtime MAC lists (hostapd_cli)
     def _acl_change(self, ifname: str, kind: str, action: str, mac: str) -> CommandResult:
@@ -244,7 +261,22 @@ class SimWifi:
                 return _fail("Command failed: Not found\n", 4)
             if str(args.get("addr", "")).lower() == STATION_MAC:
                 self._away = max(3, int(args.get("ban_time", 0)) // 1000)
+            if int(args.get("ban_time", 0)) > 0:
+                self._bans.setdefault(obj, set()).add(str(args.get("addr", "")).lower())
+            else:  # hostapd: ban_time 0 lifts a ban
+                self._bans.get(obj, set()).discard(str(args.get("addr", "")).lower())
             return _ok("{}\n")
+        if obj.startswith("hostapd.") and method == "get_clients":
+            ifname = obj.removeprefix("hostapd.")
+            if self._iface(ifname) is None:
+                return _fail("Command failed: Not found\n", 4)
+            here = ifname not in self._disabled and self._present()
+            clients = {STATION_MAC: {"auth": True, "assoc": True, "authorized": True}} if here else {}
+            return _ok(json.dumps({"freq": 2437, "clients": clients}) + "\n")
+        if obj.startswith("hostapd.") and method == "list_bans":
+            if self._iface(obj.removeprefix("hostapd.")) is None:
+                return _fail("Command failed: Not found\n", 4)
+            return _ok(json.dumps({"clients": sorted(self._bans.get(obj, set()))}) + "\n")
         if obj == "session":
             return self._session(method, args)
         return None

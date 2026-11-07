@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta
 
 import pytest
@@ -116,3 +117,25 @@ def test_write_lock_is_per_router() -> None:
     pool = ConnectionPool(lambda rec: ReplayTransport({}))  # type: ignore[arg-type, return-value]
     assert pool.write_lock("ap1") is pool.write_lock("ap1")
     assert pool.write_lock("ap1") is not pool.write_lock("ap2")
+
+
+async def _replay(rec: RouterRecord) -> Transport:
+    return ReplayTransport({})
+
+
+async def test_get_waits_while_held() -> None:
+    """#33: while a rollback apply holds a router, other reads wait instead of racing its reconnect."""
+    pool = ConnectionPool(_replay)
+    async with pool.hold("ap2"):
+        waiting = asyncio.create_task(pool.get(_rec("ap2")))
+        for _ in range(5):
+            await asyncio.sleep(0)
+        assert not waiting.done()
+    await asyncio.wait_for(waiting, 1.0)
+
+
+async def test_holder_connects_through_hold() -> None:
+    pool = ConnectionPool(_replay)
+    async with pool.hold("ap2") as token:
+        t = await asyncio.wait_for(pool.get(_rec("ap2"), token=token), 1.0)
+    assert t is await pool.get(_rec("ap2"))

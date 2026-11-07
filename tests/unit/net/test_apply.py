@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
@@ -13,13 +14,32 @@ import pytest
 
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard, ProcessInfo
-from openwrtgui.net.apply import ApplyRunner, NetCheck, net_plan, saved_check, service_check
+from openwrtgui.net.apply import (
+    ApplyRunner,
+    NetApplyResult,
+    NetCheck,
+    NetPlan,
+    Planned,
+    Snapshot,
+    Verifier,
+    net_plan,
+    saved_check,
+    service_check,
+)
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.store.settings import GuardWatchList
-from openwrtgui.transport.base import CommandResult, HostKeyInfo, HostKeyUnknown, Transport, Unreachable
+from openwrtgui.transport.base import (
+    CommandResult,
+    HostKeyChanged,
+    HostKeyInfo,
+    HostKeyUnknown,
+    Transport,
+    Unreachable,
+)
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.transport.ssh import HostKeyStore
 from openwrtgui.uci import UciOp, parse_uci_show
+from openwrtgui.wifi.service import PreviewChanged
 
 RUN = ProcessInfo(18244, ("python.exe", "dima_night.py"), datetime(2026, 11, 5, 21, 4))
 NETWORK = "network.lan=interface\nnetwork.lan.proto='static'\nnetwork.lan.ipaddr='192.168.1.2/24'\n"
@@ -44,6 +64,7 @@ class Clock:
 
     async def sleep(self, seconds: float) -> None:
         self.t += timedelta(seconds=seconds)
+        await asyncio.sleep(0)  # let other tasks (the status poller, a screen's read) run meanwhile
 
 
 @dataclass
@@ -124,8 +145,11 @@ def env(tmp_path: Path) -> Env:
     async def factory(rec: RouterRecord) -> Transport:
         if not bench.answers_at(rec.host, clock.now()):
             raise Unreachable(f"{rec.host}: no route to host")
-        if host_keys.get(rec.host, rec.port) is None:
+        pinned = host_keys.get(rec.host, rec.port)
+        if pinned is None:
             raise HostKeyUnknown(rec.host, bench.first_key or bench.key)
+        if pinned != bench.key.fingerprint:
+            raise HostKeyChanged(rec.host, pinned, bench.key)
         return FakeT(bench, rec.host)
 
     async def fetch_key(
@@ -157,7 +181,7 @@ async def _verify_ok(t: Transport) -> list[NetCheck]:
     return [NetCheck("interface lan", True, "up with 192.168.1.12/24")]
 
 
-def _lan_plan(target: str | None = "192.168.1.12") -> object:
+def _lan_plan(target: str | None = "192.168.1.12") -> NetPlan:
     return net_plan(
         router_id="ap2",
         screen="Network",
@@ -167,6 +191,33 @@ def _lan_plan(target: str | None = "192.168.1.12") -> object:
         rollback=True,
         target_host=target,
     )
+
+
+async def _apply(
+    env: Env,
+    plan: NetPlan,
+    verify: Verifier = _verify_ok,
+    before: dict[str, str] | None = SNAPSHOT,
+    digest: str | None = None,
+) -> NetApplyResult:
+    async def make(t: Transport) -> Planned:
+        snapshot = Snapshot("uci -X show network", before) if before is not None else None
+        return Planned(plan, verify, snapshot)
+
+    return await env.runner.run_planned(env.rec, make, digest)
+
+
+def _moved_to(env: Env, host: str) -> list[datetime]:
+    """The router answers at its old address until `uci apply`, then only at `host`."""
+    applied_at: list[datetime] = []
+
+    def note(command: str) -> None:
+        if command.startswith("ubus call uci apply"):
+            applied_at.append(env.clock.t)
+
+    env.bench.on_command = note
+    env.bench.answers_at = lambda h, now: h == (host if applied_at else "192.168.1.2")
+    return applied_at
 
 
 async def test_plain_apply_commits_reloads_and_verifies(env: Env) -> None:
@@ -184,12 +235,11 @@ async def test_plain_apply_commits_reloads_and_verifies(env: Env) -> None:
         "uci commit dhcp",
         "/etc/init.d/dnsmasq reload",
     )
-    t = await env.pool.get(env.rec)
 
     async def saved(_: Transport) -> list[NetCheck]:
         return [NetCheck("saved", True, "dhcp.lan.start = 50")]
 
-    result = await env.runner.run(env.rec, t, plan, saved)
+    result = await _apply(env, plan, saved, None)
     assert env.commands() == [
         "set -e\nuci set dhcp.lan.start='50'\nuci commit dhcp",
         "/etc/init.d/dnsmasq reload",
@@ -200,7 +250,7 @@ async def test_plain_apply_commits_reloads_and_verifies(env: Env) -> None:
 
 def test_rollback_preview_shows_every_step_with_a_session_placeholder() -> None:
     plan = _lan_plan()
-    assert plan.lines == (  # type: ignore[attr-defined]
+    assert plan.lines == (
         "ubus call session create '{\"timeout\":300}'",
         'ubus call session grant \'{"objects":[["network","read"],["network","write"]],'
         '"scope":"uci","ubus_rpc_session":"<session>"}\'',
@@ -226,8 +276,7 @@ def test_nothing_to_apply_is_refused() -> None:
 
 
 async def test_rollback_apply_confirms_after_reconnect(env: Env) -> None:
-    t = await env.pool.get(env.rec)
-    result = await env.runner.run(env.rec, t, _lan_plan(target=None), _verify_ok, SNAPSHOT)  # type: ignore[arg-type]
+    result = await _apply(env, _lan_plan(target=None))
     log = env.bench.log
     assert [c for _, _, c in log[:4]] == [
         "ubus call session create '{\"timeout\":300}'",
@@ -249,9 +298,8 @@ async def test_rollback_apply_confirms_after_reconnect(env: Env) -> None:
 
 
 async def test_changed_address_followed_and_record_updated(env: Env) -> None:
-    env.bench.answers_at = lambda host, now: host == "192.168.1.12"  # the change moved lan at once
-    t = FakeT(env.bench, "192.168.1.2")
-    result = await env.runner.run(env.rec, t, _lan_plan(), _verify_ok, SNAPSHOT)  # type: ignore[arg-type]
+    _moved_to(env, "192.168.1.12")  # the change moved lan at once
+    result = await _apply(env, _lan_plan())
     assert result.applied and result.verified and result.host == "192.168.1.12"
     assert env.routers.get("ap2").host == "192.168.1.12"  # type: ignore[union-attr]
     assert env.host_keys.get("192.168.1.12", 22) == env.bench.key.fingerprint
@@ -261,19 +309,26 @@ async def test_changed_address_followed_and_record_updated(env: Env) -> None:
 async def test_follow_asks_for_the_key_type_pinned_at_the_old_address(env: Env) -> None:
     """AP2, 2026-11-06: known_hosts pinned its ed25519 key, and at 192.168.1.12 a fetch that asked for no
     key type got another type of the same router's keys, so the app took it for another router."""
-    env.bench.answers_at = lambda host, now: host == "192.168.1.12"
+    _moved_to(env, "192.168.1.12")
     env.bench.first_key = _key("ecdsa-sha2-nistp256")  # the same router's other key, offered first
-    t = FakeT(env.bench, "192.168.1.2")
-    result = await env.runner.run(env.rec, t, _lan_plan(), _verify_ok, SNAPSHOT)  # type: ignore[arg-type]
+    result = await _apply(env, _lan_plan())
     assert result.applied and result.verified and result.host == "192.168.1.12", result
     assert env.host_keys.get("192.168.1.12", 22) == env.bench.key.fingerprint
 
 
 async def test_new_address_with_other_host_key_is_not_confirmed(env: Env) -> None:
-    env.bench.answers_at = lambda host, now: host == "192.168.1.12" or now >= env.clock.t + timedelta(days=1)
-    t = FakeT(env.bench, "192.168.1.2")
-    env.bench.key = _key()  # whatever answers at .12 has another key
-    result = await env.runner.run(env.rec, t, _lan_plan(), _verify_ok, SNAPSHOT)  # type: ignore[arg-type]
+    applied_at: list[datetime] = []
+    mine = env.bench.key
+
+    def note(command: str) -> None:
+        if command.startswith("ubus call uci apply"):
+            applied_at.append(env.clock.t)
+            env.bench.key = _key()  # whatever answers at .12 has another key
+
+    env.bench.on_command = note
+    env.bench.answers_at = lambda host, now: host == ("192.168.1.12" if applied_at else "192.168.1.2")
+    result = await _apply(env, _lan_plan())
+    assert env.bench.key != mine
     assert not result.applied and result.host == "192.168.1.2"
     assert env.routers.get("ap2").host == "192.168.1.2"  # type: ignore[union-attr]
     assert not any(c.startswith("ubus call uci confirm") for c in env.commands())
@@ -292,8 +347,7 @@ async def test_unreachable_after_apply_reports_restored(env: Env) -> None:
     env.bench.answers_at = lambda host, now: (
         host == "192.168.1.2" and (not applied_at or now >= applied_at[0] + timedelta(seconds=64))
     )
-    t = FakeT(env.bench, "192.168.1.2")
-    result = await env.runner.run(env.rec, t, _lan_plan(target=None), _verify_ok, SNAPSHOT)  # type: ignore[arg-type]
+    result = await _apply(env, _lan_plan(target=None))
     assert not result.applied and not result.verified
     assert result.error == (
         "Not applied: AP2 · office did not answer at 192.168.1.2 within 40 s. "
@@ -331,8 +385,7 @@ async def test_change_that_cuts_the_path_late_is_never_confirmed(env: Env) -> No
             await env.clock.sleep(1.0)
         return [NetCheck("interface lan", True, "up with 192.168.1.2/30")]
 
-    t = FakeT(env.bench, "192.168.1.2")
-    result = await env.runner.run(env.rec, t, _lan_plan(target=None), verify_lan, SNAPSHOT)  # type: ignore[arg-type]
+    result = await _apply(env, _lan_plan(target=None), verify_lan)
     assert not any(c.startswith("ubus call uci confirm") for c in env.commands())
     assert not result.applied
     assert {c.name: c.ok for c in result.checks} == {"reconnected": False, "restored": True}
@@ -345,8 +398,7 @@ async def test_change_not_seen_in_effect_is_left_to_roll_back(env: Env) -> None:
     async def not_up(t: Transport) -> list[NetCheck]:
         return [NetCheck("interface lan", False, "not up with 192.168.1.2/30 after 20 s")]
 
-    t = await env.pool.get(env.rec)
-    result = await env.runner.run(env.rec, t, _lan_plan(target=None), not_up, SNAPSHOT)  # type: ignore[arg-type]
+    result = await _apply(env, _lan_plan(target=None), not_up)
     assert not any(c.startswith("ubus call uci confirm") for c in env.commands())
     assert not result.applied and not result.verified
     assert [(c.name, c.ok) for c in result.checks] == [
@@ -368,8 +420,7 @@ async def test_guard_live_after_apply_still_confirms(env: Env) -> None:
             env.guard.check_local()
 
     env.bench.on_command = go_live
-    t = await env.pool.get(env.rec)
-    result = await env.runner.run(env.rec, t, _lan_plan(target=None), _verify_ok, SNAPSHOT)  # type: ignore[arg-type]
+    result = await _apply(env, _lan_plan(target=None))
     assert any(c.startswith("ubus call uci confirm") for c in env.commands())
     assert result.applied
     assert result.error is not None and result.error.startswith("Confirmed although Bench Guard went live")
@@ -382,8 +433,7 @@ async def test_script_refused_sends_no_apply(env: Env) -> None:
         return None
 
     env.bench.respond = refuse
-    t = await env.pool.get(env.rec)
-    result = await env.runner.run(env.rec, t, _lan_plan(target=None), _verify_ok, SNAPSHOT)  # type: ignore[arg-type]
+    result = await _apply(env, _lan_plan(target=None))
     assert not any(c.startswith("ubus call uci apply") for c in env.commands())
     assert env.commands()[-1] == 'ubus call session destroy \'{"ubus_rpc_session":"S"}\''
     assert not result.applied and result.error == "The router refused the change: uci: Invalid argument"
@@ -457,3 +507,264 @@ def test_carry_pins_only_identical_key(tmp_path: Path) -> None:
     assert store.carry("192.168.1.2", "192.168.1.12", 22, mine)
     assert store.get("192.168.1.12", 22) == mine.fingerprint
     assert not store.carry("10.0.0.1", "10.0.0.2", 22, mine)  # nothing pinned for the old address
+
+
+async def test_digest_checked_under_the_write_lock(env: Env) -> None:
+    """#32: the plan and the digest check run under the write lock, so nothing changes in between."""
+    locked: list[bool] = []
+
+    async def make(t: Transport) -> Planned:
+        locked.append(env.pool.write_lock("ap2").locked())
+        return Planned(_lan_plan(target=None), _verify_ok)
+
+    with pytest.raises(PreviewChanged):
+        await env.runner.run_planned(env.rec, make, "0000000000000000")
+    assert locked == [True]
+    assert env.commands() == []
+
+
+async def test_reload_after_commit_finishes_when_guard_goes_live(env: Env) -> None:
+    """#27: once the script committed, the reload finishes even if a run starts in between."""
+
+    def go_live(command: str) -> None:
+        if command.startswith("set -e"):
+            env.processes.append(RUN)
+            env.guard.check_local()
+
+    env.bench.on_command = go_live
+    plan = net_plan(
+        router_id="ap2",
+        screen="Network",
+        config="dhcp",
+        ops=[UciOp("set", "dhcp.lan.start", "50")],
+        current={"dhcp.lan": "dhcp", "dhcp.lan.start": "100"},
+        reloads=("/etc/init.d/dnsmasq reload",),
+    )
+    result = await _apply(env, plan, before=None)
+    assert "/etc/init.d/dnsmasq reload" in env.commands()
+    assert result.applied
+    assert result.error is not None
+    assert result.error.startswith("Saved and reloaded although Bench Guard went live (dima_night.py")
+
+
+async def test_changed_host_key_at_target_named(env: Env) -> None:
+    """#28: a key at the new address that differs from one pinned there is named as such."""
+    _moved_to(env, "192.168.1.12")
+    env.host_keys.pin("192.168.1.12", 22, _key())  # something else was pinned for .12 before
+    result = await _apply(env, _lan_plan())
+    assert not result.applied
+    assert not any(c.startswith("ubus call uci confirm") for c in env.commands())
+    reconnected = next(c for c in result.checks if c.name == "reconnected")
+    assert reconnected.detail == (
+        "192.168.1.12 answers with a host key that differs from the one pinned for AP2 · office"
+    )
+
+
+def _cut_after_apply(env: Env, back_after_s: float) -> None:
+    """Nothing answers after `uci apply` until `back_after_s` s later, then the old address is back."""
+    applied_at: list[datetime] = []
+
+    def note(command: str) -> None:
+        if command.startswith("ubus call uci apply"):
+            applied_at.append(env.clock.t)
+
+    env.bench.on_command = note
+    env.bench.answers_at = lambda host, now: (
+        host == "192.168.1.2" and (not applied_at or now >= applied_at[0] + timedelta(seconds=back_after_s))
+    )
+
+
+async def test_restore_check_retries_until_the_router_answers(env: Env) -> None:
+    """#34: at 65 s the router may still be coming back; the check tries again before it reports."""
+    _cut_after_apply(env, 68.0)
+    result = await _apply(env, _lan_plan(target=None))
+    restored = next(c for c in result.checks if c.name == "restored")
+    assert restored.ok is True, restored
+
+
+async def test_restore_unreadable_is_not_differs(env: Env) -> None:
+    """#34: a read that fails says it could not read, not that the settings differ."""
+    _cut_after_apply(env, 64.0)
+
+    def broken(command: str) -> CommandResult | None:
+        if command == "uci -X show network":
+            return CommandResult(command, "", "uci: I/O error\n", 1)
+        return None
+
+    env.bench.respond = broken
+    result = await _apply(env, _lan_plan(target=None))
+    restored = next(c for c in result.checks if c.name == "restored")
+    assert restored.ok is None
+    assert restored.detail == "could not read the settings back: uci: I/O error"
+
+
+async def test_rollback_reconnect_not_queued_behind_reads(env: Env) -> None:
+    """#33: a read issued while the router is changing waits until the apply confirmed; it never takes the
+    connection the runner needs to reach the router and confirm."""
+    events: list[str] = []
+    reads: list[asyncio.Task[Transport]] = []
+
+    async def poll() -> Transport:
+        t = await env.pool.get(env.rec)
+        events.append("read")
+        return t
+
+    def note(command: str) -> None:
+        if command.startswith("ubus call uci apply"):
+            reads.append(asyncio.ensure_future(poll()))
+        if command.startswith("ubus call uci confirm"):
+            events.append("confirm")
+
+    env.bench.on_command = note
+    result = await _apply(env, _lan_plan(target=None))
+    await asyncio.wait_for(reads[0], 1.0)
+    assert result.applied
+    assert events == ["confirm", "read"]
+
+
+# ---------------------------------------------------------------- timer rollback (changes outside uci)
+CHANGE = "nft -f /tmp/owg/new.nft"
+LISTING = "nft list table inet owg_t"
+TABLE_BEFORE = "table inet owg_t {\n}"
+
+
+def _timer_plan() -> NetPlan:
+    return net_plan(
+        router_id="ap2",
+        screen="Firewall",
+        config=None,
+        ops=[],
+        current={},
+        commands=(CHANGE,),
+        rollback=True,
+        backup=(f"{LISTING} > /tmp/owg/rb-<rollback>.nft",),
+        restore=("nft delete table inet owg_t", "nft -f /tmp/owg/rb-<rollback>.nft"),
+    )
+
+
+def _cancel(rid: str) -> str:
+    pid = f"/tmp/owg/rb-{rid}.pid"
+    return f"start-stop-daemon -K -q -p {pid}; rm -f {pid}; rm -f /tmp/owg/rb-{rid}*"
+
+
+def _table_snapshot() -> Snapshot:
+    return Snapshot(LISTING, {"text": TABLE_BEFORE}, parse=lambda text: {"text": text.strip()})
+
+
+async def _apply_timer(env: Env, verify: Verifier = _verify_ok) -> NetApplyResult:
+    async def make(t: Transport) -> Planned:
+        return Planned(_timer_plan(), verify, _table_snapshot())
+
+    return await env.runner.run_planned(env.rec, make, None)
+
+
+def test_timer_rollback_preview_names_the_timer_with_a_placeholder() -> None:
+    lines = _timer_plan().lines
+    assert lines[0] == "set -e"
+    assert lines[1] == f"{LISTING} > /tmp/owg/rb-<rollback>.nft"
+    assert lines[2].startswith(
+        "mkdir -p /tmp/owg && start-stop-daemon -S -b -m -p /tmp/owg/rb-<rollback>.pid "
+        "-x /bin/sh -- -c 'sleep 60; "
+    )
+    assert "nft delete table inet owg_t; nft -f /tmp/owg/rb-<rollback>.nft" in lines[2]
+    assert lines[3:] == (
+        CHANGE,
+        "start-stop-daemon -K -q -p /tmp/owg/rb-<rollback>.pid; rm -f /tmp/owg/rb-<rollback>.pid; "
+        "rm -f /tmp/owg/rb-<rollback>*",
+    )
+
+
+async def test_timer_rollback_confirms_after_reconnect(env: Env) -> None:
+    result = await _apply_timer(env)
+    log = env.bench.log
+    armed = log[0][2]
+    rid = armed.split("/tmp/owg/rb-", 1)[1][:6]
+    assert all(c in "0123456789abcdef" for c in rid)
+    assert armed.startswith(
+        f"set -e\n{LISTING} > /tmp/owg/rb-{rid}.nft\nmkdir -p /tmp/owg && start-stop-daemon"
+    )
+    assert "<rollback>" not in armed
+    assert log[1][2] == CHANGE
+    cancel = next(entry for entry in log if entry[2].startswith("start-stop-daemon -K"))
+    assert cancel[0] == 2  # from a new connection, once the change is seen in effect
+    assert cancel[2] == _cancel(rid)
+    assert result.applied and result.verified
+    assert [(c.name, c.ok) for c in result.checks] == [
+        ("reconnected", True),
+        ("confirmed", True),
+        ("interface lan", True),
+    ]
+
+
+async def test_timer_rollback_unconfirmed_reports_restored(env: Env) -> None:
+    changed_at: list[datetime] = []
+
+    def note(command: str) -> None:
+        if command == CHANGE:
+            changed_at.append(env.clock.t)
+
+    def respond(command: str) -> CommandResult | None:
+        if command == LISTING:
+            return CommandResult(command, TABLE_BEFORE + "\n", "", 0)
+        return None
+
+    env.bench.on_command = note
+    env.bench.respond = respond
+    env.bench.answers_at = lambda host, now: (
+        host == "192.168.1.2" and (not changed_at or now >= changed_at[0] + timedelta(seconds=64))
+    )
+    result = await _apply_timer(env)
+    assert not any(c.startswith("start-stop-daemon -K") for c in env.commands())
+    assert not result.applied
+    assert {c.name: c.ok for c in result.checks} == {"reconnected": False, "restored": True}
+    assert result.error is not None and result.error.startswith("Not applied: AP2 · office did not answer")
+
+
+async def test_timer_rollback_change_refused_restores_at_once(env: Env) -> None:
+    def refuse(command: str) -> CommandResult | None:
+        if command == CHANGE:
+            return CommandResult(command, "", "Error: syntax error, unexpected newline\n", 1)
+        return None
+
+    env.bench.respond = refuse
+    result = await _apply_timer(env)
+    commands = env.commands()
+    rid = commands[0].split("/tmp/owg/rb-", 1)[1][:6]
+    assert commands[2:] == [
+        f"nft delete table inet owg_t; nft -f /tmp/owg/rb-{rid}.nft",
+        _cancel(rid),
+    ]
+    assert not result.applied
+    assert result.error == "The router refused the change: Error: syntax error, unexpected newline"
+
+
+async def test_timer_rollback_failed_restore_leaves_the_timer_armed(env: Env) -> None:
+    def refuse(command: str) -> CommandResult | None:
+        if command == CHANGE:
+            return CommandResult(command, "", "Error: syntax error, unexpected newline\n", 1)
+        if command.startswith("nft delete table inet owg_t; "):
+            return CommandResult(command, "", 'Error: Could not open file "/tmp/owg/rb.nft"\n', 1)
+        return None
+
+    env.bench.respond = refuse
+    result = await _apply_timer(env)
+    assert not any(c.startswith("start-stop-daemon -K") for c in env.commands())  # its last chance
+    assert not result.applied
+    assert result.error == (
+        "The router refused the change: Error: syntax error, unexpected newline. Putting the previous "
+        'state back failed too (Error: Could not open file "/tmp/owg/rb.nft"); the router\'s timer '
+        "tries again within 60 s"
+    )
+
+
+async def test_saved_check_finds_a_list_item_of_a_new_section() -> None:
+    """An add_list on a section the script made is one item of the list the router shows."""
+    shown = Shown(
+        "firewall.cfg0aa001=ipset\nfirewall.cfg0aa001.entry='aa:bb:cc:dd:ee:01' 'aa:bb:cc:dd:ee:02'\n"
+    )
+    ops = [
+        UciOp("add", "firewall.$s1", "ipset"),
+        UciOp("add_list", "firewall.$s1.entry", "aa:bb:cc:dd:ee:02"),
+    ]
+    check = await saved_check(shown, "uci -X show firewall", ops, {})  # type: ignore[arg-type]
+    assert check == NetCheck("saved", True, "the router has the change")

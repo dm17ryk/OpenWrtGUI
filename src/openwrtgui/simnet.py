@@ -24,9 +24,10 @@ from openwrtgui.transport.base import CommandResult
 from openwrtgui.uci import parse_uci_show, shell_quote
 
 PC_MAC = "08:3a:88:5c:a8:39"
-CONFIGS = ("network", "dhcp")
+CONFIGS = ("network", "dhcp", "firewall")
 DEFAULT = ""  # the default staging folder (/tmp/.uci)
 SWITCH = "switch0"
+DEVICE_MACS = {"br-lan": "00:0c:43:76:20:17", "eth0.1": "00:0c:43:76:20:17", "eth0.2": "00:0c:43:76:20:16"}
 EXTERNAL = (0, 1, 2, 3, 4)
 CPU = 6
 PORTS = 8
@@ -138,6 +139,7 @@ class SimNetwork:
         self._wifi_mirror = wifi_mirror
         self.arl = dict(arl or {})  # MAC → port in `get arl_table` (empty, as on AP2's mt7620)
         self.extra_links: set[int] = set()  # more switch ports with a link than the PC's
+        self.fw: Any = None  # the SimFirewall of the same router, which may cut the PC's SSH
 
     # ---------------------------------------------------------------- what the connector asks
     def _expire(self) -> None:
@@ -155,9 +157,19 @@ class SimNetwork:
         lan = self._lan()
         return lan.address.ip if lan is not None and lan.proto == "static" and lan.address else None
 
-    def reachable(self) -> bool:
-        """The PC reaches lan: its address is in lan's subnet, and its switch port is on and in lan's VLAN."""
+    def uci(self) -> dict[str, str]:
+        """Every config as committed now (after a rollback that came due)."""
         self._expire()
+        return dict(self._committed)
+
+    def reachable(self) -> bool:
+        """The PC reaches lan: its address is in lan's subnet, its switch port is on and in lan's VLAN,
+        and the firewall lets its SSH in."""
+        self._expire()
+        if self.fw is not None:
+            self.fw.fire(self.fw.dispatch)  # a rollback timer that came due runs, reachable or not
+        if self.fw is not None and not self.fw.admits_ssh(self.pc_ip):
+            return False
         lan = self._lan()
         if lan is None or lan.address is None or not self._enabled.get(self.pc_port, True):
             return False
@@ -280,7 +292,10 @@ class SimNetwork:
         path, eq, value = arg.partition("=")
         section = ".".join(path.split(".")[:2])
         if verb == "delete":
-            for key in [k for k in work if k == path or k.startswith(path + ".")]:
+            found = [k for k in work if k == path or k.startswith(path + ".")]
+            if not found:  # uci exits 1 on a missing entry, -q only hides the message (AP2, 2026-11-07)
+                return _fail("uci: Entry not found\n")
+            for key in found:
                 del work[key]
             return _ok()
         if not eq or (path.count(".") == 2 and section not in work):
@@ -417,6 +432,8 @@ class SimNetwork:
             out[d.name] = {"type": d.type or "Network device", "up": True, "bridge-members": list(d.ports)}
         for v in switch_vlans(self._committed):
             out.setdefault(f"eth0.{v.vid or v.vlan}", {"type": "VLAN", "up": True})
+        for name, d in out.items():  # the MACs AP2 reports (tests/fixtures/ap2/network.json)
+            d["macaddr"] = DEVICE_MACS.get(name, "00:0c:43:76:20:77")
         return out
 
     def _l3(self, name: str | None) -> str | None:

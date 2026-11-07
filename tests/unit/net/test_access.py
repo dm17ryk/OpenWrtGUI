@@ -9,7 +9,7 @@ from openwrtgui.net.access import AccessChange, AccessState, SsidAccess, compile
 from openwrtgui.net.service import radio_results
 from openwrtgui.transport.base import CommandResult
 from openwrtgui.uci import UciOp, parse_uci_show
-from openwrtgui.wifi.service import ApplyResult, Check
+from openwrtgui.wifi.service import ApplyResult, Check, PreviewChanged
 
 PANEL = "f4:12:fa:f3:57:68"
 OTHER = "aa:bb:cc:dd:ee:01"
@@ -158,3 +158,50 @@ async def test_unknown_ssid_and_bad_mac_refused(net: NetEnv) -> None:
         await net.service.plan_access(
             "ap1", AccessChange("block", ("default_radio0",), mac="f4:12", method="now")
         )
+
+
+async def test_access_saved_checks_digest_under_lock(net: NetEnv) -> None:
+    """#32: a saved access change is planned and its digest checked while the write lock is held, and the
+    Wi-Fi apply then runs under that same hold."""
+    seen: list[bool] = []
+    plan_ops = net.wifi.plan_ops
+
+    async def watched(*args, **kw):  # type: ignore[no-untyped-def]
+        seen.append(net.pool.write_lock("ap1").locked())
+        return await plan_ops(*args, **kw)
+
+    net.wifi.plan_ops = watched  # type: ignore[method-assign]
+    change = AccessChange("block", ("default_radio0",), mac=OTHER, method="saved")
+    with pytest.raises(PreviewChanged):
+        await net.service.apply_access("ap1", change, "0000000000000000")
+    assert seen == [True]
+    assert not any("uci add_list wireless" in line for line in net.audit_lines())
+    plan = await net.service.plan_access("ap1", change)
+    result = await net.service.apply_access("ap1", change, plan.digest)
+    assert result.applied and result.verified, result
+
+
+async def test_timed_block_checked_with_list_bans(net: NetEnv) -> None:
+    """#29: a ban for N s is proven by reading hostapd's ban list back."""
+    change = AccessChange("block", ("default_radio0",), mac=PANEL, method="timed", seconds=60)
+    plan = await net.service.plan_access("ap1", change)
+    result = await net.service.apply_access("ap1", change, plan.digest)
+    assert [(c.name, c.ok) for c in result.checks] == [("ban phy0-ap0", True)]
+    assert result.verified
+
+
+class NoBans:
+    async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
+        if "list_bans" in command:
+            return CommandResult(command, "", "Command failed: Method not found", 4)
+        return CommandResult(command, "", "", 0)
+
+
+async def test_timed_block_unread_is_not_verified(net: NetEnv) -> None:
+    """#29: without a read-back the ban is "not verified", never shown as proven."""
+    change = AccessChange("block", ("default_radio0",), mac=PANEL, method="timed", seconds=60)
+    plan = await net.service.plan_access("ap1", change)
+    checks = await net.service._runtime_checks(plan)(NoBans())  # type: ignore[arg-type]
+    assert [(c.name, c.ok, c.detail) for c in checks] == [
+        ("ban phy0-ap0", None, "hostapd took the request; not read back")
+    ]

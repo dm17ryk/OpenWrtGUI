@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from openwrtgui.probe.commands import FAULT_RECORDS
 from openwrtgui.transport.base import Transport, ubus_call
 
 LOAD_SCALE = 65536
@@ -58,6 +59,7 @@ class RouterStatus:
     radios: tuple[RadioStatus, ...]
     interfaces: tuple[InterfaceStatus, ...]
     dhcp_server_on: bool | None
+    faults_armed: int | None = None  # the app's fault records in /tmp/owg (spec 7.1)
 
 
 def _station(raw: dict[str, Any]) -> StationInfo:
@@ -118,6 +120,13 @@ async def read_status(t: Transport) -> RouterStatus:
     memory = info.get("memory", {})
     radios = [await _radio(t, name, raw) for name, raw in wireless.items() if isinstance(raw, dict)]
     dhcp_on = None if dhcp is None else dhcp.get("values", {}).get("ignore") != "1"
+    records = await t.run(FAULT_RECORDS)
+    # no record file: cat exits 1; a router that cannot answer at all: unknown
+    armed = (
+        sum(1 for line in records.stdout.splitlines() if line.strip())
+        if records.exit_status in (0, 1)
+        else None
+    )
     return RouterStatus(
         read_at=datetime.now().astimezone(),
         uptime_s=int(info.get("uptime", 0)),
@@ -127,6 +136,7 @@ async def read_status(t: Transport) -> RouterStatus:
         radios=tuple(radios),
         interfaces=tuple(_interface(i) for i in dump.get("interface", [])),
         dhcp_server_on=dhcp_on,
+        faults_armed=armed,
     )
 
 

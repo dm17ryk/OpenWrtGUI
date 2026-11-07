@@ -48,7 +48,8 @@ def write_refusal(router: str, *, allow_writes: bool, txctl_told: bool) -> str |
     if not txctl_told:
         return (
             "pass --txctl-told once the txctl session has been told of the window on AP2 "
-            "(a radio-on window, or a network window: lan briefly at 192.168.1.12)"
+            "(a radio-on window, a network window: lan briefly at 192.168.1.12, or a firewall and faults "
+            "window: fw4 reloads)"
         )
     return None
 

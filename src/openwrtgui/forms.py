@@ -107,6 +107,8 @@ def compile_edits(
             raise ValueError(f"{edit.name} is not an option of {edit.section}")
         if row.editor == "readonly":
             raise ValueError(f"{edit.name} is read-only")
+        if row.control:  # its control runs checks a plain row would skip (#26)
+            raise ValueError(f"{edit.name} has its own control ({row.control}); change it there.")
         path = f"{config}.{edit.section}.{edit.name}"
         if edit.value is None:
             ops.append(UciOp("delete", path))

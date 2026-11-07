@@ -74,6 +74,42 @@ export type VlansIn = { upserts: VlanIn[]; deletes: string[] }
 export type MirrorIn = Partial<S['MirrorIn']>
 export type PortEnableIn = Partial<S['PortEnableIn']>
 
+// Firewall, Faults and capture (v0.4)
+export type FirewallState = S['FirewallState']
+export type FirewallConf = S['FirewallConf']
+export type ZoneConf = S['ZoneConf']
+export type FwRuleConf = S['FwRuleConf']
+export type RedirectConf = S['RedirectConf']
+export type NatConf = S['NatConf']
+export type IpsetConf = S['IpsetConf']
+export type RuleView = S['RuleView']
+export type PinView = S['PinView']
+export type NftObject = S['NftObject']
+export type TcHook = S['TcHook']
+export type CustomFile = S['CustomFile']
+export type Policy = ZoneConf['input']
+export type ModelIn = Body<S['ModelIn'], 'cells'>
+export type ZoneIn = Body<S['ZoneIn'], 'name' | 'input' | 'output' | 'forward'>
+export type ZonesIn = { upserts: ZoneIn[]; deletes: string[]; forwardings?: S['ForwardingIn'][] | null }
+export type TrafficRuleIn = Body<S['TrafficRuleIn'], 'name'>
+export type ForwardIn = Body<S['ForwardIn'], 'name' | 'src_dport' | 'dest_ip'>
+export type NatIn = Body<S['NatIn'], 'name' | 'src'>
+export type IpsetIn = Body<S['IpsetIn'], 'name' | 'match'>
+export type CustomIn = Body<S['CustomIn'], 'name'>
+export type TableIn = Body<S['TableIn'], 'action'>
+export type FaultsState = S['FaultsState']
+export type FaultTarget = S['FaultTarget']
+export type ArmedFault = S['ArmedFault']
+export type FaultCaps = S['FaultCaps']
+export type FaultIn = Body<S['FaultIn'], 'kind' | 'target'>
+export type NetemIn = Partial<S['NetemIn']>
+export type ClearIn = { ids: string[] | null }
+export type CaptureView = S['CaptureView']
+export type CaptureIn = Body<S['CaptureIn'], 'device'>
+export type CaptureDevices = S['CaptureDevicesOut']
+export type KnownDevice = S['KnownDevice']
+export type KnownTable = S['KnownTable']
+
 // RF live (/ws/rf/{id}); WebSocket messages are not in the OpenAPI schema (src/openwrtgui/rf/sample.py).
 export type Bitrate = { mbps: number; mcs: number | null; width_mhz: number; short_gi: boolean; mode: Mode }
 export type RadioSample = {

@@ -74,7 +74,7 @@ def _macs(text: str) -> tuple[str, ...]:
     return tuple(
         line.split()[0].lower()
         for line in text.splitlines()
-        if line.split() and _MAC.match(line.split()[0].lower())
+        if line.split() and _MAC.fullmatch(line.split()[0].lower())
     )
 
 
@@ -129,7 +129,7 @@ async def read_access(
 
 def _mac(text: str | None) -> str:
     mac = (text or "").strip().lower().replace("-", ":")
-    if not _MAC.match(mac):
+    if not _MAC.fullmatch(mac):
         raise ValueError(f"{text} is not a MAC address")
     return mac
 

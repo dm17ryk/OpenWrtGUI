@@ -11,6 +11,10 @@ from typing import Literal
 
 import httpx
 
+from openwrtgui.capture.service import CaptureService
+from openwrtgui.capture.wireshark import find_wireshark
+from openwrtgui.faults.service import FaultsService
+from openwrtgui.fw.service import FirewallService
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard, psutil_lister
 from openwrtgui.live import LiveHub
@@ -20,7 +24,7 @@ from openwrtgui.net.apply import ApplyRunner
 from openwrtgui.net.service import NetworkService
 from openwrtgui.onboard.pc_keys import find_pc_keys, ssh_dirs
 from openwrtgui.onboard.wizard import Connector, OnboardService, SshConnector
-from openwrtgui.paths import DataDir
+from openwrtgui.paths import DataDir, documents_dir
 from openwrtgui.poller import StatusPoller
 from openwrtgui.ports.service import PortsService
 from openwrtgui.probe.describe import SelfDescription
@@ -59,6 +63,9 @@ class AppContext:
     luci: LuciBridgeService
     net: NetworkService
     ports: PortsService
+    fw: FirewallService
+    faults: FaultsService
+    captures: CaptureService
     token: str
     port: int
     mode: Literal["real", "simulator"]
@@ -96,6 +103,10 @@ def _sim_upstream(descriptions: dict[str, SelfDescription]) -> UpstreamFactory:
         return await sim_upstream(title_of)
 
     return factory
+
+
+def _no_wireshark() -> Path | None:
+    return None
 
 
 def build_context(
@@ -203,6 +214,34 @@ def build_context(
     ports = PortsService(
         pool=pool, routers=routers, guard=guard, audit=audit, descriptions=descriptions, runner=runner
     )
+    fw = FirewallService(
+        pool=pool,
+        routers=routers,
+        guard=guard,
+        audit=audit,
+        settings=settings,
+        descriptions=descriptions,
+        runner=runner,
+    )
+    faults = FaultsService(
+        pool=pool,
+        routers=routers,
+        guard=guard,
+        audit=audit,
+        settings=settings,
+        descriptions=descriptions,
+        runner=runner,
+    )
+    # the simulator never writes into the user's Documents, nor starts Wireshark
+    captures = CaptureService(
+        pool=pool,
+        routers=routers,
+        guard=guard,
+        audit=audit,
+        net=net,
+        documents=data.root / "documents" if simulator is not None else documents_dir(),
+        wireshark=_no_wireshark if simulator is not None else find_wireshark,
+    )
     return AppContext(
         data=data,
         settings=settings,
@@ -224,6 +263,9 @@ def build_context(
         luci=luci,
         net=net,
         ports=ports,
+        fw=fw,
+        faults=faults,
+        captures=captures,
         token=token,
         port=port,
         mode="simulator" if simulator is not None else "real",

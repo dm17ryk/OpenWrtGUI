@@ -60,6 +60,18 @@ def interface_rows(
     )
 
 
+def check_name(name: str) -> None:
+    if not _NAME.fullmatch(name):
+        raise ValueError("An interface name is 1 to 15 letters, digits or _")
+
+
+def check_proto(proto: str, handlers: Mapping[str, Mapping[str, str]], router_name: str) -> None:
+    """A protocol the router has no handler for would be written and never come up (#31)."""
+    have = sorted({*handlers, "none"})
+    if proto not in have:
+        raise ValueError(f"{router_name} has no handler for protocol '{proto}'. It has: {', '.join(have)}.")
+
+
 def _ipv4(text: str) -> str:
     try:
         return str(ipaddress.IPv4Address(text.strip()))
@@ -94,8 +106,7 @@ def _existing(req: InterfaceRequest, state: NetworkState) -> None:
         parent = dynamic.dynamic_parent or "its parent"
         raise ValueError(f"{req.name} is made by {parent} at run time; change {parent} instead.")
     if req.create:
-        if not _NAME.match(req.name):
-            raise ValueError("An interface name is 1 to 15 letters, digits or _")
+        check_name(req.name)
         if state.conf(req.name) is not None:
             raise ValueError(f"There is already an interface named {req.name}")
     elif state.conf(req.name) is None:
@@ -107,11 +118,11 @@ def _proto_ops(
     current: str,
     set_here: Mapping[str, str],
     handlers: Mapping[str, Mapping[str, str]],
+    router_name: str,
 ) -> list[UciOp]:
     if req.proto is None or req.proto == current:
         return []
-    if req.proto not in handlers:
-        raise ValueError(f"{req.proto} is not a protocol of this router")
+    check_proto(req.proto, handlers, router_name)
     p = f"network.{req.name}"
     ops = [UciOp("set", f"{p}.proto", req.proto)]
     gone = set(handlers.get(current, {})) - set(handlers.get(req.proto, {}))
@@ -140,13 +151,11 @@ def compile_interface(
     ops: list[UciOp] = []
     warnings: list[str] = []
     if req.create:
+        check_proto(req.proto or "none", handlers, router_name)
         ops += [UciOp("set", p, "interface"), UciOp("set", f"{p}.proto", req.proto or "none")]
-        warnings.append(
-            f"Put {req.name} in a firewall zone "
-            "(Firewall comes with v0.4; until then LuCI › Network › Firewall)."
-        )
+        warnings.append(f"Put {req.name} in a firewall zone on the Firewall screen (Zones).")
     else:
-        ops += _proto_ops(req, current, set_here, handlers)
+        ops += _proto_ops(req, current, set_here, handlers, router_name)
     proto = req.proto or current
     if req.device is not None:
         ops.append(UciOp("set", f"{p}.device", req.device))

@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from openwrtgui.transport.base import CommandResult, ShellChannel
 
 if TYPE_CHECKING:
+    from openwrtgui.simfw import SimFirewall
     from openwrtgui.simnet import SimNetwork
     from openwrtgui.simwifi import SimWifi
 
@@ -28,6 +29,7 @@ class SimState:
     password_login: str | None = None
     wifi: SimWifi | None = None
     net: SimNetwork | None = None
+    fw: SimFirewall | None = None
 
 
 def load_commands(path: Path) -> dict[str, CommandResult]:
@@ -36,6 +38,27 @@ def load_commands(path: Path) -> dict[str, CommandResult]:
         cmd: CommandResult(cmd, entry.get("stdout", ""), entry.get("stderr", ""), int(entry.get("exit", 0)))
         for cmd, entry in raw.items()
     }
+
+
+class BytesStream:
+    """A finished capture's bytes, read back in chunks (the simulator's tcpdump)."""
+
+    def __init__(self, data: bytes, exit_status: int = 0, stderr: str = "") -> None:
+        self._data = data
+        self._closed = False
+        self._final = (exit_status, stderr)
+        self.exit_status: int | None = None
+        self.stderr = ""
+
+    async def read(self, n: int = 65536) -> bytes:
+        if self._closed:
+            return b""
+        chunk, self._data = self._data[:n], self._data[n:]
+        return chunk
+
+    async def close(self) -> None:
+        self._closed = True
+        self.exit_status, self.stderr = self._final
 
 
 class ReplayTransport:
@@ -68,15 +91,32 @@ class ReplayTransport:
     async def open_shell(self, cols: int, rows: int) -> ShellChannel:
         raise NotImplementedError("simulator has no shell")
 
+    async def stream(self, command: str) -> BytesStream:
+        self.calls.append(command)
+        data = self.state.fw.stream(command) if self.state is not None and self.state.fw is not None else None
+        if data is None:
+            return BytesStream(b"", 1, "tcpdump: no such device\n")
+        return BytesStream(data, 124)  # `timeout` ends it
+
     async def close(self) -> None:
         return None
 
     def _simulate(self, command: str) -> CommandResult | None:
         assert self.state is not None
-        # The network first: it answers only commands it knows whole (the Wi-Fi one echoes any `echo`).
+        if self.state.fw is not None:
+            self.state.fw.dispatch = self._dispatch
+            self.state.fw.fire(self._dispatch)  # router-side timers that came due run first
+        return self._dispatch(command)
+
+    def _dispatch(self, command: str) -> CommandResult | None:
+        assert self.state is not None
+        # The network first: it answers only commands it knows whole (the Wi-Fi one echoes any `echo`); the
+        # firewall last, since it splits compound commands and hands their parts back here.
         if self.state.net is not None and (answered := self.state.net.answer(command)) is not None:
             return answered
         if self.state.wifi is not None and (answered := self.state.wifi.answer(command)) is not None:
+            return answered
+        if self.state.fw is not None and (answered := self.state.fw.answer(command)) is not None:
             return answered
         if command == "true":
             return CommandResult(command, "", "", 0)

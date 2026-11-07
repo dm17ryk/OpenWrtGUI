@@ -20,6 +20,7 @@ vi.mock('../../api/client', async (orig) => {
     if (path === '/api/routers/ap2/luci/pages') return []
     if (path === '/api/routers/ap2/ports/enable/preview') return LAN2_OFF_PLAN
     if (path === '/api/routers/ap2/ports/vlans/preview') return VLAN1_PLAN
+    if (path === '/api/routers/ap2/ports/vlans/apply') return new Promise(() => {}) // still waiting for the router
     if (path === '/api/routers/ap2/ports/mirror/preview') throw new actual.ApiError(422, 'LAN2 is the monitor port; it cannot also be a source.', {})
     throw new Error(`unexpected ${path}`)
   }
@@ -111,4 +112,16 @@ test('a router without a managed switch says why', async () => {
   renderPorts()
   expect(await screen.findByText(/not managed by swconfig/)).toBeInTheDocument()
   expect(screen.queryByRole('region', { name: 'Front panel' })).toBeNull()
+})
+
+test('a VLAN 1 apply says it is waiting for the router while the rollback runs', async () => {
+  const user = renderPorts()
+  const matrix = await screen.findByRole('table', { name: 'VLAN membership' })
+  await user.click(within(matrix).getByRole('button', { name: 'VLAN 1 LAN4 untagged' }))
+  const vlans = screen.getByRole('region', { name: 'VLANs' })
+  await within(vlans).findByRole('region', { name: 'Command preview' })
+  await user.click(within(vlans).getByRole('button', { name: 'Apply with rollback' }))
+  expect(await within(vlans).findByRole('status', { name: 'Waiting for the router' })).toHaveTextContent(
+    'Applying with a 60 s rollback: waiting for AP2 to answer at 192.168.1.2…',
+  )
 })

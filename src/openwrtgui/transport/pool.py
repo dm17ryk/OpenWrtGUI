@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
@@ -26,6 +27,12 @@ class RouterHealth:
     error: str | None
 
 
+def _released() -> asyncio.Event:
+    event = asyncio.Event()
+    event.set()
+    return event
+
+
 @dataclass
 class _Slot:
     transport: Transport | None = None
@@ -34,6 +41,8 @@ class _Slot:
     health: RouterHealth | None = None
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     connecting: asyncio.Lock = field(default_factory=asyncio.Lock)
+    holder: object | None = None
+    released: asyncio.Event = field(default_factory=_released)
 
 
 class ConnectionPool:
@@ -54,8 +63,27 @@ class ConnectionPool:
     def write_lock(self, router_id: str) -> asyncio.Lock:
         return self._slot(router_id).lock
 
-    async def get(self, router: RouterRecord) -> Transport:
+    @asynccontextmanager
+    async def hold(self, router_id: str) -> AsyncIterator[object]:
+        """While a rollback apply waits for its router, everyone else's get() waits: the status poller and the
+        screens' reads must not take the connection the apply needs to reach the router and confirm. The
+        holder passes the token it gets to its own get() calls."""
+        slot = self._slot(router_id)
+        while slot.holder is not None:
+            await slot.released.wait()
+        token = object()
+        slot.holder = token
+        slot.released.clear()
+        try:
+            yield token
+        finally:
+            slot.holder = None
+            slot.released.set()
+
+    async def get(self, router: RouterRecord, *, token: object | None = None) -> Transport:
         slot = self._slot(router.id)
+        while slot.holder is not None and slot.holder is not token:
+            await slot.released.wait()
         async with slot.connecting:
             if slot.transport is not None:
                 return slot.transport

@@ -7,6 +7,7 @@ function page(path: string, title: string, pkg: string, native: string | null, s
 export const LUCI_PAGES: LuciPageView[] = [
   page('admin/network/dhcp', 'DHCP', 'luci-mod-network', null, 'Network'),
   page('admin/network/wireless', 'Wireless', 'luci-mod-network', 'wifi', 'Network'),
+  page('admin/network/firewall/zones', 'General Settings', 'luci-app-firewall', 'firewall', 'Network › Firewall'),
   page('admin/status/iptables', 'Firewall', 'luci-mod-status', null, 'Status', 'Status › Firewall (iptables)'),
   page('admin/status/overview', 'Overview', 'luci-mod-status', 'dashboard', 'Status'),
 ]

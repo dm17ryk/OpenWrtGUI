@@ -7,6 +7,48 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Firewall and faults.
+
+### Added
+
+- Firewall screen for fw4 routers: per zone and direction **Allow all** or **Block all** (rejected or
+  dropped), with each rule's effect in the model and the rules that would no longer do anything flagged. On
+  the zone that carries this app's SSH, Block all keeps "Allow SSH from this PC" (and "Allow DHCP and DNS"
+  where the router serves DHCP there) open; a pin is removed only after a warning. Every firewall change
+  applies with the 60 s rollback.
+- Zones (networks, policies, masquerade, MSS clamp, forwardings), traffic rules with live packet counters,
+  port forwards, NAT rules, IP sets and custom rule files in `/etc/nftables.d` (checked by fw4 with `nft -c`
+  before it reloads), as LuCI's Network › Firewall pages have them, and the raw ruleset.
+- Every other nftables table and traffic-control hook with its owner (fw4, this app, a known harness such as
+  `BENCHSIPGUARD` or `voipdscp`, or unknown). Tables owned by someone else are locked: **Unlock** says who
+  relies on them, and the override is audited. Edit rules and chains, delete a table or add one, runtime only
+  or saved as an fw4 include; applied atomically with `nft -f` under a router-side restore timer. The faults
+  table `benchfault` is changed only on the Faults screen.
+- Faults and capture screen: link down (switch port), isolate (L2), block flows (`rtp_in`, `sip_in`,
+  `rtp_out`, `all_in`, `all_out`, `blackout`, with loss), netem impair scoped to the target, and Wi-Fi deauth,
+  block for N s and AP down. A fault is held until cleared or for N s, cleared by a timer on the router itself;
+  armed faults are listed from their records on the router, also after a restart of the app, and the router
+  card shows "N faults armed". A fault still there after Clear stays listed, with what is left. Clear
+  everything works during a run.
+- Capture on a router interface (`br-lan`, Wi-Fi, `mon0`, LTE) to a `.pcap` in Documents or live in
+  Wireshark; the app's own SSH is never captured.
+- Settings: known devices (a name and all its MACs) and known tables (who writes which nft table).
+
+### Fixed
+
+- All options no longer edits options that have their own control on the screen; they show read-only (#26).
+- A change saved just as a harness run starts is reloaded too, not left saved but not live, and the result
+  says the run started (#27).
+- A changed host key after a rollback reads as a host key problem, and a new address that belongs to another
+  router is warned about (#28).
+- A timed Wi-Fi block is reported as proven only when hostapd lists the ban (#29).
+- Name checks no longer accept a trailing newline (#30); an unknown protocol is refused (#31).
+- The plan and its digest are checked under the router's write lock (#32).
+- Background reads wait while a rollback apply reconnects (#33).
+- The restore check retries, and a failed read is no longer reported as "differs" (#34).
+- Network and Ports: every rollback card says it is waiting for the router, a new interface links the
+  Firewall zones, and the State column shows the uptime (#35).
+
 ## [0.3.0] - 2026-11-06
 
 Network, DHCP, ports and VLANs.

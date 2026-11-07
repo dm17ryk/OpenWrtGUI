@@ -53,6 +53,8 @@ def drop_unchanged(ops: Sequence[UciOp], current: Mapping[str, str]) -> list[Uci
     a del_list of an absent item go. An add_list stays: it usually follows a delete of the same list."""
     kept: list[UciOp] = []
     for op in ops:
+        if op.op == "delete" and _new(op.path) and op.path.count(".") == 2:
+            continue  # a section the script just made has no options: uci would exit 1 (AP2, 2026-11-07)
         if op.op == "add" or _new(op.path):
             kept.append(op)
         elif (

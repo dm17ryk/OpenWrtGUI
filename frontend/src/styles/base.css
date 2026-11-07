@@ -823,6 +823,120 @@ h2 {
   align-self: flex-start;
 }
 
+/* Firewall: model cells, policies, pins, flagged rules, editors */
+.seg button.onblock {
+  background: var(--bad);
+  color: #ffffff;
+}
+.pol {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 12px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.pol.acc {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+.pol.rej {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+.pol.neu {
+  background: var(--neu-soft);
+  color: var(--ink2);
+}
+.pin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface2);
+}
+.tbl tr.flag td {
+  background: var(--warn-soft);
+}
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+.small {
+  font-size: 12px;
+}
+.nowrap {
+  white-space: nowrap;
+}
+fieldset.editor {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  margin: 0;
+  min-width: 0;
+}
+fieldset.editor legend {
+  font-weight: 600;
+  padding: 0 6px;
+}
+.note.h {
+  background: var(--har-soft);
+  border: 1px solid var(--har);
+}
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0;
+}
+.facts dt {
+  color: var(--muted);
+}
+.facts dd {
+  margin: 0;
+}
+
+/* Faults: one card per layer */
+.layers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+.layer.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.layer.off {
+  opacity: 0.7;
+}
+.layer h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.tag {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--neu-soft);
+  color: var(--ink2);
+}
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+input[type='range'] {
+  min-height: 44px;
+  accent-color: var(--bad);
+}
+
 @media (max-width: 600px) {
   .top {
     padding: 10px 16px;

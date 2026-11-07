@@ -1,0 +1,17 @@
+{
+  "tables": [
+    "table bridge voipdscp {\n\tchain post {\n\t\ttype filter hook postrouting priority 0; policy accept;\n\t\tudp dport 5004 ip dscp set ef counter\n\t\tudp dport { 5060, 5061 } ip dscp set ef counter\n\t}\n}",
+    "table ip lab_scratch {\n\tchain pre {\n\t\ttype filter hook prerouting priority 0; policy accept;\n\t\tip saddr 192.168.1.30 counter\n\t\tip daddr 192.168.1.30 counter\n\t\tudp dport 5004 counter\n\t}\n}"
+  ],
+  "fw4_chains": {
+    "BENCHSIPGUARD": [
+      "oifname { \"eth0.2\", \"wwan0\" } udp dport { 5060, 5061 } counter reject",
+      "oifname { \"eth0.2\", \"wwan0\" } tcp dport { 5060, 5061 } counter reject"
+    ]
+  },
+  "conntrack": [
+    "udp      17 29 src=192.168.1.30 dst=203.0.113.5 sport=4000 dport=31000 packets=120 bytes=24000 src=203.0.113.5 dst=192.168.2.10 sport=31000 dport=4000 packets=118 bytes=23600 [ASSURED] mark=0 use=1",
+    "udp      17 20 src=192.168.1.30 dst=192.168.1.1 sport=5060 dport=5060 packets=4 bytes=2000 src=192.168.1.1 dst=192.168.1.30 sport=5060 dport=5060 packets=4 bytes=1900 mark=0 use=1"
+  ],
+  "tc_tables": ["normal.dist", "pareto.dist", "paretonormal.dist"]
+}

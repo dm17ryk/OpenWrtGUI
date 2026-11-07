@@ -27,6 +27,7 @@ export function usePlanApply(base: string, body: object | null, onApplied: (resu
     if (!body || !plan) return
     setBusy(true)
     setApplyError(null)
+    setResult(null) // the result on screen is always the last apply's
     try {
       const done = await postJson<NetApplyResult>(`${base}/apply`, { ...body, digest: plan.digest })
       setResult(done)

@@ -379,6 +379,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/captures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Captures */
+        get: operations["captures_api_routers__router_id__captures_get"];
+        put?: never;
+        /** Capture Start */
+        post: operations["capture_start_api_routers__router_id__captures_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/captures/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Capture Devices */
+        get: operations["capture_devices_api_routers__router_id__captures_devices_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/captures/{capture_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Capture Stop */
+        post: operations["capture_stop_api_routers__router_id__captures__capture_id__stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/describe": {
         parameters: {
             query?: never;
@@ -390,6 +442,397 @@ export interface paths {
         put?: never;
         /** Describe Again */
         post: operations["describe_again_api_routers__router_id__describe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/faults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Faults State */
+        get: operations["faults_state_api_routers__router_id__faults_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/faults/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fault Apply */
+        post: operations["fault_apply_api_routers__router_id__faults_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/faults/clear/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Clear Apply */
+        post: operations["clear_apply_api_routers__router_id__faults_clear_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/faults/clear/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Clear Preview */
+        post: operations["clear_preview_api_routers__router_id__faults_clear_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/faults/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fault Preview */
+        post: operations["fault_preview_api_routers__router_id__faults_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Firewall State */
+        get: operations["firewall_state_api_routers__router_id__firewall_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/custom/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Custom Apply */
+        post: operations["custom_apply_api_routers__router_id__firewall_custom_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/custom/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Custom Preview */
+        post: operations["custom_preview_api_routers__router_id__firewall_custom_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/forwards/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Forwards Apply */
+        post: operations["forwards_apply_api_routers__router_id__firewall_forwards_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/forwards/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Forwards Preview */
+        post: operations["forwards_preview_api_routers__router_id__firewall_forwards_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/ipsets/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ipsets Apply */
+        post: operations["ipsets_apply_api_routers__router_id__firewall_ipsets_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/ipsets/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ipsets Preview */
+        post: operations["ipsets_preview_api_routers__router_id__firewall_ipsets_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/model/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Model Apply */
+        post: operations["model_apply_api_routers__router_id__firewall_model_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/model/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Model Preview */
+        post: operations["model_preview_api_routers__router_id__firewall_model_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/nat/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Nat Apply */
+        post: operations["nat_apply_api_routers__router_id__firewall_nat_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/nat/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Nat Preview */
+        post: operations["nat_preview_api_routers__router_id__firewall_nat_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/rules/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rules Apply */
+        post: operations["rules_apply_api_routers__router_id__firewall_rules_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/rules/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rules Preview */
+        post: operations["rules_preview_api_routers__router_id__firewall_rules_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/ruleset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ruleset */
+        get: operations["ruleset_api_routers__router_id__firewall_ruleset_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/tables/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tables Apply */
+        post: operations["tables_apply_api_routers__router_id__firewall_tables_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/tables/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tables Preview */
+        post: operations["tables_preview_api_routers__router_id__firewall_tables_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/zones/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Zones Apply */
+        post: operations["zones_apply_api_routers__router_id__firewall_zones_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/zones/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Zones Preview */
+        post: operations["zones_preview_api_routers__router_id__firewall_zones_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1248,6 +1691,30 @@ export interface components {
             /** Verified */
             verified: boolean;
         };
+        /** ArmedFault */
+        ArmedFault: {
+            /**
+             * Armed At
+             * Format: date-time
+             */
+            armed_at: string;
+            /** Clear */
+            clear: string[];
+            /** Device */
+            device: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "link_down" | "isolate" | "block" | "netem" | "deauth" | "ban" | "ap_down";
+            /** Summary */
+            summary: string;
+            target: components["schemas"]["FaultTarget"];
+            /** Until */
+            until: string | null;
+        };
         /** AuditEntry */
         AuditEntry: {
             /** Command */
@@ -1303,6 +1770,72 @@ export interface components {
             /** Url */
             url: string;
         };
+        /** CaptureDevicesOut */
+        CaptureDevicesOut: {
+            /** Devices */
+            devices: string[];
+            /** Wireshark */
+            wireshark: boolean;
+        };
+        /** CaptureIn */
+        CaptureIn: {
+            /** Device */
+            device: string;
+            /**
+             * Duration S
+             * @default 60
+             */
+            duration_s: number;
+            /**
+             * Filter
+             * @default
+             */
+            filter: string;
+            /**
+             * Output
+             * @default file
+             * @enum {string}
+             */
+            output: "file" | "wireshark";
+        };
+        /** CaptureView */
+        CaptureView: {
+            /** Bytes */
+            bytes: number;
+            /** Device */
+            device: string;
+            /** Duration S */
+            duration_s: number;
+            /** Error */
+            error: string | null;
+            /** Filter */
+            filter: string;
+            /** Id */
+            id: string;
+            /**
+             * Output
+             * @enum {string}
+             */
+            output: "file" | "wireshark";
+            /** Path */
+            path: string | null;
+            /** Router Id */
+            router_id: string;
+            /** Running */
+            running: boolean;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+        };
+        /** ChainIn */
+        ChainIn: {
+            /** Declaration */
+            declaration?: string | null;
+            /** Name */
+            name: string;
+        };
         /** ChannelSelection */
         ChannelSelection: {
             /**
@@ -1340,6 +1873,58 @@ export interface components {
             name: "radio" | "channel" | "width" | "TX power" | "TX mask" | "beacon rate";
             /** Ok */
             ok: boolean | null;
+        };
+        /** ClearApplyIn */
+        ClearApplyIn: {
+            /** Digest */
+            digest: string;
+            /** Ids */
+            ids?: string[] | null;
+        };
+        /** ClearIn */
+        ClearIn: {
+            /** Ids */
+            ids?: string[] | null;
+        };
+        /** CustomApplyIn */
+        CustomApplyIn: {
+            /** Content */
+            content?: string | null;
+            /** Digest */
+            digest: string;
+            /** Name */
+            name: string;
+        };
+        /** CustomFile */
+        CustomFile: {
+            /** Comments Only */
+            comments_only: boolean;
+            /** Content */
+            content: string;
+            /** From Image */
+            from_image: boolean;
+            /** Lines */
+            lines: number;
+            /** Name */
+            name: string;
+            /** Path */
+            path: string;
+        };
+        /** CustomIn */
+        CustomIn: {
+            /** Content */
+            content?: string | null;
+            /** Name */
+            name: string;
+        };
+        /** DefaultsConf */
+        DefaultsConf: {
+            /** Section */
+            section: string;
+            /** Values */
+            values: {
+                [key: string]: string;
+            };
         };
         /** DescriptionSummary */
         DescriptionSummary: {
@@ -1528,6 +2113,105 @@ export interface components {
             /** Widths */
             widths: number[];
         };
+        /** FaultApplyIn */
+        FaultApplyIn: {
+            /** Ban S */
+            ban_s?: number | null;
+            /** Digest */
+            digest: string;
+            /** Flow */
+            flow?: ("rtp_in" | "sip_in" | "rtp_out" | "all_in" | "all_out" | "blackout") | null;
+            /** Hold S */
+            hold_s?: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "link_down" | "isolate" | "block" | "netem" | "deauth" | "ban" | "ap_down";
+            /**
+             * Loss
+             * @default 100
+             */
+            loss: number;
+            netem?: components["schemas"]["NetemIn"] | null;
+            /** Port */
+            port?: number | null;
+            target: components["schemas"]["TargetIn"];
+        };
+        /** FaultCaps */
+        FaultCaps: {
+            /**
+             * Band
+             * @default prio
+             */
+            band: ("prio" | "ets") | null;
+            /** Conntrack */
+            conntrack: boolean;
+            /** Distributions */
+            distributions: string[];
+            /** Family */
+            family: ("netdev" | "bridge") | null;
+            /** Ifb */
+            ifb: boolean;
+            /**
+             * Netem
+             * @default true
+             */
+            netem: boolean;
+        };
+        /** FaultIn */
+        FaultIn: {
+            /** Ban S */
+            ban_s?: number | null;
+            /** Flow */
+            flow?: ("rtp_in" | "sip_in" | "rtp_out" | "all_in" | "all_out" | "blackout") | null;
+            /** Hold S */
+            hold_s?: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "link_down" | "isolate" | "block" | "netem" | "deauth" | "ban" | "ap_down";
+            /**
+             * Loss
+             * @default 100
+             */
+            loss: number;
+            netem?: components["schemas"]["NetemIn"] | null;
+            /** Port */
+            port?: number | null;
+            target: components["schemas"]["TargetIn"];
+        };
+        /** FaultTarget */
+        FaultTarget: {
+            /** Device */
+            device: string | null;
+            /** Ip */
+            ip: string | null;
+            /** Mac */
+            mac: string | null;
+            /** Name */
+            name: string | null;
+            /** Via */
+            via: string | null;
+        };
+        /** FaultsState */
+        FaultsState: {
+            /** Armed */
+            armed: components["schemas"]["ArmedFault"][];
+            caps: components["schemas"]["FaultCaps"];
+            ports: components["schemas"]["PortsState"] | null;
+            /** Router Id */
+            router_id: string;
+            /** Targets */
+            targets: components["schemas"]["FaultTarget"][];
+            /** Unavailable */
+            unavailable: {
+                [key: string]: string;
+            };
+            /** Wifi */
+            wifi: components["schemas"]["WifiIf"][];
+        };
         /** FinishIn */
         FinishIn: {
             /** Name */
@@ -1539,6 +2223,176 @@ export interface components {
             port_labels: {
                 [key: string]: string;
             };
+        };
+        /** FirewallConf */
+        FirewallConf: {
+            defaults: components["schemas"]["DefaultsConf"] | null;
+            /** Forwardings */
+            forwardings: components["schemas"]["ForwardingConf"][];
+            /** Includes */
+            includes: components["schemas"]["IncludeConf"][];
+            /** Ipsets */
+            ipsets: components["schemas"]["IpsetConf"][];
+            /** Nats */
+            nats: components["schemas"]["NatConf"][];
+            /** Redirects */
+            redirects: components["schemas"]["RedirectConf"][];
+            /** Rules */
+            rules: components["schemas"]["FwRuleConf"][];
+            /** Zones */
+            zones: components["schemas"]["ZoneConf"][];
+        };
+        /** FirewallState */
+        FirewallState: {
+            /** Available */
+            available: boolean;
+            conf: components["schemas"]["FirewallConf"];
+            /** Counters */
+            counters: {
+                [key: string]: number;
+            };
+            /**
+             * Custom
+             * @default []
+             */
+            custom: components["schemas"]["CustomFile"][];
+            /** Objects */
+            objects: components["schemas"]["NftObject"][];
+            /** Own Zone */
+            own_zone: string | null;
+            /** Pc Ip */
+            pc_ip: string | null;
+            /** Pins */
+            pins: components["schemas"]["PinView"][];
+            /** Reason */
+            reason: string | null;
+            /** Router Id */
+            router_id: string;
+            /** Rules */
+            rules: components["schemas"]["RuleView"][];
+            /** Ssh Port */
+            ssh_port: number;
+            /** Tc */
+            tc: components["schemas"]["TcHook"][];
+        };
+        /** ForwardIn */
+        ForwardIn: {
+            /**
+             * Dest
+             * @default lan
+             */
+            dest: string;
+            /** Dest Ip */
+            dest_ip: string;
+            /** Dest Port */
+            dest_port?: string | null;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Name */
+            name: string;
+            /**
+             * Others
+             * @default {}
+             */
+            others: {
+                [key: string]: string | null;
+            };
+            /**
+             * Proto
+             * @default tcp udp
+             */
+            proto: string;
+            /** Section */
+            section?: string | null;
+            /**
+             * Src
+             * @default wan
+             */
+            src: string;
+            /** Src Dport */
+            src_dport: string;
+        };
+        /** ForwardingConf */
+        ForwardingConf: {
+            /** Dest */
+            dest: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Section */
+            section: string;
+            /** Src */
+            src: string | null;
+        };
+        /** ForwardingIn */
+        ForwardingIn: {
+            /** Dest */
+            dest: string;
+            /** Src */
+            src: string;
+        };
+        /** ForwardsApplyIn */
+        ForwardsApplyIn: {
+            /**
+             * Deletes
+             * @default []
+             */
+            deletes: string[];
+            /** Digest */
+            digest: string;
+            /**
+             * Upserts
+             * @default []
+             */
+            upserts: components["schemas"]["ForwardIn"][];
+        };
+        /** ForwardsIn */
+        ForwardsIn: {
+            /**
+             * Deletes
+             * @default []
+             */
+            deletes: string[];
+            /**
+             * Upserts
+             * @default []
+             */
+            upserts: components["schemas"]["ForwardIn"][];
+        };
+        /** FwRuleConf */
+        FwRuleConf: {
+            /** Dest */
+            dest: string | null;
+            /** Dest Ip */
+            dest_ip: string[];
+            /** Dest Port */
+            dest_port: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Family */
+            family: string | null;
+            /** Icmp Type */
+            icmp_type: string[];
+            /** Name */
+            name: string | null;
+            /** Others */
+            others?: {
+                [key: string]: string;
+            };
+            /** Proto */
+            proto: string | null;
+            /** Section */
+            section: string;
+            /** Src */
+            src: string | null;
+            /** Src Ip */
+            src_ip: string[];
+            /** Src Port */
+            src_port: string | null;
+            /** Target */
+            target: string;
         };
         /** GuardOut */
         GuardOut: {
@@ -1649,6 +2503,17 @@ export interface components {
              * @default []
              */
             upserts: components["schemas"]["HostIn"][];
+        };
+        /** IncludeConf */
+        IncludeConf: {
+            /** Path */
+            path: string | null;
+            /** Position */
+            position: string | null;
+            /** Section */
+            section: string;
+            /** Type */
+            type: string | null;
         };
         /** InstallIn */
         InstallIn: {
@@ -1793,6 +2658,85 @@ export interface components {
             /** Own */
             own: boolean;
         };
+        /** IpsetConf */
+        IpsetConf: {
+            /** Enabled */
+            enabled: boolean;
+            /** Entries */
+            entries: string[];
+            /** Family */
+            family: string;
+            /** Match */
+            match: string[];
+            /** Name */
+            name: string | null;
+            /** Others */
+            others?: {
+                [key: string]: string;
+            };
+            /** Section */
+            section: string;
+        };
+        /** IpsetIn */
+        IpsetIn: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Entries
+             * @default []
+             */
+            entries: string[];
+            /**
+             * Family
+             * @default ipv4
+             * @enum {string}
+             */
+            family: "ipv4" | "ipv6";
+            /** Match */
+            match: string[];
+            /** Name */
+            name: string;
+            /**
+             * Others
+             * @default {}
+             */
+            others: {
+                [key: string]: string | null;
+            };
+            /** Section */
+            section?: string | null;
+        };
+        /** IpsetsApplyIn */
+        IpsetsApplyIn: {
+            /**
+             * Deletes
+             * @default []
+             */
+            deletes: string[];
+            /** Digest */
+            digest: string;
+            /**
+             * Upserts
+             * @default []
+             */
+            upserts: components["schemas"]["IpsetIn"][];
+        };
+        /** IpsetsIn */
+        IpsetsIn: {
+            /**
+             * Deletes
+             * @default []
+             */
+            deletes: string[];
+            /**
+             * Upserts
+             * @default []
+             */
+            upserts: components["schemas"]["IpsetIn"][];
+        };
         /** IwDevInfo */
         IwDevInfo: {
             /** Addr */
@@ -1817,6 +2761,28 @@ export interface components {
             type: string | null;
             /** Width Mhz */
             width_mhz: number | null;
+        };
+        /**
+         * KnownDevice
+         * @description A device by name and its MACs (spec 7.12): the panel's Ethernet and Wi-Fi MACs are unrelated.
+         */
+        KnownDevice: {
+            /** Macs */
+            macs: string[];
+            /** Name */
+            name: string;
+        };
+        /**
+         * KnownTable
+         * @description A known writer of an nft table, or of a chain inside fw4's table (spec 7.12, known writers).
+         */
+        KnownTable: {
+            /** Depends */
+            depends: string;
+            /** Match */
+            match: string;
+            /** Owner */
+            owner: string;
         };
         /** Lease */
         Lease: {
@@ -1955,6 +2921,32 @@ export interface components {
              */
             modes: ("b" | "g" | "n20" | "n40")[];
         };
+        /** ModelApplyIn */
+        ModelApplyIn: {
+            /** Cells */
+            cells: {
+                [key: string]: "ACCEPT" | "REJECT" | "DROP";
+            };
+            /** Digest */
+            digest: string;
+            /**
+             * Pins Removed
+             * @default []
+             */
+            pins_removed: ("ssh" | "dhcpdns")[];
+        };
+        /** ModelIn */
+        ModelIn: {
+            /** Cells */
+            cells: {
+                [key: string]: "ACCEPT" | "REJECT" | "DROP";
+            };
+            /**
+             * Pins Removed
+             * @default []
+             */
+            pins_removed: ("ssh" | "dhcpdns")[];
+        };
         /** ModesIn */
         ModesIn: {
             /**
@@ -1967,6 +2959,102 @@ export interface components {
              * @default []
              */
             modes: ("b" | "g" | "n20" | "n40")[];
+        };
+        /** NatConf */
+        NatConf: {
+            /** Dest Ip */
+            dest_ip: string | null;
+            /** Dest Port */
+            dest_port: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Name */
+            name: string | null;
+            /** Others */
+            others?: {
+                [key: string]: string;
+            };
+            /** Proto */
+            proto: string | null;
+            /** Section */
+            section: string;
+            /** Snat Ip */
+            snat_ip: string | null;
+            /** Snat Port */
+            snat_port: string | null;
+            /** Src */
+            src: string | null;
+            /** Src Ip */
+            src_ip: string | null;
+            /** Target */
+            target: string;
+        };
+        /** NatIn */
+        NatIn: {
+            /** Dest Ip */
+            dest_ip?: string | null;
+            /** Dest Port */
+            dest_port?: string | null;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Name */
+            name: string;
+            /**
+             * Others
+             * @default {}
+             */
+            others: {
+                [key: string]: string | null;
+            };
+            /** Proto */
+            proto?: string | null;
+            /** Section */
+            section?: string | null;
+            /** Snat Ip */
+            snat_ip?: string | null;
+            /** Snat Port */
+            snat_port?: string | null;
+            /** Src */
+            src: string;
+            /** Src Ip */
+            src_ip?: string | null;
+            /**
+             * Target
+             * @default SNAT
+             * @enum {string}
+             */
+            target: "SNAT" | "MASQUERADE" | "ACCEPT";
+        };
+        /** NatsApplyIn */
+        NatsApplyIn: {
+            /**
+             * Deletes
+             * @default []
+             */
+            deletes: string[];
+            /** Digest */
+            digest: string;
+            /**
+             * Upserts
+             * @default []
+             */
+            upserts: components["schemas"]["NatIn"][];
+        };
+        /** NatsIn */
+        NatsIn: {
+            /**
+             * Deletes
+             * @default []
+             */
+            deletes: string[];
+            /**
+             * Upserts
+             * @default []
+             */
+            upserts: components["schemas"]["NatIn"][];
         };
         /** NetApplyResult */
         NetApplyResult: {
@@ -2012,6 +3100,46 @@ export interface components {
             /** Warnings */
             warnings: string[];
         };
+        /** NetemIn */
+        NetemIn: {
+            /**
+             * Delay Ms
+             * @default 0
+             */
+            delay_ms: number;
+            /**
+             * Direction
+             * @default to
+             * @enum {string}
+             */
+            direction: "to" | "from" | "both";
+            /**
+             * Distribution
+             * @default uniform
+             * @enum {string}
+             */
+            distribution: "uniform" | "normal" | "pareto" | "paretonormal";
+            /**
+             * Duplicate Pct
+             * @default 0
+             */
+            duplicate_pct: number;
+            /**
+             * Jitter Ms
+             * @default 0
+             */
+            jitter_ms: number;
+            /**
+             * Loss Pct
+             * @default 0
+             */
+            loss_pct: number;
+            /**
+             * Reorder Pct
+             * @default 0
+             */
+            reorder_pct: number;
+        };
         /** NetworkState */
         NetworkState: {
             /** Devices */
@@ -2037,6 +3165,28 @@ export interface components {
             routes: components["schemas"]["RouteConf"][];
             /** Rules */
             rules: components["schemas"]["RuleConf"][];
+        };
+        /** NftObject */
+        NftObject: {
+            /** Chain */
+            chain: string | null;
+            /** Depends */
+            depends: string | null;
+            /** Family */
+            family: string;
+            /** Key */
+            key: string;
+            /**
+             * Owner
+             * @enum {string}
+             */
+            owner: "fw4" | "app" | "known" | "unknown";
+            /** Rules */
+            rules: number;
+            /** Table */
+            table: string;
+            /** Writer */
+            writer: string | null;
         };
         /** Ok */
         Ok: {
@@ -2134,6 +3284,22 @@ export interface components {
         PasswordIn: {
             /** Password */
             password: string;
+        };
+        /** PinView */
+        PinView: {
+            /**
+             * Id
+             * @enum {string}
+             */
+            id: "ssh" | "dhcpdns";
+            /** Match */
+            match: string;
+            /** Name */
+            name: string;
+            /** Present */
+            present: boolean;
+            /** Why */
+            why: string;
         };
         /**
          * PlanOut
@@ -2361,6 +3527,33 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** RedirectConf */
+        RedirectConf: {
+            /** Dest */
+            dest: string | null;
+            /** Dest Ip */
+            dest_ip: string | null;
+            /** Dest Port */
+            dest_port: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Name */
+            name: string | null;
+            /** Others */
+            others?: {
+                [key: string]: string;
+            };
+            /** Proto */
+            proto: string | null;
+            /** Section */
+            section: string;
+            /** Src */
+            src: string | null;
+            /** Src Dport */
+            src_dport: string | null;
+            /** Target */
+            target: string;
+        };
         /** ReleaseOut */
         ReleaseOut: {
             /** Name */
@@ -2496,6 +3689,8 @@ export interface components {
         RouterStatus: {
             /** Dhcp Server On */
             dhcp_server_on: boolean | null;
+            /** Faults Armed */
+            faults_armed?: number | null;
             /** Interfaces */
             interfaces: components["schemas"]["InterfaceStatus"][];
             /** Load */
@@ -2622,6 +3817,59 @@ export interface components {
             /** Src */
             src?: string | null;
         };
+        /** RuleView */
+        RuleView: {
+            conf: components["schemas"]["FwRuleConf"];
+            /** Direction */
+            direction: ("input" | "forward" | "output") | null;
+            /**
+             * Effect
+             * @enum {string}
+             */
+            effect: "allows" | "blocks" | "no-effect-allow" | "no-effect-block" | "other";
+            /** Packets */
+            packets: number | null;
+            /**
+             * Target Class
+             * @enum {string}
+             */
+            target_class: "accept" | "block" | "other";
+            /** Zone */
+            zone: string | null;
+        };
+        /** RulesApplyIn */
+        RulesApplyIn: {
+            /**
+             * Deletes
+             * @default []
+             */
+            deletes: string[];
+            /** Digest */
+            digest: string;
+            /**
+             * Upserts
+             * @default []
+             */
+            upserts: components["schemas"]["TrafficRuleIn"][];
+        };
+        /** RulesIn */
+        RulesIn: {
+            /**
+             * Deletes
+             * @default []
+             */
+            deletes: string[];
+            /**
+             * Upserts
+             * @default []
+             */
+            upserts: components["schemas"]["TrafficRuleIn"][];
+        };
+        /** RulesetOut */
+        RulesetOut: {
+            /** Text */
+            text: string;
+        };
         /** SessionView */
         SessionView: {
             /** Changed From */
@@ -2668,6 +3916,10 @@ export interface components {
              */
             auto_check: boolean;
             guard?: components["schemas"]["GuardWatchList"];
+            /** Known Devices */
+            known_devices?: components["schemas"]["KnownDevice"][];
+            /** Known Tables */
+            known_tables?: components["schemas"]["KnownTable"][];
             /** Last Check */
             last_check?: string | null;
             /** Skipped Version */
@@ -2795,6 +4047,168 @@ export interface components {
          * @enum {string}
          */
         Step: "address" | "host_key" | "login" | "install_key" | "identify" | "ports" | "done";
+        /** TableApplyIn */
+        TableApplyIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "edit" | "add" | "delete";
+            /**
+             * Chains
+             * @default []
+             */
+            chains: components["schemas"]["ChainIn"][];
+            /** Digest */
+            digest: string;
+            /** Family */
+            family?: string | null;
+            /**
+             * Keep
+             * @default runtime
+             * @enum {string}
+             */
+            keep: "runtime" | "include";
+            /**
+             * Key
+             * @default
+             */
+            key: string;
+            /** Name */
+            name?: string | null;
+            /**
+             * Override
+             * @default false
+             */
+            override: boolean;
+            /**
+             * Rules
+             * @default []
+             */
+            rules: components["schemas"]["TableRuleIn"][];
+        };
+        /** TableIn */
+        TableIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "edit" | "add" | "delete";
+            /**
+             * Chains
+             * @default []
+             */
+            chains: components["schemas"]["ChainIn"][];
+            /** Family */
+            family?: string | null;
+            /**
+             * Keep
+             * @default runtime
+             * @enum {string}
+             */
+            keep: "runtime" | "include";
+            /**
+             * Key
+             * @default
+             */
+            key: string;
+            /** Name */
+            name?: string | null;
+            /**
+             * Override
+             * @default false
+             */
+            override: boolean;
+            /**
+             * Rules
+             * @default []
+             */
+            rules: components["schemas"]["TableRuleIn"][];
+        };
+        /** TableRuleIn */
+        TableRuleIn: {
+            /** Body */
+            body: string;
+            /** Chain */
+            chain: string;
+        };
+        /** TargetIn */
+        TargetIn: {
+            /** Ip */
+            ip?: string | null;
+            /** Mac */
+            mac?: string | null;
+        };
+        /** TcHook */
+        TcHook: {
+            /** Dev */
+            dev: string;
+            /** Handle */
+            handle: string;
+            /** Kind */
+            kind: string;
+            /**
+             * Owner
+             * @enum {string}
+             */
+            owner: "fw4" | "app" | "known" | "unknown";
+        };
+        /** TrafficRuleIn */
+        TrafficRuleIn: {
+            /** Dest */
+            dest?: string | null;
+            /**
+             * Dest Ip
+             * @default []
+             */
+            dest_ip: string[];
+            /** Dest Port */
+            dest_port?: string | null;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Family
+             * @default any
+             * @enum {string}
+             */
+            family: "ipv4" | "ipv6" | "any";
+            /**
+             * Icmp Type
+             * @default []
+             */
+            icmp_type: string[];
+            /** Name */
+            name: string;
+            /**
+             * Others
+             * @default {}
+             */
+            others: {
+                [key: string]: string | null;
+            };
+            /** Proto */
+            proto?: string | null;
+            /** Section */
+            section?: string | null;
+            /** Src */
+            src?: string | null;
+            /**
+             * Src Ip
+             * @default []
+             */
+            src_ip: string[];
+            /** Src Port */
+            src_port?: string | null;
+            /**
+             * Target
+             * @default ACCEPT
+             * @enum {string}
+             */
+            target: "ACCEPT" | "REJECT" | "DROP";
+        };
         /** TrustIn */
         TrustIn: {
             /** Fingerprint */
@@ -2921,6 +4335,15 @@ export interface components {
              */
             upserts: components["schemas"]["VlanIn"][];
         };
+        /** WifiIf */
+        WifiIf: {
+            /** Ifname */
+            ifname: string;
+            /** Ssid */
+            ssid: string;
+            /** Up */
+            up: boolean;
+        };
         /** WifiMirror */
         WifiMirror: {
             /** Present */
@@ -2939,6 +4362,114 @@ export interface components {
             read_at: string;
             /** Router Id */
             router_id: string;
+        };
+        /** ZoneConf */
+        ZoneConf: {
+            /**
+             * Forward
+             * @enum {string}
+             */
+            forward: "ACCEPT" | "REJECT" | "DROP";
+            /**
+             * Input
+             * @enum {string}
+             */
+            input: "ACCEPT" | "REJECT" | "DROP";
+            /** Masq */
+            masq: boolean;
+            /** Mtu Fix */
+            mtu_fix: boolean;
+            /** Name */
+            name: string;
+            /** Networks */
+            networks: string[];
+            /** Others */
+            others?: {
+                [key: string]: string;
+            };
+            /**
+             * Output
+             * @enum {string}
+             */
+            output: "ACCEPT" | "REJECT" | "DROP";
+            /** Section */
+            section: string;
+        };
+        /** ZoneIn */
+        ZoneIn: {
+            /**
+             * Forward
+             * @enum {string}
+             */
+            forward: "ACCEPT" | "REJECT" | "DROP";
+            /**
+             * Input
+             * @enum {string}
+             */
+            input: "ACCEPT" | "REJECT" | "DROP";
+            /**
+             * Masq
+             * @default false
+             */
+            masq: boolean;
+            /**
+             * Mtu Fix
+             * @default false
+             */
+            mtu_fix: boolean;
+            /** Name */
+            name: string;
+            /**
+             * Networks
+             * @default []
+             */
+            networks: string[];
+            /**
+             * Others
+             * @default {}
+             */
+            others: {
+                [key: string]: string | null;
+            };
+            /**
+             * Output
+             * @enum {string}
+             */
+            output: "ACCEPT" | "REJECT" | "DROP";
+            /** Section */
+            section?: string | null;
+        };
+        /** ZonesApplyIn */
+        ZonesApplyIn: {
+            /**
+             * Deletes
+             * @default []
+             */
+            deletes: string[];
+            /** Digest */
+            digest: string;
+            /** Forwardings */
+            forwardings?: components["schemas"]["ForwardingIn"][] | null;
+            /**
+             * Upserts
+             * @default []
+             */
+            upserts: components["schemas"]["ZoneIn"][];
+        };
+        /** ZonesIn */
+        ZonesIn: {
+            /**
+             * Deletes
+             * @default []
+             */
+            deletes: string[];
+            /** Forwardings */
+            forwardings?: components["schemas"]["ForwardingIn"][] | null;
+            /**
+             * Upserts
+             * @default []
+             */
+            upserts: components["schemas"]["ZoneIn"][];
         };
     };
     responses: never;
@@ -3582,6 +5113,135 @@ export interface operations {
             };
         };
     };
+    captures_api_routers__router_id__captures_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaptureView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    capture_start_api_routers__router_id__captures_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaptureIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaptureView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    capture_devices_api_routers__router_id__captures_devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaptureDevicesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    capture_stop_api_routers__router_id__captures__capture_id__stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+                capture_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaptureView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     describe_again_api_routers__router_id__describe_post: {
         parameters: {
             query?: never;
@@ -3600,6 +5260,799 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DescriptionSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    faults_state_api_routers__router_id__faults_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FaultsState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fault_apply_api_routers__router_id__faults_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FaultApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_apply_api_routers__router_id__faults_clear_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClearApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_preview_api_routers__router_id__faults_clear_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClearIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fault_preview_api_routers__router_id__faults_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FaultIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    firewall_state_api_routers__router_id__firewall_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirewallState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    custom_apply_api_routers__router_id__firewall_custom_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    custom_preview_api_routers__router_id__firewall_custom_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forwards_apply_api_routers__router_id__firewall_forwards_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForwardsApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forwards_preview_api_routers__router_id__firewall_forwards_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ForwardsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ipsets_apply_api_routers__router_id__firewall_ipsets_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IpsetsApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ipsets_preview_api_routers__router_id__firewall_ipsets_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IpsetsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    model_apply_api_routers__router_id__firewall_model_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    model_preview_api_routers__router_id__firewall_model_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ModelIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    nat_apply_api_routers__router_id__firewall_nat_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NatsApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    nat_preview_api_routers__router_id__firewall_nat_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NatsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rules_apply_api_routers__router_id__firewall_rules_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RulesApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rules_preview_api_routers__router_id__firewall_rules_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RulesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ruleset_api_routers__router_id__firewall_ruleset_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulesetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tables_apply_api_routers__router_id__firewall_tables_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TableApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tables_preview_api_routers__router_id__firewall_tables_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TableIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    zones_apply_api_routers__router_id__firewall_zones_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZonesApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    zones_preview_api_routers__router_id__firewall_zones_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZonesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
                 };
             };
             /** @description Validation Error */

@@ -100,6 +100,14 @@ def test_script_with_a_new_section_and_a_failing_line() -> None:
     assert parse_uci_show(_run(net, c.UCI_DHCP))["dhcp.lan.start"] == "100"  # nothing committed
 
 
+def test_deleting_a_missing_entry_fails_like_uci() -> None:
+    # AP2 2026-11-07: `uci -q delete` of an absent option exits 1 (quietly), so `set -e` stops the script
+    net, _ = _net()
+    gone = net.answer(f"set -e\nmkdir -p {S}\nuci -P {S} -q delete network.lan.nosuch")
+    assert gone is not None and gone.exit_status == 1
+    assert net.answer(f"uci -P {S} -q delete network.lan.ipaddr") is not None
+
+
 def test_apply_without_staged_changes_is_refused() -> None:
     net, _ = _net()
     r = net.answer('ubus call uci apply \'{"rollback":true,"timeout":60,"ubus_rpc_session":"X"}\'')

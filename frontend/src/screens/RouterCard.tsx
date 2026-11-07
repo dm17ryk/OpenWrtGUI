@@ -20,6 +20,7 @@ export function RouterCard({ item }: { item: RouterItem }) {
   const first = status?.radios.flatMap((r) => r.stations)[0]
   const lan = status?.interfaces.find((i) => i.name === 'lan')
   const titleId = `card-${record.id}`
+  const armed = status?.faults_armed ?? 0
   return (
     <article className="card stack" aria-labelledby={titleId}>
       <div className="row" style={{ gap: 10 }}>
@@ -28,6 +29,11 @@ export function RouterCard({ item }: { item: RouterItem }) {
         </h3>
         <span className="mono muted">{record.host}</span>
         <div className="spacer" />
+        {armed > 0 && (
+          <Link className="b park" to={`/routers/${record.id}/faults`}>
+            {plural(armed, 'fault')} armed
+          </Link>
+        )}
         <HelpTip topic={HELP.routerCards}>
           <span className={BADGE[state]}>{state}</span>
         </HelpTip>
