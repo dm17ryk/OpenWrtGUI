@@ -292,7 +292,10 @@ class SimNetwork:
         path, eq, value = arg.partition("=")
         section = ".".join(path.split(".")[:2])
         if verb == "delete":
-            for key in [k for k in work if k == path or k.startswith(path + ".")]:
+            found = [k for k in work if k == path or k.startswith(path + ".")]
+            if not found:  # uci exits 1 on a missing entry, -q only hides the message (AP2, 2026-11-07)
+                return _fail("uci: Entry not found\n")
+            for key in found:
                 del work[key]
             return _ok()
         if not eq or (path.count(".") == 2 and section not in work):

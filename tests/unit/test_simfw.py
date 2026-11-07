@@ -145,6 +145,14 @@ async def test_a_block_closed_twice_on_one_line_is_a_syntax_error() -> None:
     assert "syntax error, unexpected '}', expecting newline or semicolon" in r.stderr
 
 
+async def test_qdiscs_shown_for_one_device_leave_out_the_device() -> None:
+    # iproute2 prints `dev X` only when the listing is not already filtered by device (AP2, 2026-11-07)
+    t, _net, _fw, _clock = _sim()
+    assert "dev eth0 " in await _ok(t, "tc qdisc show")
+    one = await _ok(t, "tc qdisc show dev eth0")
+    assert one.startswith("qdisc fq_codel 0: root ") and " dev " not in one
+
+
 async def test_tools_are_looked_up_one_by_one() -> None:
     # busybox ash's `command -v a b` prints the first name only; the read asks for each tool
     t, _net, _fw, _clock = _sim()
@@ -197,7 +205,7 @@ async def test_tc_netem_add_show_del() -> None:
         "match ip dst 192.168.1.30/32 flowid 1ee7:4",
     )
     shown = await _ok(t, "tc qdisc show dev eth0.1")
-    assert "qdisc netem 1ee8: dev eth0.1 parent 1ee7:4" in shown and "delay 100ms" in shown
+    assert "qdisc netem 1ee8: parent 1ee7:4" in shown and "delay 100ms" in shown  # filtered: no `dev`
     assert u32_match("192.168.1.30", "dst") in await _ok(t, "tc filter show dev eth0.1 parent 1ee7:")
     await _ok(t, "tc qdisc del dev eth0.1 root")
     assert await _ok(t, "tc qdisc show") == before

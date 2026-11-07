@@ -52,6 +52,18 @@ def test_new_section_ops_are_never_dropped() -> None:
     assert drop_unchanged(ops, {}) == ops
 
 
+def test_option_deletes_on_a_new_section_are_dropped() -> None:
+    # a section the script just made has no options yet; real uci exits 1 on deleting one (AP2, 2026-11-07)
+    ops = [
+        UciOp("add", "firewall.$r1", "rule"),
+        UciOp("delete", "firewall.$r1.dest"),
+        UciOp("delete", "firewall.$r1.src_ip"),
+        UciOp("add_list", "firewall.$r1.src_ip", "192.168.1.20"),
+        UciOp("set", "firewall.$r1.target", "DROP"),
+    ]
+    assert drop_unchanged(ops, {}) == [ops[0], ops[3], ops[4]]
+
+
 def test_after_applies_ops_and_ignores_new_sections() -> None:
     current = {"wireless.w.maclist": "a b", "wireless.w.macfilter": "deny"}
     ops = [

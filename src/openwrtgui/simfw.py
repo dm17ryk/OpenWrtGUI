@@ -616,9 +616,12 @@ class SimFirewall:
 
     def _tc(self, p: str) -> CommandResult | None:  # noqa: PLR0911
         devices = [*DEVICES, *sorted(self._links)]
-        if p == "tc qdisc show" or (m := re.fullmatch(r"tc qdisc show dev (\S+)", p)):
-            want = devices if p == "tc qdisc show" else [m.group(1)] if m else []
-            return _ok(p, "".join(self._qdisc_lines(d) for d in want if d in devices))
+        if p == "tc qdisc show":
+            return _ok(p, "".join(self._qdisc_lines(d) for d in devices))
+        if m := re.fullmatch(r"tc qdisc show dev (\S+)", p):
+            # iproute2 leaves out `dev X` when the listing is filtered by device (AP2, 2026-11-07)
+            dev = m.group(1)
+            return _ok(p, self._qdisc_lines(dev).replace(f" dev {dev} ", " ") if dev in devices else "")
         if m := re.fullmatch(r"tc filter show dev (\S+) parent (\S+)", p):
             return _ok(p, "".join(self._filters.get((m.group(1), m.group(2)), [])))
         if m := re.fullmatch(r"tc qdisc add dev (\S+) root handle (\S+) (\S+)\s*(.*)", p):

@@ -394,20 +394,14 @@ class FaultsService:
         dev = c.device or ""
         want = " ".join(c.commands)
         ok = True
+        # the whole listing: filtered by device, iproute2 leaves out `dev X` (AP2, 2026-11-07)
+        qdiscs = parse_qdiscs((await t.run("tc qdisc show")).stdout)
         if f"dev {dev} root handle {APP_ROOT}" in want:
-            q = [
-                x
-                for x in parse_qdiscs((await t.run(f"tc qdisc show dev {dev}")).stdout)
-                if x.handle == "1ee8:"
-            ]
+            q = [x for x in qdiscs if x.dev == dev and x.handle == "1ee8:"]
             shown = (await t.run(f"tc filter show dev {dev} parent {APP_ROOT}")).stdout
             ok = bool(q) and bool(parse_netem(q[0].params)) and u32_match(target.ip or "", "dst") in shown
         if APP_IFB in want:
-            q = [
-                x
-                for x in parse_qdiscs((await t.run(f"tc qdisc show dev {APP_IFB}")).stdout)
-                if x.handle == "1ee9:"
-            ]
+            q = [x for x in qdiscs if x.dev == APP_IFB and x.handle == "1ee9:"]
             shown = (await t.run(f"tc filter show dev {dev} parent ffff:")).stdout
             ok = ok and bool(q) and u32_match(target.ip or "", "src") in shown
         return NetCheck(
