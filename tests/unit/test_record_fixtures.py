@@ -208,7 +208,7 @@ def test_firewall_set_is_exactly_the_firewall_and_fault_reads() -> None:
         "tc qdisc show",
         "conntrack -L -p udp",
         "ls /usr/lib/tc",
-        "ls /lib/modules/$(uname -r)",
+        "ls /lib/modules/$(uname -r); cat /lib/modules/$(uname -r)/modules.builtin",
         'for c in start-stop-daemon setsid timeout tcpdump conntrack fw4; do command -v "$c"; done',
         "fw4 print",
         "cat /tmp/owg/fault-*.json 2>/dev/null",

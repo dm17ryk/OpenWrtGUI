@@ -8,6 +8,8 @@ type Props = { state: FaultsState; draft: FaultDraft; onChange: (d: FaultDraft) 
 
 const DISTRIBUTIONS: readonly Netem['distribution'][] = ['uniform', 'normal', 'pareto', 'paretonormal']
 const WIFI_ONLY = 'A switch port cannot disconnect a Wi-Fi station. For Wi-Fi use Deauth or AP down.'
+// netem to the target needs a root qdisc that keeps it to the target's traffic (faults/compile.py)
+const NO_BAND = ' · no prio or ets qdisc on this router'
 
 function Layer({ id, tag, title, help, on, off, children }: { id: string; tag: string; title: string; help: string; on: boolean; off: string | null; children: ReactNode }) {
   return (
@@ -138,12 +140,14 @@ export function FaultCards({ state, draft, onChange }: Props) {
           <label className="field">
             <span>Direction</span>
             <select className="in" value={draft.netem.direction} onChange={(e) => netem({ direction: e.target.value as Netem['direction'] })}>
-              <option value="to">to target</option>
+              <option value="to" disabled={!state.caps.band}>
+                to target{state.caps.band ? '' : NO_BAND}
+              </option>
               <option value="from" disabled={!state.caps.ifb}>
                 from target{state.caps.ifb ? '' : ' · no ifb on this router'}
               </option>
-              <option value="both" disabled={!state.caps.ifb}>
-                both{state.caps.ifb ? '' : ' · no ifb on this router'}
+              <option value="both" disabled={!state.caps.ifb || !state.caps.band}>
+                both{!state.caps.band ? NO_BAND : state.caps.ifb ? '' : ' · no ifb on this router'}
               </option>
             </select>
           </label>

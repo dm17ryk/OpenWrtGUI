@@ -145,6 +145,8 @@ def _netem(
     req: FaultRequest, t: FaultTarget, caps: FaultCaps, qdiscs: Sequence[Qdisc], router_name: str
 ) -> CompiledFault:
     n = req.netem or NetemParams()
+    if not caps.netem:
+        raise ValueError(f"{router_name} has no netem (sch_netem)")
     params = _netem_params(n, caps, router_name)
     dev = t.device
     if not dev:
@@ -163,8 +165,18 @@ def _netem(
                 f"{dev} has a traffic-control qdisc from someone else ({root.kind} {root.handle}); "
                 "netem would replace it."
             )
+        if caps.band is None:
+            raise ValueError(
+                f"{router_name} has neither sch_prio nor sch_ets, so netem cannot be kept to the target's "
+                "traffic; use from target"
+            )
+        band = (
+            f"prio bands 4 priomap {PRIOMAP}"
+            if caps.band == "prio"
+            else f"ets bands 4 strict 4 priomap {PRIOMAP}"
+        )
         commands += [
-            f"tc qdisc add dev {dev} root handle {APP_ROOT} prio bands 4 priomap {PRIOMAP}",
+            f"tc qdisc add dev {dev} root handle {APP_ROOT} {band}",
             f"tc qdisc add dev {dev} parent {APP_ROOT}4 handle 1ee8: netem {params}",
             f"tc filter add dev {dev} parent {APP_ROOT} protocol ip prio 1 u32 "
             f"match ip dst {t.ip}/32 flowid {APP_ROOT}4",

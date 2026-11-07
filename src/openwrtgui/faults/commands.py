@@ -5,7 +5,8 @@ from __future__ import annotations
 
 CONNTRACK_UDP = "conntrack -L -p udp"
 TC_TABLES = "ls /usr/lib/tc"
-MODULES = "ls /lib/modules/$(uname -r)"
+# module files and the built-ins (AP2 has no net/sched built in, 2026-11-07)
+MODULES = "ls /lib/modules/$(uname -r); cat /lib/modules/$(uname -r)/modules.builtin"
 # one name per `command -v`: busybox ash prints only the first of several (AP2, 2026-11-07)
 TOOLS = 'for c in start-stop-daemon setsid timeout tcpdump conntrack fw4; do command -v "$c"; done'
 

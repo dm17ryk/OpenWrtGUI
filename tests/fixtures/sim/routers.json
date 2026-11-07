@@ -26,6 +26,7 @@
     "overlay": null,
     "wifi": "ap2.uci",
     "net": "ap2.uci",
+    "fw": "ap2.json",
     "auth": "key"
   },
   {

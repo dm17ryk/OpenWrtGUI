@@ -2140,6 +2140,11 @@ export interface components {
         };
         /** FaultCaps */
         FaultCaps: {
+            /**
+             * Band
+             * @default prio
+             */
+            band: ("prio" | "ets") | null;
             /** Conntrack */
             conntrack: boolean;
             /** Distributions */
@@ -2148,6 +2153,11 @@ export interface components {
             family: ("netdev" | "bridge") | null;
             /** Ifb */
             ifb: boolean;
+            /**
+             * Netem
+             * @default true
+             */
+            netem: boolean;
         };
         /** FaultIn */
         FaultIn: {

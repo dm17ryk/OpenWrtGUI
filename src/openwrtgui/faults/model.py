@@ -68,3 +68,6 @@ class FaultCaps:
     distributions: frozenset[str]
     ifb: bool
     conntrack: bool
+    # the root qdisc that keeps netem to the target's traffic: prio, or ets with every band strict
+    band: Literal["prio", "ets"] | None = "prio"
+    netem: bool = True

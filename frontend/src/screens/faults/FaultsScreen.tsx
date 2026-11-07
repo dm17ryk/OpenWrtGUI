@@ -40,13 +40,15 @@ export function FaultsScreen() {
   const state = faults.data
   const armed = state?.armed ?? []
   const now = useNow(armed.some((f) => f.until !== null))
+  // a router without prio or ets can impair only what comes from the target
+  const fault = state?.caps.band === null && draft.netem.direction !== 'from' ? { ...draft, netem: { ...draft.netem, direction: 'from' as const } } : draft
   const refresh = (): void => {
     void client.invalidateQueries({ queryKey: ['faults', id] })
     void client.invalidateQueries({ queryKey: ['routers'] })
     void client.invalidateQueries({ queryKey: ['firewall', id] })
   }
-  const arm = usePlanApply(`/api/routers/${id}/faults`, faultRequest(draft), () => {
-    setDraft({ ...draft, kind: null })
+  const arm = usePlanApply(`/api/routers/${id}/faults`, faultRequest(fault), () => {
+    setDraft({ ...fault, kind: null })
     refresh()
   })
   const clearBody: ClearIn | null = clearing === undefined ? null : { ids: clearing }
@@ -89,12 +91,12 @@ export function FaultsScreen() {
       )}
       {state && (
         <>
-          <TargetPicker state={state} short={short} target={draft.target} onPick={(target) => setDraft({ ...draft, target })} />
-          <FaultCards state={state} draft={draft} onChange={setDraft} />
+          <TargetPicker state={state} short={short} target={draft.target} onPick={(target) => setDraft({ ...fault, target })} />
+          <FaultCards state={state} draft={fault} onChange={setDraft} />
           <section className="card stack" aria-labelledby="fault-run-h">
             <h2 id="fault-run-h">Will run on {short}</h2>
-            {faultRequest(draft) === null && !arm.result && <div className="muted">Pick a target and a fault above; the exact commands show here before anything runs.</div>}
-            <NetChange change={arm} short={short} helpTopic={HELP.faults} show={faultRequest(draft) !== null} applyLabel="Arm" provenText="Armed and proven" />
+            {faultRequest(fault) === null && !arm.result && <div className="muted">Pick a target and a fault above; the exact commands show here before anything runs.</div>}
+            <NetChange change={arm} short={short} helpTopic={HELP.faults} show={faultRequest(fault) !== null} applyLabel="Arm" provenText="Armed and proven" />
           </section>
         </>
       )}

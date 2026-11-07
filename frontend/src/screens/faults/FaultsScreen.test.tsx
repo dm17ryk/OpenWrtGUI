@@ -175,6 +175,17 @@ test('normal is greyed on a router without the distribution table', async () => 
   expect(within(netem).getByRole('option', { name: 'uniform' })).not.toBeDisabled()
 })
 
+test('without prio or ets netem works only from the target', async () => {
+  faults = { ...AP1_FAULTS, caps: { ...AP1_FAULTS.caps, band: null } }
+  const user = renderFaults()
+  await pickPanel(user)
+  const netem = card('Impair')
+  expect(within(netem).getByRole('option', { name: 'to target · no prio or ets qdisc on this router' })).toBeDisabled()
+  expect(within(netem).getByRole('option', { name: 'both · no prio or ets qdisc on this router' })).toBeDisabled()
+  expect(within(netem).getByRole('option', { name: 'from target' })).not.toBeDisabled()
+  expect(within(netem).getByLabelText('Direction')).toHaveValue('from')
+})
+
 test('netem sends its parameters', async () => {
   const user = renderFaults()
   await pickPanel(user)

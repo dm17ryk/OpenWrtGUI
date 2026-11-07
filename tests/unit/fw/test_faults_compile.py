@@ -217,3 +217,34 @@ def test_fault_id_stable() -> None:
     assert fault_id(req, []) == fault_id(FaultRequest("block", REF, flow="all_in", loss=100), [])
     assert fault_id(req, ["0f0f0f"]) != fault_id(req, [])
     assert len(fault_id(req, [])) == 6
+
+
+def test_netem_to_uses_ets_where_the_router_has_no_prio() -> None:
+    # AP2 (2026-11-07): no sch_prio, built in or as a module; sch_ets with every band strict is the same
+    ets = FaultCaps("bridge", frozenset(), True, True, band="ets")
+    c = _compile(FaultRequest("netem", REF, netem=NetemParams(delay_ms=100)), target=PANEL_ETH, caps=ets)
+    assert c.commands[0] == (
+        "tc qdisc add dev eth0.1 root handle 1ee7: ets bands 4 strict 4 "
+        "priomap 1 2 2 2 1 2 0 0 1 1 1 1 1 1 1 1"
+    )
+    assert c.commands[1] == "tc qdisc add dev eth0.1 parent 1ee7:4 handle 1ee8: netem delay 100ms"
+
+
+def test_netem_to_refused_without_a_band_qdisc_but_from_works() -> None:
+    none = FaultCaps("bridge", frozenset(), True, True, band=None)
+    with pytest.raises(
+        ValueError, match=r"^AP1 has neither sch_prio nor sch_ets, so netem cannot be kept to "
+    ):
+        _compile(FaultRequest("netem", REF, netem=NetemParams(delay_ms=10)), target=PANEL_ETH, caps=none)
+    c = _compile(
+        FaultRequest("netem", REF, netem=NetemParams(delay_ms=10, direction="from")),
+        target=PANEL_ETH,
+        caps=none,
+    )
+    assert any(" netem delay 10ms" in x for x in c.commands)
+
+
+def test_netem_refused_without_the_netem_module() -> None:
+    no = FaultCaps("bridge", frozenset(), True, True, netem=False)
+    with pytest.raises(ValueError, match=r"^AP1 has no netem \(sch_netem\)$"):
+        _compile(FaultRequest("netem", REF, netem=NetemParams(delay_ms=10)), target=PANEL_ETH, caps=no)

@@ -8,10 +8,12 @@ import pytest
 from fwenv import FwEnv
 
 from openwrtgui.faults.model import FaultRequest, NetemParams, TargetRef
-from openwrtgui.faults.service import FaultsService
+from openwrtgui.faults.service import FaultsService, caps_from
 from openwrtgui.fw.nft import parse_ruleset_json
 from openwrtgui.guard.bench_guard import GuardLocked
 from openwrtgui.probe.status import read_status
+from openwrtgui.simfw import SimFirewall
+from openwrtgui.transport.base import CommandResult
 
 PANEL = TargetRef(None, "192.168.1.30")
 FAR = TargetRef("02:00:00:00:00:01", "192.168.1.250")
@@ -147,3 +149,49 @@ async def test_status_counts_armed_faults(env: FwEnv) -> None:
     await _arm(env, _faults(env), "ap1", FaultRequest("isolate", PANEL, hold_s=600))
     assert (await read_status(await env.sim("ap1"))).faults_armed == 1
     assert (await read_status(await env.sim("ap2"))).faults_armed == 0
+
+
+def test_caps_from_module_files_and_built_ins() -> None:
+    files = "\n".join(["ifb.ko", "sch_ets.ko", "sch_netem.ko", "modules.builtin"])
+    caps = caps_from("bridge", "", files, "/usr/sbin/conntrack")
+    assert (caps.band, caps.netem, caps.ifb, caps.conntrack) == ("ets", True, True, True)
+    built_in = files + "\nkernel/net/sched/sch_prio.ko"
+    assert caps_from("bridge", "", built_in, "").band == "prio"
+    bare = caps_from(None, "", "ifb.ko", "")
+    assert (bare.band, bare.netem, bare.ifb, bare.conntrack) == (None, False, True, False)
+
+
+async def test_ap2_in_the_sim_is_the_recorded_ap2(env: FwEnv) -> None:
+    caps = (await _faults(env).state("ap2")).caps
+    assert (caps.family, caps.band, caps.netem, caps.distributions) == ("bridge", "ets", True, frozenset())
+
+
+async def test_clear_works_when_the_fault_is_already_gone(env: FwEnv) -> None:
+    faults = _faults(env)
+    _, result = await _arm(env, faults, "ap1", FaultRequest("isolate", PANEL))
+    assert result.verified
+    (armed,) = (await faults.state("ap1")).armed
+    t = await env.sim("ap1")
+    assert (await t.run("nft delete table netdev benchfault")).ok  # gone behind the app's back
+    plan = await faults.plan_clear("ap1", [armed.id])
+    cleared = await faults.apply_clear("ap1", [armed.id], plan.digest)
+    assert cleared.applied and cleared.verified, cleared
+    assert (await faults.state("ap1")).armed == ()
+
+
+async def test_a_failed_arm_removes_what_had_run(env: FwEnv, monkeypatch: pytest.MonkeyPatch) -> None:
+    real = SimFirewall._tc
+
+    def no_filter(self: SimFirewall, p: str) -> CommandResult | None:
+        if p.startswith("tc filter add"):
+            return CommandResult(p, "", "RTNETLINK answers: Operation not supported", 2)
+        return real(self, p)
+
+    monkeypatch.setattr(SimFirewall, "_tc", no_filter)
+    faults = _faults(env)
+    _, result = await _arm(env, faults, "ap2", FaultRequest("netem", FAR, netem=NetemParams(delay_ms=100)))
+    assert not result.verified
+    assert result.error is not None and "removed the parts that had run" in result.error
+    t = await env.sim("ap2")
+    assert "1ee7:" not in (await t.run("tc qdisc show")).stdout
+    assert (await faults.state("ap2")).armed == ()

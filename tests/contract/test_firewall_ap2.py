@@ -6,6 +6,7 @@ from pathlib import Path
 
 from openwrtgui.faults import commands as fc
 from openwrtgui.faults.commands import FAMILY_CHECKS
+from openwrtgui.faults.service import caps_from
 from openwrtgui.fw import commands as c
 from openwrtgui.fw.custom import parse_custom
 from openwrtgui.fw.nft import parse_ruleset_json, render_table, rule_texts, table_texts, zone_tail
@@ -104,6 +105,15 @@ def test_tools_modules_and_netem_tables() -> None:
         assert any(path.endswith(f"/{tool}") for path in tools), tool
     modules = FW[fc.MODULES].stdout.split()
     assert {"ifb.ko", "sch_netem.ko", "nft_numgen.ko"} <= set(modules)
+    assert not any("sch_prio" in m for m in modules)  # neither a module file nor built in
     assert FW[fc.TC_TABLES].exit_status == 1  # no /usr/lib/tc: only uniform jitter on AP2
+    caps = caps_from("bridge", "", FW[fc.MODULES].stdout, FW[fc.TOOLS].stdout)
+    assert (caps.band, caps.netem, caps.ifb, caps.conntrack, caps.distributions) == (
+        "ets",
+        True,
+        True,
+        True,
+        frozenset(),
+    )
     assert FW[fc.CONNTRACK_UDP].exit_status == 0
     assert FW[FAULT_RECORDS].exit_status == 1  # nothing armed

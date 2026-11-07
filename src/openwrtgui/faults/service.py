@@ -5,10 +5,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from collections.abc import Awaitable, Callable, MutableMapping, Sequence
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 from openwrtgui.faults import commands as fc
 from openwrtgui.faults.compile import TABLE, CompiledFault, compile_fault, fault_id
@@ -91,6 +92,34 @@ def _wifi(status: dict[str, Any]) -> list[WifiIf]:
     return out
 
 
+_DELETE_CHAIN = re.compile(rf"delete chain \S+ {TABLE} (\S+)")
+_DELETE_ROOT = re.compile(r"tc qdisc del dev (\S+) root")
+
+
+def clear_line(fid: str, clear: Sequence[str]) -> str:
+    """One fault's clear lines and its record removal as one command joined by `;`: a part already gone (the
+    table deleted elsewhere, a half-armed netem) must not stop the rest, or the record would stay and the
+    fault be listed forever. What is left is checked afterwards (`_gone_check`)."""
+    return "; ".join([*clear, f"rm -f {RECORD_DIR}/fault-{fid}.*"])
+
+
+def caps_from(family: str | None, tc_tables: str, modules: str, tools: str) -> FaultCaps:
+    """What a router can do for faults, from its reads: `modules` lists the module files and the kernel's
+    built-ins (paths), `tools` one path per tool found."""
+    names = {word.rsplit("/", 1)[-1] for word in modules.split()}
+    band: Literal["prio", "ets"] | None = (
+        "prio" if "sch_prio.ko" in names else "ets" if "sch_ets.ko" in names else None
+    )
+    return FaultCaps(
+        family,  # type: ignore[arg-type]
+        frozenset(n.removesuffix(".dist") for n in tc_tables.split()),
+        "ifb.ko" in names,
+        any(line.endswith("/conntrack") for line in tools.split()),
+        band,
+        "sch_netem.ko" in names,
+    )
+
+
 class FaultsService:
     def __init__(
         self,
@@ -136,14 +165,9 @@ class FaultsService:
                     family = name
                     break
             tables = await t.run(fc.TC_TABLES)
-            dists = (
-                frozenset(n.removesuffix(".dist") for n in tables.stdout.split())
-                if tables.ok
-                else frozenset()
-            )
-            modules = (await t.run(fc.MODULES)).stdout.split()
+            modules = (await t.run(fc.MODULES)).stdout
             tools = (await t.run(fc.TOOLS)).stdout
-            self._caps[rec.id] = FaultCaps(family, dists, "ifb.ko" in modules, "conntrack" in tools)  # type: ignore[arg-type]
+            self._caps[rec.id] = caps_from(family, tables.stdout if tables.ok else "", modules, tools)
         return self._caps[rec.id]
 
     async def _armed(self, t: Transport) -> list[ArmedFault]:
@@ -196,6 +220,8 @@ class FaultsService:
             unavailable |= {"isolate": NO_FAMILY, "block": NO_FAMILY}
         if not ports.managed:
             unavailable["link_down"] = NO_SWITCH
+        if not caps.netem:
+            unavailable["netem"] = f"{rec.name} has no netem (sch_netem)"
         if not any(w.up for w in wifi):
             text = NOT_ON_AIR.format(router=rec.name)
             unavailable |= {"deauth": text, "ban": text, "ap_down": text}
@@ -251,16 +277,73 @@ class FaultsService:
         self, router_id: str, req: FaultRequest, digest: str | None = None
     ) -> NetApplyResult:
         rec = self._record(router_id)
+        found: dict[str, Any] = {}
 
         async def make(t: Transport) -> Planned:
             plan, c, fid, target, state = await self._compile(rec, t, req)
+            found.update(c=c, fid=fid, family=state.caps.family)
 
             async def verify(t2: Transport) -> list[NetCheck]:
                 return await self._checks(t2, state, c, fid, target)
 
             return Planned(plan, verify)
 
-        return await self._runner.run_planned(rec, make, digest)
+        result = await self._runner.run_planned(rec, make, digest)
+        if result.verified or not result.applied or not found or not found["c"].clear:
+            return result
+        # Part of the fault ran but no record says so (a later command failed): nothing on the screen could
+        # clear it, so it is removed now, like a refused change is undone.
+        fid: str = found["fid"]
+        t = await self._pool.get(rec)
+        if (await t.run(f"cat {RECORD_DIR}/fault-{fid}.json")).ok:
+            return result
+        undo = await self._remove(rec, [(fid, tuple(found["c"].clear))], found["family"])
+        note = (
+            "The app removed the parts that had run."
+            if undo.verified
+            else f"Removing them failed: {undo.error}"
+        )
+        return replace(result, checks=(*result.checks, *undo.checks), error=f"{result.error}. {note}")
+
+    async def _remove(
+        self, rec: RouterRecord, faults: Sequence[tuple[str, tuple[str, ...]]], family: str | None
+    ) -> NetApplyResult:
+        """Run each fault's clear lines and drop its record, whatever is still there (see `clear_line`)."""
+
+        async def make(t: Transport) -> Planned:
+            commands = [clear_line(fid, clear) for fid, clear in faults]
+            plan = net_plan(
+                router_id=rec.id, screen=SCREEN, config=None, ops=[], current={}, commands=commands
+            )
+
+            async def verify(t2: Transport) -> list[NetCheck]:
+                return [await self._gone_check(t2, fid, clear, family) for fid, clear in faults]
+
+            return Planned(plan, verify)
+
+        return await self._runner.run_planned(rec, make, None, guarded=False)
+
+    async def _gone_check(self, t: Transport, fid: str, clear: Sequence[str], family: str | None) -> NetCheck:
+        """A cleared fault by effect: its chains, its qdiscs, its ifb and its record are gone."""
+        left: list[str] = []
+        chains = [m.group(1) for line in clear if (m := _DELETE_CHAIN.search(line))]
+        if chains and family is not None:
+            listed = await t.run(f"nft -j list table {family} {TABLE}")
+            have = {ch.name for ch in parse_ruleset_json(listed.stdout).chains} if listed.ok else set()
+            left += [f"chain {name}" for name in chains if name in have]
+        qdiscs = parse_qdiscs((await t.run("tc qdisc show")).stdout)
+        for line in clear:
+            if (m := _DELETE_ROOT.fullmatch(line)) and any(
+                q.dev == m.group(1) and q.root and q.handle == APP_ROOT for q in qdiscs
+            ):
+                left.append(f"netem on {m.group(1)}")
+            if line == f"ip link del {APP_IFB}" and any(q.dev == APP_IFB for q in qdiscs):
+                left.append(APP_IFB)
+        if (await t.run(f"cat {RECORD_DIR}/fault-{fid}.json")).ok:
+            left.append("its record")
+        return NetCheck(
+            f"cleared {fid}", not left, "nothing left" if not left else f"left: {', '.join(left)}"
+        )
 
     # ---------------------------------------------------------------- proof by effect
     async def _checks(
@@ -376,8 +459,7 @@ class FaultsService:
         for a in chosen:
             if a.until is not None:
                 commands.append(cancel_command(f"fault-{a.id}"))
-            commands += a.clear
-            commands.append(f"rm -f {RECORD_DIR}/fault-{a.id}.*")
+            commands.append(clear_line(a.id, a.clear))
         if ids is None:
             family = state.caps.family
             if family is not None and (await t.run(f"nft list table {family} {TABLE}")).ok:
@@ -406,13 +488,7 @@ class FaultsService:
             plan, chosen, state = await self._clear_plan(rec, t, ids)
 
             async def verify(t2: Transport) -> list[NetCheck]:
-                left = {a.id for a in await self._armed(t2)}
-                checks = [
-                    NetCheck(
-                        f"record {a.id}", a.id not in left, "cleared" if a.id not in left else "still armed"
-                    )
-                    for a in chosen
-                ]
+                checks = [await self._gone_check(t2, a.id, a.clear, state.caps.family) for a in chosen]
                 if ids is None and state.caps.family is not None:
                     gone = not (await t2.run(f"nft list table {state.caps.family} {TABLE}")).ok
                     checks.append(NetCheck(f"table {TABLE}", gone, "gone" if gone else "still there"))

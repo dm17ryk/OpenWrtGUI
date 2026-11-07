@@ -17,6 +17,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from openwrtgui.faults.commands import MODULES as MODULES_READ
 from openwrtgui.faults.commands import TOOLS as TOOLS_READ
 from openwrtgui.fw.commands import CUSTOM_FILES
 from openwrtgui.fw.model import FirewallConf, FwRuleConf, ZoneConf
@@ -196,7 +197,9 @@ class SimFirewall:
     ) -> None:
         self._net = net
         net.fw = self
-        self._families = families
+        # a router's own nft families and kernel modules (fw/<id>.json), as recorded on the real one
+        self._families = frozenset(runtime["families"]) if "families" in runtime else families
+        self._modules: tuple[str, ...] = tuple(runtime.get("modules", MODULES))
         self._clock = clock
         self._fw4_chains = [
             _Chain(name, None, [_Rule(r) for r in rules])
@@ -252,7 +255,7 @@ class SimFirewall:
     def answer(self, command: str) -> CommandResult | None:
         if m := _HEREDOC.fullmatch(command):
             return self._heredoc(command, m.group(1).strip(), m.group(2))
-        if command in (CUSTOM_FILES, TOOLS_READ):  # one command each, though they hold ; and &&
+        if command in (CUSTOM_FILES, TOOLS_READ, MODULES_READ):  # one command each, though they hold ;
             return self._plain(command)
         parts = _parts(command)
         if len(parts) == 1 and parts[0][0] == command.strip():
@@ -316,8 +319,8 @@ class SimFirewall:
             if not self._tc_tables:
                 return CommandResult(p, "", "ls: /usr/lib/tc: No such file or directory\n", 1)
             return _ok(p, "\n".join(self._tc_tables) + "\n")
-        if p == "ls /lib/modules/$(uname -r)":
-            return _ok(p, "\n".join(MODULES) + "\n")
+        if p == MODULES_READ:
+            return _ok(p, "\n".join(self._modules) + "\n")
         if p == "ls /rom/etc/nftables.d":
             return _ok(p, "".join(name.rsplit("/", 1)[1] + "\n" for name in self._rom_custom))
         if m := re.fullmatch(r'for c in ([\w -]+); do command -v "\$c"; done', p):
@@ -624,6 +627,8 @@ class SimFirewall:
                 return CommandResult(p, "", "Cannot find device\n", 1)
             if dev in self._root:
                 return CommandResult(p, "", "Error: Exclusivity flag on, cannot modify.\n", 2)
+            if f"sch_{kind}.ko" not in self._modules:  # tc loads the qdisc's module, or there is none
+                return CommandResult(p, "", "Error: Specified qdisc kind is unknown.\n", 2)
             self._root[dev] = (kind, handle, params)
             return _ok(p)
         if m := re.fullmatch(r"tc qdisc add dev (\S+) parent (\S+) handle (\S+) (\S+)\s*(.*)", p):

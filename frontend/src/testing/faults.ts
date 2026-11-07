@@ -9,14 +9,14 @@ export const AP1_FAULTS: FaultsState = {
   router_id: 'ap1',
   targets: [PANEL, WIRED],
   armed: [],
-  caps: { family: 'netdev', distributions: ['paretonormal', 'pareto', 'normal'], ifb: true, conntrack: true },
+  caps: { family: 'netdev', distributions: ['paretonormal', 'pareto', 'normal'], ifb: true, conntrack: true, band: 'prio', netem: true },
   unavailable: {},
   wifi: [{ ifname: 'phy0-ap0', ssid: 'OpenWrt', up: true }],
   ports: { ...AP2_PORTS, router_id: 'ap1' },
 }
 
-/** AP2: no distribution tables (spec 7.7: normal / pareto greyed). */
-export const AP2_FAULTS: FaultsState = { ...AP1_FAULTS, router_id: 'ap2', caps: { ...AP1_FAULTS.caps, distributions: [] } }
+/** AP2 as recorded 2026-11-07: bridge family, no distribution tables (normal / pareto greyed), ets instead of prio. */
+export const AP2_FAULTS: FaultsState = { ...AP1_FAULTS, router_id: 'ap2', caps: { ...AP1_FAULTS.caps, family: 'bridge', distributions: [], band: 'ets' } }
 
 export const ARMED: ArmedFault = {
   id: 'a1b2c3',
