@@ -29,6 +29,7 @@ const LIVE: GuardOut = {
 const calls: Array<{ path: string; body: unknown }> = []
 let fw: FirewallState = AP1_FW
 let guard: GuardOut = CLEAR
+let rulesetFails = false
 
 vi.mock('../../api/client', async (orig) => {
   const actual = await orig<typeof import('../../api/client')>()
@@ -37,7 +38,10 @@ vi.mock('../../api/client', async (orig) => {
     if (path === '/api/routers/ap1') return AP1
     if (path === '/api/guard') return guard
     if (path === '/api/routers/ap1/firewall') return fw
-    if (path === '/api/routers/ap1/firewall/ruleset') return { text: AP1_RULESET }
+    if (path === '/api/routers/ap1/firewall/ruleset') {
+      if (rulesetFails) throw new actual.ApiError(503, 'AP1 · bench did not answer', {})
+      return { text: AP1_RULESET }
+    }
     if (path === '/api/routers/ap1/luci/pages') return []
     if (path === '/api/routers/ap1/firewall/rules/preview') return RULE_ADD_PLAN
     if (path === '/api/routers/ap1/firewall/custom/preview') return CUSTOM_PLAN
@@ -56,6 +60,7 @@ beforeEach(() => {
   calls.length = 0
   fw = AP1_FW
   guard = CLEAR
+  rulesetFails = false
 })
 
 function renderTab(tab: string) {
@@ -169,6 +174,20 @@ test('Unlock on voipdscp names its owner and dependency; an edit previews with t
   await user.click(within(row).getByRole('button', { name: 'Lock' }))
   expect(screen.queryByRole('group', { name: 'Table bridge voipdscp' })).toBeNull()
   expect(within(row).getByRole('button', { name: 'Unlock…' })).toBeInTheDocument()
+})
+
+test('an unlocked table is not edited when the ruleset could not be read', async () => {
+  // its rules come from the ruleset: without it, saving as an include would write the table empty
+  rulesetFails = true
+  const user = renderTab('tables')
+  const tables = await screen.findByRole('table', { name: 'nftables tables' })
+  await user.click(within(within(tables).getByRole('row', { name: /bridge voipdscp/ })).getByRole('button', { name: 'Unlock…' }))
+  await user.click(within(screen.getByRole('group', { name: 'Unlock bridge voipdscp?' })).getByRole('button', { name: 'Unlock' }))
+  const editor = await screen.findByRole('group', { name: 'Table bridge voipdscp' })
+  expect(await within(editor).findByText(/Could not read the ruleset, so this table cannot be edited/)).toBeInTheDocument()
+  await user.click(within(editor).getByRole('button', { name: 'Saved as fw4 include' }))
+  await new Promise((r) => setTimeout(r, 400))
+  expect(calls.filter((c) => c.path.endsWith('/tables/preview'))).toHaveLength(0)
 })
 
 test('+ Add table previews the new owg_ table', async () => {

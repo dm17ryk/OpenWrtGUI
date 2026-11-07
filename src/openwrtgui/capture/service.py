@@ -61,11 +61,16 @@ class CaptureView:
     error: str | None
 
 
-def capture_command(req: CaptureRequest, pc_ip: str, ssh_port: int, device: str | None = None) -> str:
+def capture_command(req: CaptureRequest, pc_ip: str | None, ssh_port: int, device: str | None = None) -> str:
     if not _FILTER.fullmatch(req.filter):
         raise ValueError(FILTER_TEXT)
     if not 1 <= req.duration_s <= 3600:
         raise ValueError("A capture runs 1 to 3600 s")
+    if not pc_ip:
+        # the app's own SSH stream would be captured and sent back over itself, growing without end
+        raise ValueError(
+            "Could not tell this PC's address, so the capture cannot leave out the app's own SSH."
+        )
     expr = f"not (host {pc_ip} and tcp port {ssh_port})"
     if req.filter.strip():
         expr += f" and ({req.filter.strip()})"
@@ -163,10 +168,13 @@ class CaptureService:
             raise
 
     async def _start(self, rec: RouterRecord, req: CaptureRequest) -> CaptureView:
+        # only a device the router lists: the name goes into the command and the file name
+        if req.device not in await self.devices(rec.id):
+            raise ValueError(f"{rec.name} has no network device {req.device!r}")
         net = await self._net.state(rec.id)
         mon0 = req.device == "mon0"
         device = MONITOR if mon0 else req.device
-        command = capture_command(req, net.pc_ip or "0.0.0.0", rec.port, device)
+        command = capture_command(req, net.pc_ip, rec.port, device)
         sink: Sink
         path: Path | None = None
         if req.output == "wireshark":

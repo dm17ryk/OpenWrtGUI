@@ -27,6 +27,7 @@ PC_MAC = "08:3a:88:5c:a8:39"
 CONFIGS = ("network", "dhcp", "firewall")
 DEFAULT = ""  # the default staging folder (/tmp/.uci)
 SWITCH = "switch0"
+DEVICE_MACS = {"br-lan": "00:0c:43:76:20:17", "eth0.1": "00:0c:43:76:20:17", "eth0.2": "00:0c:43:76:20:16"}
 EXTERNAL = (0, 1, 2, 3, 4)
 CPU = 6
 PORTS = 8
@@ -428,6 +429,8 @@ class SimNetwork:
             out[d.name] = {"type": d.type or "Network device", "up": True, "bridge-members": list(d.ports)}
         for v in switch_vlans(self._committed):
             out.setdefault(f"eth0.{v.vid or v.vlan}", {"type": "VLAN", "up": True})
+        for name, d in out.items():  # the MACs AP2 reports (tests/fixtures/ap2/network.json)
+            d["macaddr"] = DEVICE_MACS.get(name, "00:0c:43:76:20:77")
         return out
 
     def _l3(self, name: str | None) -> str | None:

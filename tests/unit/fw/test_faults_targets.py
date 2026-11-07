@@ -7,7 +7,7 @@ import pytest
 from fwenv import FwEnv
 
 from openwrtgui.faults.model import TargetRef
-from openwrtgui.faults.targets import lan_wired_device, read_targets, resolve
+from openwrtgui.faults.targets import lan_wired_device, read_targets, resolve, router_macs
 from openwrtgui.store.settings import KnownDevice
 
 PANEL_WIFI = "f4:12:fa:f3:57:68"
@@ -62,6 +62,15 @@ async def test_target_is_router_refused(env: FwEnv) -> None:
     targets, net = await _targets(env, "ap1")
     with pytest.raises(ValueError, match=r"^192\.168\.1\.1 is AP1 · bench itself$"):
         resolve(TargetRef(None, "192.168.1.1"), targets, net, "AP1 · bench", "ip")
+
+
+async def test_router_mac_refused(env: FwEnv) -> None:
+    # isolating the router's own MAC on its lan port would cut the app off with no way to clear it
+    targets, net = await _targets(env, "ap1")
+    macs = await router_macs(await env.sim("ap1"))
+    assert "00:0c:43:76:20:17" in macs
+    with pytest.raises(ValueError, match=r"^00:0c:43:76:20:17 is AP1 · bench itself$"):
+        resolve(TargetRef("00:0C:43:76:20:17", None), targets, net, "AP1 · bench", "mac", macs)
 
 
 async def test_missing_half_and_bad_text_refused(env: FwEnv) -> None:

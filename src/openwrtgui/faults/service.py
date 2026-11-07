@@ -15,7 +15,7 @@ from openwrtgui.faults import commands as fc
 from openwrtgui.faults.compile import TABLE, CompiledFault, compile_fault, fault_id
 from openwrtgui.faults.model import ArmedFault, FaultCaps, FaultRequest, FaultTarget
 from openwrtgui.faults.parse import parse_conntrack, rtp_ports
-from openwrtgui.faults.targets import read_targets, resolve
+from openwrtgui.faults.targets import read_targets, resolve, router_macs
 from openwrtgui.fw.nft import parse_ruleset_json
 from openwrtgui.fw.owners import APP_IFB, APP_ROOT
 from openwrtgui.fw.tables import heredoc
@@ -248,7 +248,7 @@ class FaultsService:
         if req.kind in state.unavailable:
             raise ValueError(state.unavailable[req.kind])
         needs = "mac" if req.kind in ("isolate", "link_down", "deauth", "ban", "ap_down") else "ip"
-        target = resolve(req.target, state.targets, net, rec.name, needs)  # type: ignore[arg-type]
+        target = resolve(req.target, state.targets, net, rec.name, needs, await router_macs(t))  # type: ignore[arg-type]
         if req.kind == "link_down" and req.port is None and state.ports and state.ports.switch and target.mac:
             arl = parse_arl((await t.run(pc.swconfig_arl(state.ports.switch))).stdout)
             if target.mac in arl:

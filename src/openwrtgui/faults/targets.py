@@ -96,8 +96,23 @@ async def read_targets(t: Transport, net: NetworkState, known: Sequence[KnownDev
     return sorted(out, key=lambda x: (x.via is None or x.via == "wired", x.name or "~", x.mac or ""))
 
 
+async def router_macs(t: Transport) -> frozenset[str]:
+    """The router's own MAC addresses (`network.device status`), so a fault never targets the router."""
+    status = await ubus_call(t, "network.device", "status") or {}
+    return frozenset(
+        str(d["macaddr"]).lower()
+        for d in status.values()
+        if isinstance(d, dict) and d.get("macaddr") and d["macaddr"] != "00:00:00:00:00:00"
+    )
+
+
 def resolve(
-    ref: TargetRef, targets: Sequence[FaultTarget], net: NetworkState, router_name: str, needs: Needs
+    ref: TargetRef,
+    targets: Sequence[FaultTarget],
+    net: NetworkState,
+    router_name: str,
+    needs: Needs,
+    own_macs: frozenset[str] = frozenset(),
 ) -> FaultTarget:
     """The target a fault asks for, the missing half (MAC or IP) filled from what the router knows."""
     mac = check_mac(ref.mac) if ref.mac else None
@@ -118,6 +133,8 @@ def resolve(
     mine = {a.ip for v in net.interfaces if v.live for a in v.live.ipv4}
     if target.ip in mine:
         raise ValueError(f"{target.ip} is {router_name} itself")
+    if target.mac in own_macs:
+        raise ValueError(f"{target.mac} is {router_name} itself")
     if needs in ("mac", "both") and not target.mac:
         raise ValueError(f"No MAC known for {target.ip}; enter one")
     if needs in ("ip", "both") and not target.ip:

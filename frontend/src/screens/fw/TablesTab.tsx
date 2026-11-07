@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { apiFetch } from '../../api/client'
+import { ApiError, apiFetch } from '../../api/client'
 import type { FirewallState, GuardOut, NftObject, TableIn } from '../../api/types'
 import { usePlanApply } from '../../components/usePlanApply'
 import { Help, HelpTip } from '../../help/Help'
@@ -78,7 +78,8 @@ export function TablesTab({ routerId, short, state, unlocked, onUnlock, onLock, 
   const current = open ? chainsOf(parsed, open) : []
   const rows = edit?.rows ?? rowsOf(current)
   const editBody = ((): TableIn | null => {
-    if (!open || !edit) return null
+    // the rules come from the ruleset: without it an edit (or a save as include) would write the table empty
+    if (!open || !edit || !ruleset.isSuccess) return null
     const override = open.owner !== 'app'
     if (edit.remove) return { key: open.key, action: 'delete', override, keep: edit.keep }
     const rules = bodies(rows)
@@ -250,6 +251,11 @@ export function TablesTab({ routerId, short, state, unlocked, onUnlock, onLock, 
       {open && edit && (
         <fieldset className="stack editor" aria-label={`Table ${open.key}`}>
           <legend className="mono">{open.key}</legend>
+          {ruleset.isError && (
+            <div className="note x" role="alert">
+              Could not read the ruleset, so this table cannot be edited: {ruleset.error instanceof ApiError ? ruleset.error.detail : String(ruleset.error)}
+            </div>
+          )}
           <div className="row">
             <span className="b park">{open.owner === 'app' ? 'this app' : 'unlocked · edits allowed'}</span>
             <span className="spacer" />

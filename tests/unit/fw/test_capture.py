@@ -54,6 +54,25 @@ def test_filter_charset_and_duration_refused() -> None:
         capture_command(CaptureRequest("br-lan", "", 0), "192.168.1.10", 22)
 
 
+def test_capture_refused_when_the_pc_address_is_unknown() -> None:
+    # without it the app's own SSH could not be left out (Review Focus 2)
+    with pytest.raises(
+        ValueError, match="^Could not tell this PC's address, so the capture cannot leave out"
+    ):
+        capture_command(CaptureRequest("br-lan", "", 10), None, 22)
+
+
+async def test_device_must_be_one_the_router_has(env: FwEnv, tmp_path: Path) -> None:
+    service = _captures(env, tmp_path)
+    for device in ("br-lan; reboot", "../../x", "eth9"):
+        with pytest.raises(ValueError, match=r"^AP1 · bench has no network device "):
+            await service.start("ap1", CaptureRequest(device, "", 3))
+    assert not (tmp_path / "Documents").exists()  # nothing written before the check
+    assert not [line for line in env.audit_lines() if line.startswith("capture")]
+    view = await service.start("ap1", CaptureRequest("br-lan", "", 3))  # the refusals freed the router
+    await _done(service, view.id)
+
+
 async def test_capture_to_file_in_sim(env: FwEnv, tmp_path: Path) -> None:
     service = _captures(env, tmp_path)
     assert "br-lan" in await service.devices("ap1") and "mon0" in await service.devices("ap1")
