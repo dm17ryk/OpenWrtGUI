@@ -187,6 +187,34 @@ class _OnCommand:
         return getattr(self._inner, name)
 
 
+class _CountryUpdate:
+    """AP2, 2026-11-09: netifd reported radio0 up while hostapd was still in COUNTRY_UPDATE. Until the AP
+    interface operates, `iw dev X info` shows no channel and `set bitrates` fails."""
+
+    def __init__(self, inner: Transport, polls: int) -> None:
+        self._inner, self._polls = inner, polls
+
+    async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
+        if self._polls and "set bitrates" in command:
+            return CommandResult(command, "", "command failed: Network is down (-100)", 1)
+        done = await self._inner.run(command, timeout=timeout)
+        if self._polls and command == "iw dev phy0-ap0 info":
+            self._polls -= 1
+            shown = "\n".join(line for line in done.stdout.splitlines() if "channel" not in line)
+            return CommandResult(command, shown, "", 0)
+        return done
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._inner, name)
+
+
+async def test_apply_waits_for_the_ap_interface_to_operate(env: WifiEnv) -> None:
+    env.wrap.append(lambda t: _CountryUpdate(t, polls=2))  # type: ignore[arg-type, return-value]
+    result = await env.service.apply("ap2", N20_CH6)
+    assert result.applied and result.verified, [(c.name, c.detail) for c in result.checks]
+    assert next(c for c in result.checks if c.name == "channel").detail == "channel 6"
+
+
 async def test_the_change_and_the_reload_run_apart_and_a_failing_line_stops_the_commit(env: WifiEnv) -> None:
     plan = await env.service.plan("ap2", N20_CH6)
     assert plan.lines[0] == "set -e"  # a failing uci line stops the script before `uci commit`

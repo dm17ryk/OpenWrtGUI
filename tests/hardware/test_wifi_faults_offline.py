@@ -3,15 +3,16 @@ config, pick only the test SSID's station and leave the phone's other suggestion
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 from typing import cast
 
 import pytest
-from test_ap2_wifi_faults import TEST_SSID, AdbStation, _station, _test_bss
+from test_ap2_wifi_faults import TEST_SSID, AdbStation, _associated, _station, _test_bss
 
 from conftest import FwWindow, wireless_snapshot
 from openwrtgui.faults.model import FaultTarget
-from openwrtgui.transport.base import CommandResult, Transport
+from openwrtgui.transport.base import CommandResult, Transport, ubus_command
 
 RADIO = "config wifi-device 'radio0'\n\toption channel '6'\n"
 IW_DEV = """phy#0
@@ -69,6 +70,20 @@ async def test_test_bss_is_the_ap_interface_with_the_test_ssid() -> None:
         ),
     )
     assert await _test_bss(t) == "phy0-ap0"
+
+
+async def test_associated_leaves_out_a_deauthenticated_station() -> None:
+    # hostapd keeps a deauthenticated station listed, no longer associated, for about a second (AP2,
+    # 2026-11-09: the phone was still listed right after the ban)
+    clients = {
+        "clients": {
+            "02:00:00:00:00:0A": {"auth": True, "assoc": True, "authorized": True},
+            "02:00:00:00:00:0b": {"auth": False, "assoc": False, "authorized": False},
+        }
+    }
+    command = ubus_command("hostapd.phy0-ap0", "get_clients")
+    t = cast(Transport, _Router({command: _ok(command, json.dumps(clients))}))
+    assert await _associated(t, "phy0-ap0") == {"02:00:00:00:00:0a"}
 
 
 class _Scanner:
