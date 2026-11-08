@@ -448,6 +448,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/discovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Discovery State */
+        get: operations["discovery_state_api_routers__router_id__discovery_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/faults": {
         parameters: {
             query?: never;
@@ -1770,6 +1787,18 @@ export interface components {
             /** Url */
             url: string;
         };
+        /** CapabilityRow */
+        CapabilityRow: {
+            /** Name */
+            name: string;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "in image" | "added after flashing" | "missing";
+        };
         /** CaptureDevicesOut */
         CaptureDevicesOut: {
             /** Devices */
@@ -1886,6 +1915,15 @@ export interface components {
             /** Ids */
             ids?: string[] | null;
         };
+        /** ConfigDiff */
+        ConfigDiff: {
+            /** Changes */
+            changes: components["schemas"]["OptionChange"][];
+            /** Config */
+            config: string;
+            /** First Boot */
+            first_boot: boolean;
+        };
         /** CustomApplyIn */
         CustomApplyIn: {
             /** Content */
@@ -1916,6 +1954,26 @@ export interface components {
             content?: string | null;
             /** Name */
             name: string;
+        };
+        /** CustomRow */
+        CustomRow: {
+            /** Card */
+            card: string | null;
+            /** Description */
+            description: string;
+            /** Package */
+            package: string;
+            /** Programs */
+            programs: components["schemas"]["ProgramRow"][];
+            /** Service */
+            service: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "image" | "added after flashing";
+            /** Version */
+            version: string;
         };
         /** DefaultsConf */
         DefaultsConf: {
@@ -2032,6 +2090,37 @@ export interface components {
             ra?: ("server" | "relay" | "hybrid" | "disabled") | null;
             /** Start */
             start?: number | null;
+        };
+        /** DiscoveryState */
+        DiscoveryState: {
+            /** Board */
+            board: string;
+            /** Capabilities */
+            capabilities: components["schemas"]["CapabilityRow"][];
+            /** Configs */
+            configs: components["schemas"]["ConfigDiff"][];
+            /** Custom */
+            custom: components["schemas"]["CustomRow"][];
+            /** Has Overlay */
+            has_overlay: boolean;
+            /** Kept On Flash */
+            kept_on_flash: string[];
+            /** Match Note */
+            match_note: string | null;
+            overlay: components["schemas"]["OverlayDiff"];
+            packages: components["schemas"]["PackageDiff"];
+            profile: components["schemas"]["ProfileKey"] | null;
+            /** Programs */
+            programs: components["schemas"]["ProgramRow"][];
+            /**
+             * Read At
+             * Format: date-time
+             */
+            read_at: string;
+            /** Revision */
+            revision: string;
+            /** Router Id */
+            router_id: string;
         };
         /** DnsApplyIn */
         DnsApplyIn: {
@@ -3201,6 +3290,15 @@ export interface components {
             /** Path */
             path: string;
         };
+        /** OptionChange */
+        OptionChange: {
+            /** Image */
+            image: string | null;
+            /** Key */
+            key: string;
+            /** Router */
+            router: string | null;
+        };
         /** OptionEditIn */
         OptionEditIn: {
             /** Name */
@@ -3252,12 +3350,89 @@ export interface components {
             /** Radio */
             radio: string;
         };
+        /** OverlayDiff */
+        OverlayDiff: {
+            /** Added */
+            added: components["schemas"]["OverlayEntry"][];
+            /** Deleted */
+            deleted: string[];
+            /** Replaced */
+            replaced: components["schemas"]["OverlayEntry"][];
+            /** Unreadable */
+            unreadable: number;
+        };
+        /** OverlayEntry */
+        OverlayEntry: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "file" | "link" | "whiteout" | "other";
+            /** Mode */
+            mode: string;
+            /** Path */
+            path: string;
+            /** Size */
+            size: number;
+            /** Target */
+            target?: string | null;
+        };
         /** OverrideIn */
         OverrideIn: {
             /** Host */
             host: string;
             /** Ip */
             ip: string;
+        };
+        /** Package */
+        Package: {
+            /**
+             * Depends
+             * @default []
+             */
+            depends: string[];
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Files
+             * @default []
+             */
+            files: string[];
+            /**
+             * License
+             * @default
+             */
+            license: string;
+            /** Name */
+            name: string;
+            /**
+             * Origin
+             * @default
+             */
+            origin: string;
+            /**
+             * Url
+             * @default
+             */
+            url: string;
+            /** Version */
+            version: string;
+        };
+        /** PackageDiff */
+        PackageDiff: {
+            /** Added */
+            added: components["schemas"]["Package"][];
+            /** Changed */
+            changed: [
+                string,
+                string,
+                string
+            ][];
+            /** Removed */
+            removed: string[];
         };
         /** PageView */
         PageView: {
@@ -3399,6 +3574,29 @@ export interface components {
         Preview: {
             /** Commands */
             commands: string[];
+        };
+        /** ProfileKey */
+        ProfileKey: {
+            /** Board */
+            board: string;
+            /** Revision */
+            revision: string;
+            /** Sha256 */
+            sha256: string;
+        };
+        /** ProgramRow */
+        ProgramRow: {
+            /** Has Card */
+            has_card: boolean;
+            /** Path */
+            path: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "custom" | "overlay";
+            /** Usage */
+            usage: string | null;
         };
         /** ProtoView */
         ProtoView: {
@@ -5260,6 +5458,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DescriptionSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discovery_state_api_routers__router_id__discovery_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoveryState"];
                 };
             };
             /** @description Validation Error */

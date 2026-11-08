@@ -13,10 +13,12 @@ import httpx
 
 from openwrtgui.capture.service import CaptureService
 from openwrtgui.capture.wireshark import find_wireshark
+from openwrtgui.discovery.service import DiscoveryService
 from openwrtgui.faults.service import FaultsService
 from openwrtgui.fw.service import FirewallService
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard, psutil_lister
+from openwrtgui.images.store import ProfileStore
 from openwrtgui.live import LiveHub
 from openwrtgui.luci_bridge.service import LuciBridgeService, UpstreamFactory
 from openwrtgui.luci_bridge.upstream import Upstream, sim_upstream, ssh_upstream
@@ -66,6 +68,8 @@ class AppContext:
     fw: FirewallService
     faults: FaultsService
     captures: CaptureService
+    profiles: ProfileStore
+    discovery: DiscoveryService
     token: str
     port: int
     mode: Literal["real", "simulator"]
@@ -242,6 +246,10 @@ def build_context(
         documents=data.root / "documents" if simulator is not None else documents_dir(),
         wireshark=_no_wireshark if simulator is not None else find_wireshark,
     )
+    profiles = ProfileStore(data.profiles_dir)
+    discovery = DiscoveryService(
+        pool=pool, routers=routers, guard=guard, audit=audit, descriptions=descriptions, profiles=profiles
+    )
     return AppContext(
         data=data,
         settings=settings,
@@ -266,6 +274,8 @@ def build_context(
         fw=fw,
         faults=faults,
         captures=captures,
+        profiles=profiles,
+        discovery=discovery,
         token=token,
         port=port,
         mode="simulator" if simulator is not None else "real",

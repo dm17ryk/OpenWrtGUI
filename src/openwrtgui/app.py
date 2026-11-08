@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from openwrtgui.api import (
+    discovery_api,
     errors,
     faults_api,
     fw_api,
@@ -89,6 +90,7 @@ def create_app(ctx: AppContext) -> FastAPI:
         ports_api,
         fw_api,
         faults_api,
+        discovery_api,
     )
     for module in modules:
         app.include_router(module.router)
