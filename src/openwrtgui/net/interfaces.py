@@ -114,11 +114,19 @@ def _refuse_own(req: InterfaceRequest, state: NetworkState, router_name: str) ->
         )
 
 
+def dynamic_refusal(state: NetworkState, name: str) -> str | None:
+    """Why `name` cannot be changed when netifd makes it at run time (lte_4 from lte); None otherwise."""
+    dynamic = state.dynamic(name)
+    if dynamic is None:
+        return None
+    parent = dynamic.dynamic_parent or "its parent"
+    return f"{name} is made by {parent} at run time; change {parent} instead."
+
+
 def _existing(req: InterfaceRequest, state: NetworkState) -> None:
-    dynamic = state.dynamic(req.name)
-    if dynamic is not None:
-        parent = dynamic.dynamic_parent or "its parent"
-        raise ValueError(f"{req.name} is made by {parent} at run time; change {parent} instead.")
+    refusal = dynamic_refusal(state, req.name)
+    if refusal is not None:
+        raise ValueError(refusal)
     if req.create:
         check_name(req.name)
         if state.conf(req.name) is not None:

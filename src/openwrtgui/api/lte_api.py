@@ -9,9 +9,12 @@ from pydantic import BaseModel, Field
 
 from openwrtgui.api.deps import get_ctx, require_token
 from openwrtgui.api.net_api import Digest, NetPlanOut
+from openwrtgui.api.wifi_api import OptionEditIn
 from openwrtgui.context import AppContext
+from openwrtgui.forms import OptionEdit, OptionRow
 from openwrtgui.lte.at import AtResult
 from openwrtgui.lte.service import AtNeedsConfirm, LteAction, LteBusy
+from openwrtgui.lte.settings import Auth, LteSettings, PdpType
 from openwrtgui.lte.state import LteState
 from openwrtgui.net.apply import NetApplyResult
 
@@ -32,6 +35,41 @@ class AtIn(BaseModel):
 
 class ImeiOut(BaseModel):
     imei: str
+
+
+class LteSettingsIn(BaseModel):
+    """None leaves a field as it is; "" in a text field removes the option."""
+
+    apn: str | None = None
+    auth: Auth | None = None
+    username: str | None = None
+    password: str | None = Field(default=None, repr=False)
+    pincode: str | None = Field(default=None, repr=False)
+    pdptype: PdpType | None = None
+    mtu: int | None = None
+    metric: int | None = None
+    auto: bool | None = None
+    defaultroute: bool | None = None
+    edits: list[OptionEditIn] = []
+
+    def to_domain(self) -> LteSettings:
+        return LteSettings(
+            apn=self.apn,
+            auth=self.auth,
+            username=self.username,
+            password=self.password,
+            pincode=self.pincode,
+            pdptype=self.pdptype,
+            mtu=self.mtu,
+            metric=self.metric,
+            auto=self.auto,
+            defaultroute=self.defaultroute,
+            edits=tuple(OptionEdit(e.section, e.name, e.value) for e in self.edits),
+        )
+
+
+class LteSettingsApplyIn(LteSettingsIn, Digest):
+    pass
 
 
 class ActionIn(BaseModel):
@@ -58,6 +96,21 @@ async def action_apply(router_id: str, body: ActionApplyIn, ctx: Ctx) -> NetAppl
         return await ctx.lte.apply_action(_known(ctx, router_id), body.action, body.digest)
     except LteBusy as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/settings/options")
+async def settings_options(router_id: str, ctx: Ctx) -> list[OptionRow]:
+    return await ctx.lte.settings_options(_known(ctx, router_id))
+
+
+@router.post("/settings/preview")
+async def settings_preview(router_id: str, body: LteSettingsIn, ctx: Ctx) -> NetPlanOut:
+    return NetPlanOut.of(await ctx.lte.plan_settings(_known(ctx, router_id), body.to_domain()))
+
+
+@router.post("/settings/apply")
+async def settings_apply(router_id: str, body: LteSettingsApplyIn, ctx: Ctx) -> NetApplyResult:
+    return await ctx.lte.apply_settings(_known(ctx, router_id), body.to_domain(), body.digest)
 
 
 @router.post("/at")

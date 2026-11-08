@@ -9,6 +9,7 @@ from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Literal
 
+from openwrtgui.forms import OptionRow
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.guard.writes import run_audited
@@ -16,9 +17,12 @@ from openwrtgui.lte import commands as c
 from openwrtgui.lte.at import AtResult, find_at_port, is_query
 from openwrtgui.lte.commands import MODEM_DEVICE
 from openwrtgui.lte.parse import parse_at, parse_opmode
+from openwrtgui.lte.settings import LteSettings, settings_request
 from openwrtgui.lte.state import NO_LTE, LteState, read_lte
 from openwrtgui.net.apply import NetApplyResult, NetCheck, NetPlan, net_plan
+from openwrtgui.net.interfaces import InterfaceRequest, dynamic_refusal
 from openwrtgui.net.service import NetworkService
+from openwrtgui.net.state import NetworkState
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import CommandResult, Transport
 from openwrtgui.transport.pool import ConnectionPool
@@ -49,6 +53,21 @@ class AtNeedsConfirm(Exception):
 
 def _reason(result: CommandResult) -> str:
     return (result.stderr or result.stdout).strip() or f"exit {result.exit_status}"
+
+
+def _qmi_of(state: NetworkState) -> tuple[str, str | None] | None:
+    """The qmi interface's name and device; None: no LTE modem interface on this router."""
+    conf = next((v.conf for v in state.interfaces if v.conf is not None and v.conf.proto == "qmi"), None)
+    return (conf.name, conf.device) if conf is not None else None
+
+
+def _lte_name(qmi: tuple[str, str | None] | None) -> str:
+    """The actions send `ifup lte` / `ifdown lte`: the qmi interface has to be the one called lte."""
+    if qmi is None:
+        raise ValueError(NO_LTE)
+    if qmi[0] != "lte":
+        raise ValueError(f"The LTE screen expects the qmi interface to be called lte; it is {qmi[0]}")
+    return qmi[0]
 
 
 class LteService:
@@ -82,9 +101,7 @@ class LteService:
         return rec
 
     async def _qmi(self, router_id: str) -> tuple[str, str | None] | None:
-        state = await self._net.state(router_id)
-        conf = next((v.conf for v in state.interfaces if v.conf is not None and v.conf.proto == "qmi"), None)
-        return (conf.name, conf.device) if conf is not None else None
+        return _qmi_of(await self._net.state(router_id))
 
     async def modem_device(self, router_id: str) -> str | None:
         """The qmi interface's device when it is a QMI modem device (`/dev/cdc-wdmN`); None: no LTE here."""
@@ -111,11 +128,9 @@ class LteService:
     # ---------------------------------------------------------------- connect, disconnect, reboot modem
     async def _lte_device(self, router_id: str) -> str | None:
         qmi = await self._qmi(router_id)
-        if qmi is None:
-            raise ValueError(NO_LTE)
-        if qmi[0] != "lte":
-            raise ValueError(f"The LTE actions expect the qmi interface to be called lte; it is {qmi[0]}")
-        return qmi[1] if qmi[1] is not None and MODEM_DEVICE.fullmatch(qmi[1]) else None
+        _lte_name(qmi)
+        device = qmi[1] if qmi is not None else None
+        return device if device is not None and MODEM_DEVICE.fullmatch(device) else None
 
     async def plan_action(self, router_id: str, action: LteAction) -> NetPlan:
         rec = self._record(router_id)
@@ -229,6 +244,29 @@ class LteService:
             if status is not None and bool(status.get("up")) is want:
                 return True
         return False
+
+    # ---------------------------------------------------------------- settings (v0.3's interface plan)
+    async def _settings_request(self, router_id: str, settings: LteSettings) -> InterfaceRequest:
+        state = await self._net.state(router_id)
+        name = _lte_name(_qmi_of(state))
+        for edit in settings.edits:
+            if edit.section != name:
+                raise ValueError(
+                    dynamic_refusal(state, edit.section)
+                    or f"The LTE settings change {name} only, not {edit.section}"
+                )
+        return settings_request(name, settings)
+
+    async def plan_settings(self, router_id: str, settings: LteSettings) -> NetPlan:
+        return await self._net.plan_interface(router_id, await self._settings_request(router_id, settings))
+
+    async def apply_settings(self, router_id: str, settings: LteSettings, digest: str) -> NetApplyResult:
+        req = await self._settings_request(router_id, settings)
+        return await self._net.apply_interface(router_id, req, digest)
+
+    async def settings_options(self, router_id: str) -> list[OptionRow]:
+        name = _lte_name(await self._qmi(router_id))
+        return await self._net.interface_options(router_id, name)
 
     # ---------------------------------------------------------------- AT console and IMEI
     async def at_command(self, router_id: str, text: str, confirmed: bool) -> AtResult:
