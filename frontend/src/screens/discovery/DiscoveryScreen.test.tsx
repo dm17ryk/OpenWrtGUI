@@ -6,7 +6,7 @@ import { beforeEach, expect, test, vi } from 'vitest'
 import { ApiError } from '../../api/client'
 import type { DiscoveryState } from '../../api/types'
 import { AP1_DISCOVERY, AP2_FIRMWARE } from '../../testing/discovery'
-import { AP1 } from '../../testing/fixtures'
+import { AP1, ROUTERS } from '../../testing/fixtures'
 import { DiscoveryScreen } from './DiscoveryScreen'
 
 const calls: Array<{ path: string; body?: unknown }> = []
@@ -17,6 +17,7 @@ vi.mock('../../api/client', async (orig) => {
   const actual = await orig<typeof import('../../api/client')>()
   const respond = async (path: string, body?: unknown): Promise<unknown> => {
     calls.push({ path, body })
+    if (path === '/api/routers') return ROUTERS
     if (path === '/api/routers/ap1') return AP1
     if (path === '/api/routers/ap1/discovery') return discovery
     if (path === '/api/routers/ap1/luci/pages') return []
@@ -75,6 +76,20 @@ test('shows the no-match note with both ways out', async () => {
   expect(screen.getByLabelText('Import image…')).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Build from this router’s /rom' }))
   expect(calls.some((c) => c.path === '/api/routers/ap1/images/rom')).toBe(true)
+})
+
+test('lists what changed since flashing once an image matches', async () => {
+  renderDiscovery()
+  expect(await screen.findByRole('heading', { name: 'Added after flashing' })).toBeVisible()
+  expect(screen.getByRole('heading', { name: 'Config changed' })).toBeVisible()
+})
+
+test('no change lists without a matched image', async () => {
+  discovery = { ...AP1_DISCOVERY, profile: null, match_note: 'No imported image for dlink,dwr-921-c3-uboot r35692-b8bffeefdf.' }
+  renderDiscovery()
+  expect(await screen.findByText(/No imported image for/)).toBeVisible()
+  expect(screen.queryByRole('heading', { name: 'Added after flashing' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: 'Config changed' })).not.toBeInTheDocument()
 })
 
 test('adds Discovery to the router sections, after Overview', async () => {

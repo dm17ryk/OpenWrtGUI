@@ -6,7 +6,9 @@ import type { DiscoveryState, RouterDetail } from '../../api/types'
 import { Help, HelpTip } from '../../help/Help'
 import { HELP } from '../../help/topics'
 import { RouterSections } from '../../shell/RouterSections'
+import { ConfigSection } from './ConfigSection'
 import { ImageSection } from './ImageSection'
+import { OverlaySection } from './OverlaySection'
 
 /** Discovery (spec 7.8): how this router differs from its image, its custom tools, copies and flashing. */
 export function DiscoveryScreen() {
@@ -50,6 +52,8 @@ export function DiscoveryScreen() {
         <div className="note x">{discovery.error instanceof ApiError ? discovery.error.detail : String(discovery.error)}</div>
       )}
       {state && <ImageSection routerId={id} state={state} onFlash={() => setFlashing(true)} />}
+      {state?.profile && <OverlaySection routerId={id} state={state} />}
+      {state?.profile && <ConfigSection state={state} />}
       {isFlashing && <div className="muted">Flashing comes with the flash dialog.</div>}
     </main>
   )
