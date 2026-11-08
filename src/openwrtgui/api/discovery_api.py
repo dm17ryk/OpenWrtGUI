@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from openwrtgui.api.deps import get_ctx, require_token
 from openwrtgui.context import AppContext
+from openwrtgui.discovery.firmware import FirmwareCheck
 from openwrtgui.discovery.state import DiscoveryState
 
 router = APIRouter(
@@ -25,3 +26,8 @@ def _known(ctx: AppContext, router_id: str) -> str:
 @router.get("/discovery")
 async def discovery_state(router_id: str, ctx: Ctx) -> DiscoveryState:
     return await ctx.discovery.state(_known(ctx, router_id))
+
+
+@router.post("/discovery/firmware")
+async def firmware_check(router_id: str, ctx: Ctx) -> FirmwareCheck:
+    return await ctx.discovery.check_firmware(_known(ctx, router_id))

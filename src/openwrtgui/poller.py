@@ -40,6 +40,8 @@ class StatusPoller:
         self.interval_s = interval_s
         self.guard_interval_s = guard_interval_s
         self._last_guard: tuple[bool, tuple[str, ...]] | None = None
+        # called after each good poll (Discovery's dashboard summary, read once per connect)
+        self.on_status: Callable[[RouterRecord], Awaitable[None]] | None = None
 
     def _offline(self, rec: RouterRecord) -> None:
         # The router's last-known guard signs stay: a run SSID must not unlock the bench just because
@@ -73,6 +75,8 @@ class StatusPoller:
         self.statuses[rec.id] = status
         self.guard.set_router_signs(rec.id, ssids_on_air(status))
         self.hub.publish({"type": "status", "router": rec.id, "status": status})
+        if self.on_status is not None:
+            await self.on_status(rec)
 
     async def poll_all(self) -> None:
         records = [r for r in self.routers.list() if r.auth == "key"]

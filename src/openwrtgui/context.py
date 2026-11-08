@@ -248,8 +248,15 @@ def build_context(
     )
     profiles = ProfileStore(data.profiles_dir)
     discovery = DiscoveryService(
-        pool=pool, routers=routers, guard=guard, audit=audit, descriptions=descriptions, profiles=profiles
+        pool=pool,
+        routers=routers,
+        guard=guard,
+        audit=audit,
+        settings=settings,
+        descriptions=descriptions,
+        profiles=profiles,
     )
+    poller.on_status = discovery.refresh_summary
     return AppContext(
         data=data,
         settings=settings,

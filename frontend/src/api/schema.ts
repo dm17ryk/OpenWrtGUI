@@ -465,6 +465,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/discovery/firmware": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Firmware Check */
+        post: operations["firmware_check_api_routers__router_id__discovery_firmware_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/faults": {
         parameters: {
             query?: never;
@@ -2122,6 +2139,24 @@ export interface components {
             /** Router Id */
             router_id: string;
         };
+        /**
+         * DiscoverySummary
+         * @description What the dashboard shows per router: the matched image, counts, and owner tags (spec 7.1).
+         */
+        DiscoverySummary: {
+            /** Configs Changed */
+            configs_changed: number;
+            /** Files Added */
+            files_added: number;
+            /** Owners */
+            owners: string[];
+            /** Packages Added */
+            packages_added: number;
+            /** Profile */
+            profile: string | null;
+            /** Reflash Pending */
+            reflash_pending: boolean;
+        };
         /** DnsApplyIn */
         DnsApplyIn: {
             /** Cachesize */
@@ -2363,6 +2398,19 @@ export interface components {
             ssh_port: number;
             /** Tc */
             tc: components["schemas"]["TcHook"][];
+        };
+        /** FirmwareCheck */
+        FirmwareCheck: {
+            /** Detail */
+            detail: string;
+            /** Image Sha256 */
+            image_sha256: string | null;
+            /** Matches */
+            matches: boolean | null;
+            /** Read S */
+            read_s: number | null;
+            /** Router Sha256 */
+            router_sha256: string | null;
         };
         /** ForwardIn */
         ForwardIn: {
@@ -3821,6 +3869,7 @@ export interface components {
         };
         /** RouterDetail */
         RouterDetail: {
+            discovery?: components["schemas"]["DiscoverySummary"] | null;
             health: components["schemas"]["RouterHealth"];
             record: components["schemas"]["RouterRecord"];
             status: components["schemas"]["RouterStatus"] | null;
@@ -3840,6 +3889,7 @@ export interface components {
         };
         /** RouterItem */
         RouterItem: {
+            discovery?: components["schemas"]["DiscoverySummary"] | null;
             health: components["schemas"]["RouterHealth"];
             record: components["schemas"]["RouterRecord"];
             status: components["schemas"]["RouterStatus"] | null;
@@ -5489,6 +5539,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DiscoveryState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    firmware_check_api_routers__router_id__discovery_firmware_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareCheck"];
                 };
             };
             /** @description Validation Error */

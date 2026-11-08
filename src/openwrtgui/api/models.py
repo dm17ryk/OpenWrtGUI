@@ -8,6 +8,7 @@ from typing import Any
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
+from openwrtgui.discovery.state import DiscoverySummary
 from openwrtgui.guard.bench_guard import GuardState
 from openwrtgui.probe.describe import DescriptionSummary
 from openwrtgui.probe.status import RouterStatus
@@ -50,6 +51,7 @@ class RouterItem(BaseModel):
     health: RouterHealth
     status: RouterStatus | None
     summary: DescriptionSummary | None
+    discovery: DiscoverySummary | None = None
 
 
 class RouterDetail(RouterItem):

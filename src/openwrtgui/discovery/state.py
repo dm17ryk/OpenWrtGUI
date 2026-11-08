@@ -78,6 +78,19 @@ class DiscoveryState(BaseModel):
     capabilities: tuple[CapabilityRow, ...]
 
 
+class DiscoverySummary(BaseModel):
+    """What the dashboard shows per router: the matched image, counts, and owner tags (spec 7.1)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    profile: str | None
+    files_added: int
+    packages_added: int
+    configs_changed: int
+    owners: tuple[str, ...]
+    reflash_pending: bool
+
+
 def no_match_note(board: str, revision: str) -> str:
     return (
         f"No imported image for {board} {revision}. Import its sysupgrade image (Settings › Images), "
