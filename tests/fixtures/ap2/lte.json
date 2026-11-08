@@ -1,0 +1,74 @@
+{
+  "ls /dev/ttyUSB* /dev/cdc-wdm*": {
+    "stdout": "/dev/cdc-wdm0\n/dev/ttyUSB0\n/dev/ttyUSB1\n/dev/ttyUSB2\n/dev/ttyUSB3\n",
+    "exit": 0
+  },
+  "uqmi -s -d /dev/cdc-wdm0 -t 2000 --get-serving-system": {
+    "stdout": "{\"registration\":\"registered\",\"radio_interface\":[\"lte\"],\"plmn_mcc\":425,\"plmn_mnc\":1,\"plmn_description\":\"а��.�\\u0001\",\"roaming\":false}\n",
+    "exit": 0
+  },
+  "uqmi -s -d /dev/cdc-wdm0 -t 2000 --get-signal-info": {
+    "stdout": "{\"type\":\"lte\",\"rssi\":-60,\"rsrq\":-15,\"rsrp\":-95,\"snr\":8.2000000000000011}\n",
+    "exit": 0
+  },
+  "uqmi -s -d /dev/cdc-wdm0 -t 2000 --get-device-operating-mode": {
+    "stdout": "\"online\"\n",
+    "exit": 0
+  },
+  "ubus call network.interface.lte status": {
+    "stdout": "{\n\t\"up\": true,\n\t\"pending\": false,\n\t\"available\": true,\n\t\"autostart\": true,\n\t\"dynamic\": false,\n\t\"uptime\": 2222552,\n\t\"l3_device\": \"wwan0\",\n\t\"proto\": \"qmi\",\n\t\"updated\": [\n\t\t\"data\"\n\t],\n\t\"metric\": 20,\n\t\"dns_metric\": 0,\n\t\"delegation\": true,\n\t\"ipv4-address\": [\n\t\t\n\t],\n\t\"ipv6-address\": [\n\t\t\n\t],\n\t\"ipv6-prefix\": [\n\t\t\n\t],\n\t\"ipv6-prefix-assignment\": [\n\t\t\n\t],\n\t\"route\": [\n\t\t\n\t],\n\t\"dns-server\": [\n\t\t\n\t],\n\t\"dns-search\": [\n\t\t\n\t],\n\t\"neighbors\": [\n\t\t\n\t],\n\t\"inactive\": {\n\t\t\"ipv4-address\": [\n\t\t\t\n\t\t],\n\t\t\"ipv6-address\": [\n\t\t\t\n\t\t],\n\t\t\"route\": [\n\t\t\t\n\t\t],\n\t\t\"dns-server\": [\n\t\t\t\n\t\t],\n\t\t\"dns-search\": [\n\t\t\t\n\t\t],\n\t\t\"neighbors\": [\n\t\t\t\n\t\t]\n\t},\n\t\"data\": {\n\t\t\"cid_4\": \"11\",\n\t\t\"pdh_4\": \"90215808\"\n\t}\n}\n",
+    "exit": 0
+  },
+  "ubus call network.interface.lte_4 status": {
+    "stdout": "{\n\t\"up\": false,\n\t\"pending\": true,\n\t\"available\": true,\n\t\"autostart\": true,\n\t\"dynamic\": true,\n\t\"proto\": \"dhcp\",\n\t\"device\": \"wwan0\",\n\t\"data\": {\n\t\t\"zone\": \"wan\"\n\t}\n}\n",
+    "exit": 0
+  },
+  "ubus call network.device status '{\"name\":\"wwan0\"}'": {
+    "stdout": "{\n\t\"external\": false,\n\t\"present\": true,\n\t\"type\": \"Network device\",\n\t\"up\": true,\n\t\"carrier\": true,\n\t\"auth_status\": false,\n\t\"mtu\": 1420,\n\t\"mtu6\": 1420,\n\t\"macaddr\": \"6a:7e:56:80:7c:ec\",\n\t\"txqueuelen\": 1000,\n\t\"ipv6\": true,\n\t\"ip6segmentrouting\": false,\n\t\"promisc\": false,\n\t\"rpfilter\": 0,\n\t\"acceptlocal\": false,\n\t\"igmpversion\": 0,\n\t\"mldversion\": 0,\n\t\"neigh4reachabletime\": 30000,\n\t\"neigh6reachabletime\": 30000,\n\t\"neigh4gcstaletime\": 60,\n\t\"neigh6gcstaletime\": 60,\n\t\"neigh4locktime\": 100,\n\t\"dadtransmits\": 1,\n\t\"multicast\": true,\n\t\"sendredirects\": true,\n\t\"drop_v4_unicast_in_l2_multicast\": false,\n\t\"drop_v6_unicast_in_l2_multicast\": false,\n\t\"drop_gratuitous_arp\": false,\n\t\"drop_unsolicited_na\": false,\n\t\"arp_accept\": false,\n\t\"gro\": true,\n\t\"statistics\": {\n\t\t\"collisions\": 0,\n\t\t\"rx_frame_errors\": 0,\n\t\t\"tx_compressed\": 0,\n\t\t\"multicast\": 0,\n\t\t\"rx_length_errors\": 0,\n\t\t\"tx_dropped\": 0,\n\t\t\"rx_bytes\": 12173,\n\t\t\"rx_missed_errors\": 0,\n\t\t\"tx_errors\": 0,\n\t\t\"rx_compressed\": 0,\n\t\t\"rx_over_errors\": 0,\n\t\t\"tx_fifo_errors\": 0,\n\t\t\"rx_crc_errors\": 0,\n\t\t\"rx_packets\": 37,\n\t\t\"tx_heartbeat_errors\": 0,\n\t\t\"rx_dropped\": 0,\n\t\t\"tx_aborted_errors\": 0,\n\t\t\"tx_packets\": 740040,\n\t\t\"rx_errors\": 0,\n\t\t\"tx_bytes\": 257532310,\n\t\t\"tx_window_errors\": 0,\n\t\t\"rx_fifo_errors\": 0,\n\t\t\"tx_carrier_errors\": 0\n\t}\n}\n",
+    "exit": 0
+  },
+  "cat /tmp/run/dwr921-qmi-state": {
+    "stdout": "registration=registered\nradio=lte\nrssi=-60\n",
+    "exit": 0
+  },
+  "printf '%s\\r' 'AT' | timeout -s KILL 10 microcom -t 2000 -s 115200 /dev/ttyUSB0": {
+    "stdout": "",
+    "exit": 0,
+    "seconds": 2.04
+  },
+  "printf '%s\\r' 'AT' | timeout -s KILL 10 microcom -t 2000 -s 115200 /dev/ttyUSB1": {
+    "stdout": "AT\r\r\nOK\r\n",
+    "exit": 0,
+    "seconds": 2.05
+  },
+  "printf '%s\\r' 'AT+CGMI' | timeout -s KILL 10 microcom -t 2000 -s 115200 /dev/ttyUSB1": {
+    "stdout": "AT+CGMI\r\r\nBroadMobi\r\n\r\nOK\r\n",
+    "exit": 0,
+    "seconds": 2.05
+  },
+  "printf '%s\\r' 'AT+CGMM' | timeout -s KILL 10 microcom -t 2000 -s 115200 /dev/ttyUSB1": {
+    "stdout": "AT+CGMM\r\r\nBM806C\r\n\r\nOK\r\n",
+    "exit": 0,
+    "seconds": 2.05
+  },
+  "printf '%s\\r' 'AT+CGMR' | timeout -s KILL 10 microcom -t 2000 -s 115200 /dev/ttyUSB1": {
+    "stdout": "AT+CGMR\r\r\nM1.2.0_E1.0.3_A1.1.8\r\n\r\nOK\r\n",
+    "exit": 0,
+    "seconds": 2.05
+  },
+  "printf '%s\\r' 'AT+COPS?' | timeout -s KILL 10 microcom -t 2000 -s 115200 /dev/ttyUSB1": {
+    "stdout": "AT+COPS?\r\r\n+COPS: 0,0,\"Partner\",7\r\n\r\nOK\r\n",
+    "exit": 0,
+    "seconds": 2.05
+  },
+  "printf '%s\\r' 'AT+BMMODODR?' | timeout -s KILL 10 microcom -t 2000 -s 115200 /dev/ttyUSB1": {
+    "stdout": "AT+BMMODODR?\r\r\n+BMMODODR: 17\r\n\r\nOK\r\n",
+    "exit": 0,
+    "seconds": 2.05
+  },
+  "printf '%s\\r' 'AT+CSQ' | timeout -s KILL 10 microcom -t 2000 -s 115200 /dev/ttyUSB1": {
+    "stdout": "AT+CSQ\r\r\n+CSQ: 27,99\r\n\r\nOK\r\n",
+    "exit": 0,
+    "seconds": 2.05
+  }
+}
