@@ -584,6 +584,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/discovery/service/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Service Apply */
+        post: operations["service_apply_api_routers__router_id__discovery_service_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/discovery/service/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Service Preview */
+        post: operations["service_preview_api_routers__router_id__discovery_service_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/discovery/tool/apply": {
         parameters: {
             query?: never;
@@ -2350,6 +2384,11 @@ export interface components {
             revision: string;
             /** Router Id */
             router_id: string;
+            /**
+             * Services
+             * @default []
+             */
+            services: components["schemas"]["ServiceRow"][];
         };
         /**
          * DiscoverySummary
@@ -4359,6 +4398,44 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** ServiceApplyIn */
+        ServiceApplyIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "start" | "stop" | "restart";
+            /** Digest */
+            digest: string;
+            /** Name */
+            name: string;
+        };
+        /** ServiceIn */
+        ServiceIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "start" | "stop" | "restart";
+            /** Name */
+            name: string;
+        };
+        /** ServiceRow */
+        ServiceRow: {
+            /** Enabled */
+            enabled: boolean | null;
+            /** Name */
+            name: string;
+            /** Package */
+            package: string | null;
+            /** Running */
+            running: boolean | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "custom" | "overlay";
+        };
         /** SessionView */
         SessionView: {
             /** Changed From */
@@ -6079,6 +6156,76 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["HelpIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    service_apply_api_routers__router_id__discovery_service_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    service_preview_api_routers__router_id__discovery_service_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceIn"];
             };
         };
         responses: {

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -48,6 +48,15 @@ class ToolApplyIn(ToolIn, Digest):
 class PrefillIn(BaseModel):
     path: str
     usage: str | None = None
+
+
+class ServiceIn(BaseModel):
+    name: str
+    action: Literal["start", "stop", "restart"]
+
+
+class ServiceApplyIn(ServiceIn, Digest):
+    pass
 
 
 class CopyIn(BaseModel):
@@ -142,6 +151,16 @@ async def tool_preview(router_id: str, body: ToolIn, ctx: Ctx) -> NetPlanOut:
 async def tool_apply(router_id: str, body: ToolApplyIn, ctx: Ctx) -> HelpResult:
     rid = _known(ctx, router_id)
     return await ctx.discovery.apply_tool(rid, body.path, body.label, body.values, body.digest)
+
+
+@router.post("/discovery/service/preview")
+async def service_preview(router_id: str, body: ServiceIn, ctx: Ctx) -> NetPlanOut:
+    return NetPlanOut.of(await ctx.discovery.plan_service(_known(ctx, router_id), body.name, body.action))
+
+
+@router.post("/discovery/service/apply")
+async def service_apply(router_id: str, body: ServiceApplyIn, ctx: Ctx) -> NetApplyResult:
+    return await ctx.discovery.apply_service(_known(ctx, router_id), body.name, body.action, body.digest)
 
 
 @tools.get("/{board}")

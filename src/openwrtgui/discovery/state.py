@@ -26,6 +26,7 @@ from openwrtgui.discovery.overlay import (
     diff_packages,
     parse_ls_ldn,
 )
+from openwrtgui.discovery.services import SERVICE_NAME, ServiceRow, read_service
 from openwrtgui.images.apkdb import Package, is_custom, parse_apk_installed, parse_opkg_status
 from openwrtgui.images.profile import PATH_DIRS, Profile, ProfileKey
 from openwrtgui.images.usage import usage_text
@@ -75,6 +76,7 @@ class DiscoveryState(BaseModel):
     kept_on_flash: tuple[str, ...]
     custom: tuple[CustomRow, ...]
     programs: tuple[ProgramRow, ...]
+    services: tuple[ServiceRow, ...] = ()
     capabilities: tuple[CapabilityRow, ...]
 
 
@@ -211,6 +213,7 @@ async def read_discovery(
     image_configs = {k: _masked(v) for k, v in profile.configs.items()}
     kept = set((await t.run(cmd.SYSUPGRADE_LIST)).stdout.split())
     owned = {f for p in live for f in p.files}
+    custom = await _custom_rows(t, profile, live, card_paths)
     programs: list[ProgramRow] = []
     for e in overlay.added:
         if posixpath.dirname(e.path) in PATH_DIRS and e.path not in owned:
@@ -226,8 +229,30 @@ async def read_discovery(
             "packages": diff_packages(live, profile),
             "configs": diff_configs(configs, profile.model_copy(update={"configs": image_configs})),
             "kept_on_flash": tuple(e.path for e in (*overlay.added, *overlay.replaced) if e.path in kept),
-            "custom": await _custom_rows(t, profile, live, card_paths),
+            "custom": custom,
             "programs": tuple(programs),
+            "services": await _services(t, custom, overlay, owned),
             "capabilities": capability_map(profile, overlay),
         }
     )
+
+
+async def _services(
+    t: Transport, custom: Sequence[CustomRow], overlay: OverlayDiff, owned: set[str]
+) -> tuple[ServiceRow, ...]:
+    """Init scripts of custom packages, then those the overlay added that no package owns."""
+    found: list[tuple[str, Literal["custom", "overlay"], str | None]] = [
+        (row.service, "custom", row.package) for row in custom if row.service
+    ]
+    found += [
+        (posixpath.basename(e.path), "overlay", None)
+        for e in overlay.added
+        if posixpath.dirname(e.path) == "/etc/init.d" and e.kind == "file" and e.path not in owned
+    ]
+    rows: list[ServiceRow] = []
+    for name, source, package in found:
+        if not SERVICE_NAME.fullmatch(name) or any(r.name == name for r in rows):
+            continue
+        running, enabled = await read_service(t, name)
+        rows.append(ServiceRow(name=name, source=source, package=package, running=running, enabled=enabled))
+    return tuple(rows)

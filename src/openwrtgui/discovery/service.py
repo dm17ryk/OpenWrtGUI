@@ -3,10 +3,11 @@ copies, tools and services."""
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import posixpath
 import time
-from collections.abc import Callable, Mapping, MutableMapping
+from collections.abc import Awaitable, Callable, Mapping, MutableMapping
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
@@ -16,6 +17,7 @@ from openwrtgui.discovery.checklist import ChecklistStore, ReflashChecklist
 from openwrtgui.discovery.copy import CopyRequest, SavedFile, check_copy_path, read_files, write_steps
 from openwrtgui.discovery.firmware import FirmwareCheck, image_prefix_sha256, parse_proc_mtd
 from openwrtgui.discovery.overlay import parse_ls_ldn
+from openwrtgui.discovery.services import Action, read_service, service_command
 from openwrtgui.discovery.state import DiscoveryState, DiscoverySummary, no_match_note, read_discovery
 from openwrtgui.discovery.tools import ToolCard, ToolStore, help_command, tool_command
 from openwrtgui.fw import commands as fwc
@@ -76,8 +78,14 @@ class DiscoveryService:
         checklists: ChecklistStore,
         tools: ToolStore,
         clock: Callable[[], datetime] = datetime.now,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        poll_s: float = 1.0,
+        settle_s: float = 10.0,
     ) -> None:
         self.tools = tools
+        self._sleep = sleep
+        self._poll_s = poll_s
+        self._settle_s = settle_s
         self._pool = pool
         self._routers = routers
         self._guard = guard
@@ -266,6 +274,45 @@ class DiscoveryService:
         )
         self.summaries[rec.id] = summary
         return summary
+
+    # ---------------------------------------------------------------- custom services
+    async def plan_service(self, router_id: str, name: str, action: Action) -> NetPlan:
+        rec, t, desc, profile = await self._context(router_id)
+        state = await self._read(rec, t, desc, profile)
+        if name not in {s.name for s in state.services}:
+            raise ValueError(f"{name} is not a custom service; it is managed on System › Services (v0.6)")
+        command = service_command(name, action)
+        return net_plan(router_id=rec.id, screen=SCREEN, config=None, ops=[], current={}, commands=[command])
+
+    async def apply_service(self, router_id: str, name: str, action: Action, digest: str) -> NetApplyResult:
+        self._guard.require_clear()
+        plan = await self.plan_service(router_id, name, action)
+        rec = self._record(router_id)
+        if plan.digest != digest:
+            raise PreviewChanged(rec.name)
+        t = await self._pool.get(rec)
+        async with self._pool.write_lock(rec.id):
+            result = await run_audited(
+                t, plan.lines[0], router_id=rec.id, screen=SCREEN, guard=self._guard, audit=self._audit
+            )
+        if not result.ok:
+            reason = (result.stderr or result.stdout).strip() or f"exit {result.exit_status}"
+            return NetApplyResult(rec.id, False, False, (), f"{plan.lines[0]}: {reason}", rec.host)
+        want_running = action != "stop"
+        waited = 0.0
+        running: bool | None = None
+        while True:
+            running, _enabled = await read_service(t, name)
+            if running is want_running or waited >= self._settle_s:
+                break
+            await self._sleep(self._poll_s)
+            waited += self._poll_s
+        ok = running is want_running
+        detail = (
+            ("running" if running else "not running") if running is not None else "the router did not say"
+        )
+        check = NetCheck(f"service {name}", ok, detail if ok else f"{detail} after {self._settle_s:g} s")
+        return NetApplyResult(rec.id, True, ok, (check,), None, rec.host)
 
     # ---------------------------------------------------------------- copies and checklists
     async def _copy_files(
