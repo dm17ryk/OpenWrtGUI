@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { ApiError } from '../../api/client'
 import type { DiscoveryState } from '../../api/types'
-import { AP1_DISCOVERY, AP2_FIRMWARE } from '../../testing/discovery'
+import { AP1_DISCOVERY, AP2_FIRMWARE, FLASH_PLAN, MINI_PROFILE, NEWER_PROFILE } from '../../testing/discovery'
 import { AP1, ROUTERS } from '../../testing/fixtures'
 import { DiscoveryScreen } from './DiscoveryScreen'
 
@@ -28,6 +28,9 @@ vi.mock('../../api/client', async (orig) => {
       return AP2_FIRMWARE
     }
     if (path === '/api/routers/ap1/images/rom') return {}
+    if (path === '/api/images') return [MINI_PROFILE, NEWER_PROFILE]
+    if (path === '/api/routers/ap1/flash') return null
+    if (path === '/api/routers/ap1/flash/preview') return FLASH_PLAN
     throw new Error(`unexpected ${path}`)
   }
   return {
@@ -93,6 +96,14 @@ test('no change lists without a matched image', async () => {
   expect(await screen.findByText(/No imported image for/)).toBeVisible()
   expect(screen.queryByRole('heading', { name: 'Added after flashing' })).not.toBeInTheDocument()
   expect(screen.queryByRole('heading', { name: 'Config changed' })).not.toBeInTheDocument()
+})
+
+test('Flash an image opens the flash dialog for this router', async () => {
+  const user = renderDiscovery()
+  await user.click(await screen.findByRole('button', { name: 'Flash an image…' }))
+  expect(await screen.findByRole('heading', { name: 'Flash AP1 · bench' })).toBeVisible()
+  await user.click(screen.getByRole('button', { name: 'Close' }))
+  expect(screen.queryByRole('heading', { name: 'Flash AP1 · bench' })).not.toBeInTheDocument()
 })
 
 test('adds Discovery to the router sections, after Overview', async () => {

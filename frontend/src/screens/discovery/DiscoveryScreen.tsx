@@ -8,6 +8,7 @@ import { HELP } from '../../help/topics'
 import { RouterSections } from '../../shell/RouterSections'
 import { ConfigSection } from './ConfigSection'
 import { CustomSection } from './CustomSection'
+import { FlashDialog } from './FlashDialog'
 import { ImageSection } from './ImageSection'
 import { OverlaySection } from './OverlaySection'
 
@@ -56,7 +57,9 @@ export function DiscoveryScreen() {
       {state?.profile && <OverlaySection routerId={id} state={state} />}
       {state?.profile && <ConfigSection state={state} />}
       {state?.profile && <CustomSection routerId={id} state={state} />}
-      {isFlashing && <div className="muted">Flashing comes with the flash dialog.</div>}
+      {isFlashing && state && (
+        <FlashDialog routerId={id} routerName={name} board={state.board} revision={state.revision} onClose={() => setFlashing(false)} />
+      )}
     </main>
   )
 }

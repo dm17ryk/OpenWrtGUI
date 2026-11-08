@@ -104,7 +104,7 @@ test.each([
   renderPorts()
   const mirror = await screen.findByRole('region', { name: 'Mirroring' })
   expect(within(mirror).getByText(text)).toBeInTheDocument()
-  expect(within(mirror).getByText('Stop and restart come with image import (v0.5).')).toBeInTheDocument()
+  expect(within(mirror).getByText('Start, stop and restart: Discovery › Programs and services. Excluded MACs and the iperf warning are not built yet.')).toBeInTheDocument()
 })
 
 test('a router without a managed switch says why', async () => {

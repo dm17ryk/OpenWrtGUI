@@ -1,8 +1,8 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { ApiError, apiFetch, postJson } from '../api/client'
-import type { Preview, RouterRecord, SessionView } from '../api/types'
+import type { Preview, RouterItem, RouterRecord, SessionView } from '../api/types'
 import { Help, HelpTip } from '../help/Help'
 import { HELP } from '../help/topics'
 
@@ -55,6 +55,15 @@ export function AddRouter() {
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  // a router flashed without settings: its entry says which board and revision the new key belongs to
+  const routers = useQuery({
+    queryKey: ['routers'],
+    queryFn: () => apiFetch<RouterItem[]>('/api/routers'),
+    enabled: view?.expected_reflash === true,
+  })
+  const pending = routers.data?.find((r) => r.record.reflashed && r.record.host === view?.host && r.record.port === view?.port)
+    ?.record.reflashed
 
   const sid = view?.sid ?? ''
   const run = async (action: () => Promise<void>): Promise<void> => {
@@ -181,7 +190,16 @@ export function AddRouter() {
             {view.host_key.fingerprint}
           </dd>
         </dl>
-        {view.changed_from && (
+        {view.changed_from && view.expected_reflash && (
+          <div className="note stack" style={{ gap: 4 }}>
+            <strong>Expected after the flash{pending ? `: ${pending.board} ${pending.revision}` : ''}</strong>
+            <span>
+              This router was flashed without settings, and the board and revision it reports are the image’s. A flash makes a new key, so
+              this one replaces {view.changed_from}.
+            </span>
+          </div>
+        )}
+        {view.changed_from && !view.expected_reflash && (
           <div className="note x">
             This address had a different key pinned ({view.changed_from}). A reflash makes a new key; anything else means you may not be talking to your router.
           </div>

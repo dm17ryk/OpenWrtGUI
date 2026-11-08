@@ -112,7 +112,7 @@ export function MirrorCard({ routerId, short, state, onApplied }: Props) {
       </div>
       <div className="row">
         <span className={state.wifi_mirror.running ? 'b air' : 'b neu'}>{wifiMirrorText(state.wifi_mirror)}</span>
-        <span className="muted">Stop and restart come with image import (v0.5).</span>
+        <span className="muted">Start, stop and restart: Discovery › Programs and services. Excluded MACs and the iperf warning are not built yet.</span>
       </div>
     </section>
   )
