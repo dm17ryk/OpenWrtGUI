@@ -34,6 +34,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         action="store_true",
         help="allow the test that flashes AP2 (the owner's explicit OK: AP2 reboots, about 3 minutes away)",
     )
+    group.addoption(
+        "--adb-station", help="adb serial of the phone that joins the test SSID (Wi-Fi faults on air, O16)"
+    )
 
 
 @pytest.fixture

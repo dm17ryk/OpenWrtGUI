@@ -76,7 +76,7 @@ async def ap2_luci(request: pytest.FixtureRequest) -> AsyncIterator[LuciSessionT
 
 @dataclass
 class FwWindow:
-    """The app's firewall, faults and capture services on AP2, as the app builds them (context.py)."""
+    """The app's firewall, faults, capture and Wi-Fi services on AP2, as the app builds them (context.py)."""
 
     fw: FirewallService
     faults: FaultsService
@@ -84,6 +84,7 @@ class FwWindow:
     net: NetworkService
     connect: Callable[[], Awaitable[SshTransport]]
     pool: ConnectionPool
+    wifi: WifiService
 
 
 def _by_content(text: str) -> list[tuple[str, tuple[tuple[str, str], ...]]]:
@@ -156,6 +157,7 @@ async def fw_window(
         net=net,
         connect=connect,
         pool=pool,
+        wifi=wifi,
     )
     try:
         yield w
