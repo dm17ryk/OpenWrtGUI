@@ -18,6 +18,13 @@ const WAN: InterfaceView = {
   dynamic_parent: null,
 }
 
+const LTE: InterfaceView = {
+  conf: { name: 'lte', proto: 'qmi', device: '/dev/cdc-wdm0', address: null, gateway: null, dns: [], mtu: 1420, auto: true },
+  live: live('lte', true, 'qmi', 'wwan0'),
+  own: false,
+  dynamic_parent: null,
+}
+
 const LTE_4: InterfaceView = {
   conf: null,
   live: { ...live('lte_4', false, 'dhcp', 'wwan0'), dynamic: true, parent: 'lte' },
@@ -28,7 +35,7 @@ const LTE_4: InterfaceView = {
 /** AP2 as recorded 2026-11-05 (tests/fixtures/ap2/network.json), shortened. */
 export const AP2_NET: NetworkState = {
   router_id: 'ap2',
-  interfaces: [LAN, WAN, LTE_4],
+  interfaces: [LAN, WAN, LTE, LTE_4],
   devices: [{ section: 'cfg030f15', name: 'br-lan', type: 'bridge', ports: ['eth0.1'] }],
   protocols: [
     { name: 'none', label: 'No address', options: 0 },

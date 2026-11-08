@@ -74,6 +74,7 @@ test('the screen lists the interfaces, marks this app\'s own, and offers help', 
   expect(within(table).getByText("this app's connection")).toBeInTheDocument()
   expect(within(table).getByText('made by lte at run time')).toBeInTheDocument()
   expect(within(table).queryByRole('button', { name: 'Edit lte_4' })).toBeNull()
+  expect(within(table).getByRole('link', { name: 'LTE screen' })).toHaveAttribute('href', '/routers/ap2/lte')
   expect(screen.getByRole('button', { name: 'Help: Network and DHCP' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Help: Router addresses' })).toBeInTheDocument()
 })

@@ -175,6 +175,23 @@ export type RfMessage =
   | { type: 'rf-idle'; reason: string }
   | { type: 'recording'; path: string | null }
   | { type: 'rates'; mac: string; rows?: RateRow[]; error?: string }
+export type LteState = S['LteState']
+export type LteMeasure = S['Measure']
+export type ModemInfo = S['ModemInfo']
+export type AtResult = S['AtResult']
+export type LteSettingsIn = S['LteSettingsIn']
+export type LteAction = S['ActionIn']['action']
+export type LteSample = {
+  t: number
+  rssi: number | null
+  rsrp: number | null
+  rsrq: number | null
+  snr: number | null
+  registration: string | null
+  radio: string | null
+}
+/** Messages on /ws/lte/{router}. */
+export type LteMessage = { type: 'lte'; sample: LteSample } | { type: 'lte-idle'; reason: string }
 export type Security = SsidState['security']
 type ModesIn = S['ModesIn']
 
