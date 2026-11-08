@@ -6,6 +6,8 @@ import type { LteMessage, LteSample, LteState, RouterDetail } from '../../api/ty
 import { Help } from '../../help/Help'
 import { HELP } from '../../help/topics'
 import { RouterSections } from '../../shell/RouterSections'
+import { ActionsCard } from './ActionsCard'
+import { AtConsole } from './AtConsole'
 import { ModemCard } from './ModemCard'
 import { SettingsCard } from './SettingsCard'
 import { SignalCharts } from './SignalCharts'
@@ -78,6 +80,10 @@ export function LteScreen() {
           )}
           <StatusCard state={state} sample={live.sample} />
           <SignalCharts series={live.series} nowMs={nowMs} />
+          <div className="rf-cols">
+            <ActionsCard routerId={id} routerName={name} onDone={refresh} />
+            <AtConsole routerId={id} />
+          </div>
           <div className="rf-cols">
             <SettingsCard routerId={id} routerName={name} autoconnectNote={state.autoconnect_note} onApplied={refresh} />
             <ModemCard routerId={id} modem={state.modem} opmode={state.opmode} />

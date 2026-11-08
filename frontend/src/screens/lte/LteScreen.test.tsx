@@ -27,6 +27,7 @@ vi.mock('../../api/client', async (orig) => {
       if (path === '/api/routers/ap2/lte') return state
       if (path === '/api/routers/ap2/lte/settings/options') return AP2_LTE_OPTIONS
       if (path === '/api/routers/ap2/network') return AP2_NET
+      if (path === '/api/guard') return { live: false, reasons: [], checked_at: '2026-11-08T12:00:00' }
       if (path === '/api/routers/ap2/luci/pages') return []
       throw new Error(`unexpected ${path}`)
     }),
