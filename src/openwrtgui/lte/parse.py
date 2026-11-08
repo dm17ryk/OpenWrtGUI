@@ -136,17 +136,10 @@ def parse_mode_order(lines: Sequence[str]) -> int | None:
     return None
 
 
-def parse_modem_info(text: str) -> tuple[str | None, str | None, str | None]:
-    """The answers to AT+CGMI, AT+CGMM, AT+CGMR sent in one exec: manufacturer, model, firmware."""
-    answers: list[str | None] = []
-    first: str | None = None
-    for line in _lines(text):
-        if line.upper().startswith("AT"):  # the echo of the next command
-            continue
-        if _is_status(line):
-            answers.append(first if line == "OK" else None)
-            first = None
-        elif first is None:
-            first = _CGM_PREFIX.sub("", line) or None
-    padded = [*answers[:3], None, None, None]
-    return padded[0], padded[1], padded[2]
+def parse_identity(text: str, command: str) -> str | None:
+    """The answer to one of AT+CGMI, AT+CGMM, AT+CGMR (each sent on its own: the BM806C drops the third of a
+    burst), with or without a `+CGMx:` prefix; None for ERROR or no final status."""
+    answer = parse_at(text, command)
+    if answer is None or answer.status != "OK" or not answer.lines:
+        return None
+    return _CGM_PREFIX.sub("", answer.lines[0]) or None

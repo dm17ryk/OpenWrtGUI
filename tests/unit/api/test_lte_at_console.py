@@ -17,7 +17,7 @@ PORT = "/dev/ttyUSB2"
 
 
 def _microcom(quoted: str) -> str:
-    return f"printf '%s\\r' {quoted} | timeout 10 microcom -t 2000 -s 115200 {PORT}"
+    return f"printf '%s\\r' {quoted} | timeout -s KILL 10 microcom -t 2000 -s 115200 {PORT}"
 
 
 def _commands(ctx: AppContext) -> list[str]:

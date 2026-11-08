@@ -36,6 +36,7 @@ from openwrtgui.faults.commands import CAPABILITY_READS, FAMILY_CHECKS
 from openwrtgui.fw.commands import FIREWALL_READS, FW4_PRINT
 from openwrtgui.guard.audit import mask
 from openwrtgui.lte import commands as lc
+from openwrtgui.lte.at import IDENTITY, find_at_port
 from openwrtgui.net.commands import network_reads
 from openwrtgui.probe.commands import DESCRIBE_COMMANDS, FAULT_RECORDS, STATUS_COMMANDS, wireless_validate
 from openwrtgui.rf.parse import parse_station_dump
@@ -74,15 +75,13 @@ FILES = {
     "lte": "lte.json",
 }
 LTE_LIST = "ls /dev/ttyUSB* /dev/cdc-wdm*"
-# the AT reads the LTE screen makes, sent to every tty `ls` lists (only queries: nothing changes the modem)
+# the AT reads the LTE screen makes on the AT port (only queries: nothing changes the modem)
 LTE_AT_READS: tuple[tuple[str, ...], ...] = (
-    ("AT",),
-    ("AT+CGMI", "AT+CGMM", "AT+CGMR"),
+    *((command,) for command in IDENTITY),  # one exec each, as the app reads them
     ("AT+COPS?",),
     ("AT+BMMODODR?",),
     ("AT+CSQ",),
 )
-AT_PROBE = "/usr/bin/dwr921-at-probe"  # the image's read-only probe of ttyUSB0-3 (redacts IMEI, IMSI, ICCID)
 # The bench image's firmware length (uImage + kernel + squashfs up to its end, before the padding): the bytes
 # the firmware check hashes on the router's "firmware" partition
 BENCH_FIRMWARE_LEN = 11255254
@@ -141,10 +140,15 @@ async def discovery_commands(t: Runner) -> tuple[str, ...]:
 
 
 async def lte_commands(t: Runner) -> tuple[str, ...]:
-    """The LTE screen's reads (lte/commands.py), the bench's own AT probe, and the AT reads on every tty."""
+    """The LTE screen's reads (lte/commands.py), then `AT` to each tty in order up to the first that answers
+    (as the app finds its AT port) and the AT reads on that port only. On AP2 (2026-11-09) ttyUSB3 never takes
+    the bytes, and the image's dwr921-at-probe hung on it; a port after the AT port is never opened."""
     listed = (await t.run(LTE_LIST)).stdout.split()
     device = next((p for p in listed if lc.MODEM_DEVICE.fullmatch(p)), "/dev/cdc-wdm0")
-    ports = [p for p in listed if lc.AT_PORT.fullmatch(p)]
+    ports = sorted(p for p in listed if lc.AT_PORT.fullmatch(p))
+    found = await find_at_port(t)  # type: ignore[arg-type]  # a Runner is all find_at_port uses
+    probed = ports[: ports.index(found) + 1] if found in ports else ports
+    reads = tuple(lc.at(found, *r) for r in LTE_AT_READS) if found else ()
     return (
         LTE_LIST,
         lc.SERVING(device),
@@ -154,8 +158,8 @@ async def lte_commands(t: Runner) -> tuple[str, ...]:
         lc.iface_status("lte_4"),
         lc.device_status("wwan0"),
         "cat /tmp/run/dwr921-qmi-state",
-        AT_PROBE,
-        *(lc.at(port, *reads) for port in ports for reads in LTE_AT_READS),
+        *(lc.at(port, "AT") for port in probed),
+        *reads,
     )
 
 
@@ -184,9 +188,9 @@ async def record(host: str, identity: Path, known_hosts: Path, name: str) -> dic
         if name == "discovery":
             commands = await discovery_commands(t)
             return await run_set(t, commands, timed=frozenset(c for c in commands if c.startswith("dd ")))
-        if name == "lte":  # the AT probe and microcom take seconds each: timed, with the 60 s timeout
+        if name == "lte":  # microcom takes seconds each: timed, with the 60 s timeout
             commands = await lte_commands(t)
-            slow = frozenset(c for c in commands if c == AT_PROBE or "microcom" in c)
+            slow = frozenset(c for c in commands if "microcom" in c)
             return await run_set(t, commands, timed=slow)
         commands = await wifi_on_commands(t) if name == "wifi-on" else SETS[name]
         return await run_set(t, commands)

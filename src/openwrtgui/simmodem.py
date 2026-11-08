@@ -36,7 +36,9 @@ AT_ANSWERS = {
     "AT+BMMODODR?": ("+BMMODODR: 17",),
     "AT+CSQ": ("+CSQ: 20,99",),
 }
-_MICROCOM = re.compile(r"printf '%s\\r' (.+) \| timeout 10 microcom -t 2000 -s 115200 (/dev/ttyUSB[0-9])")
+_MICROCOM = re.compile(
+    r"printf '%s\\r' (.+) \| timeout -s KILL 10 microcom -t 2000 -s 115200 (/dev/ttyUSB[0-9])"
+)
 _SET_OPMODE = re.compile(
     re.escape(c.uqmi(DEVICE, "--set-device-operating-mode", "", timeout_ms=3000)) + r"(\w+)"
 )

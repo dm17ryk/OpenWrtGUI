@@ -65,7 +65,10 @@ def check_at(text: str) -> str:
 
 
 def at(port: str, *commands: str) -> str:
-    """printf repeats its format for each argument: `printf '%s\\r' 'AT+CGMI' 'AT+CGMM'` sends both lines."""
+    """printf repeats its format for each argument: `printf '%s\\r' 'AT+CGMI' 'AT+CGMM'` sends both lines.
+
+    `timeout -s KILL`: on a port that never takes the bytes (AP2's ttyUSB3) microcom waits in tcsetattr for
+    the output to drain and only records SIGTERM, so a plain `timeout` never ends it (AP2, 2026-11-09)."""
     _checked(AT_PORT, port, "a serial port")
     args = " ".join(shell_quote(check_at(c)) for c in commands)
-    return f"printf '%s\\r' {args} | timeout 10 microcom -t 2000 -s 115200 {port}"
+    return f"printf '%s\\r' {args} | timeout -s KILL 10 microcom -t 2000 -s 115200 {port}"

@@ -7,8 +7,8 @@ import pytest
 from openwrtgui.lte.parse import (
     parse_at,
     parse_cops,
+    parse_identity,
     parse_mode_order,
-    parse_modem_info,
     parse_opmode,
     parse_serving,
     parse_signal,
@@ -104,14 +104,10 @@ def test_at_answers() -> None:
     assert parse_cops(("+COPS: 0",)) is None
 
 
-def test_modem_info() -> None:
-    echoed = (
-        "AT+CGMI\r\r\nBroadMobi\r\n\r\nOK\r\nAT+CGMM\r\r\nBM806C\r\n\r\nOK\r\n"
-        "AT+CGMR\r\r\nM1.2.0_E1.0.3_A1.1.8\r\n\r\nOK\r\n"
+def test_identity() -> None:
+    assert parse_identity("AT+CGMI\r\r\nBroadMobi\r\n\r\nOK\r\n", "AT+CGMI") == "BroadMobi"  # AP2, echo on
+    assert (
+        parse_identity("\r\n+CGMR: M1.2.0_E1.0.3_A1.1.8\r\n\r\nOK\r\n", "AT+CGMR") == "M1.2.0_E1.0.3_A1.1.8"
     )
-    plain = "\r\n+CGMI: BroadMobi\r\n\r\nOK\r\n\r\nBM806C\r\n\r\nOK\r\n\r\nM1.2.0_E1.0.3_A1.1.8\r\n\r\nOK\r\n"
-    expected = ("BroadMobi", "BM806C", "M1.2.0_E1.0.3_A1.1.8")
-    assert parse_modem_info(echoed) == expected
-    assert parse_modem_info(plain) == expected
-    assert parse_modem_info("\r\nBroadMobi\r\n\r\nOK\r\n\r\nERROR\r\n") == ("BroadMobi", None, None)
-    assert parse_modem_info("") == (None, None, None)
+    assert parse_identity("AT+CGMM\r\r\nERROR\r\n", "AT+CGMM") is None
+    assert parse_identity("", "AT+CGMR") is None  # silent: no final status

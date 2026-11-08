@@ -8,9 +8,10 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from openwrtgui.lte import commands as c
-from openwrtgui.lte.parse import parse_at, parse_cops, parse_mode_order, parse_modem_info
+from openwrtgui.lte.parse import parse_at, parse_cops, parse_identity, parse_mode_order
 from openwrtgui.transport.base import Transport
 
+IDENTITY = ("AT+CGMI", "AT+CGMM", "AT+CGMR")  # one exec each: the BM806C drops the third of a burst (AP2)
 _QUERY = re.compile(r"AT(I|\+CSQ|\+CGM[IMR]|[+%][A-Z0-9]+(\?|=\?))?", re.IGNORECASE)
 
 
@@ -52,9 +53,9 @@ async def find_at_port(t: Transport) -> str | None:
 async def read_modem_info(t: Transport, port: str | None) -> ModemInfo:
     if port is None:
         return ModemInfo()
-    manufacturer, model, firmware = parse_modem_info(
-        (await t.run(c.at(port, "AT+CGMI", "AT+CGMM", "AT+CGMR"))).stdout
-    )
+    manufacturer, model, firmware = [
+        parse_identity((await t.run(c.at(port, command))).stdout, command) for command in IDENTITY
+    ]
     cops = parse_at((await t.run(c.at(port, "AT+COPS?"))).stdout, "AT+COPS?")
     order = parse_at((await t.run(c.at(port, "AT+BMMODODR?"))).stdout, "AT+BMMODODR?")
     return ModemInfo(

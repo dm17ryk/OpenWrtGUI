@@ -39,20 +39,22 @@ async def test_silent_ports_and_odd_names() -> None:
     assert c.at("/dev/ttyUSB0", "AT") in t.calls and not any("ttyACM0" in x for x in t.calls)
 
 
-async def test_modem_info_on_the_port() -> None:
-    port = "/dev/ttyUSB2"
+async def test_modem_info_on_the_port_one_command_per_exec() -> None:
+    # AP2 (2026-11-09): sent AT+CGMI, AT+CGMM, AT+CGMR in one burst, the BM806C dropped the third
+    port = "/dev/ttyUSB1"
     t = Modem(
         {
-            c.at(port, "AT+CGMI", "AT+CGMM", "AT+CGMR"): (
-                "\r\nBroadMobi\r\n\r\nOK\r\n\r\nBM806C\r\n\r\nOK\r\n\r\nM1.2.0_E1.0.3_A1.1.8\r\n\r\nOK\r\n"
-            ),
-            c.at(port, "AT+COPS?"): '\r\n+COPS: 0,0,"Partner",7\r\n\r\nOK\r\n',
-            c.at(port, "AT+BMMODODR?"): "\r\n+BMMODODR: 17\r\n\r\nOK\r\n",
+            c.at(port, "AT+CGMI"): "AT+CGMI\r\r\nBroadMobi\r\n\r\nOK\r\n",
+            c.at(port, "AT+CGMM"): "AT+CGMM\r\r\nBM806C\r\n\r\nOK\r\n",
+            c.at(port, "AT+CGMR"): "AT+CGMR\r\r\nM1.2.0_E1.0.3_A1.1.8\r\n\r\nOK\r\n",
+            c.at(port, "AT+COPS?"): 'AT+COPS?\r\r\n+COPS: 0,0,"Partner",7\r\n\r\nOK\r\n',
+            c.at(port, "AT+BMMODODR?"): "AT+BMMODODR?\r\r\n+BMMODODR: 17\r\n\r\nOK\r\n",
         }
     )
     info = await read_modem_info(t, port)  # type: ignore[arg-type]
     assert (info.manufacturer, info.model, info.firmware) == ("BroadMobi", "BM806C", "M1.2.0_E1.0.3_A1.1.8")
     assert (info.operator, info.mode_order, info.at_port) == ("Partner", 17, port)
+    assert all(call.count("'AT") == 1 for call in t.calls)  # never two AT commands in one exec
 
 
 async def test_modem_info_without_a_port() -> None:

@@ -34,16 +34,18 @@ def test_netifd_reads_and_writes() -> None:
     assert c.TTY_LIST == "ls /dev/ttyUSB*"
 
 
+MICROCOM = "timeout -s KILL 10 microcom -t 2000 -s 115200"
+
+
 def test_at_commands_are_quoted_one_argument_each() -> None:
-    assert c.at("/dev/ttyUSB2", "AT+COPS?") == (
-        "printf '%s\\r' 'AT+COPS?' | timeout 10 microcom -t 2000 -s 115200 /dev/ttyUSB2"
-    )
+    assert c.at("/dev/ttyUSB2", "AT+COPS?") == f"printf '%s\\r' 'AT+COPS?' | {MICROCOM} /dev/ttyUSB2"
     assert c.at("/dev/ttyUSB2", "AT+CGMI", "AT+CGMM", "AT+CGMR") == (
-        "printf '%s\\r' 'AT+CGMI' 'AT+CGMM' 'AT+CGMR' | timeout 10 microcom -t 2000 -s 115200 /dev/ttyUSB2"
+        f"printf '%s\\r' 'AT+CGMI' 'AT+CGMM' 'AT+CGMR' | {MICROCOM} /dev/ttyUSB2"
     )
     quoted = "'AT+CGDCONT=1,\"IP\",\"a'\\''b\"'"
-    assert c.at("/dev/ttyUSB0", 'AT+CGDCONT=1,"IP","a\'b"') == (
-        f"printf '%s\\r' {quoted} | timeout 10 microcom -t 2000 -s 115200 /dev/ttyUSB0"
+    assert (
+        c.at("/dev/ttyUSB0", 'AT+CGDCONT=1,"IP","a\'b"')
+        == f"printf '%s\\r' {quoted} | {MICROCOM} /dev/ttyUSB0"
     )
 
 
