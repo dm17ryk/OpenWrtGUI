@@ -12,11 +12,14 @@ def _texts() -> list[tuple[str, str]]:
 def test_no_secrets_in_recordings() -> None:
     # Allowed: the masked value, the simulator's own password and the public factory default root/root.
     secret = r'"(key|password|pincode)": "(?!(<hidden>|sim-password|root)")[^"]+"'
+    assert re.search(r"\b\d{15}\b", '"imei": "356938035643809"\n+CGSN: 356938035643809')
+    assert re.search(r"\b\d{15}\b", "d3fb379d5d8747cb804956688523804b7116bc72") is None
     for name, text in _texts():
         decoded = json.dumps(json.loads(text))
         for blob in (text, decoded.encode().decode("unicode_escape")):
             assert re.search(secret, blob) is None, name
-            assert re.search(r"\d{15}", blob) is None, name
+            # an IMEI stands alone; 15 digits inside a hex digest (a sha256) are not one
+            assert re.search(r"\b\d{15}\b", blob) is None, name
 
 
 def _uci_secrets(text: str) -> list[str]:
