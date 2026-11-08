@@ -237,8 +237,9 @@ def _uimage(kernel: bytes) -> bytes:
 
 
 def fwtool_metadata(meta: dict[str, object], before: bytes = b"") -> bytes:
-    """fwtool's metadata block: the JSON, then the 16-byte trailer (magic FWx0, crc32, type 1, size)."""
-    text = json.dumps(meta, indent=1).encode() + b"\n"
+    """fwtool's metadata block: an 8-byte header (version, flags), the JSON, then the 16-byte trailer
+    (magic FWx0, crc32, type 1, size), as on the bench image."""
+    text = struct.pack(">II", 0, 0) + json.dumps(meta, indent=1).encode() + b"\n"
     size = len(text) + 16
     crc = zlib.crc32(before + text)
     return text + struct.pack(">4sIBxxxI", b"FWx0", crc, 1, size)
