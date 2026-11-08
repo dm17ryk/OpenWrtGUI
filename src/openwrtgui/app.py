@@ -94,6 +94,7 @@ def create_app(ctx: AppContext) -> FastAPI:
     )
     for module in modules:
         app.include_router(module.router)
+    app.include_router(discovery_api.tools)
     app.include_router(misc_api.public)
     app.include_router(ws_api.router)
     if ctx.web_dir is not None and ctx.web_dir.is_dir():

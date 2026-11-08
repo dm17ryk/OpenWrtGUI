@@ -550,6 +550,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/discovery/help/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Help Apply */
+        post: operations["help_apply_api_routers__router_id__discovery_help_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/discovery/help/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Help Preview */
+        post: operations["help_preview_api_routers__router_id__discovery_help_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/discovery/tool/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tool Apply */
+        post: operations["tool_apply_api_routers__router_id__discovery_tool_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/discovery/tool/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tool Preview */
+        post: operations["tool_preview_api_routers__router_id__discovery_tool_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/faults": {
         parameters: {
             query?: never;
@@ -1602,6 +1670,42 @@ export interface paths {
         /** Put Settings */
         put: operations["put_settings_api_settings_put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tools/{board}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tool Cards */
+        get: operations["tool_cards_api_tools__board__get"];
+        /** Save Tool Card */
+        put: operations["save_tool_card_api_tools__board__put"];
+        post?: never;
+        /** Delete Tool Card */
+        delete: operations["delete_tool_card_api_tools__board__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tools/{board}/prefill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Prefill */
+        post: operations["prefill_api_tools__board__prefill_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2679,6 +2783,28 @@ export interface components {
             /** Version */
             version: string;
         };
+        /** HelpApplyIn */
+        HelpApplyIn: {
+            /** Digest */
+            digest: string;
+            /** Path */
+            path: string;
+        };
+        /** HelpIn */
+        HelpIn: {
+            /** Path */
+            path: string;
+        };
+        /**
+         * HelpResult
+         * @description What Run --help or a card command printed.
+         */
+        HelpResult: {
+            /** Exit Status */
+            exit_status: number | null;
+            /** Output */
+            output: string;
+        };
         /** HostConf */
         HostConf: {
             /** Gets Address */
@@ -3726,6 +3852,13 @@ export interface components {
             vlans: components["schemas"]["VlanView"][];
             wifi_mirror: components["schemas"]["WifiMirror"];
         };
+        /** PrefillIn */
+        PrefillIn: {
+            /** Path */
+            path: string;
+            /** Usage */
+            usage?: string | null;
+        };
         /** Preview */
         Preview: {
             /** Commands */
@@ -4508,6 +4641,82 @@ export interface components {
              * @enum {string}
              */
             owner: "fw4" | "app" | "known" | "unknown";
+        };
+        /** ToolApplyIn */
+        ToolApplyIn: {
+            /** Digest */
+            digest: string;
+            /** Label */
+            label: string;
+            /** Path */
+            path: string;
+            /**
+             * Values
+             * @default {}
+             */
+            values: {
+                [key: string]: string;
+            };
+        };
+        /** ToolCard */
+        ToolCard: {
+            /** Board */
+            board: string;
+            /** Commands */
+            commands: components["schemas"]["ToolCommand"][];
+            /** Name */
+            name: string;
+            /** Path */
+            path: string;
+        };
+        /** ToolCommand */
+        ToolCommand: {
+            /** Args */
+            args: string[];
+            /** Label */
+            label: string;
+            /**
+             * Params
+             * @default []
+             */
+            params: components["schemas"]["ToolParam"][];
+            /** Write */
+            write: boolean;
+        };
+        /** ToolIn */
+        ToolIn: {
+            /** Label */
+            label: string;
+            /** Path */
+            path: string;
+            /**
+             * Values
+             * @default {}
+             */
+            values: {
+                [key: string]: string;
+            };
+        };
+        /** ToolParam */
+        ToolParam: {
+            /**
+             * Choices
+             * @default []
+             */
+            choices: string[];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "choice" | "text" | "number";
+            /** Maximum */
+            maximum?: number | null;
+            /** Minimum */
+            minimum?: number | null;
+            /** Name */
+            name: string;
+            /** Pattern */
+            pattern?: string | null;
         };
         /** TrafficRuleIn */
         TrafficRuleIn: {
@@ -5810,6 +6019,146 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FirmwareCheck"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    help_apply_api_routers__router_id__discovery_help_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HelpApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HelpResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    help_preview_api_routers__router_id__discovery_help_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HelpIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tool_apply_api_routers__router_id__discovery_tool_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToolApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HelpResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tool_preview_api_routers__router_id__discovery_tool_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToolIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
                 };
             };
             /** @description Validation Error */
@@ -7938,6 +8287,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Settings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tool_cards_api_tools__board__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolCard"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_tool_card_api_tools__board__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToolCard"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolCard"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_tool_card_api_tools__board__delete: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path: {
+                board: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prefill_api_tools__board__prefill_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrefillIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolCard"];
                 };
             };
             /** @description Validation Error */

@@ -4,9 +4,12 @@ copies, tools and services."""
 from __future__ import annotations
 
 import logging
+import posixpath
 import time
-from collections.abc import Callable, MutableMapping
+from collections.abc import Callable, Mapping, MutableMapping
 from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict
 
 from openwrtgui.discovery import commands as cmd
 from openwrtgui.discovery.checklist import ChecklistStore, ReflashChecklist
@@ -14,6 +17,7 @@ from openwrtgui.discovery.copy import CopyRequest, SavedFile, check_copy_path, r
 from openwrtgui.discovery.firmware import FirmwareCheck, image_prefix_sha256, parse_proc_mtd
 from openwrtgui.discovery.overlay import parse_ls_ldn
 from openwrtgui.discovery.state import DiscoveryState, DiscoverySummary, no_match_note, read_discovery
+from openwrtgui.discovery.tools import ToolCard, ToolStore, help_command, tool_command
 from openwrtgui.fw import commands as fwc
 from openwrtgui.fw.nft import parse_ruleset_json
 from openwrtgui.fw.owners import nft_objects, tc_hooks
@@ -34,6 +38,18 @@ from openwrtgui.wifi.service import PreviewChanged
 log = logging.getLogger(__name__)
 SCREEN = "Discovery"
 FIRMWARE_TIMEOUT_S = 120.0
+HELP_WARNING = (
+    "{name} runs on {router} for at most 5 s. A program that does not know --help may do something else."
+)
+
+
+class HelpResult(BaseModel):
+    """What Run --help or a card command printed."""
+
+    model_config = ConfigDict(frozen=True)
+
+    output: str
+    exit_status: int | None
 
 
 def _proof(f: SavedFile, out: str) -> NetCheck:
@@ -58,8 +74,10 @@ class DiscoveryService:
         descriptions: MutableMapping[str, SelfDescription],
         profiles: ProfileStore,
         checklists: ChecklistStore,
+        tools: ToolStore,
         clock: Callable[[], datetime] = datetime.now,
     ) -> None:
+        self.tools = tools
         self._pool = pool
         self._routers = routers
         self._guard = guard
@@ -92,11 +110,92 @@ class DiscoveryService:
         desc = await self._described(rec, t)
         return rec, t, desc, self._profiles.match(desc.identity.board_name, desc.identity.revision)
 
-    async def state(self, router_id: str) -> DiscoveryState:
-        rec, t, desc, profile = await self._context(router_id)
+    async def _read(
+        self, rec: RouterRecord, t: Transport, desc: SelfDescription, profile: Profile | None
+    ) -> DiscoveryState:
+        cards = frozenset(c.path for c in self.tools.cards(desc.identity.board_name))
         return await read_discovery(
-            t, router_id=rec.id, identity=desc.identity, profile=profile, now=self._clock()
+            t, router_id=rec.id, identity=desc.identity, profile=profile, card_paths=cards, now=self._clock()
         )
+
+    async def state(self, router_id: str) -> DiscoveryState:
+        return await self._read(*await self._context(router_id))
+
+    # ---------------------------------------------------------------- Run --help and tool cards
+    async def _program(self, router_id: str, path: str) -> tuple[RouterRecord, Transport, str]:
+        rec, t, desc, profile = await self._context(router_id)
+        state = await self._read(rec, t, desc, profile)
+        listed = {p.path for row in state.custom for p in row.programs} | {p.path for p in state.programs}
+        if path not in listed:
+            raise ValueError(f"{path} is not a custom program of {rec.name}")
+        return rec, t, desc.identity.board_name
+
+    async def plan_help(self, router_id: str, path: str) -> NetPlan:
+        rec, _t, _board = await self._program(router_id, path)
+        warning = HELP_WARNING.format(name=posixpath.basename(path), router=rec.name)
+        return net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config=None,
+            ops=[],
+            current={},
+            commands=[help_command(path)],
+            warnings=[warning],
+        )
+
+    async def apply_help(self, router_id: str, path: str, digest: str) -> HelpResult:
+        self._guard.require_clear()
+        plan = await self.plan_help(router_id, path)
+        rec = self._record(router_id)
+        if plan.digest != digest:
+            raise PreviewChanged(rec.name)
+        t = await self._pool.get(rec)
+        async with self._pool.write_lock(rec.id):
+            result = await run_audited(
+                t, plan.lines[0], router_id=rec.id, screen=SCREEN, guard=self._guard, audit=self._audit
+            )
+        return HelpResult(output=result.stdout[:8192], exit_status=result.exit_status)
+
+    async def _card_command(
+        self, router_id: str, path: str, label: str, values: Mapping[str, str]
+    ) -> tuple[RouterRecord, ToolCard, str]:
+        rec, _t, board = await self._program(router_id, path)
+        card = next((c for c in self.tools.cards(board) if c.path == path), None)
+        if card is None:
+            raise ValueError(f"No card for {path} on {board}")
+        return rec, card, tool_command(card, label, values)
+
+    async def plan_tool(self, router_id: str, path: str, label: str, values: Mapping[str, str]) -> NetPlan:
+        rec, _card, command = await self._card_command(router_id, path, label, values)
+        return net_plan(router_id=rec.id, screen=SCREEN, config=None, ops=[], current={}, commands=[command])
+
+    async def apply_tool(
+        self, router_id: str, path: str, label: str, values: Mapping[str, str], digest: str
+    ) -> HelpResult:
+        rec, card, command = await self._card_command(router_id, path, label, values)
+        write = next(c.write for c in card.commands if c.label == label)
+        if write:
+            self._guard.require_clear()
+        plan = net_plan(router_id=rec.id, screen=SCREEN, config=None, ops=[], current={}, commands=[command])
+        if plan.digest != digest:
+            raise PreviewChanged(rec.name)
+        t = await self._pool.get(rec)
+        if write:
+            async with self._pool.write_lock(rec.id):
+                result = await run_audited(
+                    t, command, router_id=rec.id, screen=SCREEN, guard=self._guard, audit=self._audit
+                )
+        else:  # a read-only card command runs during a run too (spec 6: reading keeps working)
+            result = await run_audited(
+                t,
+                command,
+                router_id=rec.id,
+                screen=SCREEN,
+                guard=self._guard,
+                audit=self._audit,
+                require_guard=False,
+            )
+        return HelpResult(output=result.stdout[:8192], exit_status=result.exit_status)
 
     async def check_firmware(self, router_id: str) -> FirmwareCheck:
         rec, t, desc, profile = await self._context(router_id)
