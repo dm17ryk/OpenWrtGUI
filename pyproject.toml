@@ -14,6 +14,7 @@ dependencies = [
     "psutil",
     "httpx",
     "pydantic",
+    "pysquashfsimage>=0.9,<0.10",
 ]
 
 [project.optional-dependencies]
@@ -56,7 +57,7 @@ files = ["src/openwrtgui"]
 mypy_path = "src"
 
 [[tool.mypy.overrides]]
-module = ["webview", "webview.*", "asyncssh", "asyncssh.*"]
+module = ["webview", "webview.*", "asyncssh", "asyncssh.*", "PySquashfsImage", "PySquashfsImage.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

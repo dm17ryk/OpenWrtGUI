@@ -46,6 +46,8 @@ hiddenimports = [
     "uvicorn.lifespan.on",
     # asyncssh imports its key and cipher modules by name at run time.
     *collect_submodules("asyncssh"),
+    # The image reader (v0.5); its compressors are picked by the image's compression id.
+    *collect_submodules("PySquashfsImage"),
 ]
 
 a = Analysis(
