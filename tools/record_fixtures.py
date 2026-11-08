@@ -14,7 +14,9 @@ config and limits, wifi_parked.json), wifi-on (the radio while it is on air, wif
 an AP interface up on phy0), network (interfaces, DHCP, leases, routes and the switch, network.json),
 firewall (fw4's config, the nft ruleset, tc, and what the router can do for faults, firewall.json),
 discovery (the overlay listing, packages, every config, the keep list, flash partitions, RAM and /tmp,
-and the firmware hash with its run time, discovery.json; run it only while Bench Guard is clear).
+and the firmware hash with its run time, discovery.json; run it only while Bench Guard is clear),
+lte (the modem: uqmi serving system, signal and operating mode, netifd status, the image's AT probe and
+AT queries on every ttyUSB, lte.json; IMEI and ICCID are masked; never the IMEI read itself).
 """
 
 from __future__ import annotations
@@ -33,6 +35,7 @@ from openwrtgui.discovery.firmware import parse_proc_mtd
 from openwrtgui.faults.commands import CAPABILITY_READS, FAMILY_CHECKS
 from openwrtgui.fw.commands import FIREWALL_READS, FW4_PRINT
 from openwrtgui.guard.audit import mask
+from openwrtgui.lte import commands as lc
 from openwrtgui.net.commands import network_reads
 from openwrtgui.probe.commands import DESCRIBE_COMMANDS, FAULT_RECORDS, STATUS_COMMANDS, wireless_validate
 from openwrtgui.rf.parse import parse_station_dump
@@ -68,7 +71,18 @@ FILES = {
     "network": "network.json",
     "firewall": "firewall.json",
     "discovery": "discovery.json",
+    "lte": "lte.json",
 }
+LTE_LIST = "ls /dev/ttyUSB* /dev/cdc-wdm*"
+# the AT reads the LTE screen makes, sent to every tty `ls` lists (only queries: nothing changes the modem)
+LTE_AT_READS: tuple[tuple[str, ...], ...] = (
+    ("AT",),
+    ("AT+CGMI", "AT+CGMM", "AT+CGMR"),
+    ("AT+COPS?",),
+    ("AT+BMMODODR?",),
+    ("AT+CSQ",),
+)
+AT_PROBE = "/usr/bin/dwr921-at-probe"  # the image's read-only probe of ttyUSB0-3 (redacts IMEI, IMSI, ICCID)
 # The bench image's firmware length (uImage + kernel + squashfs up to its end, before the padding): the bytes
 # the firmware check hashes on the router's "firmware" partition
 BENCH_FIRMWARE_LEN = 11255254
@@ -84,6 +98,7 @@ DISCOVERY_READS = (
     "command -v sha256sum dd head",
 )
 _IMEI = re.compile(r"\b\d{15}\b")
+_ICCID = re.compile(r"\b\d{18,20}\b")
 
 
 class Runner(Protocol):
@@ -92,7 +107,7 @@ class Runner(Protocol):
 
 def sanitize(text: str) -> str:
     """The audit log's masking (uci `.key='…'` and JSON `"key": "…"`), plus IMEIs."""
-    return _IMEI.sub("<imei>", mask(text, ()))
+    return _IMEI.sub("<imei>", _ICCID.sub("<iccid>", mask(text, ())))
 
 
 async def wifi_on_commands(t: Runner) -> tuple[str, ...]:
@@ -125,6 +140,25 @@ async def discovery_commands(t: Runner) -> tuple[str, ...]:
     return (*DISCOVERY_READS, *(dc.uci_show(c) for c in configs), *hashed)
 
 
+async def lte_commands(t: Runner) -> tuple[str, ...]:
+    """The LTE screen's reads (lte/commands.py), the bench's own AT probe, and the AT reads on every tty."""
+    listed = (await t.run(LTE_LIST)).stdout.split()
+    device = next((p for p in listed if lc.MODEM_DEVICE.fullmatch(p)), "/dev/cdc-wdm0")
+    ports = [p for p in listed if lc.AT_PORT.fullmatch(p)]
+    return (
+        LTE_LIST,
+        lc.SERVING(device),
+        lc.SIGNAL(device),
+        lc.OPMODE(device),
+        lc.iface_status("lte"),
+        lc.iface_status("lte_4"),
+        lc.device_status("wwan0"),
+        "cat /tmp/run/dwr921-qmi-state",
+        AT_PROBE,
+        *(lc.at(port, *reads) for port in ports for reads in LTE_AT_READS),
+    )
+
+
 async def run_set(
     t: Runner, commands: tuple[str, ...], *, timed: frozenset[str] = frozenset()
 ) -> dict[str, dict[str, object]]:
@@ -150,6 +184,10 @@ async def record(host: str, identity: Path, known_hosts: Path, name: str) -> dic
         if name == "discovery":
             commands = await discovery_commands(t)
             return await run_set(t, commands, timed=frozenset(c for c in commands if c.startswith("dd ")))
+        if name == "lte":  # the AT probe and microcom take seconds each: timed, with the 60 s timeout
+            commands = await lte_commands(t)
+            slow = frozenset(c for c in commands if c == AT_PROBE or "microcom" in c)
+            return await run_set(t, commands, timed=slow)
         commands = await wifi_on_commands(t) if name == "wifi-on" else SETS[name]
         return await run_set(t, commands)
     finally:

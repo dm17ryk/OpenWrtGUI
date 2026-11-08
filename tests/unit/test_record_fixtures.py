@@ -185,6 +185,37 @@ async def _close(self: Replay) -> None:
     return None
 
 
+LTE_LIST = "ls /dev/ttyUSB* /dev/cdc-wdm*"
+
+
+async def test_lte_set_reads_the_modem_and_every_tty() -> None:
+    t = Replay({LTE_LIST: "/dev/cdc-wdm0\n/dev/ttyUSB0\n/dev/ttyUSB2\n"})
+    commands = await rf.lte_commands(t)
+    assert commands[:9] == (
+        LTE_LIST,
+        "uqmi -s -d /dev/cdc-wdm0 -t 2000 --get-serving-system",
+        "uqmi -s -d /dev/cdc-wdm0 -t 2000 --get-signal-info",
+        "uqmi -s -d /dev/cdc-wdm0 -t 2000 --get-device-operating-mode",
+        "ubus call network.interface.lte status",
+        "ubus call network.interface.lte_4 status",
+        'ubus call network.device status \'{"name":"wwan0"}\'',
+        "cat /tmp/run/dwr921-qmi-state",
+        "/usr/bin/dwr921-at-probe",
+    )
+    micro = "| timeout 10 microcom -t 2000 -s 115200"
+    assert f"printf '%s\\r' 'AT+COPS?' {micro} /dev/ttyUSB2" in commands
+    assert f"printf '%s\\r' 'AT+CGMI' 'AT+CGMM' 'AT+CGMR' {micro} /dev/ttyUSB0" in commands
+    assert len(commands) == 9 + 2 * 5  # five AT reads on each listed tty
+    assert not any("--get-imei" in c or "ttyUSB1" in c for c in commands)
+    assert rf.out_file(Path("tests/fixtures/ap2"), "lte") == Path("tests/fixtures/ap2/lte.json")
+
+
+def test_lte_recording_hides_imei_and_iccid() -> None:
+    out = rf.sanitize("+CGSN: 353000000000001\n+CCID: 8997201234567890123\nATI\n")
+    assert "353000000000001" not in out and "8997201234567890123" not in out
+    assert "<imei>" in out and "<iccid>" in out and "ATI" in out
+
+
 MTD = (
     "dev:    size   erasesize  name\n"
     'mtd0: 00030000 00010000 "u-boot"\n'
