@@ -12,7 +12,9 @@ taken on trust: connect with ssh once and check the fingerprint first.
 Sets: probe (the self-description and status probes, commands.json), wifi-parked (the Wi-Fi
 config and limits, wifi_parked.json), wifi-on (the radio while it is on air, wifi_on.json; needs
 an AP interface up on phy0), network (interfaces, DHCP, leases, routes and the switch, network.json),
-firewall (fw4's config, the nft ruleset, tc, and what the router can do for faults, firewall.json).
+firewall (fw4's config, the nft ruleset, tc, and what the router can do for faults, firewall.json),
+discovery (the overlay listing, packages, every config, the keep list, flash partitions, RAM and /tmp,
+and the firmware hash with its run time, discovery.json; run it only while Bench Guard is clear).
 """
 
 from __future__ import annotations
@@ -22,9 +24,12 @@ import asyncio
 import json
 import re
 import sys
+import time
 from pathlib import Path
 from typing import Protocol
 
+from openwrtgui.discovery import commands as dc
+from openwrtgui.discovery.firmware import parse_proc_mtd
 from openwrtgui.faults.commands import CAPABILITY_READS, FAMILY_CHECKS
 from openwrtgui.fw.commands import FIREWALL_READS, FW4_PRINT
 from openwrtgui.guard.audit import mask
@@ -62,7 +67,22 @@ FILES = {
     "wifi-on": "wifi_on.json",
     "network": "network.json",
     "firewall": "firewall.json",
+    "discovery": "discovery.json",
 }
+# The bench image's firmware length (uImage + kernel + squashfs up to its end, before the padding): the bytes
+# the firmware check hashes on the router's "firmware" partition
+BENCH_FIRMWARE_LEN = 11255254
+DISCOVERY_READS = (
+    dc.OVERLAY_LS,
+    dc.APK_DB,
+    dc.CONFIG_LIST,
+    dc.SYSUPGRADE_LIST,
+    dc.PROC_MTD,
+    dc.MEMINFO,
+    dc.DF_TMP,
+    "ubus -v list system",
+    "command -v sha256sum dd head",
+)
 _IMEI = re.compile(r"\b\d{15}\b")
 
 
@@ -95,13 +115,28 @@ async def wifi_on_commands(t: Runner) -> tuple[str, ...]:
     )
 
 
-async def run_set(t: Runner, commands: tuple[str, ...]) -> dict[str, dict[str, object]]:
+async def discovery_commands(t: Runner) -> tuple[str, ...]:
+    """Discovery's reads, every config `ls /etc/config` lists, and the firmware hash where there is a
+    partition named firmware (reads only: about 11 MB of flash through sha256sum, seconds of CPU)."""
+    listed = (await t.run(dc.CONFIG_LIST)).stdout.splitlines()
+    configs = [c.strip() for c in listed if dc.CONFIG_NAME.fullmatch(c.strip())]
+    index = parse_proc_mtd((await t.run(dc.PROC_MTD)).stdout).get("firmware")
+    hashed = () if index is None else (dc.firmware_hash(index, BENCH_FIRMWARE_LEN),)
+    return (*DISCOVERY_READS, *(dc.uci_show(c) for c in configs), *hashed)
+
+
+async def run_set(
+    t: Runner, commands: tuple[str, ...], *, timed: frozenset[str] = frozenset()
+) -> dict[str, dict[str, object]]:
     recorded: dict[str, dict[str, object]] = {}
     for command in commands:
-        r = await t.run(command)
+        started = time.monotonic()
+        r = await t.run(command, timeout=60.0 if command in timed else 15.0)
         entry: dict[str, object] = {"stdout": sanitize(r.stdout), "exit": r.exit_status}
         if r.stderr:
             entry["stderr"] = sanitize(r.stderr)
+        if command in timed:
+            entry["seconds"] = round(time.monotonic() - started, 2)
         recorded[command] = entry
     return recorded
 
@@ -112,6 +147,9 @@ async def record(host: str, identity: Path, known_hosts: Path, name: str) -> dic
         host, 22, "root", host_keys=HostKeyStore(known_hosts), key_paths=[identity]
     )
     try:
+        if name == "discovery":
+            commands = await discovery_commands(t)
+            return await run_set(t, commands, timed=frozenset(c for c in commands if c.startswith("dd ")))
         commands = await wifi_on_commands(t) if name == "wifi-on" else SETS[name]
         return await run_set(t, commands)
     finally:

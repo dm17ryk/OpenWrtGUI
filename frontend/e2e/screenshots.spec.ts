@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test'
-import { noHorizontalScroll, open } from './helpers'
+import { ensureImages, noHorizontalScroll, open } from './helpers'
 
 const SCREENS: ReadonlyArray<readonly [string, string, string]> = [
   ['dashboard', '/', 'AP1 · bench'],
   ['add-router', '/add', 'Where is the router?'],
   ['router-overview', '/routers/ap2', 'What AP2 says about itself'],
+  ['discovery', '/routers/ap1/discovery', 'Added after flashing'],
   ['wifi', '/routers/ap1/wifi', 'Modes'],
   ['rf-live', '/routers/ap1/rf', 'RX at AP'],
   ['network', '/routers/ap1/network', 'Router addresses'],
@@ -18,7 +19,8 @@ const SCREENS: ReadonlyArray<readonly [string, string, string]> = [
 ]
 
 for (const [name, path, ready] of SCREENS) {
-  test(`screenshot ${name}`, async ({ page }, info) => {
+  test(`screenshot ${name}`, async ({ page, request, baseURL }, info) => {
+    if (name === 'discovery') await ensureImages(request, baseURL ?? '')
     await open(page, path)
     await expect(page.getByText(ready).first()).toBeVisible()
     await page.waitForTimeout(300)

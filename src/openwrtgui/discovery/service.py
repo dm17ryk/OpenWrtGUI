@@ -1,0 +1,453 @@
+"""Discovery per router: the state read, the firmware check, the dashboard summary, and (later tasks)
+copies, tools and services."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import posixpath
+import time
+from collections.abc import Awaitable, Callable, Mapping, MutableMapping
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict
+
+from openwrtgui.discovery import commands as cmd
+from openwrtgui.discovery.checklist import ChecklistStore, ReflashChecklist
+from openwrtgui.discovery.copy import CopyRequest, SavedFile, check_copy_path, read_files, write_steps
+from openwrtgui.discovery.firmware import FirmwareCheck, image_prefix_sha256, parse_proc_mtd
+from openwrtgui.discovery.overlay import parse_ls_ldn
+from openwrtgui.discovery.services import Action, read_service, service_command
+from openwrtgui.discovery.state import DiscoveryState, DiscoverySummary, no_match_note, read_discovery
+from openwrtgui.discovery.tools import ToolCard, ToolStore, help_command, tool_command
+from openwrtgui.fw import commands as fwc
+from openwrtgui.fw.nft import parse_ruleset_json
+from openwrtgui.fw.owners import nft_objects, tc_hooks
+from openwrtgui.fw.tc import parse_qdiscs
+from openwrtgui.guard.audit import AuditLog
+from openwrtgui.guard.bench_guard import BenchGuard
+from openwrtgui.guard.readonly import is_read_only_command
+from openwrtgui.guard.writes import run_audited, run_audited_upload, upload_line
+from openwrtgui.images.profile import Profile, build_rom_profile
+from openwrtgui.images.store import ProfileStore
+from openwrtgui.net.apply import NetApplyResult, NetCheck, NetPlan, net_plan
+from openwrtgui.probe.describe import SelfDescription, describe_router
+from openwrtgui.store.routers import RouterRecord, RouterStore
+from openwrtgui.store.settings import SettingsStore
+from openwrtgui.transport.base import Transport, TransportError
+from openwrtgui.transport.pool import ConnectionPool
+from openwrtgui.wifi.service import PreviewChanged
+
+log = logging.getLogger(__name__)
+SCREEN = "Discovery"
+FIRMWARE_TIMEOUT_S = 120.0
+HELP_WARNING = (
+    "{name} runs on {router} for at most 5 s. A program that does not know --help may do something else."
+)
+
+
+class HelpResult(BaseModel):
+    """What Run --help or a card command printed."""
+
+    model_config = ConfigDict(frozen=True)
+
+    output: str
+    exit_status: int | None
+
+
+def _proof(f: SavedFile, out: str) -> NetCheck:
+    """A copied file proven by its sha256 (a link by readlink) read back on the target."""
+    name = f"file {f.path}"
+    got = (out.split() or [""])[0].strip()
+    want = f.target if f.kind == "link" else f.sha256
+    if got == want:
+        return NetCheck(name, True, "sha256 matches" if f.kind == "file" else f"links to {want}")
+    return NetCheck(name, False, f"read back {got[:12] or 'nothing'}, expected {(want or '')[:12]}")
+
+
+class DiscoveryService:
+    def __init__(
+        self,
+        *,
+        pool: ConnectionPool,
+        routers: RouterStore,
+        guard: BenchGuard,
+        audit: AuditLog,
+        settings: SettingsStore,
+        descriptions: MutableMapping[str, SelfDescription],
+        profiles: ProfileStore,
+        checklists: ChecklistStore,
+        tools: ToolStore,
+        clock: Callable[[], datetime] = datetime.now,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        poll_s: float = 1.0,
+        settle_s: float = 10.0,
+    ) -> None:
+        self.tools = tools
+        self._sleep = sleep
+        self._poll_s = poll_s
+        self._settle_s = settle_s
+        self._pool = pool
+        self._routers = routers
+        self._guard = guard
+        self._audit = audit
+        self._settings = settings
+        self._descriptions = descriptions
+        self._profiles = profiles
+        self.checklists = checklists
+        self._clock = clock
+        self.summaries: dict[str, DiscoverySummary] = {}
+
+    def _record(self, router_id: str) -> RouterRecord:
+        rec = self._routers.get(router_id)
+        if rec is None:
+            raise ValueError(f"Unknown router {router_id}")
+        return rec
+
+    async def _described(self, rec: RouterRecord, t: Transport) -> SelfDescription:
+        desc = self._descriptions.get(rec.id)
+        if desc is None:
+            desc = await describe_router(t)
+            self._descriptions[rec.id] = desc
+        return desc
+
+    async def _context(
+        self, router_id: str
+    ) -> tuple[RouterRecord, Transport, SelfDescription, Profile | None]:
+        rec = self._record(router_id)
+        t = await self._pool.get(rec)
+        desc = await self._described(rec, t)
+        return rec, t, desc, self._profiles.match(desc.identity.board_name, desc.identity.revision)
+
+    async def described(self, router_id: str) -> tuple[RouterRecord, Transport, SelfDescription]:
+        rec = self._record(router_id)
+        t = await self._pool.get(rec)
+        return rec, t, await self._described(rec, t)
+
+    def forget(self, router_id: str) -> None:
+        """After a flash: the router's description and summary are read again."""
+        self._descriptions.pop(router_id, None)
+        self.summaries.pop(router_id, None)
+
+    async def _read(
+        self, rec: RouterRecord, t: Transport, desc: SelfDescription, profile: Profile | None
+    ) -> DiscoveryState:
+        cards = frozenset(c.path for c in self.tools.cards(desc.identity.board_name))
+        return await read_discovery(
+            t, router_id=rec.id, identity=desc.identity, profile=profile, card_paths=cards, now=self._clock()
+        )
+
+    async def state(self, router_id: str) -> DiscoveryState:
+        return await self._read(*await self._context(router_id))
+
+    # ---------------------------------------------------------------- Run --help and tool cards
+    async def _program(self, router_id: str, path: str) -> tuple[RouterRecord, Transport, str]:
+        rec, t, desc, profile = await self._context(router_id)
+        state = await self._read(rec, t, desc, profile)
+        listed = {p.path for row in state.custom for p in row.programs} | {p.path for p in state.programs}
+        if path not in listed:
+            raise ValueError(f"{path} is not a custom program of {rec.name}")
+        return rec, t, desc.identity.board_name
+
+    async def plan_help(self, router_id: str, path: str) -> NetPlan:
+        rec, _t, _board = await self._program(router_id, path)
+        warning = HELP_WARNING.format(name=posixpath.basename(path), router=rec.name)
+        return net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config=None,
+            ops=[],
+            current={},
+            commands=[help_command(path)],
+            warnings=[warning],
+        )
+
+    async def apply_help(self, router_id: str, path: str, digest: str) -> HelpResult:
+        self._guard.require_clear()
+        plan = await self.plan_help(router_id, path)
+        rec = self._record(router_id)
+        if plan.digest != digest:
+            raise PreviewChanged(rec.name)
+        t = await self._pool.get(rec)
+        async with self._pool.write_lock(rec.id):
+            result = await run_audited(
+                t, plan.lines[0], router_id=rec.id, screen=SCREEN, guard=self._guard, audit=self._audit
+            )
+        return HelpResult(output=result.stdout[:8192], exit_status=result.exit_status)
+
+    async def _card_command(
+        self, router_id: str, path: str, label: str, values: Mapping[str, str]
+    ) -> tuple[RouterRecord, ToolCard, str]:
+        rec, _t, board = await self._program(router_id, path)
+        card = next((c for c in self.tools.cards(board) if c.path == path), None)
+        if card is None:
+            raise ValueError(f"No card for {path} on {board}")
+        return rec, card, tool_command(card, label, values)
+
+    async def plan_tool(self, router_id: str, path: str, label: str, values: Mapping[str, str]) -> NetPlan:
+        rec, _card, command = await self._card_command(router_id, path, label, values)
+        return net_plan(router_id=rec.id, screen=SCREEN, config=None, ops=[], current={}, commands=[command])
+
+    async def apply_tool(
+        self, router_id: str, path: str, label: str, values: Mapping[str, str], digest: str
+    ) -> HelpResult:
+        rec, card, command = await self._card_command(router_id, path, label, values)
+        write = next(c.write for c in card.commands if c.label == label)
+        # the user's "read-only" tick is not proof: during a run only what the read-only check accepts runs
+        if write or not is_read_only_command(command):
+            self._guard.require_clear()
+        plan = net_plan(router_id=rec.id, screen=SCREEN, config=None, ops=[], current={}, commands=[command])
+        if plan.digest != digest:
+            raise PreviewChanged(rec.name)
+        t = await self._pool.get(rec)
+        if write:
+            async with self._pool.write_lock(rec.id):
+                result = await run_audited(
+                    t, command, router_id=rec.id, screen=SCREEN, guard=self._guard, audit=self._audit
+                )
+        else:  # marked read-only: no write lock (and during a run only if the read-only check accepted it)
+            result = await run_audited(
+                t,
+                command,
+                router_id=rec.id,
+                screen=SCREEN,
+                guard=self._guard,
+                audit=self._audit,
+                require_guard=False,
+            )
+        return HelpResult(output=result.stdout[:8192], exit_status=result.exit_status)
+
+    async def check_firmware(self, router_id: str) -> FirmwareCheck:
+        rec, t, desc, profile = await self._context(router_id)
+        if profile is None:
+            raise ValueError(no_match_note(desc.identity.board_name, desc.identity.revision))
+        length = profile.firmware_len
+        if profile.source != "image" or length is None:
+            raise ValueError("Import the image file to check the firmware")
+        state = self._guard.state()
+        if state.live:
+            run = state.reasons[0].text if state.reasons else "a harness run"
+            megabytes = max(1, round(length / 2**20))
+            raise ValueError(f"The firmware check reads {megabytes} MB of flash; not while {run} runs")
+        image = self._profiles.image_bytes(profile.key)
+        index = parse_proc_mtd((await t.run(cmd.PROC_MTD)).stdout).get("firmware")
+        if index is None:
+            raise ValueError(f"{rec.name} has no mtd partition named firmware")
+        started = time.monotonic()
+        result = await t.run(cmd.firmware_hash(index, length), timeout=FIRMWARE_TIMEOUT_S)
+        read_s = round(time.monotonic() - started, 1)
+        expected = image_prefix_sha256(image, length)
+        words = result.stdout.split()
+        if not result.ok or not words:
+            reason = (result.stderr or result.stdout).strip() or f"exit {result.exit_status}"
+            return FirmwareCheck(
+                matches=None,
+                detail=f"Could not read the firmware partition: {reason}",
+                image_sha256=expected,
+                router_sha256=None,
+                read_s=read_s,
+            )
+        name = profile.image_name or profile.key.label
+        matches = words[0] == expected
+        detail = (
+            f"The firmware matches {name}"
+            if matches
+            else f"The firmware differs from {name} (flashed from another build, or changed since)"
+        )
+        return FirmwareCheck(
+            matches=matches, detail=detail, image_sha256=expected, router_sha256=words[0], read_s=read_s
+        )
+
+    async def _owners(self, t: Transport) -> tuple[str, ...]:
+        ruleset = parse_ruleset_json((await t.run(fwc.NFT_JSON)).stdout)
+        tags = [
+            f"{o.chain or o.table} · {o.writer or o.owner}"
+            for o in nft_objects(ruleset, self._settings.load().known_tables)
+            if o.owner != "fw4"
+        ]
+        tags += [
+            f"{h.dev} {h.kind} · {h.owner}"
+            for h in tc_hooks(parse_qdiscs((await t.run(fwc.TC_QDISCS)).stdout), frozenset())
+        ]
+        return tuple(tags)
+
+    async def summary(self, router_id: str) -> DiscoverySummary:
+        rec, t, desc, profile = await self._context(router_id)
+        state = await read_discovery(
+            t, router_id=rec.id, identity=desc.identity, profile=profile, now=self._clock()
+        )
+        summary = DiscoverySummary(
+            profile=profile.key.label if profile is not None else None,
+            files_added=len(state.overlay.added),
+            packages_added=len(state.packages.added),
+            configs_changed=sum(1 for c in state.configs if not c.first_boot),
+            owners=await self._owners(t),
+            reflash_pending=rec.reflashed is not None,
+        )
+        self.summaries[rec.id] = summary
+        return summary
+
+    async def rom_profile(self, router_id: str) -> Profile:
+        """A profile built from the router's /rom (reads only), saved with the imported ones."""
+        rec, t, desc, _profile = await self._context(router_id)
+        profile = await build_rom_profile(t, desc.identity.board_name, self._clock())
+        self._profiles.save(profile)
+        self.summaries.clear()
+        return profile
+
+    # ---------------------------------------------------------------- custom services
+    async def plan_service(self, router_id: str, name: str, action: Action) -> NetPlan:
+        rec, t, desc, profile = await self._context(router_id)
+        state = await self._read(rec, t, desc, profile)
+        if name not in {s.name for s in state.services}:
+            raise ValueError(f"{name} is not a custom service; it is managed on System › Services (v0.6)")
+        command = service_command(name, action)
+        return net_plan(router_id=rec.id, screen=SCREEN, config=None, ops=[], current={}, commands=[command])
+
+    async def apply_service(self, router_id: str, name: str, action: Action, digest: str) -> NetApplyResult:
+        self._guard.require_clear()
+        plan = await self.plan_service(router_id, name, action)
+        rec = self._record(router_id)
+        if plan.digest != digest:
+            raise PreviewChanged(rec.name)
+        t = await self._pool.get(rec)
+        async with self._pool.write_lock(rec.id):
+            result = await run_audited(
+                t, plan.lines[0], router_id=rec.id, screen=SCREEN, guard=self._guard, audit=self._audit
+            )
+        if not result.ok:
+            reason = (result.stderr or result.stdout).strip() or f"exit {result.exit_status}"
+            return NetApplyResult(rec.id, False, False, (), f"{plan.lines[0]}: {reason}", rec.host)
+        want_running = action != "stop"
+        waited = 0.0
+        running: bool | None = None
+        while True:
+            running, _enabled = await read_service(t, name)
+            if running is want_running or waited >= self._settle_s:
+                break
+            await self._sleep(self._poll_s)
+            waited += self._poll_s
+        ok = running is want_running
+        detail = (
+            ("running" if running else "not running") if running is not None else "the router did not say"
+        )
+        check = NetCheck(f"service {name}", ok, detail if ok else f"{detail} after {self._settle_s:g} s")
+        return NetApplyResult(rec.id, True, ok, (check,), None, rec.host)
+
+    # ---------------------------------------------------------------- copies and checklists
+    async def _copy_files(
+        self, source_id: str, req: CopyRequest
+    ) -> tuple[RouterRecord, tuple[SavedFile, ...]]:
+        source = self._record(source_id)
+        target = self._record(req.target)
+        if not req.paths:
+            raise ValueError("Pick the files to copy")
+        for path in req.paths:
+            check_copy_path(path, other_router=target.id != source.id)
+        if req.from_checklist is not None:
+            checklist = self.checklists.get(source.id, req.from_checklist)
+            if checklist is None:
+                raise ValueError(f"No reflash checklist {req.from_checklist} for {source.name}")
+            saved = {f.path: f for f in checklist.lost}
+            for path in req.paths:
+                f = saved.get(path)
+                if f is None or (f.kind == "file" and f.data is None):
+                    raise ValueError(f"{path} is not in that checklist with its contents")
+            return target, tuple(saved[p] for p in req.paths)
+        t = await self._pool.get(source)
+        entries, _ = parse_ls_ldn((await t.run(cmd.OVERLAY_LS)).stdout, "/overlay/upper")
+        by_path = {e.path: e for e in entries if e.kind in ("file", "link")}
+        for path in req.paths:
+            if path not in by_path:
+                raise ValueError(
+                    f"{path} is not in {source.name}'s overlay "
+                    "(only files added or changed after flashing are copied)"
+                )
+        return target, await read_files(t, [by_path[p] for p in req.paths], strict=True)
+
+    @staticmethod
+    def _copy_plan(source_id: str, target: RouterRecord, files: tuple[SavedFile, ...]) -> NetPlan:
+        lines = [
+            upload_line(command, f"{source_id}:{f.path}", data) if data is not None else command
+            for f in files
+            for command, data in write_steps(f)
+        ]
+        return net_plan(router_id=target.id, screen=SCREEN, config=None, ops=[], current={}, commands=lines)
+
+    async def plan_copy(self, source_id: str, req: CopyRequest) -> NetPlan:
+        target, files = await self._copy_files(source_id, req)
+        return self._copy_plan(source_id, target, files)
+
+    async def apply_copy(self, source_id: str, req: CopyRequest, digest: str) -> NetApplyResult:
+        self._guard.require_clear()
+        target, files = await self._copy_files(source_id, req)
+        if self._copy_plan(source_id, target, files).digest != digest:
+            raise PreviewChanged(target.name)
+        t = await self._pool.get(target)
+        checks: list[NetCheck] = []
+        async with self._pool.write_lock(target.id):
+            for f in files:
+                for command, data in write_steps(f):
+                    if data is not None:
+                        result = await run_audited_upload(
+                            t,
+                            command,
+                            data,
+                            name=f"{source_id}:{f.path}",
+                            router_id=target.id,
+                            screen=SCREEN,
+                            guard=self._guard,
+                            audit=self._audit,
+                        )
+                    else:
+                        result = await run_audited(
+                            t,
+                            command,
+                            router_id=target.id,
+                            screen=SCREEN,
+                            guard=self._guard,
+                            audit=self._audit,
+                        )
+                    if not result.ok:
+                        reason = (result.stderr or result.stdout).strip() or f"exit {result.exit_status}"
+                        return NetApplyResult(
+                            target.id, False, False, tuple(checks), f"{command}: {reason}", target.host
+                        )
+                    if command.startswith(("sha256sum ", "readlink ")):
+                        checks.append(_proof(f, result.stdout))
+        verified = all(c.ok for c in checks)
+        return NetApplyResult(target.id, True, verified, tuple(checks), None, target.host)
+
+    async def save_checklist(self, router_id: str) -> ReflashChecklist:
+        rec, t, desc, profile = await self._context(router_id)
+        if profile is None:
+            raise ValueError(no_match_note(desc.identity.board_name, desc.identity.revision))
+        state = await read_discovery(
+            t, router_id=rec.id, identity=desc.identity, profile=profile, now=self._clock()
+        )
+        if not state.kept_known:
+            raise ValueError(
+                f"Could not read what a flash keeps on {rec.name} (sysupgrade -l); no checklist saved"
+            )
+        lost = [
+            e for e in (*state.overlay.added, *state.overlay.replaced) if e.path not in state.kept_on_flash
+        ]
+        checklist = ReflashChecklist(
+            router_id=rec.id,
+            saved_at=self._clock(),
+            profile=profile.key,
+            overlay=state.overlay,
+            packages_added=state.packages.added,
+            lost=await read_files(t, sorted(lost, key=lambda e: e.path), strict=False),
+        )
+        self.checklists.save(checklist)
+        return checklist
+
+    async def refresh_summary(self, rec: RouterRecord) -> None:
+        """The poller's hook: once per connect (the cache is cleared on import, delete and flash)."""
+        if rec.id in self.summaries:
+            return
+        try:
+            await self.summary(rec.id)
+        except (TransportError, ValueError) as exc:
+            log.debug("discovery summary of %s failed: %s", rec.id, exc)

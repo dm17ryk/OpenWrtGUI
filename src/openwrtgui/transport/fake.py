@@ -4,15 +4,16 @@ from __future__ import annotations
 
 import json
 import shlex
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from openwrtgui.transport.base import CommandResult, ShellChannel
+from openwrtgui.transport.base import UPLOAD_CHUNK, CommandResult, ShellChannel, Unreachable
 
 if TYPE_CHECKING:
     from openwrtgui.simfw import SimFirewall
+    from openwrtgui.simimage import SimImage
     from openwrtgui.simnet import SimNetwork
     from openwrtgui.simwifi import SimWifi
 
@@ -30,6 +31,8 @@ class SimState:
     wifi: SimWifi | None = None
     net: SimNetwork | None = None
     fw: SimFirewall | None = None
+    image: SimImage | None = None
+    generation_seen: int = 0  # the image's flash generation whose reset (keys, password) was applied
 
 
 def load_commands(path: Path) -> dict[str, CommandResult]:
@@ -66,6 +69,7 @@ class ReplayTransport:
         self._commands = dict(commands)
         self.state = state
         self.calls: list[str] = []
+        self.uploads: dict[str, bytes] = {}  # command → the bytes it was fed, last upload wins
 
     async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
         self.calls.append(command)
@@ -88,11 +92,38 @@ class ReplayTransport:
             return CommandResult(command, "", "passwd: password for root is unchanged\n", 1)
         return await self.run(command, timeout=timeout)
 
+    async def upload(
+        self,
+        command: str,
+        data: bytes,
+        progress: Callable[[int], None] | None = None,
+        *,
+        timeout: float = 600.0,
+    ) -> CommandResult:
+        """The simulated router takes it; without a simulator it is kept in `uploads` and succeeds."""
+        self.calls.append(command)
+        self._down()
+        for at in range(0, len(data), UPLOAD_CHUNK):
+            if progress is not None:
+                progress(min(at + UPLOAD_CHUNK, len(data)))
+        self.uploads[command] = data
+        if self.state is not None and self.state.image is not None:
+            taken = self.state.image.upload(command, data)
+            if taken is not None:
+                return taken
+            return CommandResult(command, "", f"sim: no upload target for '{command}'", 1)
+        return CommandResult(command, "", "", 0)
+
     async def open_shell(self, cols: int, rows: int) -> ShellChannel:
         raise NotImplementedError("simulator has no shell")
 
     async def stream(self, command: str) -> BytesStream:
         self.calls.append(command)
+        self._down()
+        if self.state is not None and self.state.image is not None:
+            read = self.state.image.stream(command)
+            if read is not None:
+                return BytesStream(read, 0)
         data = self.state.fw.stream(command) if self.state is not None and self.state.fw is not None else None
         if data is None:
             return BytesStream(b"", 1, "tcpdump: no such device\n")
@@ -101,17 +132,27 @@ class ReplayTransport:
     async def close(self) -> None:
         return None
 
+    def _down(self) -> None:
+        """A rebooting router drops the connection, as a flash does to the app's session."""
+        if self.state is not None and self.state.image is not None and self.state.image.rebooting:
+            raise Unreachable("the connection was lost: the router is rebooting")
+
     def _simulate(self, command: str) -> CommandResult | None:
         assert self.state is not None
+        self._down()
         if self.state.fw is not None:
             self.state.fw.dispatch = self._dispatch
             self.state.fw.fire(self._dispatch)  # router-side timers that came due run first
+        self._down()  # a timer may have started a flash
         return self._dispatch(command)
 
     def _dispatch(self, command: str) -> CommandResult | None:
         assert self.state is not None
-        # The network first: it answers only commands it knows whole (the Wi-Fi one echoes any `echo`); the
-        # firewall last, since it splits compound commands and hands their parts back here.
+        # The image side first: it answers only exact commands it owns. Then the network: it answers only
+        # commands it knows whole (the Wi-Fi one echoes any `echo`); the firewall last, since it splits
+        # compound commands and hands their parts back here.
+        if self.state.image is not None and (answered := self.state.image.answer(command)) is not None:
+            return answered
         if self.state.net is not None and (answered := self.state.net.answer(command)) is not None:
             return answered
         if self.state.wifi is not None and (answered := self.state.wifi.answer(command)) is not None:

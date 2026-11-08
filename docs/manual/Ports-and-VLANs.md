@@ -40,4 +40,5 @@ with the rollback; choose **off** to stop it.
 ## Wi-Fi mirror
 
 Whether the router has the `wifi-mirror` service, and whether it runs: **present · running**, **stopped**, or
-**not on this router**. Stop and restart come with image import (v0.5).
+**not on this router**. Start, stop and restart it in [Discovery › Custom services](Discovery#custom-services).
+Excluded MACs and the iperf warning are not built yet.

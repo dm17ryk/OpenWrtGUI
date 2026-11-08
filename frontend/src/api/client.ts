@@ -89,6 +89,15 @@ export function putJson<T>(path: string, data: unknown): Promise<T> {
   return apiFetch<T>(path, { method: 'PUT', body: JSON.stringify(data) })
 }
 
+/** A file as the raw request body (an imported firmware image); its name travels in X-File-Name. */
+export function postBytes<T>(path: string, data: ArrayBuffer, name: string): Promise<T> {
+  return apiFetch<T>(path, {
+    method: 'POST',
+    body: data,
+    headers: { 'Content-Type': 'application/octet-stream', 'X-File-Name': name },
+  })
+}
+
 export function socketUrl(path: string, params: Record<string, string> = {}): string {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:'
   const query = new URLSearchParams({ ...params, t: token ?? '' })

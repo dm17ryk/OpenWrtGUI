@@ -40,6 +40,9 @@ A card lists model and firmware, then:
 - **Network**: LAN address and whether this router runs the DHCP server.
 - **Login**: "app key · host key pinned" when all is set.
 
+Tags such as **BENCHSIPGUARD · dima_night** name the nftables tables and tc hooks another tool keeps on the
+router, and who keeps them (see [Firewall](Firewall)); they come from the router's last Discovery read.
+
 When the app has faults armed on a router, the card also shows **N faults armed**, which opens
 [Faults and capture](Faults-and-capture). The count comes from the fault records on the router, so it stays
 right after the app restarts.
@@ -54,6 +57,11 @@ Below the cards, anything that needs you:
 - **host key changed**: the router presents a different SSH key than the pinned one, usually after a
   reflash. **Check and re-pin** opens the wizard to compare and pin the new key.
 - **unreachable since hh:mm**: with the last error.
+- **N files added after flashing**: the router's overlay has files its image does not; **Open Discovery**
+  shows them and which a flash would lose.
+- **Reflashed without settings: add it again**: the router was flashed from this app without keeping
+  settings and now answers at 192.168.1.1 with no password. Connect it alone to this PC; **Add again** opens
+  the wizard at that address.
 
 ## Router list
 

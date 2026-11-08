@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
+import hashlib
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from openwrtgui.guard.audit import AuditLog, Source, mask
 from openwrtgui.guard.bench_guard import BenchGuard
-from openwrtgui.transport.base import CommandResult, Transport, TransportError
+from openwrtgui.transport.base import CommandResult, Transport, TransportError, Uploader
 
 
 @dataclass(frozen=True)
@@ -60,6 +61,42 @@ async def run_audited(
         source=source,
         secrets=secrets,
     )
+    return result
+
+
+def upload_line(command: str, name: str, data: bytes) -> str:
+    """What the preview and the audit log show for an upload: the exact command and what goes to its stdin."""
+    return f"{command}  # stdin: {name} ({len(data)} B, sha256 {hashlib.sha256(data).hexdigest()[:12]})"
+
+
+async def run_audited_upload(
+    transport: Transport,
+    command: str,
+    data: bytes,
+    *,
+    name: str,
+    router_id: str,
+    screen: str,
+    guard: BenchGuard,
+    audit: AuditLog,
+    source: Source = "user",
+    progress: Callable[[int], None] | None = None,
+    require_guard: bool = True,
+    timeout: float = 600.0,
+) -> CommandResult:
+    """One upload, like run_audited: refused while Bench Guard is live, audited as upload_line. The caller
+    holds the write lock."""
+    if require_guard:
+        guard.require_clear()
+    if not isinstance(transport, Uploader):
+        raise TransportError("This connection cannot send files")
+    line = upload_line(command, name, data)
+    try:
+        result = await transport.upload(command, data, progress, timeout=timeout)
+    except TransportError:
+        audit.record(router=router_id, screen=screen, command=line, exit_status=None, source=source)
+        raise
+    audit.record(router=router_id, screen=screen, command=line, exit_status=result.exit_status, source=source)
     return result
 
 

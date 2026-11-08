@@ -19,7 +19,9 @@ router itself if you can (serial console: `dropbearkey -y -f /etc/dropbear/dropb
 **Accept and pin** stores it; from then on the app refuses to talk to anything presenting another key.
 
 If the address had a different key pinned before, the wizard says so. A reflash makes a new key; anything
-else means you may not be talking to your router.
+else means you may not be talking to your router. After a [flash without keeping settings](Discovery#flash-this-image)
+from this app, the wizard reads the router's board and revision first (that one connection pins nothing): when
+they match the image you flashed, it shows **Expected after the flash: board revision** instead of the warning.
 
 ## 3. Log in to the router
 
@@ -66,3 +68,6 @@ said about itself and the saved port map.
 
 A router you added without finishing the key step shows **needs app key** on the dashboard, with an
 **Install key** button.
+
+Once its sysupgrade image is imported in [Settings › Images](Settings#images), [Discovery](Discovery) shows
+what changed on the router since flashing.

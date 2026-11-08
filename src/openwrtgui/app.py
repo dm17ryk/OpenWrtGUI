@@ -13,9 +13,12 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from openwrtgui.api import (
+    discovery_api,
     errors,
     faults_api,
+    flash_api,
     fw_api,
+    images_api,
     luci_api,
     misc_api,
     net_api,
@@ -89,9 +92,13 @@ def create_app(ctx: AppContext) -> FastAPI:
         ports_api,
         fw_api,
         faults_api,
+        discovery_api,
+        images_api,
+        flash_api,
     )
     for module in modules:
         app.include_router(module.router)
+    app.include_router(discovery_api.tools)
     app.include_router(misc_api.public)
     app.include_router(ws_api.router)
     if ctx.web_dir is not None and ctx.web_dir.is_dir():

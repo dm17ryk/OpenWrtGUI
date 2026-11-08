@@ -110,6 +110,26 @@ export type CaptureDevices = S['CaptureDevicesOut']
 export type KnownDevice = S['KnownDevice']
 export type KnownTable = S['KnownTable']
 
+// Discovery and images (v0.5)
+export type ProfileOut = S['ProfileOut']
+export type ProfileKey = S['ProfileKey']
+export type DiscoveryState = S['DiscoveryState']
+export type DiscoverySummary = S['DiscoverySummary']
+export type FirmwareCheck = S['FirmwareCheck']
+export type OverlayEntry = S['OverlayEntry']
+export type ConfigDiff = S['ConfigDiff']
+export type CustomRow = S['CustomRow']
+export type ProgramRow = S['ProgramRow']
+export type ServiceRow = S['ServiceRow']
+export type ChecklistInfo = S['ChecklistInfo']
+export type ToolCard = S['ToolCard']
+export type ToolCommand = S['ToolCommand']
+export type ToolParam = S['ToolParam']
+export type HelpResult = S['HelpResult']
+export type FlashJob = S['FlashJob']
+export type FlashPlanOut = S['FlashPlanOut']
+export type CopyIn = Body<S['CopyIn'], 'paths' | 'target'>
+
 // RF live (/ws/rf/{id}); WebSocket messages are not in the OpenAPI schema (src/openwrtgui/rf/sample.py).
 export type Bitrate = { mbps: number; mcs: number | null; width_mhz: number; short_gi: boolean; mode: Mode }
 export type RadioSample = {

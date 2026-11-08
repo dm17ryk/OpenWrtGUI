@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 import type { RouterItem } from '../api/types'
 import { Help } from '../help/Help'
 import { HELP } from '../help/topics'
-import { hhmm, routerState } from './routerState'
+import { hhmm, plural, routerState } from './routerState'
 
 type Row = { key: string; tag: string; tagClass: string; text: ReactNode; action?: ReactNode }
 
@@ -12,6 +12,35 @@ function rows(items: RouterItem[]): Row[] {
   for (const item of items) {
     const { record, health } = item
     const state = routerState(item)
+    const added = item.discovery?.files_added ?? 0
+    if (record.reflashed) {
+      // flashed without settings: it answers at 192.168.1.1 with a new key, not at its old address
+      out.push({
+        key: `${record.id}-reflashed`,
+        tag: record.name,
+        tagClass: 'b bad',
+        text: `Reflashed without settings: add it again (${record.reflashed.board} ${record.reflashed.revision} at 192.168.1.1, no password).`,
+        action: (
+          <Link className="btn" to="/add?host=192.168.1.1">
+            Add again
+          </Link>
+        ),
+      })
+      continue
+    }
+    if (added > 0) {
+      out.push({
+        key: `${record.id}-added`,
+        tag: record.name,
+        tagClass: 'b neu',
+        text: `${plural(added, 'file')} added after flashing. Discovery says which a flash would lose.`,
+        action: (
+          <Link className="btn" to={`/routers/${record.id}/discovery`}>
+            Open Discovery
+          </Link>
+        ),
+      })
+    }
     if (state === 'needs app key') {
       out.push({
         key: `${record.id}-key`,

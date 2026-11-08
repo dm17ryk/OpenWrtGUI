@@ -38,6 +38,15 @@ export function RouterCard({ item }: { item: RouterItem }) {
           <span className={BADGE[state]}>{state}</span>
         </HelpTip>
       </div>
+      {(item.discovery?.owners.length ?? 0) > 0 && (
+        <div className="row" style={{ flexWrap: 'wrap', gap: 6 }} aria-label="Owned by">
+          {item.discovery?.owners.map((o) => (
+            <span key={o} className="b neu mono" title="A table or hook another tool keeps on this router">
+              {o}
+            </span>
+          ))}
+        </div>
+      )}
       {summary && (
         <div style={{ fontSize: 13, color: 'var(--ink2)' }}>
           {summary.model} · <span className="mono">{summary.revision}</span>

@@ -16,7 +16,9 @@
     ],
     "wifi_mirror": true,
     "auth": "key",
-    "fw": "ap1.json"
+    "fw": "ap1.json",
+    "image": "mini-r35692.bin",
+    "upper": "overlay/ap1.json"
   },
   {
     "id": "ap2",
@@ -27,7 +29,9 @@
     "wifi": "ap2.uci",
     "net": "ap2.uci",
     "fw": "ap2.json",
-    "auth": "key"
+    "auth": "key",
+    "image": "mini-r35692.bin",
+    "upper": "overlay/ap2.json"
   },
   {
     "id": "ap3",
@@ -37,7 +41,9 @@
     "overlay": "ap3.overlay.json",
     "wifi": "ap3.uci",
     "net": "ap3.uci",
-    "auth": "none"
+    "auth": "none",
+    "image": "mini-r35692.bin",
+    "upper": "overlay/ap3.json"
   },
   {
     "id": "new",

@@ -23,6 +23,9 @@ class DataDir:
     audit_dir: Path
     updates_dir: Path
     logs_dir: Path
+    profiles_dir: Path
+    tools_dir: Path
+    reflash_dir: Path
 
     @classmethod
     def at(cls, root: Path) -> DataDir:
@@ -35,8 +38,20 @@ class DataDir:
             audit_dir=root / "audit",
             updates_dir=root / "updates",
             logs_dir=root / "logs",
+            profiles_dir=root / "profiles",
+            tools_dir=root / "tools",
+            reflash_dir=root / "reflash",
         )
-        for folder in (d.root, d.keys_dir, d.audit_dir, d.updates_dir, d.logs_dir):
+        for folder in (
+            d.root,
+            d.keys_dir,
+            d.audit_dir,
+            d.updates_dir,
+            d.logs_dir,
+            d.profiles_dir,
+            d.tools_dir,
+            d.reflash_dir,
+        ):
             folder.mkdir(parents=True, exist_ok=True)
         return d
 

@@ -38,6 +38,7 @@ async def list_routers(ctx: Ctx) -> list[RouterItem]:
             health=ctx.pool.health(r.id),
             status=ctx.statuses.get(r.id),
             summary=summarize(d) if (d := ctx.descriptions.get(r.id)) else None,
+            discovery=ctx.discovery.summaries.get(r.id),
         )
         for r in ctx.routers.list()
     ]
@@ -67,5 +68,6 @@ async def remove_router(router_id: str, ctx: Ctx) -> Ok:
     await ctx.pool.drop(router_id)
     ctx.statuses.pop(router_id, None)
     ctx.descriptions.pop(router_id, None)
+    ctx.discovery.summaries.pop(router_id, None)
     ctx.guard.forget_router(router_id)
     return Ok()

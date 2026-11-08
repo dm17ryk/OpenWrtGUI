@@ -104,6 +104,29 @@ test('only the 2.4 GHz block is drawn for 2g-only routers', () => {
   expect(screen.queryByRole('heading', { name: '5 GHz air' })).toBeNull()
 })
 
+const SUMMARY_AP1 = { profile: 'dlink,dwr-921-c3-uboot r35692-b8bffeefdf', files_added: 3, packages_added: 1, configs_changed: 2, owners: [], reflash_pending: false }
+
+test('lists files added after flashing in Needs attention', () => {
+  renderWith([{ ...AP1, discovery: SUMMARY_AP1 }, AP2])
+  const attention = screen.getByRole('region', { name: 'Needs attention' })
+  expect(within(attention).getByText(/3 files added after flashing/)).toBeInTheDocument()
+  expect(within(attention).getByRole('link', { name: 'Open Discovery' })).toHaveAttribute('href', '/routers/ap1/discovery')
+})
+
+test('a router reflashed without settings is to be added again', () => {
+  const reflashed = { ...AP2, record: { ...AP2.record, reflashed: { board: 'dlink,dwr-921-c3-uboot', revision: 'r35700-0c0ffee000', at: '2026-11-08T12:00:00' } } }
+  renderWith([AP1, reflashed])
+  const attention = screen.getByRole('region', { name: 'Needs attention' })
+  expect(within(attention).getByText(/Reflashed without settings: add it again/)).toBeInTheDocument()
+  expect(within(attention).getByRole('link', { name: 'Add again' })).toHaveAttribute('href', '/add?host=192.168.1.1')
+})
+
+test('shows owner tags on the router card', () => {
+  renderWith([{ ...AP1, discovery: { ...SUMMARY_AP1, owners: ['BENCHSIPGUARD · dima_night'] } }, AP2])
+  const card = screen.getByRole('article', { name: 'AP1 · bench' })
+  expect(within(card).getByText('BENCHSIPGUARD · dima_night')).toBeInTheDocument()
+})
+
 test('a router card shows the faults armed on it and links to them', () => {
   const armed = { ...AP1, status: AP1.status && { ...AP1.status, faults_armed: 1 } }
   renderWith([armed, AP2])

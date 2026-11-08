@@ -13,6 +13,8 @@
 - [Ports, VLANs, mirroring](Ports-and-VLANs)
 - [Firewall](Firewall)
 - [Faults and capture](Faults-and-capture)
+- [Discovery](Discovery)
+- [Adding a router family](Adding-a-router-family)
 - [LuCI pages](LuCI-pages)
 - [Bench Guard](Bench-Guard)
 - [Terminal and audit log](Terminal-and-audit-log)

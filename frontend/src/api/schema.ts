@@ -157,6 +157,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Images */
+        get: operations["list_images_api_images_get"];
+        put?: never;
+        /** Import Image */
+        post: operations["import_image_api_images_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/{board}/{folder}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Image */
+        delete: operations["delete_image_api_images__board___folder__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/onboard": {
         parameters: {
             query?: never;
@@ -442,6 +477,210 @@ export interface paths {
         put?: never;
         /** Describe Again */
         post: operations["describe_again_api_routers__router_id__describe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/discovery": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Discovery State */
+        get: operations["discovery_state_api_routers__router_id__discovery_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/discovery/checklist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Checklist */
+        post: operations["save_checklist_api_routers__router_id__discovery_checklist_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/discovery/checklists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Checklists */
+        get: operations["checklists_api_routers__router_id__discovery_checklists_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/discovery/copy/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copy Apply */
+        post: operations["copy_apply_api_routers__router_id__discovery_copy_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/discovery/copy/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copy Preview */
+        post: operations["copy_preview_api_routers__router_id__discovery_copy_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/discovery/firmware": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Firmware Check */
+        post: operations["firmware_check_api_routers__router_id__discovery_firmware_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/discovery/help/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Help Apply */
+        post: operations["help_apply_api_routers__router_id__discovery_help_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/discovery/help/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Help Preview */
+        post: operations["help_preview_api_routers__router_id__discovery_help_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/discovery/service/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Service Apply */
+        post: operations["service_apply_api_routers__router_id__discovery_service_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/discovery/service/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Service Preview */
+        post: operations["service_preview_api_routers__router_id__discovery_service_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/discovery/tool/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tool Apply */
+        post: operations["tool_apply_api_routers__router_id__discovery_tool_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/discovery/tool/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tool Preview */
+        post: operations["tool_preview_api_routers__router_id__discovery_tool_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -833,6 +1072,74 @@ export interface paths {
         put?: never;
         /** Zones Preview */
         post: operations["zones_preview_api_routers__router_id__firewall_zones_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/flash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Flash Job */
+        get: operations["flash_job_api_routers__router_id__flash_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/flash/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Flash Preview */
+        post: operations["flash_preview_api_routers__router_id__flash_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/flash/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Flash Start */
+        post: operations["flash_start_api_routers__router_id__flash_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/images/rom": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rom Profile */
+        post: operations["rom_profile_api_routers__router_id__images_rom_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1506,6 +1813,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tools/{board}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tool Cards */
+        get: operations["tool_cards_api_tools__board__get"];
+        /** Save Tool Card */
+        put: operations["save_tool_card_api_tools__board__put"];
+        post?: never;
+        /** Delete Tool Card */
+        delete: operations["delete_tool_card_api_tools__board__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tools/{board}/prefill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Prefill */
+        post: operations["prefill_api_tools__board__prefill_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/update": {
         parameters: {
             query?: never;
@@ -1770,6 +2113,18 @@ export interface components {
             /** Url */
             url: string;
         };
+        /** CapabilityRow */
+        CapabilityRow: {
+            /** Name */
+            name: string;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "in image" | "added after flashing" | "missing";
+        };
         /** CaptureDevicesOut */
         CaptureDevicesOut: {
             /** Devices */
@@ -1874,6 +2229,26 @@ export interface components {
             /** Ok */
             ok: boolean | null;
         };
+        /**
+         * ChecklistInfo
+         * @description A saved checklist without the file contents.
+         */
+        ChecklistInfo: {
+            /** Lost */
+            lost: string[];
+            /** Packages Added */
+            packages_added: string[];
+            profile: components["schemas"]["ProfileKey"] | null;
+            /** Restorable */
+            restorable: string[];
+            /**
+             * Saved At
+             * Format: date-time
+             */
+            saved_at: string;
+            /** Stamp */
+            stamp: string;
+        };
         /** ClearApplyIn */
         ClearApplyIn: {
             /** Digest */
@@ -1885,6 +2260,35 @@ export interface components {
         ClearIn: {
             /** Ids */
             ids?: string[] | null;
+        };
+        /** ConfigDiff */
+        ConfigDiff: {
+            /** Changes */
+            changes: components["schemas"]["OptionChange"][];
+            /** Config */
+            config: string;
+            /** First Boot */
+            first_boot: boolean;
+        };
+        /** CopyApplyIn */
+        CopyApplyIn: {
+            /** Digest */
+            digest: string;
+            /** From Checklist */
+            from_checklist?: string | null;
+            /** Paths */
+            paths: string[];
+            /** Target */
+            target: string;
+        };
+        /** CopyIn */
+        CopyIn: {
+            /** From Checklist */
+            from_checklist?: string | null;
+            /** Paths */
+            paths: string[];
+            /** Target */
+            target: string;
         };
         /** CustomApplyIn */
         CustomApplyIn: {
@@ -1916,6 +2320,26 @@ export interface components {
             content?: string | null;
             /** Name */
             name: string;
+        };
+        /** CustomRow */
+        CustomRow: {
+            /** Card */
+            card: string | null;
+            /** Description */
+            description: string;
+            /** Package */
+            package: string;
+            /** Programs */
+            programs: components["schemas"]["ProgramRow"][];
+            /** Service */
+            service: string | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "image" | "added after flashing";
+            /** Version */
+            version: string;
         };
         /** DefaultsConf */
         DefaultsConf: {
@@ -2032,6 +2456,65 @@ export interface components {
             ra?: ("server" | "relay" | "hybrid" | "disabled") | null;
             /** Start */
             start?: number | null;
+        };
+        /** DiscoveryState */
+        DiscoveryState: {
+            /** Board */
+            board: string;
+            /** Capabilities */
+            capabilities: components["schemas"]["CapabilityRow"][];
+            /** Configs */
+            configs: components["schemas"]["ConfigDiff"][];
+            /** Custom */
+            custom: components["schemas"]["CustomRow"][];
+            /** Has Overlay */
+            has_overlay: boolean;
+            /**
+             * Kept Known
+             * @default true
+             */
+            kept_known: boolean;
+            /** Kept On Flash */
+            kept_on_flash: string[];
+            /** Match Note */
+            match_note: string | null;
+            overlay: components["schemas"]["OverlayDiff"];
+            packages: components["schemas"]["PackageDiff"];
+            profile: components["schemas"]["ProfileKey"] | null;
+            /** Programs */
+            programs: components["schemas"]["ProgramRow"][];
+            /**
+             * Read At
+             * Format: date-time
+             */
+            read_at: string;
+            /** Revision */
+            revision: string;
+            /** Router Id */
+            router_id: string;
+            /**
+             * Services
+             * @default []
+             */
+            services: components["schemas"]["ServiceRow"][];
+        };
+        /**
+         * DiscoverySummary
+         * @description What the dashboard shows per router: the matched image, counts, and owner tags (spec 7.1).
+         */
+        DiscoverySummary: {
+            /** Configs Changed */
+            configs_changed: number;
+            /** Files Added */
+            files_added: number;
+            /** Owners */
+            owners: string[];
+            /** Packages Added */
+            packages_added: number;
+            /** Profile */
+            profile: string | null;
+            /** Reflash Pending */
+            reflash_pending: boolean;
         };
         /** DnsApplyIn */
         DnsApplyIn: {
@@ -2275,6 +2758,91 @@ export interface components {
             /** Tc */
             tc: components["schemas"]["TcHook"][];
         };
+        /** FirmwareCheck */
+        FirmwareCheck: {
+            /** Detail */
+            detail: string;
+            /** Image Sha256 */
+            image_sha256: string | null;
+            /** Matches */
+            matches: boolean | null;
+            /** Read S */
+            read_s: number | null;
+            /** Router Sha256 */
+            router_sha256: string | null;
+        };
+        /** FlashIn */
+        FlashIn: {
+            /** Board */
+            board: string;
+            /**
+             * Isolated
+             * @default false
+             */
+            isolated: boolean;
+            /**
+             * Keep Settings
+             * @default true
+             */
+            keep_settings: boolean;
+            /** Revision */
+            revision: string;
+            /** Sha256 */
+            sha256: string;
+        };
+        /** FlashJob */
+        FlashJob: {
+            /** Detail */
+            detail?: string | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "upload" | "check" | "arm" | "wait" | "prove" | "done" | "failed";
+            /** Router Id */
+            router_id: string;
+            /** Sent */
+            sent: number;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Total */
+            total: number;
+        };
+        /** FlashPlanOut */
+        FlashPlanOut: {
+            /** Digest */
+            digest: string;
+            /** Lines */
+            lines: string[];
+            /** Warnings */
+            warnings: string[];
+        };
+        /** FlashStartIn */
+        FlashStartIn: {
+            /** Board */
+            board: string;
+            /** Digest */
+            digest: string;
+            /**
+             * Isolated
+             * @default false
+             */
+            isolated: boolean;
+            /**
+             * Keep Settings
+             * @default true
+             */
+            keep_settings: boolean;
+            /** Revision */
+            revision: string;
+            /** Sha256 */
+            sha256: string;
+        };
         /** ForwardIn */
         ForwardIn: {
             /**
@@ -2433,6 +3001,28 @@ export interface components {
             status: string;
             /** Version */
             version: string;
+        };
+        /** HelpApplyIn */
+        HelpApplyIn: {
+            /** Digest */
+            digest: string;
+            /** Path */
+            path: string;
+        };
+        /** HelpIn */
+        HelpIn: {
+            /** Path */
+            path: string;
+        };
+        /**
+         * HelpResult
+         * @description What Run --help or a card command printed.
+         */
+        HelpResult: {
+            /** Exit Status */
+            exit_status: number | null;
+            /** Output */
+            output: string;
         };
         /** HostConf */
         HostConf: {
@@ -3201,6 +3791,15 @@ export interface components {
             /** Path */
             path: string;
         };
+        /** OptionChange */
+        OptionChange: {
+            /** Image */
+            image: string | null;
+            /** Key */
+            key: string;
+            /** Router */
+            router: string | null;
+        };
         /** OptionEditIn */
         OptionEditIn: {
             /** Name */
@@ -3252,12 +3851,89 @@ export interface components {
             /** Radio */
             radio: string;
         };
+        /** OverlayDiff */
+        OverlayDiff: {
+            /** Added */
+            added: components["schemas"]["OverlayEntry"][];
+            /** Deleted */
+            deleted: string[];
+            /** Replaced */
+            replaced: components["schemas"]["OverlayEntry"][];
+            /** Unreadable */
+            unreadable: number;
+        };
+        /** OverlayEntry */
+        OverlayEntry: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "file" | "link" | "whiteout" | "other";
+            /** Mode */
+            mode: string;
+            /** Path */
+            path: string;
+            /** Size */
+            size: number;
+            /** Target */
+            target?: string | null;
+        };
         /** OverrideIn */
         OverrideIn: {
             /** Host */
             host: string;
             /** Ip */
             ip: string;
+        };
+        /** Package */
+        Package: {
+            /**
+             * Depends
+             * @default []
+             */
+            depends: string[];
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Files
+             * @default []
+             */
+            files: string[];
+            /**
+             * License
+             * @default
+             */
+            license: string;
+            /** Name */
+            name: string;
+            /**
+             * Origin
+             * @default
+             */
+            origin: string;
+            /**
+             * Url
+             * @default
+             */
+            url: string;
+            /** Version */
+            version: string;
+        };
+        /** PackageDiff */
+        PackageDiff: {
+            /** Added */
+            added: components["schemas"]["Package"][];
+            /** Changed */
+            changed: [
+                string,
+                string,
+                string
+            ][];
+            /** Removed */
+            removed: string[];
         };
         /** PageView */
         PageView: {
@@ -3395,10 +4071,70 @@ export interface components {
             vlans: components["schemas"]["VlanView"][];
             wifi_mirror: components["schemas"]["WifiMirror"];
         };
+        /** PrefillIn */
+        PrefillIn: {
+            /** Path */
+            path: string;
+            /** Usage */
+            usage?: string | null;
+        };
         /** Preview */
         Preview: {
             /** Commands */
             commands: string[];
+        };
+        /** ProfileKey */
+        ProfileKey: {
+            /** Board */
+            board: string;
+            /** Revision */
+            revision: string;
+            /** Sha256 */
+            sha256: string;
+        };
+        /** ProfileOut */
+        ProfileOut: {
+            /** Boards */
+            boards: string[];
+            /**
+             * Built At
+             * Format: date-time
+             */
+            built_at: string;
+            /** Custom */
+            custom: string[];
+            /** Folder */
+            folder: string;
+            /** Image Name */
+            image_name: string | null;
+            /** Image Size */
+            image_size: number | null;
+            key: components["schemas"]["ProfileKey"];
+            /** Label */
+            label: string;
+            /** Packages */
+            packages: number;
+            /** Revision */
+            revision: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "image" | "rom";
+        };
+        /** ProgramRow */
+        ProgramRow: {
+            /** Has Card */
+            has_card: boolean;
+            /** Path */
+            path: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "custom" | "overlay";
+            /** Usage */
+            usage: string | null;
         };
         /** ProtoView */
         ProtoView: {
@@ -3554,6 +4290,21 @@ export interface components {
             /** Target */
             target: string;
         };
+        /**
+         * ReflashPending
+         * @description Flashed without keeping settings: the router comes back like firstboot and waits for Add again.
+         */
+        ReflashPending: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Board */
+            board: string;
+            /** Revision */
+            revision: string;
+        };
         /** ReleaseOut */
         ReleaseOut: {
             /** Name */
@@ -3623,6 +4374,7 @@ export interface components {
         };
         /** RouterDetail */
         RouterDetail: {
+            discovery?: components["schemas"]["DiscoverySummary"] | null;
             health: components["schemas"]["RouterHealth"];
             record: components["schemas"]["RouterRecord"];
             status: components["schemas"]["RouterStatus"] | null;
@@ -3642,6 +4394,7 @@ export interface components {
         };
         /** RouterItem */
         RouterItem: {
+            discovery?: components["schemas"]["DiscoverySummary"] | null;
             health: components["schemas"]["RouterHealth"];
             record: components["schemas"]["RouterRecord"];
             status: components["schemas"]["RouterStatus"] | null;
@@ -3679,6 +4432,7 @@ export interface components {
             port_labels: {
                 [key: string]: string;
             };
+            reflashed?: components["schemas"]["ReflashPending"] | null;
             /**
              * Username
              * @default root
@@ -3870,12 +4624,55 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** ServiceApplyIn */
+        ServiceApplyIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "start" | "stop" | "restart";
+            /** Digest */
+            digest: string;
+            /** Name */
+            name: string;
+        };
+        /** ServiceIn */
+        ServiceIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "start" | "stop" | "restart";
+            /** Name */
+            name: string;
+        };
+        /** ServiceRow */
+        ServiceRow: {
+            /** Enabled */
+            enabled: boolean | null;
+            /** Name */
+            name: string;
+            /** Package */
+            package: string | null;
+            /** Running */
+            running: boolean | null;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "custom" | "overlay";
+        };
         /** SessionView */
         SessionView: {
             /** Changed From */
             changed_from: string | null;
             /** Error */
             error: string | null;
+            /**
+             * Expected Reflash
+             * @default false
+             */
+            expected_reflash: boolean;
             /** Host */
             host: string;
             host_key: components["schemas"]["HostKeyInfo"] | null;
@@ -4152,6 +4949,82 @@ export interface components {
              * @enum {string}
              */
             owner: "fw4" | "app" | "known" | "unknown";
+        };
+        /** ToolApplyIn */
+        ToolApplyIn: {
+            /** Digest */
+            digest: string;
+            /** Label */
+            label: string;
+            /** Path */
+            path: string;
+            /**
+             * Values
+             * @default {}
+             */
+            values: {
+                [key: string]: string;
+            };
+        };
+        /** ToolCard */
+        ToolCard: {
+            /** Board */
+            board: string;
+            /** Commands */
+            commands: components["schemas"]["ToolCommand"][];
+            /** Name */
+            name: string;
+            /** Path */
+            path: string;
+        };
+        /** ToolCommand */
+        ToolCommand: {
+            /** Args */
+            args: string[];
+            /** Label */
+            label: string;
+            /**
+             * Params
+             * @default []
+             */
+            params: components["schemas"]["ToolParam"][];
+            /** Write */
+            write: boolean;
+        };
+        /** ToolIn */
+        ToolIn: {
+            /** Label */
+            label: string;
+            /** Path */
+            path: string;
+            /**
+             * Values
+             * @default {}
+             */
+            values: {
+                [key: string]: string;
+            };
+        };
+        /** ToolParam */
+        ToolParam: {
+            /**
+             * Choices
+             * @default []
+             */
+            choices: string[];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "choice" | "text" | "number";
+            /** Maximum */
+            maximum?: number | null;
+            /** Minimum */
+            minimum?: number | null;
+            /** Name */
+            name: string;
+            /** Pattern */
+            pattern?: string | null;
         };
         /** TrafficRuleIn */
         TrafficRuleIn: {
@@ -4668,6 +5541,87 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Health"];
+                };
+            };
+        };
+    };
+    list_images_api_images_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileOut"][];
+                };
+            };
+        };
+    };
+    import_image_api_images_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-file-name"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_image_api_images__board___folder__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board: string;
+                folder: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5260,6 +6214,410 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DescriptionSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discovery_state_api_routers__router_id__discovery_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DiscoveryState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_checklist_api_routers__router_id__discovery_checklist_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    checklists_api_routers__router_id__discovery_checklists_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistInfo"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    copy_apply_api_routers__router_id__discovery_copy_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CopyApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    copy_preview_api_routers__router_id__discovery_copy_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CopyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    firmware_check_api_routers__router_id__discovery_firmware_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FirmwareCheck"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    help_apply_api_routers__router_id__discovery_help_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HelpApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HelpResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    help_preview_api_routers__router_id__discovery_help_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HelpIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    service_apply_api_routers__router_id__discovery_service_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    service_preview_api_routers__router_id__discovery_service_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tool_apply_api_routers__router_id__discovery_tool_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToolApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HelpResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tool_preview_api_routers__router_id__discovery_tool_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToolIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
                 };
             };
             /** @description Validation Error */
@@ -6053,6 +7411,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    flash_job_api_routers__router_id__flash_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlashJob"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    flash_preview_api_routers__router_id__flash_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FlashIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlashPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    flash_start_api_routers__router_id__flash_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FlashStartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlashJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rom_profile_api_routers__router_id__images_rom_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileOut"];
                 };
             };
             /** @description Validation Error */
@@ -7388,6 +8878,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Settings"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    tool_cards_api_tools__board__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolCard"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_tool_card_api_tools__board__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ToolCard"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolCard"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_tool_card_api_tools__board__delete: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path: {
+                board: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prefill_api_tools__board__prefill_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrefillIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolCard"];
                 };
             };
             /** @description Validation Error */

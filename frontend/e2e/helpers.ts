@@ -1,6 +1,28 @@
+import { readFileSync } from 'node:fs'
 import { expect, type APIRequestContext, type Page } from '@playwright/test'
 
 export const TOKEN = 'e2e'
+export const IMAGE_FIXTURES = '../tests/fixtures/images'
+export const IMAGES = ['mini-r35692.bin', 'mini-r35700.bin']
+const AUTH = { Authorization: `Bearer ${TOKEN}` }
+
+export async function clearImages(request: APIRequestContext, baseURL: string): Promise<void> {
+  const listed = (await (await request.get(`${baseURL}/api/images`, { headers: AUTH })).json()) as Array<{ key: { board: string }; folder: string }>
+  for (const p of listed) {
+    await request.delete(`${baseURL}/api/images/${encodeURIComponent(p.key.board)}/${encodeURIComponent(p.folder)}`, { headers: AUTH })
+  }
+}
+
+/** Both mini images imported; one already there is fine ("already imported"). */
+export async function ensureImages(request: APIRequestContext, baseURL: string): Promise<void> {
+  for (const name of IMAGES) {
+    const res = await request.post(`${baseURL}/api/images`, {
+      headers: { ...AUTH, 'Content-Type': 'application/octet-stream', 'X-File-Name': name },
+      data: readFileSync(`${IMAGE_FIXTURES}/${name}`),
+    })
+    if (!res.ok()) expect(await res.text()).toContain('already imported')
+  }
+}
 
 /** Open the app the way the launcher does (token in the hash), then go to a screen. */
 export async function open(page: Page, hashPath = '/'): Promise<void> {

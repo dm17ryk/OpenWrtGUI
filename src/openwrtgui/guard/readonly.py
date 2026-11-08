@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
+import re
 import shlex
+
+from openwrtgui.discovery.commands import OVERLAY_LS, ROM_LS
 
 # "&" also covers "&&" and "|&": a single & starts a second command in the background.
 _FORBIDDEN = (";", "&", "||", ">", "<", "`", "$(", "\n")
+# Discovery's own reads (v0.5), as exact texts: they need `-exec ls` and a stderr redirect.
+_EXACT = frozenset({OVERLAY_LS, ROM_LS})
+_FIRMWARE_HASH = re.compile(
+    r"dd if=/dev/mtdblock\d{1,2} bs=65536 count=\d{1,6} 2>/dev/null \| head -c \d{1,10} \| sha256sum"
+)
 
 _ALWAYS = frozenset(
     [
@@ -178,10 +186,14 @@ def _segment_ok(words: list[str]) -> bool:
         return bool({"show", "get", "list"} & set(args)) and "set" not in args
     if prog in ("apk", "opkg"):
         return args[:1] in (["list"], ["info"])
+    if prog == "sysupgrade":
+        return args == ["-l"]
     return False
 
 
 def is_read_only_command(cmd: str) -> bool:
+    if cmd in _EXACT or _FIRMWARE_HASH.fullmatch(cmd):
+        return True
     if not cmd.strip() or any(token in cmd for token in _FORBIDDEN):
         return False
     try:

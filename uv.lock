@@ -411,6 +411,7 @@ dependencies = [
     { name = "httpx" },
     { name = "psutil" },
     { name = "pydantic" },
+    { name = "pysquashfsimage" },
     { name = "pywebview" },
     { name = "uvicorn" },
     { name = "websockets" },
@@ -442,6 +443,7 @@ requires-dist = [
     { name = "psutil" },
     { name = "pydantic" },
     { name = "pyinstaller", marker = "extra == 'build'" },
+    { name = "pysquashfsimage", specifier = ">=0.9,<0.10" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "pytest-asyncio", marker = "extra == 'dev'" },
     { name = "pytest-cov", marker = "extra == 'dev'" },
@@ -714,6 +716,15 @@ sdist = { url = "https://files.pythonhosted.org/packages/5c/c3/8cf2bd403676ac956
 wheels = [
     { url = "https://files.pythonhosted.org/packages/61/fd/b8bb263364f50b92a78c3511df251a7f7d1f45a1f3e5c5df8036bb8bf0ca/pyobjc_framework_webkit-13.0-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:3d99dd14a745d0520c2af55ac57afe63aac0368897613990a69cf36479b5d4cc", size = 51167, upload-time = "2026-10-30T10:45:32.138Z" },
     { url = "https://files.pythonhosted.org/packages/14/3c/6b443750f473e60d798393f14f2b0a0142cfbcb4c7369655e63a15cf9973/pyobjc_framework_webkit-13.0-cp313-cp313t-macosx_10_13_universal2.whl", hash = "sha256:0378b0755d162f7bf0154fbd57edf72ab2e4619bf0379bde00e66208704b6cb5", size = 51688, upload-time = "2026-10-30T10:45:33.05Z" },
+]
+
+[[package]]
+name = "pysquashfsimage"
+version = "0.9.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/62/b6/8a453795e78c743bb6d765b8288f86ecbba4e3522bcc1db534142062ec0e/PySquashfsImage-0.9.0.tar.gz", hash = "sha256:d3330ccd111ac2ef2cebf0c392077fe8608e2760862531d960ec9cb6c6d3655f", size = 44190, upload-time = "2023-07-02T23:41:10.785Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/28/f7/fa862ed72fbd05c930aeb979785fcfe33f9b874e639eb563f5ab9e46e277/PySquashfsImage-0.9.0-py2.py3-none-any.whl", hash = "sha256:a8ea154bf946f985c65fab7d8c08dc73da7ad47a0aebf0d13ae50ae56e369f90", size = 43220, upload-time = "2023-07-02T23:41:09.091Z" },
 ]
 
 [[package]]

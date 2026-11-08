@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { ApiError } from '../api/client'
-import type { SessionView } from '../api/types'
-import { SUMMARY, sessionView } from '../testing/fixtures'
+import type { RouterItem, SessionView } from '../api/types'
+import { AP1, SUMMARY, sessionView } from '../testing/fixtures'
 import { AddRouter } from './AddRouter'
 
 const INSTALL = "mkdir -p /etc/dropbear && touch /etc/dropbear/authorized_keys && chmod 600 /etc/dropbear/authorized_keys && (grep -qxF 'ssh-ed25519 AAAA openwrtgui@PC' /etc/dropbear/authorized_keys || echo 'ssh-ed25519 AAAA openwrtgui@PC' >> /etc/dropbear/authorized_keys)"
@@ -16,12 +16,18 @@ const calls: Array<{ path: string; body: unknown }> = []
 let installFails = false
 let autoLogin: SessionView = sessionView('login')
 let autoLoginFails = false
+let hostKey: SessionView = sessionView('host_key')
+const REFLASHED: RouterItem = {
+  ...AP1,
+  record: { ...AP1.record, host: '192.168.1.4', reflashed: { board: 'dlink,dwr-921-c3-uboot', revision: 'r35700-0c0ffee000', at: '2026-11-08T12:00:00' } },
+}
 
 vi.mock('../api/client', async (orig) => {
   const actual = await orig<typeof import('../api/client')>()
   const respond = async (path: string, body?: unknown): Promise<unknown> => {
     calls.push({ path, body })
-    if (path === '/api/onboard') return sessionView('host_key')
+    if (path === '/api/onboard') return hostKey
+    if (path === '/api/routers') return [REFLASHED]
     if (path.endsWith('/trust')) return sessionView('login')
     if (path.endsWith('/auto-login')) {
       if (autoLoginFails) throw new actual.ApiError(504, '192.168.1.4:22: timed out', {})
@@ -55,6 +61,7 @@ beforeEach(() => {
   installFails = false
   autoLogin = sessionView('login')
   autoLoginFails = false
+  hostKey = sessionView('host_key')
 })
 
 function renderWizard() {
@@ -90,6 +97,23 @@ test('address comes from the link and the host key is shown before pinning', asy
   await userEvent.setup().click(screen.getByRole('button', { name: 'Connect' }))
   expect(await screen.findByText('SHA256:simkey')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Help: 2. Check the router is the one you mean' })).toBeInTheDocument()
+})
+
+test('expects the new host key after a matching reflash', async () => {
+  hostKey = sessionView('host_key', { changed_from: 'SHA256:old', expected_reflash: true })
+  renderWizard()
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Connect' }))
+  expect(await screen.findByText('Expected after the flash: dlink,dwr-921-c3-uboot r35700-0c0ffee000')).toBeVisible()
+  expect(screen.queryByText(/may not be talking to your router/)).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Accept and pin' })).toBeEnabled()
+})
+
+test('a changed key without a matching reflash keeps the warning', async () => {
+  hostKey = sessionView('host_key', { changed_from: 'SHA256:old' })
+  renderWizard()
+  await userEvent.setup().click(screen.getByRole('button', { name: 'Connect' }))
+  expect(await screen.findByText(/may not be talking to your router/)).toBeVisible()
+  expect(screen.queryByText(/Expected after the flash/)).not.toBeInTheDocument()
 })
 
 test('the install and skip buttons explain themselves from the manual', async () => {

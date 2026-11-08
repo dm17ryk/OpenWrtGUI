@@ -15,6 +15,7 @@ import httpx
 
 from openwrtgui.guard.bench_guard import ProcessInfo
 from openwrtgui.simfw import SimFirewall
+from openwrtgui.simimage import SimImage
 from openwrtgui.simnet import SimNetwork
 from openwrtgui.simwifi import SimWifi
 from openwrtgui.store.routers import RouterRecord, RouterStore
@@ -108,10 +109,12 @@ class SimConnector:
         self._clock = clock
         self._entries = sim_routers(sim_dir)
         self._states: dict[str, SimState] = {}
-        self._host_keys: dict[str, HostKeyInfo] = {}
+        self._host_keys: dict[tuple[str, int], HostKeyInfo] = {}
 
     def _address(self, entry: dict[str, Any]) -> str:
         state = self._states.get(entry["id"])
+        if state is not None and state.image is not None and state.image.address_reset:
+            return "192.168.1.1"  # back like firstboot after a flash without settings
         if state is not None and state.net is not None:
             return state.net.address() or entry["host"]
         return str(entry["host"])
@@ -120,6 +123,8 @@ class SimConnector:
         for entry in self._entries:
             if self._address(entry) == host:
                 state = self._states.get(entry["id"])
+                if state is not None and state.image is not None and state.image.rebooting:
+                    raise Unreachable(f"{host}:22: Connection refused")
                 if state is not None and state.net is not None and not state.net.reachable():
                     raise Unreachable(f"{host}:22: No route to host")
                 return entry
@@ -145,24 +150,63 @@ class SimConnector:
                 else {}
             )
             fw = SimFirewall(net, runtime, clock=self._clock)
-        return SimState(root_password=entry.get("password") or SIM_ROOT_PASSWORD, wifi=wifi, net=net, fw=fw)
+        image = None
+        if entry.get("image"):
+            upper = (
+                json.loads((self._sim_dir / entry["upper"]).read_text(encoding="utf-8"))
+                if entry.get("upper")
+                else {}
+            )
+            board = sim_commands(self._sim_dir, entry["id"]).get("ubus call system board")
+            image = SimImage(
+                (self._sim_dir.parent / "images" / entry["image"]).read_bytes(),
+                upper,
+                clock=self._clock,
+                board_json=board.stdout if board is not None else None,
+            )
+        return SimState(
+            root_password=entry.get("password") or SIM_ROOT_PASSWORD, wifi=wifi, net=net, fw=fw, image=image
+        )
 
     def state(self, host: str) -> SimState:
         entry = self._entry(host)
         if entry["id"] not in self._states:
             self._states[entry["id"]] = self._new_state(entry)
-        return self._states[entry["id"]]
+        state = self._states[entry["id"]]
+        if state.image is not None and state.image.generation != state.generation_seen:
+            # flashed without keeping settings: no app key, no password, as at firstboot
+            state.generation_seen = state.image.generation
+            state.authorized_keys.clear()
+            state.root_password = None
+        return state
+
+    def _generation(self, router_id: str) -> int:
+        state = self._states.get(router_id)
+        return state.image.generation if state is not None and state.image is not None else 0
 
     async def fetch_host_key(self, host: str, port: int = 22) -> HostKeyInfo:
         router_id = self._entry(host)["id"]
-        if router_id not in self._host_keys:
+        key_id = (router_id, self._generation(router_id))  # a reflash without settings makes a new host key
+        if key_id not in self._host_keys:
             key = asyncssh.generate_private_key("ssh-ed25519")
-            self._host_keys[router_id] = HostKeyInfo(
+            self._host_keys[key_id] = HostKeyInfo(
                 type="ssh-ed25519",
                 fingerprint=key.get_fingerprint("sha256"),
                 public=key.export_public_key("openssh").decode("ascii").strip(),
             )
-        return self._host_keys[router_id]
+        return self._host_keys[key_id]
+
+    async def identity_unchecked(self, host: str, port: int = 22) -> tuple[str, str]:
+        """As the real connector: root with no password, the host key not checked (the sim checks none)."""
+        from openwrtgui.onboard.wizard import identity_of
+
+        try:
+            t = await self.connect(host, port, password=None, key_paths=[])
+            release = (await t.run("cat /etc/openwrt_release")).stdout
+            board = (await t.run("ubus call system board")).stdout
+        except (AuthFailed, Unreachable):
+            return "", ""
+        return identity_of(release, board)
 
     async def connect(
         self,
@@ -185,9 +229,8 @@ class SimConnector:
             if password != state.root_password:
                 raise AuthFailed(f"{host} refused the login")
         elif key_paths:
-            if entry.get("auth") != "key" and not any(
-                line in state.authorized_keys for line in _public_lines(key_paths)
-            ):
+            trusted = entry.get("auth") == "key" and self._generation(entry["id"]) == 0
+            if not trusted and not any(line in state.authorized_keys for line in _public_lines(key_paths)):
                 raise AuthFailed(f"{host} refused the key")
         else:
             raise AuthFailed(f"{host} refused the login")
