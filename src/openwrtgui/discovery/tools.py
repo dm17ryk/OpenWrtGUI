@@ -100,12 +100,41 @@ def check_card(card: ToolCard) -> None:
                 )
 
 
+def _without_optional(line: str) -> str:
+    """The line with each `[` up to the next `]` replaced by a space; a `[` never closed stays as text.
+    One pass (a regex here is quadratic on a run of `[`: CodeQL py/polynomial-redos)."""
+    out: list[str] = []
+    at = 0
+    while (start := line.find("[", at)) != -1:
+        end = line.find("]", start + 1)
+        if end == -1:
+            break
+        out.append(line[at:start])
+        out.append(" ")
+        at = end + 1
+    out.append(line[at:])
+    return "".join(out)
+
+
+def _braced(line: str) -> list[str]:
+    """What stands between each `{` and the next `}`, in one pass."""
+    found: list[str] = []
+    at = 0
+    while (start := line.find("{", at)) != -1:
+        end = line.find("}", start + 1)
+        if end == -1:
+            break
+        found.append(line[start + 1 : end])
+        at = end + 1
+    return found
+
+
 def prefill_card(board: str, path: str, usage: str | None) -> ToolCard:
     """Filled from the first Usage: line: the first {a|b|c} group gives one command per alternative, each
     later {…} group a choice parameter; […] parts are left out. Every command is a write until marked."""
     line = next((ln for ln in (usage or "").splitlines() if "usage:" in ln.lower()), "")
-    line = re.sub(r"\[[^\]]*\]", " ", line)
-    groups = [[c.strip() for c in g.split("|") if c.strip()] for g in re.findall(r"\{([^}]*)\}", line)]
+    line = _without_optional(line)
+    groups = [[c.strip() for c in g.split("|") if c.strip()] for g in _braced(line)]
     groups = [g for g in groups if g and all(LITERAL.fullmatch(c) for c in g)]
     name = posixpath.basename(path)[:40] or "tool"
     if not groups:

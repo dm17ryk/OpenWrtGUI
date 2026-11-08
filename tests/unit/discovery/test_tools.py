@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 import pytest
@@ -46,6 +47,23 @@ def test_prefill_without_usage() -> None:
     assert [(c.label, c.args, c.write) for c in card.commands] == [("run", (), True)]
     optional = prefill_card(BOARD, "/usr/bin/x", "Usage: x [-v] {start|stop}")
     assert [c.args for c in optional.commands] == [("start",), ("stop",)]
+
+
+def test_prefill_reads_brackets_and_braces_as_the_usage_line_means() -> None:
+    nested = prefill_card(BOARD, "/usr/bin/x", "Usage: x [-o [file]] {a|b} [--] {lan1|wan} {unclosed")
+    assert [c.args for c in nested.commands] == [("a", "{arg1}"), ("b", "{arg1}")]
+    assert nested.commands[0].params[0].choices == ("lan1", "wan")
+    unclosed = prefill_card(BOARD, "/usr/bin/x", "Usage: x [-v {start|stop}")
+    assert [c.args for c in unclosed.commands] == [("start",), ("stop",)]
+
+
+@pytest.mark.parametrize("usage", ["Usage: x " + "[" * 200_000, "Usage: x " + "{{|" * 70_000])
+def test_prefill_reads_a_hostile_usage_line_in_linear_time(usage: str) -> None:
+    """CodeQL py/polynomial-redos: a long run of '[' or '{{|' must not make the prefill quadratic."""
+    started = time.monotonic()
+    card = prefill_card(BOARD, "/usr/bin/x", usage)
+    assert time.monotonic() - started < 0.5
+    assert [c.label for c in card.commands] == ["run"]
 
 
 def test_tool_command_quotes_and_checks() -> None:
