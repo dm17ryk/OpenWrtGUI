@@ -185,6 +185,51 @@ async def _close(self: Replay) -> None:
     return None
 
 
+MTD = (
+    "dev:    size   erasesize  name\n"
+    'mtd0: 00030000 00010000 "u-boot"\n'
+    'mtd1: 00010000 00010000 "u-boot-env"\n'
+    'mtd2: 00010000 00010000 "factory"\n'
+    'mtd3: 00fb0000 00010000 "firmware"\n'
+)
+
+
+async def test_discovery_set_reads_every_config_and_the_firmware_partition() -> None:
+    t = Replay({"ls /etc/config": "dhcp\ndropbear\nwireless\nbad name\n", "cat /proc/mtd": MTD})
+    assert await rf.discovery_commands(t) == (
+        "find /overlay/upper -xdev ! -type d -exec ls -ldn {} +",
+        "cat /lib/apk/db/installed",
+        "ls /etc/config",
+        "sysupgrade -l",
+        "cat /proc/mtd",
+        "cat /proc/meminfo",
+        "df -k /tmp",
+        "ubus -v list system",
+        "command -v sha256sum dd head",
+        "uci show dhcp",
+        "uci show dropbear",
+        "uci show wireless",
+        "dd if=/dev/mtdblock3 bs=65536 count=172 2>/dev/null | head -c 11255254 | sha256sum",
+    )
+    assert rf.out_file(Path("tests/fixtures/ap2"), "discovery") == Path("tests/fixtures/ap2/discovery.json")
+
+
+async def test_discovery_set_without_a_firmware_partition_hashes_nothing() -> None:
+    t = Replay({"ls /etc/config": "network\n", "cat /proc/mtd": "dev:    size   erasesize  name\n"})
+    commands = await rf.discovery_commands(t)
+    assert commands[-1] == "uci show network"
+    assert not any(c.startswith("dd ") for c in commands)
+
+
+async def test_the_firmware_hash_records_its_run_time() -> None:
+    hashed = "dd if=/dev/mtdblock3 bs=65536 count=172 2>/dev/null | head -c 11255254 | sha256sum"
+    t = Replay({hashed: "4ede1b92  -\n", "uci show wireless": "wireless.default_radio0.key='k'\n"})
+    recorded = await rf.run_set(t, ("uci show wireless", hashed), timed=frozenset({hashed}))
+    assert recorded["uci show wireless"] == {"stdout": "wireless.default_radio0.key='<hidden>'\n", "exit": 0}
+    assert isinstance(recorded[hashed]["seconds"], float)
+    assert "seconds" not in recorded["uci show wireless"]
+
+
 NETDEV_CHECK = (
     "nft -c -f /dev/stdin <<'OWG'\n"
     'table netdev owgcheck { chain c { type filter hook egress device "br-lan" priority -500; }; }\n'
