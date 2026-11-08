@@ -7,6 +7,7 @@ import { Help, HelpTip } from '../../help/Help'
 import { HELP } from '../../help/topics'
 import { RouterSections } from '../../shell/RouterSections'
 import { ConfigSection } from './ConfigSection'
+import { CustomSection } from './CustomSection'
 import { ImageSection } from './ImageSection'
 import { OverlaySection } from './OverlaySection'
 
@@ -54,6 +55,7 @@ export function DiscoveryScreen() {
       {state && <ImageSection routerId={id} state={state} onFlash={() => setFlashing(true)} />}
       {state?.profile && <OverlaySection routerId={id} state={state} />}
       {state?.profile && <ConfigSection state={state} />}
+      {state?.profile && <CustomSection routerId={id} state={state} />}
       {isFlashing && <div className="muted">Flashing comes with the flash dialog.</div>}
     </main>
   )

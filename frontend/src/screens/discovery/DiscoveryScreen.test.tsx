@@ -18,6 +18,8 @@ vi.mock('../../api/client', async (orig) => {
   const respond = async (path: string, body?: unknown): Promise<unknown> => {
     calls.push({ path, body })
     if (path === '/api/routers') return ROUTERS
+    if (path === '/api/guard') return { live: false, reasons: [], checked_at: '2026-11-08T12:00:00' }
+    if (path === '/api/tools/dlink%2Cdwr-921-c3-uboot') return []
     if (path === '/api/routers/ap1') return AP1
     if (path === '/api/routers/ap1/discovery') return discovery
     if (path === '/api/routers/ap1/luci/pages') return []
@@ -82,6 +84,7 @@ test('lists what changed since flashing once an image matches', async () => {
   renderDiscovery()
   expect(await screen.findByRole('heading', { name: 'Added after flashing' })).toBeVisible()
   expect(screen.getByRole('heading', { name: 'Config changed' })).toBeVisible()
+  expect(screen.getByRole('heading', { name: 'Your custom packages' })).toBeVisible()
 })
 
 test('no change lists without a matched image', async () => {
