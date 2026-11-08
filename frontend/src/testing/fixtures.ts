@@ -93,6 +93,7 @@ export function sessionView(step: SessionView['step'], extra: Partial<SessionVie
     username: 'root',
     login_method: null,
     key_path: null,
+    expected_reflash: false,
     ...extra,
   }
 }

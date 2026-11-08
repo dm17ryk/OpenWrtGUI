@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import shlex
 import uuid
@@ -13,10 +14,12 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Literal, Protocol
 
+import asyncssh
+
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.guard.writes import WriteAction, perform_write
-from openwrtgui.probe.commands import ROOT_PASSWORD_STATE
+from openwrtgui.probe.commands import RELEASE, ROOT_PASSWORD_STATE, SYSTEM_BOARD
 from openwrtgui.probe.describe import (
     DescriptionSummary,
     SelfDescription,
@@ -24,6 +27,7 @@ from openwrtgui.probe.describe import (
     propose_port_labels,
     summarize,
 )
+from openwrtgui.probe.identity import parse_release
 from openwrtgui.store.keys import AppKey
 from openwrtgui.store.routers import RouterRecord, RouterStore, make_router_id
 from openwrtgui.transport.base import AuthFailed, HostKeyInfo, KeyFileError, Transport, TransportError
@@ -59,8 +63,44 @@ class Step(StrEnum):
     DONE = "done"
 
 
+def identity_of(release: str, board_json: str) -> tuple[str, str]:
+    """(board_name, DISTRIB_REVISION) from `cat /etc/openwrt_release` and `ubus call system board`."""
+    try:
+        board = json.loads(board_json or "{}")
+    except ValueError:
+        board = {}
+    name = str(board.get("board_name", "")) if isinstance(board, dict) else ""
+    return name, parse_release(release).get("DISTRIB_REVISION", "")
+
+
+async def read_identity_unchecked(host: str, port: int, timeout: float = 10.0) -> tuple[str, str]:
+    """A router back from a flash without settings: root, no password, its new host key not checked. Two
+    reads, then the connection is closed; nothing is pinned here. ("", "") when it does not answer."""
+    try:
+        conn = await asyncio.wait_for(
+            asyncssh.connect(
+                host,
+                port,
+                username=DEFAULT_USER,
+                password="",
+                client_keys=None,
+                config=[],
+                agent_path=None,
+                known_hosts=None,
+            ),
+            timeout,
+        )
+    except (OSError, TimeoutError, asyncssh.Error):
+        return "", ""
+    async with conn:
+        release = await conn.run(RELEASE, check=False, timeout=timeout)
+        board = await conn.run(SYSTEM_BOARD, check=False, timeout=timeout)
+    return identity_of(str(release.stdout or ""), str(board.stdout or ""))
+
+
 class Connector(Protocol):
     async def fetch_host_key(self, host: str, port: int) -> HostKeyInfo: ...
+    async def identity_unchecked(self, host: str, port: int) -> tuple[str, str]: ...
     async def connect(
         self,
         host: str,
@@ -79,6 +119,9 @@ class SshConnector:
 
     async def fetch_host_key(self, host: str, port: int) -> HostKeyInfo:
         return await fetch_host_key(host, port)
+
+    async def identity_unchecked(self, host: str, port: int) -> tuple[str, str]:
+        return await read_identity_unchecked(host, port)
 
     async def connect(
         self,
@@ -118,6 +161,8 @@ class SessionView:
     username: str
     login_method: LoginMethod | None
     key_path: str | None  # a key this PC already had that the router trusts; the app will use it
+    # the changed host key is the one a flash without settings made: board and revision match the image
+    expected_reflash: bool = False
 
 
 def _no_pc_keys() -> Sequence[Path]:
@@ -145,6 +190,7 @@ class _Session:
     key_path: Path | None = None
     description: SelfDescription | None = None
     error: str | None = None
+    expected_reflash: bool = False
 
 
 class OnboardService:
@@ -206,6 +252,7 @@ class OnboardService:
             username=s.username,
             login_method=s.login_method,
             key_path=str(s.key_path) if s.key_path else None,
+            expected_reflash=s.expected_reflash,
         )
 
     @staticmethod
@@ -251,8 +298,23 @@ class OnboardService:
             changed_from=pinned if pinned and pinned != info.fingerprint else None,
             last_used=self._clock(),
         )
+        if session.changed_from is not None:
+            session.expected_reflash = await self._expected_reflash(host, port)
         self._sessions[session.sid] = session
         return self._view(session)
+
+    async def _expected_reflash(self, host: str, port: int) -> bool:
+        """A router at this address was flashed without settings: read its board and revision before anything
+        is pinned (that one connection checks no host key and is closed at once); equal to the image → the new
+        host key is the one the flash made."""
+        pending = next(
+            (r.reflashed for r in self._routers.list() if r.reflashed and (r.host, r.port) == (host, port)),
+            None,
+        )
+        if pending is None:
+            return False
+        board, revision = await self._connector.identity_unchecked(host, port)
+        return (board, revision) == (pending.board, pending.revision)
 
     async def trust(self, sid: str, fingerprint: str) -> SessionView:
         s = await self._get(sid)

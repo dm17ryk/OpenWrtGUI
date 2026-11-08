@@ -196,6 +196,18 @@ class SimConnector:
             )
         return self._host_keys[key_id]
 
+    async def identity_unchecked(self, host: str, port: int = 22) -> tuple[str, str]:
+        """As the real connector: root with no password, the host key not checked (the sim checks none)."""
+        from openwrtgui.onboard.wizard import identity_of
+
+        try:
+            t = await self.connect(host, port, password=None, key_paths=[])
+            release = (await t.run("cat /etc/openwrt_release")).stdout
+            board = (await t.run("ubus call system board")).stdout
+        except (AuthFailed, Unreachable):
+            return "", ""
+        return identity_of(release, board)
+
     async def connect(
         self,
         host: str,

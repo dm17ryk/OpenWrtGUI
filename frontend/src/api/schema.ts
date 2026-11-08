@@ -4285,6 +4285,21 @@ export interface components {
             /** Target */
             target: string;
         };
+        /**
+         * ReflashPending
+         * @description Flashed without keeping settings: the router comes back like firstboot and waits for Add again.
+         */
+        ReflashPending: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Board */
+            board: string;
+            /** Revision */
+            revision: string;
+        };
         /** ReleaseOut */
         ReleaseOut: {
             /** Name */
@@ -4412,6 +4427,7 @@ export interface components {
             port_labels: {
                 [key: string]: string;
             };
+            reflashed?: components["schemas"]["ReflashPending"] | null;
             /**
              * Username
              * @default root
@@ -4647,6 +4663,11 @@ export interface components {
             changed_from: string | null;
             /** Error */
             error: string | null;
+            /**
+             * Expected Reflash
+             * @default false
+             */
+            expected_reflash: boolean;
             /** Host */
             host: string;
             host_key: components["schemas"]["HostKeyInfo"] | null;

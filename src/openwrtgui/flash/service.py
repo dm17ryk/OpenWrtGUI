@@ -27,7 +27,7 @@ from openwrtgui.images.store import ProfileStore
 from openwrtgui.net.service import NetworkService
 from openwrtgui.probe.commands import RELEASE, SYSTEM_BOARD
 from openwrtgui.probe.identity import parse_release
-from openwrtgui.store.routers import RouterRecord, RouterStore
+from openwrtgui.store.routers import ReflashPending, RouterRecord, RouterStore
 from openwrtgui.transport.base import CommandResult, HostKeyChanged, Transport, TransportError
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.wifi.service import PreviewChanged
@@ -136,12 +136,30 @@ class FlashService:
     ) -> None:
         try:
             armed_at = await self._send(rec, req, plan, image)
+            if not req.keep_settings:
+                self._reflashed(rec, req, board)
+                await self._pool.drop(rec.id)
+                return
             await self._come_back(rec, req, board, armed_at)
         except _Failed as exc:
             self._update(rec.id, phase="failed", error=str(exc))
         except Exception as exc:  # the job must end in a phase the UI shows, whatever broke
             log.exception("flash of %s failed", rec.id)
             self._update(rec.id, phase="failed", error=str(exc) or type(exc).__name__)
+
+    def _reflashed(self, rec: RouterRecord, req: FlashRequest, board: str) -> None:
+        """Without settings the router comes back as 192.168.1.1, no password, no key: the entry waits."""
+        pending = ReflashPending(board=board, revision=req.revision, at=self._clock())
+        self._routers.upsert(rec.model_copy(update={"reflashed": pending}))
+        self._discovery.forget(rec.id)
+        self._update(
+            rec.id,
+            phase="done",
+            detail=(
+                f"Reflashed without settings: {rec.name} comes back as 192.168.1.1 with no password. "
+                "Connect it alone to this PC, then add it again."
+            ),
+        )
 
     async def _step(
         self, t: Transport, rec: RouterRecord, command: str, timeout: float = 60.0

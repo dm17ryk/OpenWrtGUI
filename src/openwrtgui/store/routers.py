@@ -15,6 +15,16 @@ from pydantic import BaseModel, ConfigDict, TypeAdapter
 from openwrtgui.store import write_atomic
 
 
+class ReflashPending(BaseModel):
+    """Flashed without keeping settings: the router comes back like firstboot and waits for Add again."""
+
+    model_config = ConfigDict(frozen=True)
+
+    board: str
+    revision: str
+    at: datetime
+
+
 class RouterRecord(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -28,6 +38,7 @@ class RouterRecord(BaseModel):
     key_path: str | None = None
     port_labels: dict[int, str] = {}
     added_at: datetime
+    reflashed: ReflashPending | None = None
 
 
 _LIST = TypeAdapter(list[RouterRecord])

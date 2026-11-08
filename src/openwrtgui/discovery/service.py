@@ -280,7 +280,7 @@ class DiscoveryService:
             packages_added=len(state.packages.added),
             configs_changed=sum(1 for c in state.configs if not c.first_boot),
             owners=await self._owners(t),
-            reflash_pending=False,
+            reflash_pending=rec.reflashed is not None,
         )
         self.summaries[rec.id] = summary
         return summary
