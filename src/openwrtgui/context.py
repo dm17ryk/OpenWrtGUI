@@ -17,6 +17,7 @@ from openwrtgui.discovery.checklist import ChecklistStore
 from openwrtgui.discovery.service import DiscoveryService
 from openwrtgui.discovery.tools import ToolStore
 from openwrtgui.faults.service import FaultsService
+from openwrtgui.flash.service import FlashService
 from openwrtgui.fw.service import FirewallService
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard, psutil_lister
@@ -72,6 +73,7 @@ class AppContext:
     captures: CaptureService
     profiles: ProfileStore
     discovery: DiscoveryService
+    flash: FlashService
     token: str
     port: int
     mode: Literal["real", "simulator"]
@@ -261,6 +263,15 @@ def build_context(
         tools=ToolStore(data.tools_dir),
     )
     poller.on_status = discovery.refresh_summary
+    flash = FlashService(
+        pool=pool,
+        routers=routers,
+        guard=guard,
+        audit=audit,
+        profiles=profiles,
+        discovery=discovery,
+        net=net,
+    )
     return AppContext(
         data=data,
         settings=settings,
@@ -287,6 +298,7 @@ def build_context(
         captures=captures,
         profiles=profiles,
         discovery=discovery,
+        flash=flash,
         token=token,
         port=port,
         mode="simulator" if simulator is not None else "real",

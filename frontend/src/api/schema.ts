@@ -1078,6 +1078,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/flash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Flash Job */
+        get: operations["flash_job_api_routers__router_id__flash_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/flash/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Flash Preview */
+        post: operations["flash_preview_api_routers__router_id__flash_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/flash/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Flash Start */
+        post: operations["flash_start_api_routers__router_id__flash_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/images/rom": {
         parameters: {
             query?: never;
@@ -2714,6 +2765,78 @@ export interface components {
             read_s: number | null;
             /** Router Sha256 */
             router_sha256: string | null;
+        };
+        /** FlashIn */
+        FlashIn: {
+            /** Board */
+            board: string;
+            /**
+             * Isolated
+             * @default false
+             */
+            isolated: boolean;
+            /**
+             * Keep Settings
+             * @default true
+             */
+            keep_settings: boolean;
+            /** Revision */
+            revision: string;
+            /** Sha256 */
+            sha256: string;
+        };
+        /** FlashJob */
+        FlashJob: {
+            /** Detail */
+            detail?: string | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "upload" | "check" | "arm" | "wait" | "prove" | "done" | "failed";
+            /** Router Id */
+            router_id: string;
+            /** Sent */
+            sent: number;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Total */
+            total: number;
+        };
+        /** FlashPlanOut */
+        FlashPlanOut: {
+            /** Digest */
+            digest: string;
+            /** Lines */
+            lines: string[];
+            /** Warnings */
+            warnings: string[];
+        };
+        /** FlashStartIn */
+        FlashStartIn: {
+            /** Board */
+            board: string;
+            /** Digest */
+            digest: string;
+            /**
+             * Isolated
+             * @default false
+             */
+            isolated: boolean;
+            /**
+             * Keep Settings
+             * @default true
+             */
+            keep_settings: boolean;
+            /** Revision */
+            revision: string;
+            /** Sha256 */
+            sha256: string;
         };
         /** ForwardIn */
         ForwardIn: {
@@ -7262,6 +7385,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    flash_job_api_routers__router_id__flash_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlashJob"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    flash_preview_api_routers__router_id__flash_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FlashIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlashPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    flash_start_api_routers__router_id__flash_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FlashStartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlashJob"];
                 };
             };
             /** @description Validation Error */

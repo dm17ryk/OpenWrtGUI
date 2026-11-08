@@ -118,6 +118,16 @@ class DiscoveryService:
         desc = await self._described(rec, t)
         return rec, t, desc, self._profiles.match(desc.identity.board_name, desc.identity.revision)
 
+    async def described(self, router_id: str) -> tuple[RouterRecord, Transport, SelfDescription]:
+        rec = self._record(router_id)
+        t = await self._pool.get(rec)
+        return rec, t, await self._described(rec, t)
+
+    def forget(self, router_id: str) -> None:
+        """After a flash: the router's description and summary are read again."""
+        self._descriptions.pop(router_id, None)
+        self.summaries.pop(router_id, None)
+
     async def _read(
         self, rec: RouterRecord, t: Transport, desc: SelfDescription, profile: Profile | None
     ) -> DiscoveryState:

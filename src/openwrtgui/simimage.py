@@ -26,6 +26,7 @@ from openwrtgui.transport.base import CommandResult
 from openwrtgui.uci import shell_quote
 
 NOT_MINE = frozenset({"network", "dhcp", "firewall", "wireless"})  # the network and Wi-Fi simulators' configs
+REBOOT_S = 20.0  # how long a simulated flash keeps the router away (tests shorten it)
 SYSUPGRADE_CONF = (
     "## This file contains files and directories that should\n## be preserved during an upgrade.\n"
 )
@@ -88,7 +89,7 @@ class SimImage:
         *,
         clock: Callable[[], float],
         board_json: str | None = None,
-        reboot_s: float = 20.0,
+        reboot_s: float | None = None,
     ) -> None:
         self._clock = clock
         self._reboot_s = reboot_s
@@ -384,6 +385,6 @@ class SimImage:
             if flag == "-T ":
                 return _ok(c)
             self._pending = (data, flag != "-n ")
-            self._reboot_until = self._clock() + self._reboot_s
+            self._reboot_until = self._clock() + (REBOOT_S if self._reboot_s is None else self._reboot_s)
             return _ok(c, "Commencing upgrade. Closing all shell sessions.\n")
         return None
