@@ -5,8 +5,11 @@ uv run pytest -m hardware tests/hardware/test_ap2_wifi_faults.py --router 192.16
     --known-hosts <file> --allow-writes --txctl-told --adb-station <serial> -v -s
 
 Run it only in a radio window the txctl session agreed to (OwgTest, channel 6, at most 15 minutes), with the
-phone's owner told. The radio goes on air with a key made for this run, so only the phone joins; it joins over
-adb (`cmd wifi connect-network`) and forgets the network at the end. The test always writes back the exact
+phone's owner at hand. The radio goes on air with a key made for this run, so only the phone joins. The
+phone runs a user build, where `cmd wifi connect-network` is root-only, so the test gives it the SSID as a
+network suggestion over adb; the first time, the owner unlocks the phone and taps Allow on its
+suggested-networks prompt for Shell (the approval stays). The suggestion is removed at the end. The test
+always writes back the exact
 /etc/config/wireless it found, reloads the radio and checks it is parked; `fw_window` then checks the
 firewall, nft tables, qdiscs, /tmp/owg and the switch ports are as found.
 """
@@ -34,7 +37,9 @@ AP2 = "ap2"
 TEST_SSID = "OwgTest"  # not a run SSID, so no harness station joins and Bench Guard stays quiet
 CONFIG = "/etc/config/wireless"
 PARK_WAIT_S = 20
+APPROVE_WAIT_S = 240  # the first join waits for the owner to unlock the phone and tap Allow
 JOIN_WAIT_S = 90
+SCAN_EVERY_S = 10
 BAN_S = 30
 AP_DOWN_S = 10
 LAB = {
@@ -52,13 +57,16 @@ class _Hidden(str):
 
 
 class AdbStation:
-    """The phone, joined to the test SSID over adb. The key is on adb's command line only, never in output."""
+    """The phone, given the test SSID as a network suggestion over adb (`cmd wifi add-suggestion`); it joins
+    on its own once its owner has allowed Shell's suggestions. The key is on adb's command line only, never
+    in output."""
 
     def __init__(self, serial: str) -> None:
         self.serial = serial
         self.enabled_wifi = False
+        self.suggested = False
 
-    def _shell(self, *args: str) -> str:
+    def _shell(self, *args: str, check: bool = True) -> str:
         done = subprocess.run(
             ["adb", "-s", self.serial, "shell", "cmd", "wifi", *args],
             capture_output=True,
@@ -66,7 +74,7 @@ class AdbStation:
             timeout=30,
             check=False,
         )
-        if done.returncode != 0:
+        if check and done.returncode != 0:
             raise RuntimeError(f"adb cmd wifi {args[0]} failed ({done.returncode})")
         return done.stdout
 
@@ -74,14 +82,24 @@ class AdbStation:
         if "Wifi is disabled" in await asyncio.to_thread(self._shell, "status"):
             await asyncio.to_thread(self._shell, "set-wifi-enabled", "enabled")
             self.enabled_wifi = True
-        await asyncio.to_thread(self._shell, "connect-network", ssid, "wpa2", key)
+        await asyncio.to_thread(self._shell, "add-suggestion", ssid, "wpa2", key)
+        self.suggested = True
+
+    async def scan(self) -> None:
+        """Ask for a scan now. Best effort: Android may throttle it, and the phone scans on its own anyway."""
+        await asyncio.to_thread(self._shell, "start-scan", check=False)
+
+    async def rejoin(self) -> None:
+        """Wi-Fi off and on: Android keeps away for minutes from an AP that turned it down, and Wi-Fi off
+        clears that."""
+        await asyncio.to_thread(self._shell, "set-wifi-enabled", "disabled")
+        await asyncio.sleep(3)
+        await asyncio.to_thread(self._shell, "set-wifi-enabled", "enabled")
 
     async def forget(self, ssid: str) -> None:
-        listed = await asyncio.to_thread(self._shell, "list-networks")
-        for line in listed.splitlines():
-            parts = line.split()
-            if len(parts) >= 2 and parts[0].isdigit() and parts[1] == ssid:
-                await asyncio.to_thread(self._shell, "forget-network", parts[0])
+        if self.suggested:
+            await asyncio.to_thread(self._shell, "remove-suggestion", ssid)
+            self.suggested = False
         if self.enabled_wifi:
             await asyncio.to_thread(self._shell, "set-wifi-enabled", "disabled")
 
@@ -103,17 +121,17 @@ async def _clients(t: Transport, ifname: str) -> set[str]:
     return {k.lower() for k in clients}
 
 
-async def _station(w: FwWindow, phone: AdbStation, key: str) -> FaultTarget:
+async def _station(w: FwWindow, phone: AdbStation, wait_s: int = JOIN_WAIT_S) -> FaultTarget:
     """The one station of the test SSID (its key was made for this run, so it is the phone)."""
-    for second in range(JOIN_WAIT_S):
+    for second in range(wait_s):
         on_air = [x for x in (await w.faults.state(AP2)).targets if x.via not in (None, "wired")]
         if len(on_air) == 1:
             return on_air[0]
         assert len(on_air) < 2, f"more than one station on {TEST_SSID}: {on_air}"
-        if second and second % 30 == 0:
-            await phone.join(TEST_SSID, key)  # Android waits longer after rejected joins; ask again
+        if second % SCAN_EVERY_S == 0:
+            await phone.scan()
         await asyncio.sleep(1)
-    pytest.fail(f"no station joined {TEST_SSID} in {JOIN_WAIT_S} s")
+    pytest.fail(f"no station joined {TEST_SSID} in {wait_s} s")
 
 
 async def _on_air(t: Transport) -> bool:
@@ -171,9 +189,10 @@ async def _faults_on_air(w: FwWindow, t: Transport, phone: AdbStation, key: str)
     )
     assert on.applied and on.verified, [f"{c.name}: {c.detail}" for c in on.checks if not c.ok] or on.error
     await phone.join(TEST_SSID, key)
+    print(f"\nwaiting {APPROVE_WAIT_S} s for the phone: unlock it, tap Allow on the suggestions prompt")
 
     # Block for 30 s: hostapd lists the ban and keeps the phone out, then lifts the ban on time
-    station = await _station(w, phone, key)
+    station = await _station(w, phone, APPROVE_WAIT_S)
     assert station.mac and station.via
     print(f"\nstation {station.mac} on {station.via}")
     _proven(await _arm(w, FaultRequest("ban", TargetRef(station.mac, None), ban_s=BAN_S)))
@@ -186,12 +205,13 @@ async def _faults_on_air(w: FwWindow, t: Transport, phone: AdbStation, key: str)
     assert (await w.faults.state(AP2)).armed == ()
 
     # Deauth: the phone leaves at once, and may join again
-    station = await _station(w, phone, key)
+    await phone.rejoin()  # the ban turned the phone down; Android would keep away from AP2 for minutes
+    station = await _station(w, phone)
     assert station.mac
     _proven(await _arm(w, FaultRequest("deauth", TargetRef(station.mac, None))))
 
     # AP down held 10 s: hostapd stops the BSS, the router's timer starts it again
-    station = await _station(w, phone, key)
+    station = await _station(w, phone)
     assert station.mac and station.via
     _proven(await _arm(w, FaultRequest("ap_down", TargetRef(station.mac, None), hold_s=AP_DOWN_S)))
     await w.pool.close_all()  # the app goes away; the router's timer brings the BSS back
@@ -199,4 +219,4 @@ async def _faults_on_air(w: FwWindow, t: Transport, phone: AdbStation, key: str)
     shown = await t.run(f"hostapd_cli -i {station.via} status")
     assert "state=ENABLED" in shown.stdout, shown.stdout
     assert (await w.faults.state(AP2)).armed == ()
-    await _station(w, phone, key)
+    await _station(w, phone)
