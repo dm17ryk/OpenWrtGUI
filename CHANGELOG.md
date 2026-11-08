@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-08
+
 Image import and Discovery.
 
 ### Added
@@ -166,7 +168,8 @@ The foundation: install, update, add routers, see them, and stay out of a runnin
 - Router simulator built from recorded router output, used for e2e tests, screenshots and demos.
 - CI, pre-release and release workflows, wiki sync, CodeQL and Dependabot.
 
-[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.5.0
 [0.4.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.4.0
 [0.3.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.3.0
 [0.2.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.2.0
