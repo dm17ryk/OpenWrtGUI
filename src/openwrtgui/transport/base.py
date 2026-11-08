@@ -93,6 +93,23 @@ class Streamer(Protocol):
     async def stream(self, command: str) -> ByteStream: ...
 
 
+UPLOAD_CHUNK = 65536
+
+
+@runtime_checkable
+class Uploader(Protocol):
+    """Bytes to a command's stdin (`cat > <path>`), in UPLOAD_CHUNK pieces; progress(sent) after each."""
+
+    async def upload(
+        self,
+        command: str,
+        data: bytes,
+        progress: Callable[[int], None] | None = None,
+        *,
+        timeout: float = 600.0,
+    ) -> CommandResult: ...
+
+
 class Transport(Protocol):
     async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult: ...
     async def run_stdin(self, command: str, stdin: str, *, timeout: float = 15.0) -> CommandResult: ...

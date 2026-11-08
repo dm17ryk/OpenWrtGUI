@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import asyncssh
 
 from openwrtgui.store import write_atomic
 from openwrtgui.transport.base import (
+    UPLOAD_CHUNK,
     AuthFailed,
     CommandResult,
     HostKeyChanged,
@@ -23,6 +24,12 @@ from openwrtgui.transport.base import (
 )
 
 log = logging.getLogger(__name__)
+
+
+def _text(out: object) -> str:
+    if isinstance(out, bytes):
+        return out.decode(errors="replace")
+    return str(out or "")
 
 
 def _host_pattern(host: str, port: int) -> str:
@@ -219,6 +226,29 @@ class SshTransport:
             raise Unreachable(f"{self.host}: {why or type(exc).__name__}") from exc
         status = done.exit_status if done.exit_status is not None else -1
         return CommandResult(command, str(done.stdout or ""), str(done.stderr or ""), status)
+
+    async def upload(
+        self,
+        command: str,
+        data: bytes,
+        progress: Callable[[int], None] | None = None,
+        *,
+        timeout: float = 600.0,
+    ) -> CommandResult:
+        try:
+            process = await self._conn.create_process(command, encoding=None)
+            for at in range(0, len(data), UPLOAD_CHUNK):
+                process.stdin.write(data[at : at + UPLOAD_CHUNK])
+                await process.stdin.drain()
+                if progress is not None:
+                    progress(min(at + UPLOAD_CHUNK, len(data)))
+            process.stdin.write_eof()
+            done = await process.wait(check=False, timeout=timeout)
+        except (OSError, TimeoutError, asyncssh.Error) as exc:
+            why = str(exc).strip() or type(exc).__name__
+            raise Unreachable(f"{self.host}: upload stopped: {why}") from exc
+        status = done.exit_status if done.exit_status is not None else -1
+        return CommandResult(command, _text(done.stdout), _text(done.stderr), status)
 
     async def stream(self, command: str) -> _ByteStream:
         try:

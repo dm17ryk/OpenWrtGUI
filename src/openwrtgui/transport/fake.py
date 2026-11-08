@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import json
 import shlex
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from openwrtgui.transport.base import CommandResult, ShellChannel
+from openwrtgui.transport.base import UPLOAD_CHUNK, CommandResult, ShellChannel
 
 if TYPE_CHECKING:
     from openwrtgui.simfw import SimFirewall
@@ -66,6 +66,7 @@ class ReplayTransport:
         self._commands = dict(commands)
         self.state = state
         self.calls: list[str] = []
+        self.uploads: dict[str, bytes] = {}  # command → the bytes it was fed, last upload wins
 
     async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
         self.calls.append(command)
@@ -87,6 +88,22 @@ class ReplayTransport:
                 return CommandResult(command, "Password for root changed by root\n", "", 0)
             return CommandResult(command, "", "passwd: password for root is unchanged\n", 1)
         return await self.run(command, timeout=timeout)
+
+    async def upload(
+        self,
+        command: str,
+        data: bytes,
+        progress: Callable[[int], None] | None = None,
+        *,
+        timeout: float = 600.0,
+    ) -> CommandResult:
+        """Without a simulator an upload is kept in `uploads` and succeeds (a test sink)."""
+        self.calls.append(command)
+        for at in range(0, len(data), UPLOAD_CHUNK):
+            if progress is not None:
+                progress(min(at + UPLOAD_CHUNK, len(data)))
+        self.uploads[command] = data
+        return CommandResult(command, "", "", 0)
 
     async def open_shell(self, cols: int, rows: int) -> ShellChannel:
         raise NotImplementedError("simulator has no shell")
