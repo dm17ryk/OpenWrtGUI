@@ -1,12 +1,31 @@
-"""The modem's AT port (v0.6a plan D4) and the reads made on it (D2, D3, D10)."""
+"""The modem's AT port (v0.6a plan D4), the reads made on it (D2, D3, D10) and the console rules (D5)."""
 
 from __future__ import annotations
+
+import re
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
 from openwrtgui.lte import commands as c
 from openwrtgui.lte.parse import parse_at, parse_cops, parse_mode_order, parse_modem_info
 from openwrtgui.transport.base import Transport
+
+_QUERY = re.compile(r"AT(I|\+CSQ|\+CGM[IMR]|[+%][A-Z0-9]+(\?|=\?))?", re.IGNORECASE)
+
+
+def is_query(text: str) -> bool:
+    """D5: the forms that read and cannot change the modem; they run any time, even during a harness run."""
+    return _QUERY.fullmatch(text.strip()) is not None
+
+
+class AtResult(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    command: str
+    lines: tuple[str, ...]
+    status: Literal["OK", "ERROR", "no answer"]
+    error: str | None
 
 
 class ModemInfo(BaseModel):

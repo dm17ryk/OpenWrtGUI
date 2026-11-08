@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Literal
@@ -12,9 +13,9 @@ from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.guard.writes import run_audited
 from openwrtgui.lte import commands as c
-from openwrtgui.lte.at import find_at_port
+from openwrtgui.lte.at import AtResult, find_at_port, is_query
 from openwrtgui.lte.commands import MODEM_DEVICE
-from openwrtgui.lte.parse import parse_opmode
+from openwrtgui.lte.parse import parse_at, parse_opmode
 from openwrtgui.lte.state import NO_LTE, LteState, read_lte
 from openwrtgui.net.apply import NetApplyResult, NetCheck, NetPlan, net_plan
 from openwrtgui.net.service import NetworkService
@@ -33,8 +34,17 @@ NO_ADDRESS = "no address yet: waiting for the carrier's DHCP"
 DROPS = "{name}'s LTE session drops; devices that route through it lose the internet until it is back"
 
 
+NEEDS_CONFIRM = "This command may change the modem; send it again with confirm"
+NO_MODEM_ANSWER = "No answer from the modem"
+IMEI_RULE = re.compile(r"[0-9]{15}")
+
+
 class LteBusy(Exception):
     """One LTE action at a time per router (409)."""
+
+
+class AtNeedsConfirm(Exception):
+    """D5: an AT command that is not a query runs only once the person confirms it (428)."""
 
 
 def _reason(result: CommandResult) -> str:
@@ -219,6 +229,58 @@ class LteService:
             if status is not None and bool(status.get("up")) is want:
                 return True
         return False
+
+    # ---------------------------------------------------------------- AT console and IMEI
+    async def at_command(self, router_id: str, text: str, confirmed: bool) -> AtResult:
+        """D5: no preview, every line audited. Queries run any time; anything else needs Bench Guard clear,
+        the person's confirmation and the write lock."""
+        rec = self._record(router_id)
+        command = c.check_at(text)
+        query = is_query(command)
+        if not query:
+            self._guard.require_clear()
+            if not confirmed:
+                raise AtNeedsConfirm(NEEDS_CONFIRM)
+        t = await self._pool.get(rec)
+        port = await self.at_port(rec, t)
+        if port is None:
+            return AtResult(
+                command=command, lines=(), status="no answer", error=f"No AT port answered on {rec.name}"
+            )
+        line = c.at(port, command)
+        if query:
+            done = await run_audited(
+                t,
+                line,
+                router_id=rec.id,
+                screen=SCREEN,
+                guard=self._guard,
+                audit=self._audit,
+                require_guard=False,
+            )
+        else:
+            async with self._pool.write_lock(rec.id):
+                done = await self._cmd(rec, t, line)
+        answer = parse_at(done.stdout, command)
+        if answer is None:
+            return AtResult(command=command, lines=(), status="no answer", error=NO_MODEM_ANSWER)
+        return AtResult(command=command, lines=answer.lines, status=answer.status, error=answer.error)
+
+    async def imei(self, router_id: str) -> str:
+        """D3: read only when the person asks; never stored, logged or audited."""
+        rec = self._record(router_id)
+        device = await self.modem_device(router_id)
+        if device is None:
+            raise ValueError(NO_LTE)
+        t = await self._pool.get(rec)
+        result = await t.run(c.IMEI(device))
+        try:
+            value = json.loads(result.stdout) if result.ok else None
+        except ValueError:
+            value = None
+        if not isinstance(value, str) or not IMEI_RULE.fullmatch(value):
+            raise ValueError("The modem did not give its IMEI")
+        return value
 
     async def _address(self, t: Transport) -> str | None:
         status = await self._status(t, "lte_4")
