@@ -19,6 +19,7 @@ from openwrtgui.api import (
     flash_api,
     fw_api,
     images_api,
+    lte_api,
     luci_api,
     misc_api,
     net_api,
@@ -95,6 +96,7 @@ def create_app(ctx: AppContext) -> FastAPI:
         discovery_api,
         images_api,
         flash_api,
+        lte_api,
     )
     for module in modules:
         app.include_router(module.router)

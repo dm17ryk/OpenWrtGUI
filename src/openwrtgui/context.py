@@ -23,6 +23,7 @@ from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard, psutil_lister
 from openwrtgui.images.store import ProfileStore
 from openwrtgui.live import LiveHub
+from openwrtgui.lte.service import LteService
 from openwrtgui.luci_bridge.service import LuciBridgeService, UpstreamFactory
 from openwrtgui.luci_bridge.upstream import Upstream, sim_upstream, ssh_upstream
 from openwrtgui.net.apply import ApplyRunner
@@ -74,6 +75,7 @@ class AppContext:
     profiles: ProfileStore
     discovery: DiscoveryService
     flash: FlashService
+    lte: LteService
     token: str
     port: int
     mode: Literal["real", "simulator"]
@@ -299,6 +301,7 @@ def build_context(
         profiles=profiles,
         discovery=discovery,
         flash=flash,
+        lte=LteService(pool=pool, routers=routers, guard=guard, audit=audit, net=net),
         token=token,
         port=port,
         mode="simulator" if simulator is not None else "real",
