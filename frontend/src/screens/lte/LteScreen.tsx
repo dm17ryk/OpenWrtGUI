@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { apiFetch, openSocket } from '../../api/client'
@@ -6,6 +6,8 @@ import type { LteMessage, LteSample, LteState, RouterDetail } from '../../api/ty
 import { Help } from '../../help/Help'
 import { HELP } from '../../help/topics'
 import { RouterSections } from '../../shell/RouterSections'
+import { ModemCard } from './ModemCard'
+import { SettingsCard } from './SettingsCard'
 import { SignalCharts } from './SignalCharts'
 import { EMPTY_SERIES, pushLte, type LteSeries } from './signal'
 import { StatusCard } from './StatusCard'
@@ -45,6 +47,10 @@ export function LteScreen() {
   const live = useLiveSignal(id, state?.available === true)
   const name = detail.data?.record.name ?? id
   const nowMs = live.sample ? live.sample.t * 1000 : 0
+  const client = useQueryClient()
+  const refresh = (): void => {
+    for (const key of ['lte', 'lte-options', 'network']) void client.invalidateQueries({ queryKey: [key, id] })
+  }
 
   return (
     <main className="wrap">
@@ -72,6 +78,10 @@ export function LteScreen() {
           )}
           <StatusCard state={state} sample={live.sample} />
           <SignalCharts series={live.series} nowMs={nowMs} />
+          <div className="rf-cols">
+            <SettingsCard routerId={id} routerName={name} autoconnectNote={state.autoconnect_note} onApplied={refresh} />
+            <ModemCard routerId={id} modem={state.modem} opmode={state.opmode} />
+          </div>
         </>
       )}
     </main>

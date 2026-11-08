@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import type { LteMessage, LteState } from '../../api/types'
 import { AP2 } from '../../testing/fixtures'
 import { AP2_LTE, AP2_LTE_OPTIONS, NO_LTE } from '../../testing/lte'
+import { AP2_NET } from '../../testing/net'
 import { LteScreen } from './LteScreen'
 
 vi.mock('uplot', () => ({
@@ -25,6 +26,7 @@ vi.mock('../../api/client', async (orig) => {
       if (path === '/api/routers/ap2') return AP2
       if (path === '/api/routers/ap2/lte') return state
       if (path === '/api/routers/ap2/lte/settings/options') return AP2_LTE_OPTIONS
+      if (path === '/api/routers/ap2/network') return AP2_NET
       if (path === '/api/routers/ap2/luci/pages') return []
       throw new Error(`unexpected ${path}`)
     }),
