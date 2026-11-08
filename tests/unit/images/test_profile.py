@@ -111,11 +111,22 @@ def test_rom_key_folder_and_label() -> None:
     assert image.folder == "r1-d340a53f2de0"
 
 
-@pytest.mark.xfail(strict=True, reason="Task 6: the simulator learns /rom")
-async def test_rom_profile_from_the_simulator(sim_transport) -> None:  # type: ignore[no-untyped-def]
+async def test_rom_profile_from_the_simulator() -> None:
     from openwrtgui.images.profile import build_rom_profile
+    from openwrtgui.simulator import SimConnector
 
-    p = await build_rom_profile(sim_transport("ap2"), "dlink,dwr-921-c3-uboot", NOW)
-    assert p.key.sha256 == "rom"
+    sim = SimConnector(ROOT / "tests" / "fixtures" / "sim")
+    t = await sim.connect("192.168.1.2", 22, password=None, key_paths=[Path("app_key")])
+    p = await build_rom_profile(t, "dlink,dwr-921-c3-uboot", NOW)
+    image = build_profile(MINI.read_bytes(), "mini-r35692.bin", NOW)
+    assert p.key == ProfileKey(board="dlink,dwr-921-c3-uboot", revision="r35692-b8bffeefdf", sha256="rom")
     assert p.firmware_len is None
-    assert [c.name for c in p.custom] == ["dwr921-diag", "dwr921-internet-led", "dwr921-portctl"]
+    assert p.custom == image.custom
+    assert profile_paths(p) == profile_paths(image)
+    assert p.configs == image.configs
+    assert (p.services, p.uci_defaults, p.modules, p.programs) == (
+        image.services,
+        image.uci_defaults,
+        image.modules,
+        image.programs,
+    )

@@ -1,0 +1,16 @@
+{
+  "files": {
+    "/etc/owg/nft/inet-owg_test.nft": {
+      "data": "add table inet owg_test\nflush table inet owg_test\ntable inet owg_test {\n}\n",
+      "mode": "0644"
+    },
+    "/root/notes.txt": {
+      "data": "bench notes\n",
+      "mode": "0644"
+    }
+  },
+  "configs": {
+    "dropbear": "\nconfig dropbear\n\toption PasswordAuth 'on'\n\toption RootPasswordAuth 'off'\n\toption Port '22'\n"
+  },
+  "firmware_matches": true
+}

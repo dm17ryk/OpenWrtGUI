@@ -1,0 +1,24 @@
+{
+  "files": {
+    "/usr/sbin/wifi-mirror": {
+      "data": "#!/bin/sh\n\nset -eu\n\nusage() {\n\tcat <<'EOF'\nUsage: wifi-mirror {start|stop|status}\nEOF\n}\n\nusage\n",
+      "mode": "0755"
+    },
+    "/etc/init.d/wifi-mirror": {
+      "data": "#!/bin/sh /etc/rc.common\n\nSTART=99\nUSE_PROCD=1\n",
+      "mode": "0755"
+    },
+    "/usr/bin/iperf3": {
+      "data": "\u007fELF\u0000\u0000\u0000\u0000",
+      "mode": "0755"
+    }
+  },
+  "whiteouts": ["/etc/uci-defaults/20_dwr921_c3_uboot_luci"],
+  "packages": [
+    "P:iperf3\nV:3.17.1-r2\nA:mipsel_24kc\nT:Internet Protocol bandwidth measuring tool\nU:https://software.es.net/iperf/\nL:BSD-3-Clause\no:feeds/packages/net/iperf3\nF:usr/bin\nR:iperf3\n"
+  ],
+  "configs": {
+    "dropbear": "\nconfig dropbear\n\toption PasswordAuth 'on'\n\toption RootPasswordAuth 'on'\n\toption Port '2222'\n"
+  },
+  "firmware_matches": false
+}
