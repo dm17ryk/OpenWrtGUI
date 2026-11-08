@@ -13,6 +13,7 @@ import httpx
 
 from openwrtgui.capture.service import CaptureService
 from openwrtgui.capture.wireshark import find_wireshark
+from openwrtgui.discovery.checklist import ChecklistStore
 from openwrtgui.discovery.service import DiscoveryService
 from openwrtgui.faults.service import FaultsService
 from openwrtgui.fw.service import FirewallService
@@ -255,6 +256,7 @@ def build_context(
         settings=settings,
         descriptions=descriptions,
         profiles=profiles,
+        checklists=ChecklistStore(data.reflash_dir),
     )
     poller.on_status = discovery.refresh_summary
     return AppContext(

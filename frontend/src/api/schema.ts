@@ -465,6 +465,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/discovery/checklist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save Checklist */
+        post: operations["save_checklist_api_routers__router_id__discovery_checklist_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/discovery/checklists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Checklists */
+        get: operations["checklists_api_routers__router_id__discovery_checklists_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/discovery/copy/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copy Apply */
+        post: operations["copy_apply_api_routers__router_id__discovery_copy_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/discovery/copy/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Copy Preview */
+        post: operations["copy_preview_api_routers__router_id__discovery_copy_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/discovery/firmware": {
         parameters: {
             query?: never;
@@ -1920,6 +1988,26 @@ export interface components {
             /** Ok */
             ok: boolean | null;
         };
+        /**
+         * ChecklistInfo
+         * @description A saved checklist without the file contents.
+         */
+        ChecklistInfo: {
+            /** Lost */
+            lost: string[];
+            /** Packages Added */
+            packages_added: string[];
+            profile: components["schemas"]["ProfileKey"] | null;
+            /** Restorable */
+            restorable: string[];
+            /**
+             * Saved At
+             * Format: date-time
+             */
+            saved_at: string;
+            /** Stamp */
+            stamp: string;
+        };
         /** ClearApplyIn */
         ClearApplyIn: {
             /** Digest */
@@ -1940,6 +2028,26 @@ export interface components {
             config: string;
             /** First Boot */
             first_boot: boolean;
+        };
+        /** CopyApplyIn */
+        CopyApplyIn: {
+            /** Digest */
+            digest: string;
+            /** From Checklist */
+            from_checklist?: string | null;
+            /** Paths */
+            paths: string[];
+            /** Target */
+            target: string;
+        };
+        /** CopyIn */
+        CopyIn: {
+            /** From Checklist */
+            from_checklist?: string | null;
+            /** Paths */
+            paths: string[];
+            /** Target */
+            target: string;
         };
         /** CustomApplyIn */
         CustomApplyIn: {
@@ -5539,6 +5647,138 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DiscoveryState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_checklist_api_routers__router_id__discovery_checklist_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistInfo"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    checklists_api_routers__router_id__discovery_checklists_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChecklistInfo"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    copy_apply_api_routers__router_id__discovery_copy_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CopyApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    copy_preview_api_routers__router_id__discovery_copy_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CopyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
                 };
             };
             /** @description Validation Error */

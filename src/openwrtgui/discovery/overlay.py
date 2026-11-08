@@ -32,9 +32,9 @@ class OverlayEntry(BaseModel):
 def mode_bits(mode: str) -> int:
     """`-rwxr-xr-x` → 0o755 (setuid, setgid and sticky shown as s, S, t, T)."""
     bits = 0
-    for at, (char, value) in enumerate(zip(mode[1:10], (0o400, 0o200, 0o100) * 3, strict=False)):
+    for at, char in enumerate(mode[1:10]):
         if char not in "-ST":
-            bits |= value
+            bits |= 0o400 >> at
         if char.lower() in "st" and at in (2, 5, 8):
             bits |= {2: 0o4000, 5: 0o2000, 8: 0o1000}[at]
     return bits

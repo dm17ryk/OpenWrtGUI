@@ -12,6 +12,7 @@ from openwrtgui.discovery.overlay import (
     diff_configs,
     diff_overlay,
     diff_packages,
+    mode_bits,
     parse_ls_ldn,
 )
 from openwrtgui.images.apkdb import parse_apk_installed
@@ -61,6 +62,15 @@ def test_overlay_names_with_shell_characters() -> None:
     )
     assert [e.path for e in entries] == ["/root/a b", "/root/it's", "/root/$(reboot)", "/root/new"]
     assert unreadable == 2
+
+
+def test_mode_bits() -> None:
+    assert mode_bits("-rw-r--r--") == 0o644
+    assert mode_bits("-rwxr-xr-x") == 0o755
+    assert mode_bits("lrwxrwxrwx") == 0o777
+    assert mode_bits("-rwsr-xr-t") == 0o5755
+    assert mode_bits("-rwSr--r-T") == 0o5644
+    assert mode_bits("c---------") == 0
 
 
 async def test_diff_overlay_against_the_mini_profile() -> None:
