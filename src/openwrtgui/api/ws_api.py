@@ -77,6 +77,33 @@ async def rf_live(ws: WebSocket, router_id: str) -> None:
         sampler.unsubscribe(queue)
 
 
+@router.websocket("/ws/lte/{router_id}")
+async def lte_live(ws: WebSocket, router_id: str) -> None:
+    """The LTE signal every 10 s while the screen is open (v0.6a plan D1)."""
+    ctx = await ws_accept(ws)
+    if ctx is None:
+        return
+    if ctx.routers.get(router_id) is None:
+        await ws.close(code=WS_NOT_FOUND)
+        return
+    sampler = ctx.lte_live.sampler(router_id)
+    queue = sampler.subscribe()
+
+    async def send_samples() -> None:
+        while True:
+            await ws.send_json(wire(await queue.get()))
+
+    sender = asyncio.create_task(send_samples())
+    try:
+        while True:
+            await ws.receive_json()  # nothing to ask yet; reading notices the close
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+    finally:
+        sender.cancel()
+        sampler.unsubscribe(queue)
+
+
 @router.websocket("/ws/terminal/{router_id}")
 async def terminal(ws: WebSocket, router_id: str) -> None:
     ctx = await ws_accept(ws)

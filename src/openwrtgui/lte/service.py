@@ -9,6 +9,7 @@ from datetime import datetime
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.lte.at import find_at_port
+from openwrtgui.lte.commands import MODEM_DEVICE
 from openwrtgui.lte.state import LteState, read_lte
 from openwrtgui.net.service import NetworkService
 from openwrtgui.store.routers import RouterRecord, RouterStore
@@ -49,6 +50,12 @@ class LteService:
         state = await self._net.state(router_id)
         conf = next((v.conf for v in state.interfaces if v.conf is not None and v.conf.proto == "qmi"), None)
         return (conf.name, conf.device) if conf is not None else None
+
+    async def modem_device(self, router_id: str) -> str | None:
+        """The qmi interface's device when it is a QMI modem device (`/dev/cdc-wdmN`); None: no LTE here."""
+        qmi = await self._qmi(router_id)
+        device = qmi[1] if qmi is not None else None
+        return device if device is not None and MODEM_DEVICE.fullmatch(device) else None
 
     async def at_port(self, rec: RouterRecord, t: Transport) -> str | None:
         """D4: found once per connection (a reconnect may follow a modem that re-enumerated)."""

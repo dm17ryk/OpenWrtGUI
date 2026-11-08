@@ -75,6 +75,7 @@ def create_app(ctx: AppContext) -> FastAPI:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             ctx.rf.close_all()
+            ctx.lte_live.close_all()
             await ctx.luci.close_all()
             await ctx.pool.close_all()
 
