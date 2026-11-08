@@ -65,6 +65,7 @@ class InterfaceIn(BaseModel):
     dns: list[str] | None = None
     mtu: int | None = None
     bridge_ports: list[str] | None = None
+    auto: bool | None = None
     edits: list[OptionEditIn] = []
 
     def to_domain(self) -> InterfaceRequest:
@@ -79,6 +80,7 @@ class InterfaceIn(BaseModel):
             dns=tuple(self.dns) if self.dns is not None else None,
             mtu=self.mtu,
             bridge_ports=tuple(self.bridge_ports) if self.bridge_ports is not None else None,
+            auto=self.auto,
             edits=tuple(OptionEdit(e.section, e.name, e.value) for e in self.edits),
         )
 

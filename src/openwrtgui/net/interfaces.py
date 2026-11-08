@@ -26,6 +26,16 @@ CONTROLLED_INTERFACE = {
     "mtu": "MTU",
 }
 STATIC_ONLY = ("ipaddr", "netmask", "gateway", "broadcast")
+# qmi options the LTE screen keeps as they are (v0.6a plan D7, D8): the row shows "set above: LTE screen"
+QMI_LOCKED = {
+    "dhcp": (
+        "lte_4 must stay DHCP: the BM806C sends downlink only after a DHCP exchange binds this router's MAC"
+    ),
+    "autoconnect": (
+        "This image's qmi.sh turns the modem's autoconnect off at every connect, so the setting has no effect"
+    ),
+}
+QMI_CONTROL = "LTE screen"
 _NAME = re.compile(r"^[A-Za-z0-9_]{1,15}$")
 MTU_MIN, MTU_MAX = 68, 9000
 
@@ -42,6 +52,7 @@ class InterfaceRequest:
     dns: tuple[str, ...] | None = None
     mtu: int | None = None
     bridge_ports: tuple[str, ...] | None = None
+    auto: bool | None = None  # bring up at boot (netifd's `auto`, on by default); None leaves it
     edits: tuple[OptionEdit, ...] = field(default=(), repr=False)
 
 
@@ -51,12 +62,15 @@ def interface_rows(
     conf = state.conf(name)
     if conf is None:
         raise ValueError(f"There is no interface named {name}")
+    controlled = dict(CONTROLLED_INTERFACE)
+    if conf.proto == "qmi":
+        controlled |= dict.fromkeys(QMI_LOCKED, QMI_CONTROL)
     return forms.option_rows(
         "network",
         [("interface", name)],
         {"interface": handlers.get(conf.proto, {})},
         uci,
-        controlled={"interface": CONTROLLED_INTERFACE},
+        controlled={"interface": controlled},
     )
 
 
@@ -147,6 +161,8 @@ def compile_interface(
         return [UciOp("delete", p)], [], []
     conf = state.conf(req.name)
     current = conf.proto if conf is not None else "none"
+    if current == "qmi":
+        _qmi_rules(req)
     set_here = options(uci, "network", req.name)
     ops: list[UciOp] = []
     warnings: list[str] = []
@@ -179,6 +195,10 @@ def compile_interface(
         ops.append(UciOp("set", f"{p}.mtu", str(req.mtu)))
     if req.bridge_ports is not None:
         ops += _bridge_ops(req, state, conf.device if conf else req.device)
+    if req.auto is False:
+        ops.append(UciOp("set", f"{p}.auto", "0"))
+    elif req.auto is True and "auto" in set_here:
+        ops.append(UciOp("delete", f"{p}.auto"))
     secrets: list[str] = []
     if req.edits:
         edit_ops, secrets = forms.compile_edits(
@@ -186,6 +206,18 @@ def compile_interface(
         )
         ops += edit_ops
     return ops, secrets, warnings
+
+
+def _qmi_rules(req: InterfaceRequest) -> None:
+    """The LTE modem's interface keeps its protocol, its DHCP lte_4 and the modem's autoconnect off."""
+    if req.delete or (req.proto is not None and req.proto != "qmi"):
+        raise ValueError(
+            f"{req.name} is the LTE modem's interface; its protocol stays LTE (QMI). "
+            "Change its settings on the LTE screen."
+        )
+    for edit in req.edits:
+        if edit.name in QMI_LOCKED:
+            raise ValueError(QMI_LOCKED[edit.name])
 
 
 def _bridge_ops(req: InterfaceRequest, state: NetworkState, device: str | None) -> list[UciOp]:

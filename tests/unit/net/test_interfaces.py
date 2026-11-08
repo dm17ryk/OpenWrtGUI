@@ -7,6 +7,7 @@ from collections.abc import Callable
 import pytest
 from netenv import NetEnv
 
+from openwrtgui.forms import OptionEdit
 from openwrtgui.net import dhcp, dns, interfaces
 from openwrtgui.net.interfaces import InterfaceRequest
 
@@ -97,6 +98,51 @@ async def test_all_options_from_proto_handler(net: NetEnv) -> None:
     assert rows["ip6addr"].control is None and rows["ip6addr"].config == "network"
     qmi = {r.name: r for r in await net.service.interface_options("ap2", "lte")}
     assert qmi["apn"].value == "uinternet" and qmi["password"].editor == "secret"
+
+
+DHCP_LOCK = (
+    "lte_4 must stay DHCP: the BM806C sends downlink only after a DHCP exchange binds this router's MAC"
+)
+AUTOCONNECT_LOCK = (
+    "This image's qmi.sh turns the modem's autoconnect off at every connect, so the setting has no effect"
+)
+
+
+async def test_qmi_dhcp_stays_on(net: NetEnv) -> None:
+    dhcp_off = InterfaceRequest("lte", edits=(OptionEdit("lte", "dhcp", "0"),))
+    with pytest.raises(ValueError, match=f"^{DHCP_LOCK}$"):
+        await net.service.plan_interface("ap2", dhcp_off)
+
+
+async def test_qmi_autoconnect_is_locked(net: NetEnv) -> None:
+    with pytest.raises(ValueError, match=f"^{AUTOCONNECT_LOCK}$"):
+        await net.service.plan_interface(
+            "ap2", InterfaceRequest("lte", edits=(OptionEdit("lte", "autoconnect", "1"),))
+        )
+    rows = {r.name: r for r in await net.service.interface_options("ap2", "lte")}
+    assert rows["dhcp"].control == "LTE screen" and rows["autoconnect"].control == "LTE screen"
+    assert rows["apn"].control is None
+
+
+async def test_bring_up_at_boot(net: NetEnv) -> None:
+    off = await net.service.plan_interface("ap2", InterfaceRequest("lte", auto=False))
+    assert f"{SESSION_SET} network.lte.auto='0'" in off.lines
+    await net.service.apply_interface("ap2", InterfaceRequest("lte", auto=False), off.digest)
+    on = await net.service.plan_interface("ap2", InterfaceRequest("lte", auto=True))
+    assert "uci -P /var/run/rpcd/uci-<session> -q delete network.lte.auto" in on.lines
+    already_on = await net.service.plan_interface("ap2", InterfaceRequest("wan", auto=True, mtu=1500))
+    assert not any("network.wan.auto" in line for line in already_on.lines)
+
+
+async def test_static_on_lte_is_refused(net: NetEnv) -> None:
+    with pytest.raises(
+        ValueError,
+        match=r"^lte is the LTE modem's interface; its protocol stays LTE \(QMI\)\. Change its settings on "
+        r"the LTE screen\.$",
+    ):
+        await net.service.plan_interface(
+            "ap2", InterfaceRequest("lte", proto="static", address="10.0.0.2/24")
+        )
 
 
 async def test_target_outside_pc_subnet_warns(net: NetEnv) -> None:
