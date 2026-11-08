@@ -99,6 +99,17 @@ def _by_content(text: str) -> list[tuple[str, tuple[tuple[str, str], ...]]]:
     )
 
 
+async def wireless_snapshot(t: Transport) -> str:
+    """AP2's /etc/config/wireless as found, for the restore to write back. A failed or empty read is refused
+    here: written back, it would wipe the router's wireless config. The message never shows the file (it
+    holds AP2's key)."""
+    shown = await t.run("cat /etc/config/wireless")
+    assert shown.ok and "config wifi-device" in shown.stdout, (
+        f"cannot read AP2's wireless config (exit {shown.exit_status}): {shown.stderr.strip()}"
+    )
+    return shown.stdout
+
+
 async def fw_found(t: Transport) -> dict[str, object]:
     """What the firewall and faults window must leave as it found: firewall config, nft tables, qdiscs,
     /tmp/owg, the switch ports, the parked radio."""
