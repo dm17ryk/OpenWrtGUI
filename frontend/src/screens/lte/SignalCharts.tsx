@@ -16,6 +16,9 @@ type Props = { series: LteSeries; nowMs: number }
 /** RSSI, RSRP, RSRQ and SNR over the chosen window; one sample every 10 s while the screen is open. */
 export function SignalCharts({ series, nowMs }: Props) {
   const [windowS, setWindowS] = useState<WindowS>(300)
+  const [openedMs] = useState(() => Date.now()) // the axis end until the first sample arrives
+  const end = (nowMs || openedMs) / 1000
+  const xRange = [end - windowS, end] as const
   return (
     <section className="card stack" aria-labelledby="lte-live-h">
       <div className="row">
@@ -34,7 +37,7 @@ export function SignalCharts({ series, nowMs }: Props) {
       </div>
       <div className="rf-cols">
         {METRICS.map((m) => (
-          <RfChart key={m.key} title={m.label} unit={m.unit} series={[{ label: m.label, tone: 'rx', points: windowed(series[m.key], nowMs, windowS) }]} />
+          <RfChart key={m.key} title={m.label} unit={m.unit} xRange={xRange} series={[{ label: m.label, tone: 'rx', points: windowed(series[m.key], nowMs, windowS) }]} />
         ))}
       </div>
     </section>

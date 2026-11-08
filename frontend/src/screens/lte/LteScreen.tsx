@@ -12,7 +12,7 @@ import { ModemCard } from './ModemCard'
 import { SettingsCard } from './SettingsCard'
 import { SignalCharts } from './SignalCharts'
 import { EMPTY_SERIES, pushLte, type LteSeries } from './signal'
-import { StatusCard } from './StatusCard'
+import { SignalTiles, StatusCard } from './StatusCard'
 
 /** The live signal: one sample every 10 s from /ws/lte while the screen is open. */
 function useLiveSignal(routerId: string, enabled: boolean) {
@@ -78,16 +78,17 @@ export function LteScreen() {
               {live.idle}
             </div>
           )}
-          <StatusCard state={state} sample={live.sample} />
+          <div className="rf-cols">
+            <StatusCard state={state} sample={live.sample} />
+            <ModemCard routerId={id} modem={state.modem} opmode={state.opmode} />
+          </div>
+          <SignalTiles state={state} sample={live.sample} />
           <SignalCharts series={live.series} nowMs={nowMs} />
           <div className="rf-cols">
             <ActionsCard routerId={id} routerName={name} onDone={refresh} />
             <AtConsole routerId={id} />
           </div>
-          <div className="rf-cols">
-            <SettingsCard routerId={id} routerName={name} autoconnectNote={state.autoconnect_note} onApplied={refresh} />
-            <ModemCard routerId={id} modem={state.modem} opmode={state.opmode} />
-          </div>
+          <SettingsCard routerId={id} routerName={name} autoconnectNote={state.autoconnect_note} onApplied={refresh} />
         </>
       )}
     </main>

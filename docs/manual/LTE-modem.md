@@ -3,7 +3,9 @@
 The LTE screen shows a router's LTE modem (the BroadMobi BM806C on the bench routers): whether it is
 registered, the signal, the data session, and the modem's own details. It also connects and disconnects the
 session, reboots the modem safely, changes the LTE settings with rollback, and has an AT console. Open it from
-the router's sections, or from the LTE interface's row on Network and DHCP.
+the router's sections, or from the LTE interface's row on [Network and DHCP](Network-and-DHCP).
+
+![LTE modem](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/lte.png)
 
 A router without a qmi interface in its network config has no LTE screen content: the screen says so and
 shows nothing else.

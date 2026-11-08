@@ -52,7 +52,24 @@ function SignalTile({ label, unit, measure }: { label: string; unit: 'dBm' | 'dB
 
 type Props = { state: LteState; sample: LteSample | null }
 
-/** Registration, radio, operator, the data session and the four signal values with their labels. */
+/** The four signal values with their labels: the latest live sample, or the screen's read until one comes. */
+export function SignalTiles({ state, sample }: Props) {
+  return (
+    <>
+      <div className="hrow">
+        <h2>Signal quality</h2>
+        <Help topic={HELP.lteSignal} />
+      </div>
+      <div className="rf-tiles">
+        {METRICS.map((m) => (
+          <SignalTile key={m.key} label={m.label} unit={m.unit} measure={current(m.key, state, sample)} />
+        ))}
+      </div>
+    </>
+  )
+}
+
+/** Registration, radio, operator and the data session. */
 export function StatusCard({ state, sample }: Props) {
   const registration = sample?.registration ?? state.registration
   const radio = sample?.radio ?? state.radio
@@ -67,30 +84,19 @@ export function StatusCard({ state, sample }: Props) {
     ['RX / TX', `${bytes(state.rx_bytes)} / ${bytes(state.tx_bytes)}`],
   ]
   return (
-    <>
-      <section className="card stack" aria-labelledby="lte-status-h">
-        <div className="hrow">
-          <h2 id="lte-status-h">Status</h2>
-          <Help topic={HELP.lteStatus} />
-        </div>
-        <dl className="kv">
-          {rows.map(([k, v]) => (
-            <div key={k} style={{ display: 'contents' }}>
-              <dt>{k}</dt>
-              <dd className="mono">{v}</dd>
-            </div>
-          ))}
-        </dl>
-      </section>
+    <section className="card stack" aria-labelledby="lte-status-h">
       <div className="hrow">
-        <h2>Signal quality</h2>
-        <Help topic={HELP.lteSignal} />
+        <h2 id="lte-status-h">Status</h2>
+        <Help topic={HELP.lteStatus} />
       </div>
-      <div className="rf-tiles">
-        {METRICS.map((m) => (
-          <SignalTile key={m.key} label={m.label} unit={m.unit} measure={current(m.key, state, sample)} />
+      <dl className="kv">
+        {rows.map(([k, v]) => (
+          <div key={k} style={{ display: 'contents' }}>
+            <dt>{k}</dt>
+            <dd className="mono">{v}</dd>
+          </div>
         ))}
-      </div>
-    </>
+      </dl>
+    </section>
   )
 }

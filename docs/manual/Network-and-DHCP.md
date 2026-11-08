@@ -12,6 +12,8 @@ Every interface the router has (lan, wan, lte, VLAN interfaces), with its protoc
 and whether it is up (with how long, for example **up · 2 h 14 min**). The one this app talks to the router
 through is marked **this app's connection**.
 Interfaces the router makes by itself while running (such as `lte_4`, made by `lte`) are listed read-only.
+The LTE interface's row has **LTE screen**, which opens the [LTE modem](LTE-modem) screen: its APN, PIN and
+the rest are set there, and its protocol stays LTE (QMI).
 
 **Edit** opens the interface: choose its protocol (Static, DHCP client, No address, and whatever else the router
 offers, such as LTE or PPP), and for Static its address, gateway, DNS servers and MTU. Write the address with its

@@ -87,6 +87,12 @@ pwsh -File tools/build_windows.ps1        # PyInstaller build + self-check (vers
   ends with it removed; a flash keeps settings, AP2 ends on the image it started on (flash it back) with the
   checks above as before. Never flash without keeping settings on the bench: that is tested in the simulator
   only (AP2 would come back as 192.168.1.1, clashing with AP1).
+- **An LTE action on AP2** (connect, disconnect, reboot modem, an LTE settings change, an AT command that is
+  not a query) is a write window: only with the owner's OK in this session, the txctl session told (AP2's LTE
+  session drops), Bench Guard clear. Never set the modem's operating mode to `reset` (it wedges the BM806C
+  until a power cycle). AP2 ends as found: `uci show network` as before and lte up as before. Never type a
+  SIM PIN or an APN password, and never write the IMEI to a log, a file or the audit log. AT queries and the
+  LTE screen's reads are reads.
 - While Bench Guard reports a live run (`dima_night`, `rh_soak`, `overnight_wifi`, `txlab_*`,
   `voip_chain`, lock files, run SSIDs), every router is read-only. Do not work around it.
 - Agents **never type router passwords**. Where a password is needed, the owner types it.

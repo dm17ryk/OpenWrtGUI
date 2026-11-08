@@ -300,6 +300,21 @@ The wizard described in section 5.
   - AT console with history
 - **Phase 2**: SIM PIN management, SMS, USSD (the D-Link UI had these).
 
+> **v0.6 note** (plan `docs/superpowers/plans/2026-11-08-v0.6a-lte.md`, decisions D1-D12):
+> - Status comes from the bench's own reads (`uqmi --get-serving-system`, `--get-signal-info`, netifd's status);
+>   the live chart samples every 10 s only while the screen is open, and a lost answer is a missed sample, not
+>   a state change (D1).
+> - Modem info comes from `AT+CGMI`, `AT+CGMM`, `AT+CGMR`, not `ATI`; the IMEI from `uqmi --get-imei` only on
+>   Reveal, never stored or audited (D3).
+> - The AT port is found per router by sending `AT` to each `/dev/ttyUSB*` in order; the first `OK` is used
+>   (D4). The simulator answers on ttyUSB2; AP2's port is recorded in the HW-1 window (Task 15).
+> - Reboot modem is operating mode `low_power`, then `online`, each read back, then `ifup lte`; never `reset`,
+>   which wedges the BM806C until a power cycle (D6).
+> - Correction to Settings above: this image's `qmi.sh` ignores the uci `autoconnect` option and turns the
+>   modem's autoconnect off at every connect, so the UI shows the option locked with that reason (D7).
+> - `dhcp=0` on the qmi interface is refused: lte_4 must stay DHCP (D8). Bring up at boot is netifd's `auto`
+>   (D9).
+
 ### 7.11 System (11; LuCI System and Status parity)
 - System: hostname, time zone, NTP client/server, log buffer, remote syslog.
 - Access: root password; SSH (port, interface, password auth, root login); SSH keys (each labelled: app, harness, other); HTTP(S) (LuCI on/off, redirect to HTTPS).
@@ -431,8 +446,8 @@ Each milestone gets its own implementation plan. The first plan covers v0.1 Foun
 | # | Item | How to close it |
 |---|---|---|
 | O1 | BM806C "reset to defaults" command. The D-Link firmware's `libusbmodem.so` resets its DWP-812 modem profile with `AT%SYSCMD="/etc/sysconfig/script/cus_restore_default.sh"`, but the BM806C answers `AT%SYSCMD=?` with ERROR. `usbmodem_set_defaults` references `AT+BMMODODR=17`. An earlier Claude Code session reportedly reset this modem over SSH; the command is not in the local transcripts | Ask Dmitry for the command, or disassemble `usbmodem_set_defaults`; then test on AP2's modem with Dmitry's OK |
-| O2 | Names for the `AT+BMMODODR` codes (17 now) | BroadMobi AT manual |
-| O3 | Operator name from QMI comes back garbled (encoding) | Decode per QMI spec, or `AT+COPS?` |
+| O2 | Names for the `AT+BMMODODR` codes (17 now) | BroadMobi AT manual. v0.6 shows the code read-only ("names not mapped yet") |
+| O3 | Operator name from QMI comes back garbled (encoding) | v0.6: the operator comes from `AT+COPS?`; QMI's name only when no AT port answers, marked "(from QMI, may be garbled)" |
 | O4 | rt2800 noise floor and RX/TX air-time split are expected missing; confirm with the radio up | **Done 2026-11-05 on AP2 (on air, ch 6):** `survey dump` has no `noise` line and no RX/TX time on any channel, only active, busy and extension busy time. rt2800 also marks every channel `[in use]`, so the RF sampler takes the entry of the radio's own frequency (`current_survey`). The radio's own beacons, read on a monitor interface of the same radio, come from the TX path: `6.0 Mb/s [bit 15] BSSID:…`, with no `<freq> MHz` (the beacon parser reads the rate after the timestamp). So the beacon check reads the rate the driver reports for the beacons it sent, not beacons heard over the air. The monitor interface goes only with `iw dev owgmon0 del`; `ip link del` answers "Not supported" |
 | O5 | `txpower limit` on rt2800 is expected to equal fixed | Open: not measured in the 2026-11-05 window |
 | O6 | minstrel `rc_stats` path with a station associated | Open: no station joined in the 2026-11-05 window (one-time key), so the RF rates table stays "not available" |
