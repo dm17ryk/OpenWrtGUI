@@ -16,9 +16,14 @@ function plural(n: number, one: string, many: string): string {
 type RowsProps = {
   title: string
   entries: OverlayEntry[]
-  kept: Set<string>
+  kept: Set<string> | null // null: `sysupgrade -l` could not be read
   ticked: Set<string>
   onTick: (path: string) => void
+}
+
+function KeptChip({ path, kept }: { path: string; kept: Set<string> | null }) {
+  if (kept === null) return <span className="b neu">kept or lost: unknown</span>
+  return <span className={kept.has(path) ? 'b air' : 'b park'}>{kept.has(path) ? 'kept on a flash' : 'lost on a flash'}</span>
 }
 
 function Rows({ title, entries, kept, ticked, onTick }: RowsProps) {
@@ -36,7 +41,7 @@ function Rows({ title, entries, kept, ticked, onTick }: RowsProps) {
               </span>
             </label>
             {e.target && <span className="muted">→ {e.target}</span>}
-            <span className={kept.has(e.path) ? 'b air' : 'b park'}>{kept.has(e.path) ? 'kept on a flash' : 'lost on a flash'}</span>
+            <KeptChip path={e.path} kept={kept} />
           </li>
         ))}
       </ul>
@@ -52,7 +57,7 @@ export function OverlaySection({ routerId, state }: Props) {
   const [target, setTarget] = useState('')
   const [saved, setSaved] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const kept = new Set(state.kept_on_flash)
+  const kept = state.kept_known === false ? null : new Set(state.kept_on_flash)
   const { overlay, packages } = state
   const tick = (path: string): void => {
     const next = new Set(ticked)
@@ -83,6 +88,12 @@ export function OverlaySection({ routerId, state }: Props) {
       </div>
       {!state.has_overlay && <div className="muted">This router has no overlay.</div>}
       {nothing && state.has_overlay && <div className="muted">Nothing changed since flashing.</div>}
+      {kept === null && (
+        <div className="note w">
+          Could not read what a flash keeps (<span className="mono">sysupgrade -l</span> failed), so whether a flash keeps each file is
+          unknown and no reflash checklist can be saved.
+        </div>
+      )}
       <Rows title="Added" entries={overlay.added} kept={kept} ticked={ticked} onTick={tick} />
       <Rows title="Changed from the image" entries={overlay.replaced} kept={kept} ticked={ticked} onTick={tick} />
       {overlay.deleted.length > 0 && (

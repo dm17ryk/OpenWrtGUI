@@ -103,6 +103,16 @@ test('shows upload progress and the phases until done', async () => {
   expect(await screen.findByRole('checkbox', { name: AP2_CHECKLIST.restorable[0] })).toBeChecked()
 })
 
+test('a done flash from before can be followed by another', async () => {
+  current = job('done', { detail: 'Flashed AP2 · office with r35700-0c0ffee000 in 0 min 21 s' })
+  const user = renderFlash()
+  expect(await screen.findByText('Flashed AP2 · office with r35700-0c0ffee000 in 0 min 21 s')).toBeVisible()
+  expect(screen.queryByRole('combobox', { name: 'Image' })).not.toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Flash again' }))
+  expect(await screen.findByRole('combobox', { name: 'Image' })).toBeVisible()
+  expect(screen.queryByText(/Flashed AP2/)).not.toBeInTheDocument()
+})
+
 test('shows a failed flash with its reason and no Copy back', async () => {
   const user = renderFlash()
   await screen.findByRole('region', { name: 'Command preview' })

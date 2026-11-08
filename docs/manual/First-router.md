@@ -62,10 +62,12 @@ differently, then **Save port map**.
 ## Afterwards
 
 The router appears on the [Dashboard](Dashboard) and in the router list. Its overview page shows what it
-said about itself and the saved port map. Once its sysupgrade image is imported in
-[Settings › Images](Settings#images), [Discovery](Discovery) shows what changed on it since flashing.
+said about itself and the saved port map.
 
 ![Router overview: what AP2 says about itself](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/router-overview.png)
 
 A router you added without finishing the key step shows **needs app key** on the dashboard, with an
 **Install key** button.
+
+Once its sysupgrade image is imported in [Settings › Images](Settings#images), [Discovery](Discovery) shows
+what changed on the router since flashing.

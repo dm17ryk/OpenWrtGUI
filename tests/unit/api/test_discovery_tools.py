@@ -67,15 +67,16 @@ async def test_promoted_card_shows_and_runs(ctx: AppContext) -> None:
     assert result.exit_status is not None
 
 
-async def test_read_only_command_runs_during_a_run(ctx_guard_live: AppContext) -> None:
+async def test_card_commands_wait_during_a_run_even_when_marked_read_only(ctx_guard_live: AppContext) -> None:
+    """A user's "read-only" tick is not proof: during a run only a command the app's own read-only check
+    accepts may run, and a custom program never passes it."""
     import_mini(ctx_guard_live)
     ctx_guard_live.discovery.tools.save(MIRROR)
-    plan = await ctx_guard_live.discovery.plan_tool("ap1", MIRROR.path, "status", {})
-    await ctx_guard_live.discovery.apply_tool("ap1", MIRROR.path, "status", {}, plan.digest)
-    assert any(e.command == "/usr/sbin/wifi-mirror status" for e in ctx_guard_live.audit.query())
-    stop = await ctx_guard_live.discovery.plan_tool("ap1", MIRROR.path, "stop", {})
-    with pytest.raises(GuardLocked):
-        await ctx_guard_live.discovery.apply_tool("ap1", MIRROR.path, "stop", {}, stop.digest)
+    for label in ("status", "stop"):
+        plan = await ctx_guard_live.discovery.plan_tool("ap1", MIRROR.path, label, {})
+        with pytest.raises(GuardLocked):
+            await ctx_guard_live.discovery.apply_tool("ap1", MIRROR.path, label, {}, plan.digest)
+    assert not any(e.command.startswith("/usr/sbin/wifi-mirror") for e in ctx_guard_live.audit.query())
 
 
 async def test_tool_endpoints(authed: httpx.AsyncClient, ctx: AppContext) -> None:

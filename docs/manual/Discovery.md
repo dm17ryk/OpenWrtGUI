@@ -37,7 +37,8 @@ The dialog then shows the upload, **Checking the image on …**, **Starting sysu
 back** with the time so far, and **Checking the new firmware**. A reflash checklist is saved first, and the flash
 is reported done only when the router answers again with the new board and revision. After a flash that kept
 settings, **Copy back lost files** lists the files the checklist saved, all ticked, and copies them back to the
-router with the usual preview.
+router with the usual preview. **Flash again** sets the finished flash aside and shows the form again, for
+example to flash the router back to the image it had.
 
 **Keep settings** (on by default) keeps `/etc/config`, the SSH host keys and the app's key, so the app reconnects
 by itself; the app also keeps its own saved firewall files (`/etc/owg`). Without it, the router comes back as
@@ -97,9 +98,10 @@ know `--help` may do something else, so it is previewed, refused during a run an
 Turns a program into named commands with checked parameters, filled in from its usage line: the first `{a|b|c}`
 group gives one command per choice, later groups become choice parameters. Edit each command's label and
 arguments (words; a parameter goes in as `{name}`), its parameters (a choice list, a text pattern or a number
-range) and **Changes the router**: every command counts as a change until you untick it, and read-only commands
-also run during a run. **Save card** checks the card and keeps it per board, so every router with that board
-shows it.
+range) and **Changes the router**: every command counts as a change until you untick it. A read-only command
+runs without taking the router's write lock, but it still waits while [Bench Guard](Bench-Guard) shows a run:
+the app cannot check that a custom program only reads. **Save card** checks the card and keeps it per board, so
+every router with that board shows it.
 
 A card has one button per command; pick one, fill in its parameters, check the exact command in the preview and
 **Run** it; what it printed is shown below. **Edit** reopens the card, **Remove** (twice) deletes it.

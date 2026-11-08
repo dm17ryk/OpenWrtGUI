@@ -271,8 +271,16 @@ class FlashService:
                 self._guard.require_clear()
                 await self._step(t, rec, plan.lines[-1])
                 return self._monotonic()
-            except (_Failed, GuardLocked, TransportError) as exc:
-                await self._remove(t, rec, path)
+            except Exception as exc:  # whatever stopped it before sysupgrade, the image does not stay behind
+                remover: Transport | None = t
+                if isinstance(exc, TransportError):  # that connection is gone: remove the file on a new one
+                    await self._pool.drop(rec.id)
+                    try:
+                        remover = await self._pool.get(rec)
+                    except TransportError:
+                        remover = None
+                if remover is not None:
+                    await self._remove(remover, rec, path)
                 if isinstance(exc, GuardLocked):
                     raise _Failed(f"Stopped before sysupgrade: Bench Guard sees {exc}") from exc
                 if isinstance(exc, TransportError):

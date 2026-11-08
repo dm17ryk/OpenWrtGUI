@@ -12,6 +12,8 @@ import pytest
 from openwrtgui.context import AppContext
 from openwrtgui.discovery.copy import CopyRequest
 from openwrtgui.guard.bench_guard import GuardLocked
+from openwrtgui.simimage import SimImage
+from openwrtgui.transport.base import CommandResult
 from openwrtgui.transport.fake import ReplayTransport
 
 MINI = Path(__file__).resolve().parents[2] / "fixtures" / "images" / "mini-r35692.bin"
@@ -90,6 +92,27 @@ async def test_checklist_lists_what_a_flash_loses(ctx: AppContext) -> None:
     assert c.profile is not None
     assert ctx.discovery.checklists.latest("ap2") == c
     assert len(list(ctx.data.reflash_dir.glob("ap2-*.json"))) == 1
+
+
+async def test_checklist_refused_when_the_keep_list_cannot_be_read(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Without `sysupgrade -l` every changed file would count as lost and be stored on this PC."""
+    import_mini(ctx)
+    real = SimImage.answer
+
+    def answer(self: SimImage, command: str) -> CommandResult | None:
+        if command == "sysupgrade -l":
+            return CommandResult(command, "", "sh: sysupgrade: not found\n", 127)
+        return real(self, command)
+
+    monkeypatch.setattr(SimImage, "answer", answer)
+    state = await ctx.discovery.state("ap2")
+    assert (state.kept_known, state.kept_on_flash) == (False, ())
+    refused = r"^Could not read what a flash keeps on AP2 · office \(sysupgrade -l\); no checklist saved$"
+    with pytest.raises(ValueError, match=refused):
+        await ctx.discovery.save_checklist("ap2")
+    assert ctx.discovery.checklists.latest("ap2") is None
 
 
 async def test_copy_back_from_a_checklist(ctx: AppContext) -> None:

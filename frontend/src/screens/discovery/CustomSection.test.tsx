@@ -130,7 +130,7 @@ test('stops and starts a custom service', async () => {
   ])
 })
 
-test('greys writes while Bench Guard is live', async () => {
+test('greys writes and every card command while Bench Guard is live', async () => {
   guard = LIVE
   cards = [{ ...PORTCTL_CARD, commands: PORTCTL_CARD.commands.map((c) => (c.label === 'port-status' ? { ...c, write: false } : c)) }]
   renderCustom()
@@ -141,5 +141,6 @@ test('greys writes while Bench Guard is live', async () => {
   expect(within(serviceRow('wifi-mirror')).getByRole('button', { name: 'Stop' })).toBeDisabled()
   const card = await screen.findByRole('region', { name: 'Card dwr921-portctl' })
   expect(within(card).getByRole('button', { name: 'port-enable' })).toBeDisabled()
-  expect(within(card).getByRole('button', { name: 'port-status' })).toBeEnabled()
+  // marked read-only, but a custom program cannot be checked as a read: it waits too
+  expect(within(card).getByRole('button', { name: 'port-status' })).toBeDisabled()
 })

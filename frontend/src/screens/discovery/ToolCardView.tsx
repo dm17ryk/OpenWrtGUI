@@ -88,7 +88,8 @@ export function ToolCardView({ routerId, card, live, busyTitle, onEdit, onRemove
       </div>
       <div className="row" style={{ flexWrap: 'wrap', gap: 6 }}>
         {card.commands.map((c) => {
-          const isWaiting = c.write && live
+          // during a run every card command waits: a custom program cannot be checked as a read
+          const isWaiting = live
           return (
             <button
               key={c.label}
@@ -118,7 +119,7 @@ export function ToolCardView({ routerId, card, live, busyTitle, onEdit, onRemove
           warnings={run.plan?.warnings ?? []}
           error={run.error}
           isBusy={run.isBusy}
-          isDisabled={(command?.write ?? true) && live}
+          isDisabled={live}
           applyLabel="Run"
           onApply={() => void run.run()}
           helpTopic={HELP.promote}

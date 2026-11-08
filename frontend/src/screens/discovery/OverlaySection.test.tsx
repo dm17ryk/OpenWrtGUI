@@ -49,6 +49,15 @@ test('lists added, changed and deleted with what a flash keeps', () => {
   expect(screen.getByText(/iperf3 3\.17\.1-r2/)).toBeVisible()
 })
 
+test('says so when what a flash keeps could not be read', () => {
+  const state: DiscoveryState = { ...AP1_DISCOVERY, kept_on_flash: [], kept_known: false }
+  renderWith(<OverlaySection routerId="ap1" state={state} />)
+  expect(screen.getByText(/Could not read what a flash keeps/)).toBeVisible()
+  const mirror = screen.getByText('/usr/sbin/wifi-mirror').closest('li') as HTMLElement
+  expect(within(mirror).getByText('kept or lost: unknown')).toBeVisible()
+  expect(screen.queryByText('lost on a flash')).not.toBeInTheDocument()
+})
+
 test('counts names that could not be read', () => {
   const state: DiscoveryState = { ...AP1_DISCOVERY, overlay: { ...AP1_DISCOVERY.overlay, unreadable: 1 } }
   renderWith(<OverlaySection routerId="ap1" state={state} />)

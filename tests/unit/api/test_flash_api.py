@@ -16,7 +16,7 @@ from openwrtgui.context import AppContext
 from openwrtgui.flash.plan import FlashRequest
 from openwrtgui.flash.service import FlashJob
 from openwrtgui.simimage import SimImage
-from openwrtgui.transport.base import CommandResult
+from openwrtgui.transport.base import CommandResult, TransportError
 
 FIX = Path(__file__).resolve().parents[2] / "fixtures" / "images"
 MINI = (FIX / "mini-r35692.bin").read_bytes()
@@ -92,6 +92,59 @@ async def test_validate_refusal_flashes_nothing(ctx: AppContext, monkeypatch: py
     assert job.phase == "failed"
     assert job.error == "AP2 · office refused the image: fwtool_device_match"
     assert not any("start-stop-daemon" in c for c in _calls(ctx))
+
+
+async def test_a_dropped_connection_removes_the_image_on_a_new_one(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _ready(ctx)
+
+    def upload(self: SimImage, command: str, data: bytes) -> CommandResult:
+        raise TransportError("connection lost")
+
+    monkeypatch.setattr(SimImage, "upload", upload)
+    transports: list[object] = []
+    real_get = ctx.pool.get
+
+    async def get(rec: object, **kwargs: object) -> object:
+        t = await real_get(rec, **kwargs)  # type: ignore[arg-type]
+        transports.append(t)
+        return t
+
+    dropped: list[str] = []
+    real_drop = ctx.pool.drop
+
+    async def drop(router_id: str) -> None:
+        dropped.append(router_id)
+        await real_drop(router_id)
+
+    monkeypatch.setattr(ctx.pool, "get", get)
+    monkeypatch.setattr(ctx.pool, "drop", drop)
+    job = await _flash(ctx)
+    assert job.phase == "failed"
+    assert job.error == "Stopped before sysupgrade: connection lost"
+    assert "ap2" in dropped
+    assert len({id(t) for t in transports}) >= 2  # the removal went over a new connection
+    assert f"rm -f /tmp/owg/fw-{REQ.sha256[:12]}.bin" in _calls(ctx)
+
+
+async def test_an_unexpected_answer_still_removes_the_image(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _ready(ctx)
+    real = SimImage.answer
+
+    def answer(self: SimImage, command: str) -> CommandResult | None:
+        if command.startswith("ubus call system validate_firmware_image"):
+            return CommandResult(command, "[]", "", 0)  # JSON, but not the object ubus answers
+        return real(self, command)
+
+    monkeypatch.setattr(SimImage, "answer", answer)
+    job = await _flash(ctx)
+    assert job.phase == "failed"
+    calls = _calls(ctx)
+    assert f"rm -f /tmp/owg/fw-{REQ.sha256[:12]}.bin" in calls
+    assert not any("start-stop-daemon" in c for c in calls)
 
 
 async def test_run_starting_during_upload_stops_before_sysupgrade(

@@ -71,9 +71,11 @@ export function FlashDialog({ routerId, routerName, board, revision, pollMs = 10
   const [isStarting, setStarting] = useState(false)
   const [keptSettings, setKeptSettings] = useState(true)
   const [isCopying, setCopying] = useState(false)
+  // the app keeps a router's last flash job; "Flash again" sets that one aside
+  const [dismissedAt, setDismissedAt] = useState<string | null>(null)
   const candidates = (images.data ?? []).filter((p) => p.source === 'image' && p.boards.includes(board))
   const chosen = candidates.find((p) => p.folder === folder) ?? candidates.find((p) => p.revision !== revision) ?? candidates[0] ?? null
-  const current = job.data ?? null
+  const current = job.data && job.data.started_at !== dismissedAt ? job.data : null
   const isBusy = isRunning(current)
   const body =
     chosen && (keep || isolated) && !isBusy
@@ -113,10 +115,24 @@ export function FlashDialog({ routerId, routerName, board, revision, pollMs = 10
         </button>
       </div>
       {current && <Progress job={current} name={routerName} />}
-      {phase === 'done' && keptSettings && !isCopying && (
-        <div>
-          <button className="btn" type="button" onClick={() => setCopying(true)}>
-            Copy back lost files
+      {phase === 'done' && (
+        <div className="row" style={{ gap: 8 }}>
+          {keptSettings && !isCopying && (
+            <button className="btn" type="button" onClick={() => setCopying(true)}>
+              Copy back lost files
+            </button>
+          )}
+          <button
+            className="btn"
+            type="button"
+            onClick={() => {
+              setDismissedAt(current?.started_at ?? null)
+              setCopying(false)
+              setTyped('')
+              setStartError(null)
+            }}
+          >
+            Flash again
           </button>
         </div>
       )}

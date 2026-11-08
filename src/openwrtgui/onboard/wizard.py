@@ -92,9 +92,12 @@ async def read_identity_unchecked(host: str, port: int, timeout: float = 10.0) -
         )
     except (OSError, TimeoutError, asyncssh.Error):
         return "", ""
-    async with conn:
-        release = await conn.run(RELEASE, check=False, timeout=timeout)
-        board = await conn.run(SYSTEM_BOARD, check=False, timeout=timeout)
+    try:
+        async with conn:
+            release = await conn.run(RELEASE, check=False, timeout=timeout)
+            board = await conn.run(SYSTEM_BOARD, check=False, timeout=timeout)
+    except (OSError, TimeoutError, asyncssh.Error):  # a router still booting: the usual changed-key check
+        return "", ""
     return identity_of(str(release.stdout or ""), str(board.stdout or ""))
 
 

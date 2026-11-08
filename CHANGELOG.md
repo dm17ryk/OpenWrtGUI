@@ -20,9 +20,9 @@ Image import and Discovery.
   from the image's defaults (configs made at first boot are named, not read), copy files to another router with
   each copy proven by its sha256, and reflash checklists that keep the files a flash would lose.
 - The bench's own packages and programs added after flashing, with their usage text: **Run --help** (previewed
-  and audited), **Promote** to a card of named commands with checked parameters (kept per board; read-only
-  commands also run during a run), and Start, Stop and Restart for custom services, proven by reading the state
-  back.
+  and audited), **Promote** to a card of named commands with checked parameters (kept per board; every card
+  command waits while Bench Guard shows a run), and Start, Stop and Restart for custom services, proven by
+  reading the state back.
 - Flash from an imported image: exact preview, the image validated on the router (`validate_firmware_image`,
   `sysupgrade -T`), `sysupgrade` started by a router-side timer, progress through the reboot, and done only when
   the router answers with the new board and revision. Keep settings, or flash without them after confirming the

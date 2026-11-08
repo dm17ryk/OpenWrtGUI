@@ -46,14 +46,25 @@ def _mb(size: int) -> int:
     return max(1, round(size / 2**20))
 
 
+def _safe(path: str) -> bool:
+    return bool(SAFE_PATH.fullmatch(path)) and "/../" not in f"{path}/" and "/./" not in f"{path}/"
+
+
+def _secret(path: str) -> bool:
+    """The router's password hashes and SSH host keys: never stored on this PC."""
+    return path == "/etc/shadow" or path.startswith("/etc/dropbear/")
+
+
 def check_copy_path(path: str, *, other_router: bool) -> None:
-    if not SAFE_PATH.fullmatch(path) or "/../" in f"{path}/" or "/./" in f"{path}/":
+    if not _safe(path):
         raise ValueError(f"{path} has characters a copy does not take")
     if other_router and (path == "/etc/shadow" or path.startswith(_OWN)):
         raise ValueError(f"{path} is the router's own key or password; it is not copied")
 
 
 async def _read(t: Transport, path: str) -> bytes:
+    if not _safe(path):  # the path goes into a command: callers check it, this makes sure
+        raise ValueError(f"{path} has characters a copy does not take")
     stream = getattr(t, "stream", None)
     if stream is None:
         raise TransportError("This connection cannot read files")
@@ -68,12 +79,17 @@ async def _read(t: Transport, path: str) -> bytes:
 
 
 async def read_files(t: Transport, entries: Sequence[OverlayEntry], *, strict: bool) -> tuple[SavedFile, ...]:
-    """The entries' contents. strict (a copy): over a limit is refused. Not strict (a checklist): a file over
-    a limit is listed without its contents."""
+    """The entries' contents. strict (a copy): an unsafe name or a file over a limit is refused. Not strict
+    (a checklist): those, and the router's password hashes and host keys, are listed without contents."""
     out: list[SavedFile] = []
     total = 0
     for e in entries:
         mode = f"{mode_bits(e.mode):04o}"
+        if not _safe(e.path):
+            if strict:
+                raise ValueError(f"{e.path} has characters a copy does not take")
+            out.append(SavedFile(path=e.path, kind="file", mode=mode, size=e.size, sha256=None))
+            continue
         if e.kind == "link":
             if e.target is None or not _TARGET.fullmatch(e.target):
                 if strict:
@@ -90,7 +106,7 @@ async def read_files(t: Transport, entries: Sequence[OverlayEntry], *, strict: b
             if e.size > MAX_FILE:
                 raise ValueError(f"{e.path} is {_mb(e.size)} MB; a copy takes files up to 1 MB")
             raise ValueError("A copy takes at most 4 MB in all")
-        if too_big:
+        if too_big or (not strict and _secret(e.path)):
             out.append(SavedFile(path=e.path, kind="file", mode=mode, size=e.size, sha256=None))
             continue
         data = await _read(t, e.path)

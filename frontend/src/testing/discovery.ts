@@ -419,6 +419,7 @@ export const AP1_DISCOVERY: DiscoveryState = {
   "kept_on_flash": [
     "/etc/config/dropbear"
   ],
+  "kept_known": true,
   "custom": [
     {
       "package": "dwr921-diag",

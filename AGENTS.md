@@ -24,8 +24,8 @@ in `docs/superpowers/plans/`.
 | `src/openwrtgui/fw/` | Firewall: fw4 config and `nft -j` / `nft -a` parsers, the filtering model and pins, zones and sections compiled to uci ops, other nft tables and custom rule files (router-side timer rollback), owners |
 | `src/openwrtgui/faults/` | Fault targets, the `benchfault` chains, netem, port and hostapd faults, records in `/tmp/owg`, held faults cleared by the router's timer |
 | `src/openwrtgui/capture/` | `tcpdump -w -` over a binary SSH channel to a `.pcap` or Wireshark, the app's own SSH filtered out |
-| `src/openwrtgui/images/` | Sysupgrade images read on this PC (uImage, squashfs via PySquashfsImage, fwtool metadata), apk/opkg databases, profiles; kept in `<data>/images/<board>/<revision>-<sha12>/` |
-| `src/openwrtgui/discovery/` | Overlay, package and config diffs against the image, capabilities, copies, reflash checklists (`<data>/checklists/<router>/`), promoted tool cards (`<data>/tools/<board>.json`), custom services |
+| `src/openwrtgui/images/` | Sysupgrade images read on this PC (uImage, squashfs via PySquashfsImage, fwtool metadata), apk/opkg databases, profiles; kept in `<data>/profiles/<board>/<revision>-<sha12>/` (`profile.json`, and `image.bin` for an imported image) |
+| `src/openwrtgui/discovery/` | Overlay, package and config diffs against the image, capabilities, copies, reflash checklists (`<data>/reflash/<router>-<stamp>.json`), promoted tool cards (`<data>/tools/<board>.json`), custom services |
 | `src/openwrtgui/flash/` | Flash plan (board, hash, RAM and isolation checks), upload to `/tmp/owg`, router-side timer for `sysupgrade`, come-back and revision proof |
 | `frontend/src/` | React screens (`screens/`), shell (`shell/`), API client and generated types (`api/`) |
 | `tests/` | `unit/`, `contract/` (recorded AP2 output replayed), `hardware/` (opt-in), `fixtures/` |

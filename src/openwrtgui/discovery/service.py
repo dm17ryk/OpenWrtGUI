@@ -26,6 +26,7 @@ from openwrtgui.fw.owners import nft_objects, tc_hooks
 from openwrtgui.fw.tc import parse_qdiscs
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
+from openwrtgui.guard.readonly import is_read_only_command
 from openwrtgui.guard.writes import run_audited, run_audited_upload, upload_line
 from openwrtgui.images.profile import Profile, build_rom_profile
 from openwrtgui.images.store import ProfileStore
@@ -192,7 +193,8 @@ class DiscoveryService:
     ) -> HelpResult:
         rec, card, command = await self._card_command(router_id, path, label, values)
         write = next(c.write for c in card.commands if c.label == label)
-        if write:
+        # the user's "read-only" tick is not proof: during a run only what the read-only check accepts runs
+        if write or not is_read_only_command(command):
             self._guard.require_clear()
         plan = net_plan(router_id=rec.id, screen=SCREEN, config=None, ops=[], current={}, commands=[command])
         if plan.digest != digest:
@@ -203,7 +205,7 @@ class DiscoveryService:
                 result = await run_audited(
                     t, command, router_id=rec.id, screen=SCREEN, guard=self._guard, audit=self._audit
                 )
-        else:  # a read-only card command runs during a run too (spec 6: reading keeps working)
+        else:  # marked read-only: no write lock (and during a run only if the read-only check accepted it)
             result = await run_audited(
                 t,
                 command,
@@ -423,6 +425,10 @@ class DiscoveryService:
         state = await read_discovery(
             t, router_id=rec.id, identity=desc.identity, profile=profile, now=self._clock()
         )
+        if not state.kept_known:
+            raise ValueError(
+                f"Could not read what a flash keeps on {rec.name} (sysupgrade -l); no checklist saved"
+            )
         lost = [
             e for e in (*state.overlay.added, *state.overlay.replaced) if e.path not in state.kept_on_flash
         ]

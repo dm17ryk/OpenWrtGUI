@@ -2469,6 +2469,11 @@ export interface components {
             custom: components["schemas"]["CustomRow"][];
             /** Has Overlay */
             has_overlay: boolean;
+            /**
+             * Kept Known
+             * @default true
+             */
+            kept_known: boolean;
             /** Kept On Flash */
             kept_on_flash: string[];
             /** Match Note */

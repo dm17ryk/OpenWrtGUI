@@ -129,7 +129,7 @@ export function CustomSection({ routerId, state }: { routerId: string; state: Di
       </div>
       {live && guard.data && (
         <div className="note w">
-          A harness run is live ({guardReasonText(guard.data)}): Run --help, commands that change the router and services wait for it to end.
+          A harness run is live ({guardReasonText(guard.data)}): Run --help, card commands and services wait for it to end.
         </div>
       )}
       {state.custom.length === 0 && <div className="muted">The image has no custom packages.</div>}

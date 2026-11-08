@@ -74,6 +74,7 @@ class DiscoveryState(BaseModel):
     packages: PackageDiff
     configs: tuple[ConfigDiff, ...]
     kept_on_flash: tuple[str, ...]
+    kept_known: bool = True  # False: `sysupgrade -l` failed, so what a flash keeps is unknown
     custom: tuple[CustomRow, ...]
     programs: tuple[ProgramRow, ...]
     services: tuple[ServiceRow, ...] = ()
@@ -211,7 +212,8 @@ async def read_discovery(
         shown = await t.run(cmd.uci_show(name))
         configs[name] = _masked(parse_uci_show(shown.stdout)) if shown.ok else {}
     image_configs = {k: _masked(v) for k, v in profile.configs.items()}
-    kept = set((await t.run(cmd.SYSUPGRADE_LIST)).stdout.split())
+    keep_list = await t.run(cmd.SYSUPGRADE_LIST)
+    kept = set(keep_list.stdout.split()) if keep_list.ok else set()
     owned = {f for p in live for f in p.files}
     custom = await _custom_rows(t, profile, live, card_paths)
     programs: list[ProgramRow] = []
@@ -229,6 +231,7 @@ async def read_discovery(
             "packages": diff_packages(live, profile),
             "configs": diff_configs(configs, profile.model_copy(update={"configs": image_configs})),
             "kept_on_flash": tuple(e.path for e in (*overlay.added, *overlay.replaced) if e.path in kept),
+            "kept_known": keep_list.ok,
             "custom": custom,
             "programs": tuple(programs),
             "services": await _services(t, custom, overlay, owned),
