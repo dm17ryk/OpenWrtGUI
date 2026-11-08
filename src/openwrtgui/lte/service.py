@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import weakref
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Literal
@@ -36,6 +37,7 @@ POLL_S = 2.0  # the nominal step: CONNECT_S / POLL_S polls, whatever poll_s is s
 READBACK_TRIES = 3
 NO_ADDRESS = "no address yet: waiting for the carrier's DHCP"
 DROPS = "{name}'s LTE session drops; devices that route through it lose the internet until it is back"
+NOT_IN_MODE = "The modem did not go {mode}{why}; it may need ifup lte or a power cycle"
 
 
 NEEDS_CONFIRM = "This command may change the modem; send it again with confirm"
@@ -89,7 +91,8 @@ class LteService:
         self._net = net
         self._clock = clock
         self._sleep = sleep
-        self._ports: dict[str, tuple[int, str | None]] = {}  # router → (connection, AT port found on it)
+        # router → (connection, AT port that answered on it); only a found port is kept
+        self._ports: dict[str, tuple[weakref.ref[Transport], str]] = {}
         self._busy: dict[str, asyncio.Lock] = {}
         self.poll_s = POLL_S
         self.readback_s = 1.0
@@ -110,20 +113,31 @@ class LteService:
         return device if device is not None and MODEM_DEVICE.fullmatch(device) else None
 
     async def at_port(self, rec: RouterRecord, t: Transport) -> str | None:
-        """D4: found once per connection (a reconnect may follow a modem that re-enumerated)."""
+        """D4: a port that answered is kept for this connection; none found is probed again next time (a modem
+        plugged in or still enumerating), and a kept port that stops answering is dropped (`forget_port`)."""
         cached = self._ports.get(rec.id)
-        if cached is not None and cached[0] == id(t):
+        if cached is not None and cached[0]() is t:
             return cached[1]
         port = await find_at_port(t)
-        self._ports[rec.id] = (id(t), port)
+        if port is None:
+            self._ports.pop(rec.id, None)
+        else:
+            self._ports[rec.id] = (weakref.ref(t), port)
         return port
+
+    def forget_port(self, router_id: str) -> None:
+        """The kept AT port gave no answer (the modem re-enumerated): probe again on the next use."""
+        self._ports.pop(router_id, None)
 
     async def state(self, router_id: str) -> LteState:
         rec = self._record(router_id)
         qmi = await self._qmi(router_id)
         t = await self._pool.get(rec)
         port = await self.at_port(rec, t) if qmi is not None else None
-        return await read_lte(t, router_id=rec.id, qmi=qmi, at_port=port, now=self._clock())
+        state = await read_lte(t, router_id=rec.id, qmi=qmi, at_port=port, now=self._clock())
+        if "AT" in state.missing:
+            self.forget_port(rec.id)
+        return state
 
     # ---------------------------------------------------------------- connect, disconnect, reboot modem
     async def _lte_device(self, router_id: str) -> str | None:
@@ -190,20 +204,22 @@ class LteService:
                 (lines[2], lines[3], "online"),
             ):
                 done = await self._cmd(rec, t, set_line)
-                if not done.ok:
-                    return NetApplyResult(
-                        rec.id, False, False, tuple(checks), f"{set_line}: {_reason(done)}", rec.host
-                    )
+                if not done.ok and not checks:  # the first line: nothing changed yet
+                    return NetApplyResult(rec.id, False, False, (), f"{set_line}: {_reason(done)}", rec.host)
+                if not done.ok:  # low_power went through: say where the modem was left
+                    checks.append(NetCheck(f"modem {mode}", False, _reason(done)))
+                    error = NOT_IN_MODE.format(mode=mode, why=f" ({_reason(done)})")
+                    return NetApplyResult(rec.id, True, False, tuple(checks), error, rec.host)
                 ok = await self._readback(rec, t, read_line, mode)
                 checks.append(NetCheck(f"modem {mode}", ok, mode if ok else f"still not {mode}"))
                 if not ok:
-                    error = f"The modem did not go {mode}; it may need ifup lte or a power cycle"
+                    error = NOT_IN_MODE.format(mode=mode, why="")
                     return NetApplyResult(rec.id, True, False, tuple(checks), error, rec.host)
         command = c.IFDOWN_LTE if action == "disconnect" else c.IFUP_LTE
         done = await self._cmd(rec, t, command)
-        if not done.ok:
+        if not done.ok:  # after a reboot the modem's mode did change: that counts as applied
             return NetApplyResult(
-                rec.id, False, False, tuple(checks), f"{command}: {_reason(done)}", rec.host
+                rec.id, bool(checks), False, tuple(checks), f"{command}: {_reason(done)}", rec.host
             )
         if action == "disconnect":
             down = await self._wait_up(t, want=False, limit_s=DISCONNECT_S)
@@ -297,10 +313,16 @@ class LteService:
                 require_guard=False,
             )
         else:
-            async with self._pool.write_lock(rec.id):
+            # one LTE write at a time, as the actions: a command that may change the modem never waits behind
+            # a connect or reboot to run later; it is refused (409)
+            busy = self._busy.setdefault(rec.id, asyncio.Lock())
+            if busy.locked():
+                raise LteBusy(f"An LTE action is already running on {rec.name}")
+            async with busy, self._pool.write_lock(rec.id):
                 done = await self._cmd(rec, t, line)
         answer = parse_at(done.stdout, command)
         if answer is None:
+            self.forget_port(rec.id)  # the next command probes again: the modem may have re-enumerated
             return AtResult(command=command, lines=(), status="no answer", error=NO_MODEM_ANSWER)
         return AtResult(command=command, lines=answer.lines, status=answer.status, error=answer.error)
 

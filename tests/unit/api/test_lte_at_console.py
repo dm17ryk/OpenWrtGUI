@@ -44,6 +44,24 @@ async def test_at_text_is_one_shell_quoted_printf_argument(ctx: AppContext) -> N
     assert _commands(ctx)[-1] == _microcom('\'AT+CGDCONT=1,"IP","a$(x)b"\'')
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "AT+CPIN=1234",
+        'AT+CPIN="1234"',
+        'at+clck="SC",0,"1234"',
+        'AT+CPWD="SC","1234","5678"',
+        "AT+CPIN=12'34",
+    ],
+)
+async def test_a_sim_pin_sent_in_the_console_is_hidden_in_the_audit(ctx: AppContext, text: str) -> None:
+    result = await ctx.lte.at_command("ap2", text, confirmed=True)
+    assert result.status == "OK"
+    commands = _commands(ctx)
+    assert "<hidden>" in commands[-1]
+    assert not any(pin in command for command in commands for pin in ("1234", "5678", "34"))
+
+
 async def test_at_console_during_a_run(ctx_guard_live: AppContext) -> None:
     csq = await ctx_guard_live.lte.at_command("ap2", "AT+CSQ", confirmed=False)
     assert (csq.status, csq.lines) == ("OK", ("+CSQ: 20,99",))

@@ -119,6 +119,8 @@ async def at_command(router_id: str, body: AtIn, ctx: Ctx) -> AtResult:
         return await ctx.lte.at_command(_known(ctx, router_id), body.command, body.confirmed)
     except AtNeedsConfirm as exc:
         raise HTTPException(status_code=428, detail=str(exc)) from exc
+    except LteBusy as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.post("/imei")

@@ -112,7 +112,9 @@ async def read_lte(
     counters = await _json(t, c.device_status(l3)) if isinstance(l3, str) and c.NETDEV.fullmatch(l3) else None
     stats = counters.get("statistics") if isinstance(counters, dict) else None
     modem = await read_modem_info(t, at_port)
-    if at_port is None:
+    if at_port is not None and modem.model_dump(exclude={"at_port"}, exclude_none=True) == {}:
+        modem = ModemInfo()  # the port answered once and is silent now: the modem re-enumerated
+    if modem.at_port is None:
         missing.append("AT")
     operator = modem.operator
     source: Literal["at", "qmi"] | None = "at" if operator else None

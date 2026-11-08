@@ -50,6 +50,9 @@ _UCI_SECRET = re.compile(
 )
 # The same options in JSON (ubus call uci set / ubus call network …).
 _JSON_SECRET = re.compile(rf"(\"(?:{_SECRET_OPTIONS})\"\s*:\s*)\"(?:[^\"\\]|\\.)*\"")
+# SIM PINs sent as AT commands (3GPP 27.007 +CPIN, +CLCK, +CPWD): everything after `=` up to the end of the
+# shell-quoted argument (a ' inside written as '\''), so neither the PIN nor its pieces stay visible.
+_AT_SECRET = re.compile(r"(\+(?:CPIN|CLCK|CPWD)=)((?:'\\''|[^'\r\n])*)", re.IGNORECASE)
 
 
 def _hide_value(match: re.Match[str]) -> str:
@@ -77,6 +80,7 @@ def mask(command: str, secrets: Sequence[str]) -> str:
         if secret:
             command = command.replace(secret, HIDDEN)
     command = _UCI_SECRET.sub(_hide_value, command)
+    command = _AT_SECRET.sub(rf"\1{HIDDEN}", command)
     return _JSON_SECRET.sub(rf'\1"{HIDDEN}"', command)
 
 

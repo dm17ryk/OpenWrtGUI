@@ -10,6 +10,7 @@ import pytest
 from openwrtgui.context import AppContext
 from openwrtgui.guard.bench_guard import GuardLocked
 from openwrtgui.lte.service import LteBusy
+from openwrtgui.transport.base import CommandResult
 from openwrtgui.transport.fake import ReplayTransport
 from openwrtgui.wifi.service import PreviewChanged
 
@@ -83,6 +84,39 @@ async def test_a_modem_that_stays_low_power_stops_before_ifup(ctx: AppContext) -
     assert "ifup lte" not in _calls(ctx)
 
 
+async def _refuse(ctx: AppContext, line: str) -> None:
+    modem = await _modem(ctx)
+    real = modem.answer
+
+    def refusing(command: str) -> CommandResult | None:
+        return CommandResult(command, "", "Request failed\n", 1) if command == line else real(command)
+
+    modem.answer = refusing  # type: ignore[method-assign]
+
+
+async def test_a_failed_online_step_says_the_modem_was_left_in_low_power(ctx: AppContext) -> None:
+    await _refuse(ctx, ONLINE)
+    plan = await ctx.lte.plan_action("ap2", "reboot")
+    result = await ctx.lte.apply_action("ap2", "reboot", plan.digest)
+    assert (result.applied, result.verified) == (True, False)
+    assert (
+        result.error == "The modem did not go online (Request failed); it may need ifup lte or a power cycle"
+    )
+    assert {c.name: c.ok for c in result.checks} == {"modem low_power": True, "modem online": False}
+    assert "ifup lte" not in _calls(ctx)
+
+
+async def test_a_failed_ifup_after_the_reboot_still_counts_as_applied(ctx: AppContext) -> None:
+    await _refuse(ctx, "ifup lte")
+    plan = await ctx.lte.plan_action("ap2", "reboot")
+    result = await ctx.lte.apply_action("ap2", "reboot", plan.digest)
+    assert (result.applied, result.verified) == (True, False)
+    assert result.error == "ifup lte: Request failed"
+    connect = await ctx.lte.plan_action("ap2", "connect")
+    nothing = await ctx.lte.apply_action("ap2", "connect", connect.digest)
+    assert (nothing.applied, nothing.error) == (False, "ifup lte: Request failed")
+
+
 async def test_actions_wait_for_the_run(ctx_guard_live: AppContext) -> None:
     ctx_guard_live.lte.poll_s = ctx_guard_live.lte.readback_s = 0.0
     plan = await ctx_guard_live.lte.plan_action("ap2", "disconnect")
@@ -108,6 +142,34 @@ async def test_one_lte_action_at_a_time(ctx: AppContext) -> None:
         await ctx.lte.apply_action("ap2", "connect", connect.digest)
     gate.set()
     await first
+
+
+async def test_an_at_command_that_may_change_the_modem_waits_for_no_action(
+    ctx: AppContext, authed: httpx.AsyncClient
+) -> None:
+    gate = asyncio.Event()
+
+    async def slow(_s: float) -> None:
+        await gate.wait()
+
+    (await _modem(ctx)).stays_low_power = True
+    ctx.lte.readback_s = 1.0
+    ctx.lte._sleep = slow  # type: ignore[assignment]
+    plan = await ctx.lte.plan_action("ap2", "reboot")
+    first = asyncio.create_task(ctx.lte.apply_action("ap2", "reboot", plan.digest))
+    await asyncio.sleep(0.05)
+    try:
+        with pytest.raises(LteBusy, match=r"^An LTE action is already running on AP2 · office$"):
+            await asyncio.wait_for(ctx.lte.at_command("ap2", "AT+CFUN=0", confirmed=True), 2.0)
+        body = {"command": "AT+CFUN=0", "confirmed": True}
+        refused = await asyncio.wait_for(authed.post("/api/routers/ap2/lte/at", json=body), 2.0)
+        assert refused.status_code == 409
+        query = await asyncio.wait_for(ctx.lte.at_command("ap2", "AT+CSQ", confirmed=False), 2.0)
+        assert query.status == "OK"  # a query still runs
+    finally:
+        gate.set()
+        await first
+    assert not any("AT+CFUN=0" in c for c in _calls(ctx))
 
 
 async def test_stale_digest(ctx: AppContext) -> None:

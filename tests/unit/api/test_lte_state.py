@@ -5,7 +5,9 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import httpx
+import pytest
 
+from openwrtgui import simmodem
 from openwrtgui.context import AppContext
 from openwrtgui.lte.state import read_lte
 from openwrtgui.transport.base import CommandResult
@@ -41,6 +43,36 @@ async def test_state_without_a_modem(ctx: AppContext) -> None:
     s = await ctx.lte.state("ap2")
     assert {"signal", "serving system", "operating mode", "AT"} <= set(s.missing)
     assert s.up is True and s.rsrp is None and s.operator is None
+
+
+async def test_a_modem_plugged_in_later_is_found(ctx: AppContext) -> None:
+    t = await _sim(ctx)
+    assert t.state is not None and t.state.modem is not None
+    t.state.modem.plugged = False
+    assert "AT" in (await ctx.lte.state("ap2")).missing
+    t.state.modem.plugged = True
+    s = await ctx.lte.state("ap2")
+    assert s.modem.at_port == "/dev/ttyUSB2" and "AT" not in s.missing
+
+
+async def test_an_at_port_that_goes_silent_is_named_then_found_again(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert (await ctx.lte.state("ap2")).modem.at_port == "/dev/ttyUSB2"
+    monkeypatch.setattr(simmodem, "AT_PORT", "/dev/ttyUSB1")  # the modem re-enumerated; SSH stayed up
+    silent = await ctx.lte.state("ap2")
+    assert "AT" in silent.missing and silent.modem.manufacturer is None
+    again = await ctx.lte.state("ap2")
+    assert again.modem.at_port == "/dev/ttyUSB1" and "AT" not in again.missing
+
+
+async def test_the_console_finds_the_port_again_after_no_answer(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert (await ctx.lte.at_command("ap2", "AT+CSQ", confirmed=False)).status == "OK"
+    monkeypatch.setattr(simmodem, "AT_PORT", "/dev/ttyUSB1")
+    assert (await ctx.lte.at_command("ap2", "AT+CSQ", confirmed=False)).status == "no answer"
+    assert (await ctx.lte.at_command("ap2", "AT+CSQ", confirmed=False)).status == "OK"
 
 
 async def test_the_operator_falls_back_to_qmi_without_at(ctx: AppContext) -> None:
