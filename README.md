@@ -14,12 +14,25 @@ is connected, and how each router describes itself. It never disturbs a test run
 
 ![Dashboard: three routers, the 2.4 GHz air map and one station](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/dashboard.png)
 
-> v0.4 adds the firewall and faults: both filtering models per zone with the rules that keep the app's own
-> path open, every nftables table with its owner, and faults from a pulled cable to netem, held by a timer
-> on the router, plus capture to Wireshark. v0.3 added the network (addresses with a router-side rollback,
-> DHCP, DNS, routes, ports and VLANs); v0.2 Wi-Fi with proof on air, RF live and the LuCI fallback; v0.1
-> the foundation: install, update, add routers, the dashboard, Bench Guard, the terminal and the audit
-> log. LTE and image import follow; see the [roadmap](ROADMAP.md).
+> v0.5 adds image import and Discovery: import a router's sysupgrade image and see what changed on the
+> router since flashing, the bench's own packages and programs as cards, and flash a router from an image.
+> v0.4 added the firewall and faults: both filtering models per zone, every nftables table with its owner,
+> and faults from a pulled cable to netem, plus capture to Wireshark. v0.3 added the network (addresses with
+> a router-side rollback, DHCP, DNS, routes, ports and VLANs); v0.2 Wi-Fi with proof on air, RF live and the
+> LuCI fallback; v0.1 the foundation: install, update, add routers, the dashboard, Bench Guard, the terminal
+> and the audit log. LTE follows; see the [roadmap](ROADMAP.md).
+
+## What v0.5 adds
+
+| Screen | What you get |
+|---|---|
+| **Settings › Images** | Import a router's sysupgrade `.bin`: the app reads its squashfs on this PC and keeps a profile per board and revision (packages, configs, the bench's own packages with their usage text). A router whose image you do not have can build a profile from its own `/rom`. |
+| **Discovery** | Per router: the image it matches and a firmware check, the files and packages added after flashing (and which a flash would lose), configs changed from the image's defaults, copy files to another router, and a reflash checklist. The bench's own packages and programs show their usage; run `--help`, promote a program to a card of named commands with checked parameters, and start, stop or restart custom services. |
+| **Flash** | Flash a router from an imported image: the exact steps in the preview, the router validates the image first, a timer on the router starts `sysupgrade`, and the flash counts only when the router answers with the new revision. Keep settings, or flash clean after confirming the router is isolated; the wizard then expects its new key. |
+
+| Discovery |
+|---|
+| ![Discovery](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/discovery.png) |
 
 ## What v0.4 adds
 

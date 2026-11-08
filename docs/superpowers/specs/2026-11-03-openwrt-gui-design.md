@@ -233,6 +233,9 @@ Mockups for screens 1–12 are on the canvas (`docs/design/canvas/project/`). Sc
 - **Wi-Fi mirror** (`wifi-mirror` where present): status, stop/restart, excluded MACs, warning before iperf.
   v0.3 shows the status only (present, running or stopped, from `ubus call service list`); stop/restart, the
   excluded MACs and the iperf warning come with image import (v0.5), which reads how `wifi-mirror` is set up.
+  *v0.5 note* (plan D7): `wifi-mirror` is not in the bench image (AP1 added it after flashing), so how it is set
+  up cannot be read; its service gets Start, Stop and Restart on Discovery › Custom services where a router has
+  it, and the excluded MACs and the iperf warning stay deferred.
 
 ### 7.6 Firewall (4)
 
@@ -261,6 +264,15 @@ Mockups for screens 1–12 are on the canvas (`docs/design/canvas/project/`). Sc
 ### 7.8 Discovery and tools (6)
 - **What the router says about itself** (section 5): model and board file, services found, feature flags, LuCI pages installed. LuCI pages without a native screen are listed with **Open in LuCI** (7.14) and a note that they have no native screen yet.
 - Image match and firmware hash; capability map (in image / added after flashing / missing); your custom packages (card, service, or "no card yet" with `--help` and Promote); files added after flashing (copy to another router, save as a reflash checklist); config changed vs image defaults, with diff.
+- *v0.5 note*: "What the router says about itself" stays on the router's Overview; Discovery is its own screen
+  per router. **Run `--help`** counts as a write (plan D3): previewed, refused during a run, audited, run with
+  `timeout 5` and cut at 8 KB; the usage text read from the image is shown first, without running anything (an
+  unknown program such as `dwr921-internet-led` would start its loop). The **firmware check** (D4) hashes the
+  firmware partition (11 MB through `sha256sum`) only when asked and not during a run. A custom package is an apk
+  entry with neither a license nor a URL; promoted cards are kept per board; custom services (an init script from
+  a custom package or added after flashing) get Start, Stop and Restart now, other services wait for System ›
+  Services. Configs created at first boot (`network`, `wireless`) have no image default and are named, not read.
+  **Flash lives on Discovery** (D11), next to the image match; System › Backup and firmware (7.11) will link to it.
 - **Phase 2** (D17): each capability chip links to its own tool page. Planned pages:
   - Throughput: iperf3 / iperf 2, router as server or client.
   - Air survey: `iw` scan and survey.
@@ -297,6 +309,14 @@ The wizard described in section 5.
   - backup download (`sysupgrade -b`), restore
   - reset to defaults (`firstboot`), with a warning that the LAN address returns to 192.168.1.1 and would clash with AP1
   - **Flash firmware from an imported image**: board and hash checked, keep-settings option, upload over scp, `sysupgrade -T` on the router, flash, reconnect, verify the new revision. Files added after flashing can be copied back afterwards (list from Discovery). Without keep settings the router returns like `firstboot` (192.168.1.1, no password, no key), so the app asks for the router to be isolated first; the expected host-key change is accepted only after the board and revision check.
+  - *v0.5 note*: built on Discovery (plan D11). The image goes up over the SSH channel's stdin (`cat > /tmp/owg/…`)
+    instead of scp, through the same audited write path as every other change; its sha256 is checked, then `validate_firmware_image` and `sysupgrade -T`;
+    `sysupgrade` is started 2 s later by a router-side timer (O15), so the app's connection dropping does not
+    matter. A flash that keeps settings also keeps `/etc/owg/` (D5) by adding that line to `/etc/sysupgrade.conf`
+    when it is missing. Done means the router answered again with a fresh uptime, the image's board and its
+    revision. A reflash checklist is saved before every flash. Without keep settings (D6) the router entry shows
+    "Reflashed without settings: add it again" and the wizard reads the board and revision over one unchecked,
+    unpinned connection before accepting the new key; built and tested in the simulator only (O17).
   - reboot
 - Status: overview, routes, system log, kernel log, processes, realtime load/bandwidth/connections, diagnostics (ping, traceroute, nslookup run on the router).
 
@@ -426,6 +446,7 @@ Each milestone gets its own implementation plan. The first plan covers v0.1 Foun
 | O14 | rpcd `uci apply` with rollback and `uci confirm` work from SSH, with the confirm sent over a second SSH connection | **Done 2026-11-05 on AP2** (`tools/rollback_spike.py`, throwaway config `owgprobe`, nothing reloaded): a value staged in an rpcd session and applied with a 10 s rollback was committed, then restored by rpcd 10 s later with no confirm; with a 30 s rollback and `uci confirm` sent from a new SSH connection it stayed. `session destroy` also removes the session's staging folder. **2026-11-06 on AP2 with real `network` changes** (`tests/hardware/test_ap2_network.py`): lan `192.168.1.2/30` (cuts the PC off at the same address) and lan `192.168.77.2/24` were never confirmed and AP2 restored itself, back at `.2` with its previous config; a free port off and on, the switch mirror on and off and a `/32` route were applied, proven and undone. The address follow to `.12` was not confirmed because the app compared a host key of another type than the one pinned (fixed: it asks for the pinned type), and the DNS check looked before procd had restarted dnsmasq (fixed: it waits). **Re-run 2026-11-06 with both fixes: 7 of 7 passed** — the follow to `.12` reconnected, proved and confirmed in 11.7 s; the two cuts were never confirmed and restored in 70 s and 75 s; the DNS change was proven after dnsmasq's restart; AP2 was left as found |
 | O15 | A router-side timer that outlives the SSH connection (`start-stop-daemon -b` shell in `/tmp/owg`), for rollback of non-uci firewall changes and for held faults | **Done 2026-11-07 on AP2** (`tools/timer_spike.py`, `build/o15.json`): a 10 s timer fired after the SSH connection closed, and a 30 s timer was cancelled from a new connection; nothing was left in `/tmp`. In the firewall and faults window that followed (`tests/hardware/test_ap2_firewall.py`, `test_ap2_faults.py`, 15:24-15:31): an `all_in` block held 15 s was cleared on time by the router's timer after the app dropped its connection, LAN2 held down 10 s came back by the timer, and an app table add/edit/delete ran under the timer rollback and was confirmed. Also proven there: lan input Block all with the SSH pin confirmed in 8 s; without the pin AP2 rolled back by itself in 66 s; a 5 s br-lan capture held none of the app's own SSH packets. Two failures found and fixed test-first: a new traffic rule was refused (uci exits 1 on `-q delete` of an option the new section lacks), and the netem check read `tc qdisc show dev X`, which leaves out `dev X` (netem itself, on `ets`, was set). Both passed when re-run on AP2 the same day (21:59-22:01, `test_rule_add_and_delete` and `test_netem_to_target_and_clear`); the run left only an empty `/tmp/owg`, removed by hand. AP2 ended as found |
 | O16 | Wi-Fi faults on air: deauth, ban for N s, AP down | Open: built and tested in the simulator; needs a radio window on AP2 (its radio stays parked) |
+| O17 | Flash from the app on AP2: upload and validate in `/tmp/owg`, then a flash that keeps settings, the come-back and the revision proof, and flashing back. Flash without keeping settings is simulator-only (AP2 would return as 192.168.1.1, clashing with AP1) | Open: built and tested in the simulator (unit tests and the e2e flash of the simulated AP2); needs Dmitry's OK for an AP2 write window, the txctl session told and its run over |
 
 ## 14. Out of scope
 

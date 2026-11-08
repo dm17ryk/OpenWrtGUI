@@ -24,6 +24,9 @@ in `docs/superpowers/plans/`.
 | `src/openwrtgui/fw/` | Firewall: fw4 config and `nft -j` / `nft -a` parsers, the filtering model and pins, zones and sections compiled to uci ops, other nft tables and custom rule files (router-side timer rollback), owners |
 | `src/openwrtgui/faults/` | Fault targets, the `benchfault` chains, netem, port and hostapd faults, records in `/tmp/owg`, held faults cleared by the router's timer |
 | `src/openwrtgui/capture/` | `tcpdump -w -` over a binary SSH channel to a `.pcap` or Wireshark, the app's own SSH filtered out |
+| `src/openwrtgui/images/` | Sysupgrade images read on this PC (uImage, squashfs via PySquashfsImage, fwtool metadata), apk/opkg databases, profiles; kept in `<data>/images/<board>/<revision>-<sha12>/` |
+| `src/openwrtgui/discovery/` | Overlay, package and config diffs against the image, capabilities, copies, reflash checklists (`<data>/checklists/<router>/`), promoted tool cards (`<data>/tools/<board>.json`), custom services |
+| `src/openwrtgui/flash/` | Flash plan (board, hash, RAM and isolation checks), upload to `/tmp/owg`, router-side timer for `sysupgrade`, come-back and revision proof |
 | `frontend/src/` | React screens (`screens/`), shell (`shell/`), API client and generated types (`api/`) |
 | `tests/` | `unit/`, `contract/` (recorded AP2 output replayed), `hardware/` (opt-in), `fixtures/` |
 
@@ -77,6 +80,11 @@ pwsh -File tools/build_windows.ps1        # PyInstaller build + self-check (vers
   agreed to (an fw4 reload counts as a network reload), never while a harness run is live, and with the 60 s
   rollback or the router-side timer. AP2 ends as found: `uci -X show firewall` and `nft list tables` as
   before, `tc qdisc show` as before, `/tmp/owg` gone, every port on. Wi-Fi faults wait for a radio window.
+- **An image upload or a flash on AP2** is a write window: only with the owner's OK in this session, the txctl
+  session told and its run over, Bench Guard clear. An upload and validate writes only `/tmp/owg` (RAM) and
+  ends with it removed; a flash keeps settings, AP2 ends on the image it started on (flash it back) with the
+  checks above as before. Never flash without keeping settings on the bench: that is tested in the simulator
+  only (AP2 would come back as 192.168.1.1, clashing with AP1).
 - While Bench Guard reports a live run (`dima_night`, `rh_soak`, `overnight_wifi`, `txlab_*`,
   `voip_chain`, lock files, run SSIDs), every router is read-only. Do not work around it.
 - Agents **never type router passwords**. Where a password is needed, the owner types it.

@@ -10,6 +10,8 @@ Discovery needs the router's image: import its sysupgrade file in [Settings](Set
 from the router's own `/rom` (see [Adding a router family](Adding-a-router-family)). What the router says about
 itself (board file, services, LuCI pages) stays on the router's **Overview**.
 
+![Discovery: what AP1 changed since flashing](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/discovery.png)
+
 ## Image
 
 The image this router matches, by board and revision. With no match, **Import image…** and **Build from this
@@ -24,11 +26,18 @@ router's CPU, so it runs only when you press it and not while [Bench Guard](Benc
 
 ## Flash this image
 
-Flashes the router with an imported image. The preview lists every step before anything is sent: the image goes
-to `/tmp/owg` on the router, its sha256 is checked, the router validates it (`validate_firmware_image` and
-`sysupgrade -T`), and `sysupgrade` is started by a timer on the router two seconds later. The router is off the
-network for about three minutes; once `sysupgrade` starts it cannot be stopped. A reflash checklist is saved
-first. The flash is reported done only when the router answers again with the new revision.
+**Flash an image…** opens the flash dialog. Pick one of the imported images for this router's board (the dialog
+offers one whose revision differs from the running one). The preview lists every step before anything is sent:
+the image goes to `/tmp/owg` on the router, its sha256 is checked, the router validates it
+(`validate_firmware_image` and `sysupgrade -T`), and `sysupgrade` is started by a timer on the router two seconds
+later. The router is off the network for about three minutes; once `sysupgrade` starts it cannot be stopped.
+**Flash** stays grey until you type the router's name (its short name, such as `AP2`, is enough).
+
+The dialog then shows the upload, **Checking the image on …**, **Starting sysupgrade**, **Waiting for … to come
+back** with the time so far, and **Checking the new firmware**. A reflash checklist is saved first, and the flash
+is reported done only when the router answers again with the new board and revision. After a flash that kept
+settings, **Copy back lost files** lists the files the checklist saved, all ticked, and copies them back to the
+router with the usual preview.
 
 **Keep settings** (on by default) keeps `/etc/config`, the SSH host keys and the app's key, so the app reconnects
 by itself; the app also keeps its own saved firewall files (`/etc/owg`). Without it, the router comes back as
@@ -47,8 +56,9 @@ a flash that keeps settings keeps it or loses it. A name that cannot be read is 
 
 ## Copy files
 
-Tick files and **Copy to…** another router (or this one, to copy back after a flash). The preview shows each file
-with its size and sha256; each copied file is proven by reading its sha256 back. Files up to 1 MB each and 4 MB in
+Tick files and pick a router in **Copy to** (any router the app has a key for, this one included). The preview
+shows each file with its size and sha256; **Copy** sends them and proves each copied file by reading its sha256
+back. Files up to 1 MB each and 4 MB in
 all; a router's own keys and password files (`/etc/shadow`, `/etc/dropbear`, `/etc/owg`) are never copied to
 another router.
 
@@ -66,27 +76,36 @@ image default to compare with, and their values (Wi-Fi keys among them) are not 
 ## Your custom packages
 
 Packages with neither a license nor a URL: the bench's own, such as `dwr921-portctl`. Each shows its version,
-description and programs with the usage text read from the image, and one of: **card** (a screen of this app
-already drives it, such as Ports for `dwr921-portctl`, or you promoted it), **service**, or **no card yet**.
+description and programs with the usage text read from the image, and one of: a link to the screen of this app
+that already drives it (such as **Ports screen** for `dwr921-portctl`), **card below** (you promoted it),
+**service** with its state (driven from Custom services), or **no card yet** with **Run --help** and **Promote**
+on each of its programs.
 
 ## Programs and services
 
 Programs added after flashing that no package owns (a script copied by hand), in the same form as custom
-packages.
+packages: usage text, then **Run --help** and **Promote** until it has a card.
 
 ## Run help
 
 Runs `<program> --help` on the router for at most 5 seconds and shows what it prints. A program that does not
 know `--help` may do something else, so it is previewed, refused during a run and recorded in the audit log.
+**Promote from this output** fills a card from what it printed instead of the usage line.
 
 ## Promote to a card
 
 Turns a program into named commands with checked parameters, filled in from its usage line: the first `{a|b|c}`
-group gives one command per choice, later groups become choice parameters. Every command counts as a change until
-you mark it read-only; read-only commands also run during a run. Cards are kept per board, so every router with
-that board shows them.
+group gives one command per choice, later groups become choice parameters. Edit each command's label and
+arguments (words; a parameter goes in as `{name}`), its parameters (a choice list, a text pattern or a number
+range) and **Changes the router**: every command counts as a change until you untick it, and read-only commands
+also run during a run. **Save card** checks the card and keeps it per board, so every router with that board
+shows it.
+
+A card has one button per command; pick one, fill in its parameters, check the exact command in the preview and
+**Run** it; what it printed is shown below. **Edit** reopens the card, **Remove** (twice) deletes it.
 
 ## Custom services
 
-The init scripts of custom packages and those added after flashing: running and enabled state, with **Start**,
-**Stop** and **Restart**, each proven by reading the state back. Other services come with the System screen.
+The init scripts of custom packages and those added after flashing: the package they come from, running and
+enabled state, with **Start**, **Stop** and **Restart**, each previewed and proven by reading the state back. They
+wait while Bench Guard shows a run. Other services come with the System screen.

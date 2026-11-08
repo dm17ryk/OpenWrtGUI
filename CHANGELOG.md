@@ -7,6 +7,35 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Image import and Discovery.
+
+### Added
+
+- Settings › Images: import a router's sysupgrade image (uImage, squashfs and fwtool metadata are read on this
+  PC; nothing goes to a router) into a profile per board and revision with its packages, default configs and
+  the bench's own packages with their usage text; delete a profile. A router without an imported image can
+  build a profile from its own `/rom`.
+- Discovery screen per router: the matched image and a firmware check (the router's firmware partition hashed
+  against the image), files and packages added after flashing with whether a flash keeps them, configs changed
+  from the image's defaults (configs made at first boot are named, not read), copy files to another router with
+  each copy proven by its sha256, and reflash checklists that keep the files a flash would lose.
+- The bench's own packages and programs added after flashing, with their usage text: **Run --help** (previewed
+  and audited), **Promote** to a card of named commands with checked parameters (kept per board; read-only
+  commands also run during a run), and Start, Stop and Restart for custom services, proven by reading the state
+  back.
+- Flash from an imported image: exact preview, the image validated on the router (`validate_firmware_image`,
+  `sysupgrade -T`), `sysupgrade` started by a router-side timer, progress through the reboot, and done only when
+  the router answers with the new board and revision. Keep settings, or flash without them after confirming the
+  router is isolated; the Add-router wizard then accepts the new host key only when the board and revision it
+  reads match the image. **Copy back lost files** restores what the checklist saved.
+- Needs attention: "N files added after flashing" and "Reflashed without settings: add it again".
+
+### Changed
+
+- Router cards show the owners of other tools' nftables tables and tc hooks (for example
+  `BENCHSIPGUARD · dima_night`).
+- Ports › Wi-Fi mirror points to Discovery › Custom services for Start, Stop and Restart.
+
 ## [0.4.0] - 2026-11-07
 
 Firewall and faults.
