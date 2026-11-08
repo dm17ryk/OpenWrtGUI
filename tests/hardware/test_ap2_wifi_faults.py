@@ -44,6 +44,13 @@ LAB = {
 }
 
 
+class _Hidden(str):
+    """The run's Wi-Fi key: pytest prints a failing frame's locals, so its repr must not show it."""
+
+    def __repr__(self) -> str:
+        return "'<hidden>'"
+
+
 class AdbStation:
     """The phone, joined to the test SSID over adb. The key is on adb's command line only, never in output."""
 
@@ -132,7 +139,7 @@ async def test_wifi_faults_on_air(fw_window: FwWindow, request: pytest.FixtureRe
     t = await fw_window.connect()
     snapshot = (await t.run(f"cat {CONFIG}")).stdout
     before = (await t.run("uci -q show wireless")).stdout
-    key = secrets.token_urlsafe(16)
+    key = _Hidden(secrets.token_urlsafe(16))
     try:
         await _faults_on_air(fw_window, t, phone, key)
     finally:
