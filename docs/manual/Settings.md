@@ -41,6 +41,13 @@ nftables tables, or chains inside fw4's table, that a harness writes, with its n
 [Firewall](Firewall#other-nftables-tables) screen shows them with that owner and keeps them locked until you
 unlock one. It starts with `BENCHSIPGUARD` (dima_night) and `bridge voipdscp` (the VoIP chain).
 
+## Images
+
+The firmware images imported on this PC, and profiles built from a router's `/rom`, each by board and revision,
+with the size and the bench's own packages it holds. **Import image…** reads a sysupgrade `.bin` (see
+[Adding a router family](Adding-a-router-family)); **Delete** removes the profile and its copy of the image.
+A router whose board and revision match a profile shows how it differs on [Discovery](Discovery).
+
 ## App SSH key
 
 The app's own key (ed25519), created on first start. Shown with its fingerprint; **Export public key**

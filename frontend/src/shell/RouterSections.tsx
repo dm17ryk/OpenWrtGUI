@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
 import { luciPageLink, useLuciPages } from '../screens/luci/pages'
 
-export type Section = 'overview' | 'wifi' | 'rf' | 'network' | 'ports' | 'firewall' | 'faults' | 'luci'
+export type Section = 'overview' | 'discovery' | 'wifi' | 'rf' | 'network' | 'ports' | 'firewall' | 'faults' | 'luci'
 
 type Props = { routerId: string; name: string; current: Section; luciPath?: string }
 
@@ -14,6 +14,7 @@ export function RouterSections({ routerId, name, current, luciPath }: Props) {
   const base = `/routers/${routerId}`
   const own: ReadonlyArray<readonly [Section | 'terminal', string, string]> = [
     ['overview', 'Overview', base],
+    ['discovery', 'Discovery', `${base}/discovery`],
     ['wifi', 'Wi-Fi', `${base}/wifi`],
     ['rf', 'RF live', `${base}/rf`],
     ['network', 'Network & DHCP', `${base}/network`],
