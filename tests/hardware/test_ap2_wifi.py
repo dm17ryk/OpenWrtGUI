@@ -22,6 +22,7 @@ from types import ModuleType
 
 import pytest
 
+from conftest import wireless_snapshot
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.probe.describe import SelfDescription
@@ -124,7 +125,7 @@ async def _restore(t: SshTransport, snapshot: str) -> None:
 
 async def test_apply_verify_record_restore(ap2_rw: SshTransport, tmp_path: Path) -> None:
     t = ap2_rw
-    snapshot = (await t.run(f"cat {CONFIG}")).stdout
+    snapshot = await wireless_snapshot(t)  # a failed read must never be written back over AP2's config
     before = (await t.run("uci -q show wireless")).stdout
     assert parse_uci_show(before).get("wireless.radio0.disabled") == "1", (
         "AP2's radio must be parked before the window"

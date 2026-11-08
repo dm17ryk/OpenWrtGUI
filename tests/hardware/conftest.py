@@ -76,7 +76,7 @@ async def ap2_luci(request: pytest.FixtureRequest) -> AsyncIterator[LuciSessionT
 
 @dataclass
 class FwWindow:
-    """The app's firewall, faults and capture services on AP2, as the app builds them (context.py)."""
+    """The app's firewall, faults, capture and Wi-Fi services on AP2, as the app builds them (context.py)."""
 
     fw: FirewallService
     faults: FaultsService
@@ -84,6 +84,7 @@ class FwWindow:
     net: NetworkService
     connect: Callable[[], Awaitable[SshTransport]]
     pool: ConnectionPool
+    wifi: WifiService
 
 
 def _by_content(text: str) -> list[tuple[str, tuple[tuple[str, str], ...]]]:
@@ -96,6 +97,17 @@ def _by_content(text: str) -> list[tuple[str, tuple[tuple[str, str], ...]]]:
         )
         for name in (k for k in shown if k.count(".") == 1)
     )
+
+
+async def wireless_snapshot(t: Transport) -> str:
+    """AP2's /etc/config/wireless as found, for the restore to write back. A failed or empty read is refused
+    here: written back, it would wipe the router's wireless config. The message never shows the file (it
+    holds AP2's key)."""
+    shown = await t.run("cat /etc/config/wireless")
+    assert shown.ok and "config wifi-device" in shown.stdout, (
+        f"cannot read AP2's wireless config (exit {shown.exit_status}): {shown.stderr.strip()}"
+    )
+    return shown.stdout
 
 
 async def fw_found(t: Transport) -> dict[str, object]:
@@ -156,6 +168,7 @@ async def fw_window(
         net=net,
         connect=connect,
         pool=pool,
+        wifi=wifi,
     )
     try:
         yield w
