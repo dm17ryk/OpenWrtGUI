@@ -51,6 +51,24 @@ async def test_fetch_and_pin_then_password_login(ssh_server: SshServer, tmp_path
         await t.close()
 
 
+async def test_output_that_is_not_utf8_is_read_and_keeps_the_connection(
+    ssh_server: SshServer, tmp_path: Path
+) -> None:
+    t = await SshTransport.connect(
+        "127.0.0.1",
+        ssh_server.port,
+        "root",
+        host_keys=await _pinned(ssh_server, tmp_path),
+        password=TEST_PASSWORD,
+    )
+    try:
+        r = await t.run("not-utf8")
+        assert r.exit_status == 0 and r.stdout.startswith('{"plmn_description":"') and "�" in r.stdout
+        assert (await t.run("echo hi")).stdout == "hi\n"
+    finally:
+        await t.close()
+
+
 async def test_a_timeout_says_so(ssh_server: SshServer, tmp_path: Path) -> None:
     t = await SshTransport.connect(
         "127.0.0.1",
@@ -255,6 +273,30 @@ async def test_shell_channel(ssh_server: SshServer, tmp_path: Path) -> None:
             chunk = await shell.read()
             assert chunk, "shell closed early"
             out += chunk
+        await shell.close()
+    finally:
+        await t.close()
+
+
+async def test_shell_output_that_is_not_utf8_keeps_the_terminal(
+    ssh_server: SshServer, tmp_path: Path
+) -> None:
+    t = await SshTransport.connect(
+        "127.0.0.1",
+        ssh_server.port,
+        "root",
+        host_keys=await _pinned(ssh_server, tmp_path),
+        password=TEST_PASSWORD,
+    )
+    try:
+        shell = await t.open_shell(80, 24)
+        await shell.write("not-utf8\n")
+        out = ""
+        while "you typed not-utf8" not in out:
+            chunk = await asyncio.wait_for(shell.read(), 5.0)
+            assert chunk, "shell closed early"
+            out += chunk
+        assert "�" in out
         await shell.close()
     finally:
         await t.close()
