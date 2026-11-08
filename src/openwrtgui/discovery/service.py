@@ -27,7 +27,7 @@ from openwrtgui.fw.tc import parse_qdiscs
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.guard.writes import run_audited, run_audited_upload, upload_line
-from openwrtgui.images.profile import Profile
+from openwrtgui.images.profile import Profile, build_rom_profile
 from openwrtgui.images.store import ProfileStore
 from openwrtgui.net.apply import NetApplyResult, NetCheck, NetPlan, net_plan
 from openwrtgui.probe.describe import SelfDescription, describe_router
@@ -274,6 +274,14 @@ class DiscoveryService:
         )
         self.summaries[rec.id] = summary
         return summary
+
+    async def rom_profile(self, router_id: str) -> Profile:
+        """A profile built from the router's /rom (reads only), saved with the imported ones."""
+        rec, t, desc, _profile = await self._context(router_id)
+        profile = await build_rom_profile(t, desc.identity.board_name, self._clock())
+        self._profiles.save(profile)
+        self.summaries.clear()
+        return profile
 
     # ---------------------------------------------------------------- custom services
     async def plan_service(self, router_id: str, name: str, action: Action) -> NetPlan:

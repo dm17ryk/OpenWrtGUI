@@ -17,6 +17,7 @@ from openwrtgui.api import (
     errors,
     faults_api,
     fw_api,
+    images_api,
     luci_api,
     misc_api,
     net_api,
@@ -91,6 +92,7 @@ def create_app(ctx: AppContext) -> FastAPI:
         fw_api,
         faults_api,
         discovery_api,
+        images_api,
     )
     for module in modules:
         app.include_router(module.router)
