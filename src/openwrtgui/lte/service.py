@@ -1,22 +1,44 @@
-"""The LTE screen's service: the state now; actions, the AT console and settings come in later tasks."""
+"""The LTE screen's service: the state, connect / disconnect / reboot modem, the AT console and settings."""
 
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Awaitable, Callable
 from datetime import datetime
+from typing import Literal
 
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
+from openwrtgui.guard.writes import run_audited
+from openwrtgui.lte import commands as c
 from openwrtgui.lte.at import find_at_port
 from openwrtgui.lte.commands import MODEM_DEVICE
-from openwrtgui.lte.state import LteState, read_lte
+from openwrtgui.lte.parse import parse_opmode
+from openwrtgui.lte.state import NO_LTE, LteState, read_lte
+from openwrtgui.net.apply import NetApplyResult, NetCheck, NetPlan, net_plan
 from openwrtgui.net.service import NetworkService
 from openwrtgui.store.routers import RouterRecord, RouterStore
-from openwrtgui.transport.base import Transport
+from openwrtgui.transport.base import CommandResult, Transport
 from openwrtgui.transport.pool import ConnectionPool
+from openwrtgui.wifi.service import PreviewChanged
 
 SCREEN = "LTE"
+LteAction = Literal["connect", "disconnect", "reboot"]
+CONNECT_S = 60.0
+DISCONNECT_S = 20.0
+POLL_S = 2.0  # the nominal step: CONNECT_S / POLL_S polls, whatever poll_s is set to
+READBACK_TRIES = 3
+NO_ADDRESS = "no address yet: waiting for the carrier's DHCP"
+DROPS = "{name}'s LTE session drops; devices that route through it lose the internet until it is back"
+
+
+class LteBusy(Exception):
+    """One LTE action at a time per router (409)."""
+
+
+def _reason(result: CommandResult) -> str:
+    return (result.stderr or result.stdout).strip() or f"exit {result.exit_status}"
 
 
 class LteService:
@@ -39,6 +61,9 @@ class LteService:
         self._clock = clock
         self._sleep = sleep
         self._ports: dict[str, tuple[int, str | None]] = {}  # router → (connection, AT port found on it)
+        self._busy: dict[str, asyncio.Lock] = {}
+        self.poll_s = POLL_S
+        self.readback_s = 1.0
 
     def _record(self, router_id: str) -> RouterRecord:
         rec = self._routers.get(router_id)
@@ -72,3 +97,132 @@ class LteService:
         t = await self._pool.get(rec)
         port = await self.at_port(rec, t) if qmi is not None else None
         return await read_lte(t, router_id=rec.id, qmi=qmi, at_port=port, now=self._clock())
+
+    # ---------------------------------------------------------------- connect, disconnect, reboot modem
+    async def _lte_device(self, router_id: str) -> str | None:
+        qmi = await self._qmi(router_id)
+        if qmi is None:
+            raise ValueError(NO_LTE)
+        if qmi[0] != "lte":
+            raise ValueError(f"The LTE actions expect the qmi interface to be called lte; it is {qmi[0]}")
+        return qmi[1] if qmi[1] is not None and MODEM_DEVICE.fullmatch(qmi[1]) else None
+
+    async def plan_action(self, router_id: str, action: LteAction) -> NetPlan:
+        rec = self._record(router_id)
+        device = await self._lte_device(router_id)
+        drops = DROPS.format(name=rec.name)
+        if action == "connect":
+            lines, warnings = [c.IFUP_LTE], []
+        elif action == "disconnect":
+            lines, warnings = [c.IFDOWN_LTE], [drops]
+        else:
+            if device is None:
+                raise ValueError("Reboot needs the modem's QMI device (/dev/cdc-wdmN) in network.lte.device")
+            lines = [
+                c.set_opmode(device, "low_power"),
+                c.OPMODE(device),
+                c.set_opmode(device, "online"),
+                c.OPMODE(device),
+                c.IFUP_LTE,
+            ]
+            warnings = [drops]
+        return net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config=None,
+            ops=[],
+            current={},
+            commands=lines,
+            warnings=warnings,
+        )
+
+    async def apply_action(self, router_id: str, action: LteAction, digest: str) -> NetApplyResult:
+        rec = self._record(router_id)
+        busy = self._busy.setdefault(rec.id, asyncio.Lock())
+        if busy.locked():
+            raise LteBusy(f"An LTE action is already running on {rec.name}")
+        async with busy:
+            self._guard.require_clear()
+            plan = await self.plan_action(router_id, action)
+            if plan.digest != digest:
+                raise PreviewChanged(rec.name)
+            t = await self._pool.get(rec)
+            async with self._pool.write_lock(rec.id):
+                return await self._run_action(rec, t, action, plan.lines)
+
+    async def _cmd(self, rec: RouterRecord, t: Transport, command: str) -> CommandResult:
+        return await run_audited(
+            t, command, router_id=rec.id, screen=SCREEN, guard=self._guard, audit=self._audit
+        )
+
+    async def _run_action(
+        self, rec: RouterRecord, t: Transport, action: LteAction, lines: tuple[str, ...]
+    ) -> NetApplyResult:
+        checks: list[NetCheck] = []
+        if action == "reboot":
+            for set_line, read_line, mode in (
+                (lines[0], lines[1], "low_power"),
+                (lines[2], lines[3], "online"),
+            ):
+                done = await self._cmd(rec, t, set_line)
+                if not done.ok:
+                    return NetApplyResult(
+                        rec.id, False, False, tuple(checks), f"{set_line}: {_reason(done)}", rec.host
+                    )
+                ok = await self._readback(rec, t, read_line, mode)
+                checks.append(NetCheck(f"modem {mode}", ok, mode if ok else f"still not {mode}"))
+                if not ok:
+                    error = f"The modem did not go {mode}; it may need ifup lte or a power cycle"
+                    return NetApplyResult(rec.id, True, False, tuple(checks), error, rec.host)
+        command = c.IFDOWN_LTE if action == "disconnect" else c.IFUP_LTE
+        done = await self._cmd(rec, t, command)
+        if not done.ok:
+            return NetApplyResult(
+                rec.id, False, False, tuple(checks), f"{command}: {_reason(done)}", rec.host
+            )
+        if action == "disconnect":
+            down = await self._wait_up(t, want=False, limit_s=DISCONNECT_S)
+            checks.append(
+                NetCheck("lte down", down, "down" if down else f"still up after {DISCONNECT_S:g} s")
+            )
+        else:
+            up = await self._wait_up(t, want=True, limit_s=CONNECT_S)
+            checks.append(NetCheck("lte up", up, "up" if up else f"not up after {CONNECT_S:g} s"))
+            if up:
+                address = await self._address(t)
+                checks.append(NetCheck("lte_4 address", True if address else None, address or NO_ADDRESS))
+        verified = all(check.ok is not False for check in checks)
+        return NetApplyResult(rec.id, True, verified, tuple(checks), None, rec.host)
+
+    async def _readback(self, rec: RouterRecord, t: Transport, read_line: str, mode: str) -> bool:
+        for attempt in range(READBACK_TRIES):
+            if attempt:
+                await self._sleep(self.readback_s)
+            answer = await self._cmd(rec, t, read_line)
+            if answer.ok and parse_opmode(answer.stdout) == mode:
+                return True
+        return False
+
+    async def _status(self, t: Transport, name: str) -> dict[str, object] | None:
+        result = await t.run(c.iface_status(name))
+        try:
+            data = json.loads(result.stdout) if result.ok else None
+        except ValueError:
+            return None
+        return data if isinstance(data, dict) else None
+
+    async def _wait_up(self, t: Transport, *, want: bool, limit_s: float) -> bool:
+        for attempt in range(max(1, int(limit_s / POLL_S))):
+            if attempt:
+                await self._sleep(self.poll_s)
+            status = await self._status(t, "lte")
+            if status is not None and bool(status.get("up")) is want:
+                return True
+        return False
+
+    async def _address(self, t: Transport) -> str | None:
+        status = await self._status(t, "lte_4")
+        addresses = status.get("ipv4-address") if status else None
+        first = addresses[0] if isinstance(addresses, list) and addresses else None
+        address = first.get("address") if isinstance(first, dict) else None
+        return address if isinstance(address, str) else None
