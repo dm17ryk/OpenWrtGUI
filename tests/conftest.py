@@ -29,6 +29,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
     group.addoption("--allow-writes", action="store_true", help="allow tests that change AP2 and restore it")
     group.addoption("--txctl-told", action="store_true", help="the txctl session gave its OK for this window")
+    group.addoption(
+        "--allow-flash",
+        action="store_true",
+        help="allow the test that flashes AP2 (the owner's explicit OK: AP2 reboots, about 3 minutes away)",
+    )
 
 
 @pytest.fixture

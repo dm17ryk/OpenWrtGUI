@@ -49,6 +49,15 @@ class FlashJob(BaseModel):
     detail: str | None = None
 
 
+class ImageCheck(BaseModel):
+    """What an upload-and-validate without a flash found."""
+
+    model_config = ConfigDict(frozen=True)
+
+    ok: bool
+    detail: str
+
+
 class _Failed(Exception):
     """A step before sysupgrade failed; the message is the job's error."""
 
@@ -196,25 +205,60 @@ class FlashService:
         if not tested.ok:
             raise _Failed(f"{rec.name} refused the image: {_reason(tested)}")
 
+    async def _upload(
+        self, t: Transport, rec: RouterRecord, plan: FlashPlan, image: bytes, progress: Callable[[int], None]
+    ) -> None:
+        await self._step(t, rec, "mkdir -p /tmp/owg")
+        uploaded = await run_audited_upload(
+            t,
+            plan.upload_command,
+            image,
+            name=plan.lines[1].split("# stdin: ", 1)[1].split(" (", 1)[0],
+            router_id=rec.id,
+            screen=SCREEN,
+            guard=self._guard,
+            audit=self._audit,
+            progress=progress,
+        )
+        if not uploaded.ok:
+            raise _Failed(f"The upload to {rec.name} failed: {_reason(uploaded)}")
+
+    async def check_only(self, router_id: str, req: FlashRequest, digest: str) -> ImageCheck:
+        """Upload and validate without flashing (the AP2 window before a flash): the plan's steps up to
+        `sysupgrade -T`, then the file and an empty /tmp/owg taken away again. No job, checklist or timer."""
+        self._guard.require_clear()
+        rec, image, plan, _board = await self._prepare(router_id, req)
+        if plan.digest != digest:
+            raise PreviewChanged(rec.name)
+        t = await self._pool.get(rec)
+        async with self._pool.write_lock(rec.id):
+            try:
+                await self._upload(t, rec, plan, image, lambda _sent: None)
+                await self._check_image(t, rec, req, plan)
+                check = ImageCheck(
+                    ok=True, detail=f"{rec.name} accepted the image (validate_firmware_image, sysupgrade -T)"
+                )
+            except (_Failed, TransportError) as exc:
+                check = ImageCheck(ok=False, detail=str(exc))
+            finally:
+                await self._remove(t, rec, fw_path(req.sha256))
+                await run_audited(
+                    t,
+                    "rmdir /tmp/owg 2>/dev/null || true",
+                    router_id=rec.id,
+                    screen=SCREEN,
+                    guard=self._guard,
+                    audit=self._audit,
+                    require_guard=False,
+                )
+        return check
+
     async def _send(self, rec: RouterRecord, req: FlashRequest, plan: FlashPlan, image: bytes) -> float:
         path = fw_path(req.sha256)
         t = await self._pool.get(rec)
         async with self._pool.write_lock(rec.id):
             try:
-                await self._step(t, rec, "mkdir -p /tmp/owg")
-                uploaded = await run_audited_upload(
-                    t,
-                    plan.upload_command,
-                    image,
-                    name=plan.lines[1].split("# stdin: ", 1)[1].split(" (", 1)[0],
-                    router_id=rec.id,
-                    screen=SCREEN,
-                    guard=self._guard,
-                    audit=self._audit,
-                    progress=lambda sent: self._update(rec.id, sent=sent),
-                )
-                if not uploaded.ok:
-                    raise _Failed(f"The upload to {rec.name} failed: {_reason(uploaded)}")
+                await self._upload(t, rec, plan, image, lambda sent: self._update(rec.id, sent=sent))
                 self._update(rec.id, phase="check")
                 await self._check_image(t, rec, req, plan)
                 try:
