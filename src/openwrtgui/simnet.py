@@ -16,12 +16,15 @@ import re
 import shlex
 import time
 from collections.abc import Callable, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from openwrtgui.net.parse import devices, interfaces, routes, rules
 from openwrtgui.ports.parse import render_members, switch_conf, switch_ports, switch_vlans
 from openwrtgui.transport.base import CommandResult
 from openwrtgui.uci import parse_uci_show, shell_quote
+
+if TYPE_CHECKING:
+    from openwrtgui.simmodem import SimModem
 
 PC_MAC = "08:3a:88:5c:a8:39"
 CONFIGS = ("network", "dhcp", "firewall")
@@ -140,6 +143,7 @@ class SimNetwork:
         self.arl = dict(arl or {})  # MAC → port in `get arl_table` (empty, as on AP2's mt7620)
         self.extra_links: set[int] = set()  # more switch ports with a link than the PC's
         self.fw: Any = None  # the SimFirewall of the same router, which may cut the PC's SSH
+        self.modem: SimModem | None = None  # the LTE modem: its session is the qmi interface's state
 
     # ---------------------------------------------------------------- what the connector asks
     def _expire(self) -> None:
@@ -331,6 +335,11 @@ class SimNetwork:
                 return _fail("Command failed: Not found\n", 4)
             return _ok(json.dumps({k: v for k, v in entry.items() if k != "interface"}, indent="\t") + "\n")
         if (obj, method) == ("network.device", "status"):
+            if "name" in args:  # one device: netifd answers with that device's object itself
+                found = self._devices().get(str(args["name"]))
+                if found is None:
+                    return _fail("Command failed: Not found\n", 4)
+                return _ok(json.dumps(found, indent="\t") + "\n")
             return _ok(json.dumps(self._devices(), indent="\t") + "\n")
         if (obj, method) == ("luci-rpc", "getDHCPLeases"):
             leases = [
@@ -395,9 +404,10 @@ class SimNetwork:
     def _dump(self) -> list[dict[str, Any]]:
         out: list[dict[str, Any]] = []
         for conf in interfaces(self._committed):
+            session = self.modem.connected if self.modem is not None else True
             entry: dict[str, Any] = {
                 "interface": conf.name,
-                "up": conf.auto and conf.proto in ("static", "qmi", "none"),
+                "up": conf.auto and (conf.proto in ("static", "none") or (conf.proto == "qmi" and session)),
                 "pending": conf.proto in ("dhcp", "dhcpv6"),
                 "dynamic": False,
                 "proto": conf.proto,
@@ -414,16 +424,20 @@ class SimNetwork:
                     entry["ipv4-address"] = [{"address": conf.address.ip, "mask": conf.address.prefix}]
             out.append(entry)
             if conf.proto == "qmi":
-                out.append(
-                    {
-                        "interface": f"{conf.name}_4",
-                        "up": False,
-                        "pending": True,
-                        "dynamic": True,
-                        "proto": "dhcp",
-                        "device": "wwan0",
-                    }
-                )
+                leased = bool(entry["up"]) and self.modem is not None and self.modem.lease
+                dynamic: dict[str, Any] = {
+                    "interface": f"{conf.name}_4",
+                    "up": leased,
+                    "pending": bool(entry["up"]) and not leased,
+                    "dynamic": True,
+                    "proto": "dhcp",
+                    "device": "wwan0",
+                    "ipv4-address": [{"address": "10.64.12.7", "mask": 30}] if leased else [],
+                }
+                if leased:
+                    dynamic["uptime"] = 990
+                    dynamic["l3_device"] = "wwan0"
+                out.append(dynamic)
         return out
 
     def _devices(self) -> dict[str, Any]:
@@ -432,6 +446,13 @@ class SimNetwork:
             out[d.name] = {"type": d.type or "Network device", "up": True, "bridge-members": list(d.ports)}
         for v in switch_vlans(self._committed):
             out.setdefault(f"eth0.{v.vid or v.vlan}", {"type": "VLAN", "up": True})
+        if self.modem is not None and any(i.proto == "qmi" for i in interfaces(self._committed)):
+            out["wwan0"] = {
+                "type": "Network device",
+                "up": self.modem.connected,
+                "mtu": 1420,
+                "statistics": {"rx_bytes": self.modem.rx_bytes, "tx_bytes": self.modem.tx_bytes},
+            }
         for name, d in out.items():  # the MACs AP2 reports (tests/fixtures/ap2/network.json)
             d["macaddr"] = DEVICE_MACS.get(name, "00:0c:43:76:20:77")
         return out

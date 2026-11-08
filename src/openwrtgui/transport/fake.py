@@ -14,6 +14,7 @@ from openwrtgui.transport.base import UPLOAD_CHUNK, CommandResult, ShellChannel,
 if TYPE_CHECKING:
     from openwrtgui.simfw import SimFirewall
     from openwrtgui.simimage import SimImage
+    from openwrtgui.simmodem import SimModem
     from openwrtgui.simnet import SimNetwork
     from openwrtgui.simwifi import SimWifi
 
@@ -32,6 +33,7 @@ class SimState:
     net: SimNetwork | None = None
     fw: SimFirewall | None = None
     image: SimImage | None = None
+    modem: SimModem | None = None
     generation_seen: int = 0  # the image's flash generation whose reset (keys, password) was applied
 
 
@@ -152,6 +154,8 @@ class ReplayTransport:
         # commands it knows whole (the Wi-Fi one echoes any `echo`); the firewall last, since it splits
         # compound commands and hands their parts back here.
         if self.state.image is not None and (answered := self.state.image.answer(command)) is not None:
+            return answered
+        if self.state.modem is not None and (answered := self.state.modem.answer(command)) is not None:
             return answered
         if self.state.net is not None and (answered := self.state.net.answer(command)) is not None:
             return answered
