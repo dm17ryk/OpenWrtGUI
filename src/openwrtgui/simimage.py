@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from openwrtgui.discovery import commands as cmd
+from openwrtgui.flash.plan import KEEP_LINE
 from openwrtgui.images.apkdb import is_custom, parse_apk_installed
 from openwrtgui.images.sysupgrade import ImageError, open_root, parse_layout
 from openwrtgui.images.uci_file import parse_uci_file
@@ -25,7 +26,6 @@ from openwrtgui.transport.base import CommandResult
 from openwrtgui.uci import shell_quote
 
 NOT_MINE = frozenset({"network", "dhcp", "firewall", "wireless"})  # the network and Wi-Fi simulators' configs
-KEEP_LINE = "grep -qx /etc/owg/ /etc/sysupgrade.conf || echo /etc/owg/ >> /etc/sysupgrade.conf"
 SYSUPGRADE_CONF = (
     "## This file contains files and directories that should\n## be preserved during an upgrade.\n"
 )
