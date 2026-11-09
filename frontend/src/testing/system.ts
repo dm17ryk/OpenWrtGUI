@@ -4,6 +4,7 @@ import type {
   CronState,
   DiagResult,
   LogEntry,
+  NetApplyResult,
   NetPlan,
   ProcessList,
   SystemOverview,
@@ -706,4 +707,86 @@ export const AP2_PING: DiagResult = {
   "command": "timeout -s KILL 25 ping -c 4 -W 2 '192.168.1.10'",
   "output": "PING 192.168.1.10 (192.168.1.10): 56 data bytes\n64 bytes from 192.168.1.10: seq=0 ttl=64 time=0.512 ms\n64 bytes from 192.168.1.10: seq=1 ttl=64 time=0.513 ms\n64 bytes from 192.168.1.10: seq=2 ttl=64 time=0.514 ms\n64 bytes from 192.168.1.10: seq=3 ttl=64 time=0.515 ms\n\n--- 192.168.1.10 ping statistics ---\n4 packets transmitted, 4 packets received, 0% loss\n",
   "exit_status": 0
+}
+
+export const AP2_HOSTNAME_RESULT: NetApplyResult = {
+  "router_id": "ap2",
+  "applied": true,
+  "verified": true,
+  "checks": [
+    {
+      "name": "saved",
+      "ok": true,
+      "detail": "the router has the change"
+    },
+    {
+      "name": "hostname",
+      "ok": true,
+      "detail": "bench-ap2"
+    }
+  ],
+  "error": null,
+  "host": "192.168.1.2"
+}
+
+export const AP2_SERVICE_PLAN: NetPlan = {
+  "router_id": "ap2",
+  "screen": "System",
+  "lines": [
+    "/etc/init.d/sysntpd restart"
+  ],
+  "warnings": [],
+  "rollback": false,
+  "target_host": null,
+  "digest": "b641a0defc358848"
+}
+
+export const AP2_SERVICE_RESULT: NetApplyResult = {
+  "router_id": "ap2",
+  "applied": true,
+  "verified": true,
+  "checks": [
+    {
+      "name": "service sysntpd",
+      "ok": true,
+      "detail": "running"
+    }
+  ],
+  "error": null,
+  "host": "192.168.1.2"
+}
+
+export const AP2_CRON_PLAN: NetPlan = {
+  "router_id": "ap2",
+  "screen": "System",
+  "lines": [
+    "mkdir -p /etc/crontabs && cat > /etc/crontabs/root <<'OWG'",
+    "*/5 * * * * logger owg-test",
+    "OWG",
+    "/etc/init.d/cron restart"
+  ],
+  "warnings": [],
+  "rollback": false,
+  "target_host": null,
+  "digest": "f34300eee0bb713d"
+}
+
+export const AP2_CRON_RESULT: NetApplyResult = {
+  "router_id": "ap2",
+  "applied": true,
+  "verified": true,
+  "checks": [
+    {
+      "name": "saved",
+      "ok": true,
+      "detail": "the router has the new file"
+    },
+    {
+      "name": "cron",
+      "ok": true,
+      "detail": "running"
+    }
+  ],
+  "error": null,
+  "host": "192.168.1.2"
 }

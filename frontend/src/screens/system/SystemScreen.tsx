@@ -5,9 +5,12 @@ import type { RouterDetail, SystemOverview } from '../../api/types'
 import { Help } from '../../help/Help'
 import { HELP } from '../../help/topics'
 import { RouterSections } from '../../shell/RouterSections'
+import { CronTab } from './CronTab'
 import { DiagnosticsTab } from './DiagnosticsTab'
 import { LogsTab } from './LogsTab'
 import { ProcessesTab } from './ProcessesTab'
+import { ServicesTab } from './ServicesTab'
+import { SettingsTab } from './SettingsTab'
 import { StatusTab } from './StatusTab'
 
 const TABS = [
@@ -15,6 +18,9 @@ const TABS = [
   ['logs', 'Logs'],
   ['processes', 'Processes'],
   ['diagnostics', 'Diagnostics'],
+  ['settings', 'System and time'],
+  ['services', 'Services'],
+  ['cron', 'Scheduled tasks'],
 ] as const
 type Tab = (typeof TABS)[number][0]
 
@@ -58,6 +64,9 @@ export function SystemScreen() {
       {tab === 'logs' && <LogsTab routerId={id} />}
       {tab === 'processes' && <ProcessesTab routerId={id} />}
       {tab === 'diagnostics' && <DiagnosticsTab routerId={id} />}
+      {tab === 'settings' && <SettingsTab routerId={id} routerName={name} />}
+      {tab === 'services' && <ServicesTab routerId={id} routerName={name} />}
+      {tab === 'cron' && <CronTab routerId={id} routerName={name} />}
     </main>
   )
 }
