@@ -34,6 +34,7 @@ test('lists the router screens and folds the LuCI pages into one list', async ()
     'Wi-Fi',
     'RF live',
     'Network & DHCP',
+    'LTE',
     'Ports & VLANs',
     'Firewall',
     'Faults & capture',
@@ -44,6 +45,7 @@ test('lists the router screens and folds the LuCI pages into one list', async ()
   expect(within(nav).getByRole('link', { name: 'Wi-Fi' })).toHaveAttribute('aria-current', 'page')
   expect(within(nav).getByRole('link', { name: 'Overview' })).not.toHaveAttribute('aria-current')
   expect(within(nav).getByRole('link', { name: 'RF live' })).toHaveAttribute('href', '/routers/ap2/rf')
+  expect(within(nav).getByRole('link', { name: 'LTE' })).toHaveAttribute('href', '/routers/ap2/lte')
   const more = within(nav).getByText('LuCI pages (1)')
   expect(more.closest('details')).not.toHaveAttribute('open')
   await user.click(more)

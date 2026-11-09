@@ -217,7 +217,9 @@ class SshTransport:
 
     async def _run(self, command: str, stdin: str | None, timeout: float) -> CommandResult:
         try:
-            done = await self._conn.run(command, input=stdin, check=False, timeout=timeout)
+            # errors="replace": output that is not valid UTF-8 (AP2's QMI operator name) reads with U+FFFD; a
+            # strict decode would close the whole SSH connection
+            done = await self._conn.run(command, input=stdin, check=False, timeout=timeout, errors="replace")
         except (OSError, TimeoutError, asyncssh.Error) as exc:
             # asyncssh's TimeoutError has no text of its own
             why = str(exc).strip() or (
@@ -258,7 +260,9 @@ class SshTransport:
         return _ByteStream(process)
 
     async def open_shell(self, cols: int, rows: int) -> ShellChannel:
-        process = await self._conn.create_process(term_type="xterm-256color", term_size=(cols, rows))
+        process = await self._conn.create_process(
+            term_type="xterm-256color", term_size=(cols, rows), errors="replace"
+        )
         return _Shell(process)
 
     async def forward_local(self, remote_host: str, remote_port: int) -> LocalForward:

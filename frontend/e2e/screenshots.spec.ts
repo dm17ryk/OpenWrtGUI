@@ -9,6 +9,7 @@ const SCREENS: ReadonlyArray<readonly [string, string, string]> = [
   ['wifi', '/routers/ap1/wifi', 'Modes'],
   ['rf-live', '/routers/ap1/rf', 'RX at AP'],
   ['network', '/routers/ap1/network', 'Router addresses'],
+  ['lte', '/routers/ap1/lte', 'Signal quality'],
   ['ports', '/routers/ap1/ports', 'Front panel'],
   ['firewall', '/routers/ap1/firewall', 'Filtering model'],
   ['faults', '/routers/ap1/faults', 'Faults and capture'],

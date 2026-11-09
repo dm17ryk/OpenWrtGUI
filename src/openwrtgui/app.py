@@ -19,6 +19,7 @@ from openwrtgui.api import (
     flash_api,
     fw_api,
     images_api,
+    lte_api,
     luci_api,
     misc_api,
     net_api,
@@ -74,6 +75,7 @@ def create_app(ctx: AppContext) -> FastAPI:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             ctx.rf.close_all()
+            ctx.lte_live.close_all()
             await ctx.luci.close_all()
             await ctx.pool.close_all()
 
@@ -95,6 +97,7 @@ def create_app(ctx: AppContext) -> FastAPI:
         discovery_api,
         images_api,
         flash_api,
+        lte_api,
     )
     for module in modules:
         app.include_router(module.router)

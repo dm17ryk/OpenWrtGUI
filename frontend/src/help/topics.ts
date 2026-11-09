@@ -49,6 +49,15 @@ export const HELP = {
   netAccess: 'Network-and-DHCP#wi-fi-access-by-mac',
   netDns: 'Network-and-DHCP#dns',
   netRoutes: 'Network-and-DHCP#static-routes-and-rules',
+  // LTE modem (v0.6)
+  lte: 'LTE-modem',
+  lteStatus: 'LTE-modem#status',
+  lteSignal: 'LTE-modem#signal-quality',
+  lteCharts: 'LTE-modem#live-signal',
+  lteSettings: 'LTE-modem#settings',
+  lteModem: 'LTE-modem#modem',
+  lteActions: 'LTE-modem#connect-disconnect-reboot',
+  lteAt: 'LTE-modem#at-console',
   // Ports, VLANs, mirroring
   ports: 'Ports-and-VLANs',
   portsPanel: 'Ports-and-VLANs#front-panel',

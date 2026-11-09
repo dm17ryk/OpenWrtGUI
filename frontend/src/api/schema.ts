@@ -1146,6 +1146,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/lte": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lte State */
+        get: operations["lte_state_api_routers__router_id__lte_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/action/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Action Apply */
+        post: operations["action_apply_api_routers__router_id__lte_action_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/action/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Action Preview */
+        post: operations["action_preview_api_routers__router_id__lte_action_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/at": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** At Command */
+        post: operations["at_command_api_routers__router_id__lte_at_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/imei": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Imei */
+        post: operations["imei_api_routers__router_id__lte_imei_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/settings/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Settings Apply */
+        post: operations["settings_apply_api_routers__router_id__lte_settings_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/settings/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Settings Options */
+        get: operations["settings_options_api_routers__router_id__lte_settings_options_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/settings/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Settings Preview */
+        post: operations["settings_preview_api_routers__router_id__lte_settings_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/luci/bridges/{bridge_id}": {
         parameters: {
             query?: never;
@@ -1994,6 +2130,24 @@ export interface components {
             /** Ssids */
             ssids: components["schemas"]["SsidAccess"][];
         };
+        /** ActionApplyIn */
+        ActionApplyIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "connect" | "disconnect" | "reboot";
+            /** Digest */
+            digest: string;
+        };
+        /** ActionIn */
+        ActionIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "connect" | "disconnect" | "reboot";
+        };
         /** Address */
         Address: {
             /** Ip */
@@ -2057,6 +2211,30 @@ export interface components {
             target: components["schemas"]["FaultTarget"];
             /** Until */
             until: string | null;
+        };
+        /** AtIn */
+        AtIn: {
+            /** Command */
+            command: string;
+            /**
+             * Confirmed
+             * @default false
+             */
+            confirmed: boolean;
+        };
+        /** AtResult */
+        AtResult: {
+            /** Command */
+            command: string;
+            /** Error */
+            error: string | null;
+            /** Lines */
+            lines: string[];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "OK" | "ERROR" | "no answer";
         };
         /** AuditEntry */
         AuditEntry: {
@@ -3094,6 +3272,11 @@ export interface components {
              */
             upserts: components["schemas"]["HostIn"][];
         };
+        /** ImeiOut */
+        ImeiOut: {
+            /** Imei */
+            imei: string;
+        };
         /** IncludeConf */
         IncludeConf: {
             /** Path */
@@ -3119,6 +3302,8 @@ export interface components {
         InterfaceApplyIn: {
             /** Address */
             address?: string | null;
+            /** Auto */
+            auto?: boolean | null;
             /** Bridge Ports */
             bridge_ports?: string[] | null;
             /**
@@ -3173,6 +3358,8 @@ export interface components {
         InterfaceIn: {
             /** Address */
             address?: string | null;
+            /** Auto */
+            auto?: boolean | null;
             /** Bridge Ports */
             bridge_ports?: string[] | null;
             /**
@@ -3447,6 +3634,134 @@ export interface components {
              */
             username: string;
         };
+        /** LteSettingsApplyIn */
+        LteSettingsApplyIn: {
+            /** Apn */
+            apn?: string | null;
+            /** Auth */
+            auth?: ("none" | "pap" | "chap" | "both") | null;
+            /** Auto */
+            auto?: boolean | null;
+            /** Defaultroute */
+            defaultroute?: boolean | null;
+            /** Digest */
+            digest: string;
+            /**
+             * Edits
+             * @default []
+             */
+            edits: components["schemas"]["OptionEditIn"][];
+            /** Metric */
+            metric?: number | null;
+            /** Mtu */
+            mtu?: number | null;
+            /** Password */
+            password?: string | null;
+            /** Pdptype */
+            pdptype?: ("ipv4" | "ipv6" | "ipv4v6") | null;
+            /** Pincode */
+            pincode?: string | null;
+            /** Username */
+            username?: string | null;
+        };
+        /**
+         * LteSettingsIn
+         * @description None leaves a field as it is; "" in a text field removes the option.
+         */
+        LteSettingsIn: {
+            /** Apn */
+            apn?: string | null;
+            /** Auth */
+            auth?: ("none" | "pap" | "chap" | "both") | null;
+            /** Auto */
+            auto?: boolean | null;
+            /** Defaultroute */
+            defaultroute?: boolean | null;
+            /**
+             * Edits
+             * @default []
+             */
+            edits: components["schemas"]["OptionEditIn"][];
+            /** Metric */
+            metric?: number | null;
+            /** Mtu */
+            mtu?: number | null;
+            /** Password */
+            password?: string | null;
+            /** Pdptype */
+            pdptype?: ("ipv4" | "ipv6" | "ipv4v6") | null;
+            /** Pincode */
+            pincode?: string | null;
+            /** Username */
+            username?: string | null;
+        };
+        /** LteState */
+        LteState: {
+            /**
+             * Autoconnect Note
+             * @default This image's qmi.sh turns the modem's autoconnect off at every connect, so the setting has no effect
+             */
+            autoconnect_note: string;
+            /** Available */
+            available: boolean;
+            /** Device */
+            device?: string | null;
+            /** Ipv4 */
+            ipv4?: string | null;
+            /** Mcc */
+            mcc?: number | null;
+            /**
+             * Missing
+             * @default []
+             */
+            missing: string[];
+            /** Mnc */
+            mnc?: number | null;
+            /** @default {} */
+            modem: components["schemas"]["ModemInfo"];
+            /** Note */
+            note?: string | null;
+            /** Operator */
+            operator?: string | null;
+            /** Operator Source */
+            operator_source?: ("at" | "qmi") | null;
+            /** Opmode */
+            opmode?: string | null;
+            /** Pending */
+            pending?: boolean | null;
+            /** Radio */
+            radio?: string | null;
+            /**
+             * Read At
+             * Format: date-time
+             */
+            read_at: string;
+            /** Registration */
+            registration?: string | null;
+            /** Roaming */
+            roaming?: boolean | null;
+            /** Router Id */
+            router_id: string;
+            rsrp?: components["schemas"]["Measure"] | null;
+            rsrq?: components["schemas"]["Measure"] | null;
+            rssi?: components["schemas"]["Measure"] | null;
+            /** Rx Bytes */
+            rx_bytes?: number | null;
+            snr?: components["schemas"]["Measure"] | null;
+            /** Tx Bytes */
+            tx_bytes?: number | null;
+            /** Up */
+            up?: boolean | null;
+            /** Uptime S */
+            uptime_s?: number | null;
+        };
+        /** Measure */
+        Measure: {
+            /** Label */
+            label: ("excellent" | "good" | "fair" | "poor") | null;
+            /** Value */
+            value: number;
+        };
         /** MirrorApplyIn */
         MirrorApplyIn: {
             /** Digest */
@@ -3536,6 +3851,21 @@ export interface components {
              * @default []
              */
             pins_removed: ("ssh" | "dhcpdns")[];
+        };
+        /** ModemInfo */
+        ModemInfo: {
+            /** At Port */
+            at_port?: string | null;
+            /** Firmware */
+            firmware?: string | null;
+            /** Manufacturer */
+            manufacturer?: string | null;
+            /** Mode Order */
+            mode_order?: number | null;
+            /** Model */
+            model?: string | null;
+            /** Operator */
+            operator?: string | null;
         };
         /** ModesIn */
         ModesIn: {
@@ -7543,6 +7873,274 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lte_state_api_routers__router_id__lte_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LteState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    action_apply_api_routers__router_id__lte_action_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActionApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    action_preview_api_routers__router_id__lte_action_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    at_command_api_routers__router_id__lte_at_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AtIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    imei_api_routers__router_id__lte_imei_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImeiOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    settings_apply_api_routers__router_id__lte_settings_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LteSettingsApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    settings_options_api_routers__router_id__lte_settings_options_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OptionRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    settings_preview_api_routers__router_id__lte_settings_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LteSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
                 };
             };
             /** @description Validation Error */

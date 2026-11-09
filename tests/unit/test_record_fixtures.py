@@ -185,6 +185,59 @@ async def _close(self: Replay) -> None:
     return None
 
 
+LTE_LIST = "ls /dev/ttyUSB* /dev/cdc-wdm*"
+
+
+MICRO = "| timeout -s KILL 10 microcom -t 2000 -s 115200"
+
+
+async def test_lte_set_reads_the_modem_and_the_at_port_only() -> None:
+    ttys = "/dev/ttyUSB0\n/dev/ttyUSB2\n/dev/ttyUSB3\n"
+    t = Replay(
+        {
+            LTE_LIST: "/dev/cdc-wdm0\n" + ttys,
+            "ls /dev/ttyUSB*": ttys,
+            f"printf '%s\\r' 'AT' {MICRO} /dev/ttyUSB2": "AT\r\r\nOK\r\n",
+        }
+    )
+    commands = await rf.lte_commands(t)
+    assert commands[:8] == (
+        LTE_LIST,
+        "uqmi -s -d /dev/cdc-wdm0 -t 2000 --get-serving-system",
+        "uqmi -s -d /dev/cdc-wdm0 -t 2000 --get-signal-info",
+        "uqmi -s -d /dev/cdc-wdm0 -t 2000 --get-device-operating-mode",
+        "ubus call network.interface.lte status",
+        "ubus call network.interface.lte_4 status",
+        'ubus call network.device status \'{"name":"wwan0"}\'',
+        "cat /tmp/run/dwr921-qmi-state",
+    )
+    # like the app (lte/at.py find_at_port): `AT` to each tty in order up to the first OK, the reads there
+    # only; AP2's ttyUSB3 never takes the bytes, so a port after the AT port is never opened
+    assert commands[8:] == (
+        f"printf '%s\\r' 'AT' {MICRO} /dev/ttyUSB0",
+        f"printf '%s\\r' 'AT' {MICRO} /dev/ttyUSB2",
+        f"printf '%s\\r' 'AT+CGMI' {MICRO} /dev/ttyUSB2",
+        f"printf '%s\\r' 'AT+CGMM' {MICRO} /dev/ttyUSB2",
+        f"printf '%s\\r' 'AT+CGMR' {MICRO} /dev/ttyUSB2",
+        f"printf '%s\\r' 'AT+COPS?' {MICRO} /dev/ttyUSB2",
+        f"printf '%s\\r' 'AT+BMMODODR?' {MICRO} /dev/ttyUSB2",
+        f"printf '%s\\r' 'AT+CSQ' {MICRO} /dev/ttyUSB2",
+    )
+    assert not any("--get-imei" in c or "ttyUSB3" in c for c in commands)
+    # the image's dwr921-at-probe hung on AP2 (its picocom never exited): every AT read here is bounded
+    assert not any("dwr921-at-probe" in c for c in commands)
+    assert all(
+        c.split("| ")[-1].startswith("timeout -s KILL 10 microcom") for c in commands if "microcom" in c
+    )
+    assert rf.out_file(Path("tests/fixtures/ap2"), "lte") == Path("tests/fixtures/ap2/lte.json")
+
+
+def test_lte_recording_hides_imei_and_iccid() -> None:
+    out = rf.sanitize("+CGSN: 353000000000001\n+CCID: 8997201234567890123\nATI\n")
+    assert "353000000000001" not in out and "8997201234567890123" not in out
+    assert "<imei>" in out and "<iccid>" in out and "ATI" in out
+
+
 MTD = (
     "dev:    size   erasesize  name\n"
     'mtd0: 00030000 00010000 "u-boot"\n'

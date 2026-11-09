@@ -7,6 +7,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- LTE screen per router with an LTE modem: registration, radio, roaming, the operator (from the modem's AT
+  port, or from QMI marked as possibly garbled), the data session with its address and counters, and RSSI,
+  RSRP, RSRQ and SNR with quality labels and live charts (one sample every 10 s while the screen is open).
+- LTE settings (APN, authentication, user name, password, SIM PIN, PDP type, MTU, metric, bring up at boot,
+  default route, and every other option of the interface) through the interface plan with its 60 s rollback;
+  the password and PIN show as `<hidden>` in the preview and the audit log. The modem's autoconnect and
+  lte_4's DHCP stay as they are, with the reason shown.
+- Connect, Disconnect and Reboot modem, each previewed and proven; the reboot goes low power, then online,
+  each read back, and never uses the modem's reset mode (it wedges the BM806C until a power cycle).
+- AT console: queries run any time, also during a harness run; any other command asks first and waits for the
+  run. Modem details from `AT+CGMI`, `AT+CGMM`, `AT+CGMR`; the IMEI only on Reveal, never stored or audited.
+- Network and DHCP: the LTE interface's row links to the LTE screen, and **bring up at boot** (`auto`) can be
+  set on any interface.
+
 ## [0.5.0] - 2026-11-08
 
 Image import and Discovery.

@@ -5,7 +5,8 @@ import { toUplot, type Point } from './series'
 
 export type ChartSeries = { label: string; tone: 'rx' | 'tx'; points: Point[] }
 
-type Props = { title: string; unit: string; series: ChartSeries[] }
+/** `xRange` (seconds) pins the time axis to the window, so a chart with one or two points still reads as now. */
+type Props = { title: string; unit: string; series: ChartSeries[]; xRange?: readonly [number, number] }
 
 const HEIGHT = 210
 
@@ -30,11 +31,13 @@ function columns(series: ChartSeries[]): uPlot.AlignedData {
 }
 
 /** A line chart for RF values: 2 px lines in the RX / TX colours, a hover readout in the legend. */
-export function RfChart({ title, unit, series }: Props) {
+export function RfChart({ title, unit, series, xRange }: Props) {
   const box = useRef<HTMLDivElement>(null)
   const plot = useRef<uPlot | null>(null)
+  const range = useRef(xRange)
   const theme = useTheme()
   const labels = series.map((s) => `${s.label}:${s.tone}`).join('|')
+  const pinned = xRange !== undefined
 
   useEffect(() => {
     const el = box.current
@@ -45,12 +48,15 @@ export function RfChart({ title, unit, series }: Props) {
     const opts: uPlot.Options = {
       width: el.clientWidth || 600,
       height: HEIGHT,
-      scales: { x: { time: true } },
+      scales: {
+        x: pinned ? { time: true, range: (_u, min, max) => (range.current ? [range.current[0], range.current[1]] : [min, max]) } : { time: true },
+      },
       axes: [
         { stroke: ink, grid: { stroke: grid, width: 1 }, ticks: { stroke: axis, width: 1 } },
         { stroke: ink, grid: { stroke: grid, width: 1 }, ticks: { stroke: axis, width: 1 }, label: unit, size: 56 },
       ],
-      series: [{}, ...series.map((s) => ({ label: s.label, stroke: token(`--${s.tone}`), width: 2, points: { show: false } }))],
+      // a line needs two points: until then the sample shows as a dot
+      series: [{}, ...series.map((s) => ({ label: s.label, stroke: token(`--${s.tone}`), width: 2, points: { show: (u: uPlot) => u.data[0].length < 2, size: 7 } }))],
       cursor: { drag: { x: false, y: false } },
       legend: { show: true, live: true },
     }
@@ -64,11 +70,12 @@ export function RfChart({ title, unit, series }: Props) {
     }
     // the chart is rebuilt only when its series or the theme change; data changes go through setData
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [labels, unit, theme])
+  }, [labels, unit, theme, pinned])
 
   useEffect(() => {
+    range.current = xRange
     plot.current?.setData(columns(series))
-  }, [series])
+  }, [series, xRange])
 
   const last = series.map((s) => [s.label, s.points.at(-1)?.v ?? null] as const)
   return (

@@ -142,6 +142,11 @@ export function Interfaces({ routerId, routerName, host, state, onApplied }: Pro
                     )}
                   </td>
                   <td>
+                    {v.conf?.proto === 'qmi' && (
+                      <Link className="btn" to={`/routers/${routerId}/lte`}>
+                        LTE screen
+                      </Link>
+                    )}{' '}
                     {v.conf && (
                       <button className="btn" type="button" aria-label={`Edit ${name}`} aria-expanded={editing === name} onClick={() => setEditing(editing === name ? null : name)}>
                         Edit

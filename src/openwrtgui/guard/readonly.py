@@ -6,13 +6,18 @@ import re
 import shlex
 
 from openwrtgui.discovery.commands import OVERLAY_LS, ROM_LS
+from openwrtgui.lte.commands import TTY_LIST
 
 # "&" also covers "&&" and "|&": a single & starts a second command in the background.
 _FORBIDDEN = (";", "&", "||", ">", "<", "`", "$(", "\n")
 # Discovery's own reads (v0.5), as exact texts: they need `-exec ls` and a stderr redirect.
-_EXACT = frozenset({OVERLAY_LS, ROM_LS})
+_EXACT = frozenset({OVERLAY_LS, ROM_LS, TTY_LIST})
 _FIRMWARE_HASH = re.compile(
     r"dd if=/dev/mtdblock\d{1,2} bs=65536 count=\d{1,6} 2>/dev/null \| head -c \d{1,10} \| sha256sum"
+)
+# the LTE screen's modem reads (lte/commands.py): serving system, signal, operating mode; not the IMEI
+_UQMI_READ = re.compile(
+    r"uqmi -s -d /dev/cdc-wdm[0-9] -t 2000 --get-(serving-system|signal-info|device-operating-mode)"
 )
 
 _ALWAYS = frozenset(
@@ -192,7 +197,7 @@ def _segment_ok(words: list[str]) -> bool:
 
 
 def is_read_only_command(cmd: str) -> bool:
-    if cmd in _EXACT or _FIRMWARE_HASH.fullmatch(cmd):
+    if cmd in _EXACT or _FIRMWARE_HASH.fullmatch(cmd) or _UQMI_READ.fullmatch(cmd):
         return True
     if not cmd.strip() or any(token in cmd for token in _FORBIDDEN):
         return False

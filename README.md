@@ -14,13 +14,27 @@ is connected, and how each router describes itself. It never disturbs a test run
 
 ![Dashboard: three routers, the 2.4 GHz air map and one station](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/dashboard.png)
 
-> v0.5 adds image import and Discovery: import a router's sysupgrade image and see what changed on the
+> v0.6 adds the LTE modem: registration, operator and signal with quality labels and live charts, the LTE
+> settings with rollback, connect, disconnect, a safe modem reboot, and an AT console.
+> v0.5 added image import and Discovery: import a router's sysupgrade image and see what changed on the
 > router since flashing, the bench's own packages and programs as cards, and flash a router from an image.
 > v0.4 added the firewall and faults: both filtering models per zone, every nftables table with its owner,
 > and faults from a pulled cable to netem, plus capture to Wireshark. v0.3 added the network (addresses with
 > a router-side rollback, DHCP, DNS, routes, ports and VLANs); v0.2 Wi-Fi with proof on air, RF live and the
 > LuCI fallback; v0.1 the foundation: install, update, add routers, the dashboard, Bench Guard, the terminal
-> and the audit log. LTE follows; see the [roadmap](ROADMAP.md).
+> and the audit log. The System screen (LuCI's System and Status pages) follows; see the [roadmap](ROADMAP.md).
+
+## What v0.6 adds
+
+| Screen | What you get |
+|---|---|
+| **LTE** | Per router with an LTE modem: registration, radio, roaming, operator, the data session with its address, and RSSI, RSRP, RSRQ and SNR with quality labels and live charts. The modem's model and firmware; the IMEI only when you press Reveal. |
+| **LTE settings** | APN, authentication, password, SIM PIN, PDP type, MTU, metric, bring up at boot and default route, with the exact commands in the preview and the router's 60 s rollback. Options this image ignores or needs as they are (autoconnect, lte_4's DHCP) stay put, with the reason. |
+| **LTE actions** | Connect, Disconnect, and Reboot modem (low power, then online, each read back; never the reset mode that wedges the BM806C). An AT console: queries run any time, other commands ask first and wait for a harness run. |
+
+| LTE |
+|---|
+| ![LTE](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/lte.png) |
 
 ## What v0.5 adds
 

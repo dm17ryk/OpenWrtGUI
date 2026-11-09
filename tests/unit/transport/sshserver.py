@@ -36,6 +36,9 @@ async def _handle(process: asyncssh.SSHServerProcess[str]) -> None:
     if cmd == "echo hi":
         process.stdout.write("hi\n")
         process.exit(0)
+    elif cmd == "not-utf8":  # AP2's uqmi --get-serving-system: QMI's operator name is not valid UTF-8
+        process.stdout.write('{"plmn_description":"\xd0\xb0\x9c\xee.\xcb"}\n')  # latin-1: these exact bytes
+        process.exit(0)
     elif cmd == "cat":
         data = await process.stdin.read()
         process.stdout.write(data)
@@ -43,6 +46,8 @@ async def _handle(process: asyncssh.SSHServerProcess[str]) -> None:
     elif cmd is None:
         process.stdout.write("shell> ")
         line = await process.stdin.readline()
+        if line.strip() == "not-utf8":
+            process.stdout.write("\xd0\xb0\x9c\xee.\xcb\n")
         process.stdout.write(f"you typed {line.strip()}\n")
         process.exit(0)
     else:
@@ -67,6 +72,7 @@ async def start_server(authorized: Sequence[str] = (), *, no_login: bool = False
         server_host_keys=[host_key],
         process_factory=_handle,
         authorized_client_keys=auth_keys,
+        encoding="latin-1",  # byte for byte: lets a handler send output that is not valid UTF-8
     )
     port = acceptor.sockets[0].getsockname()[1]
     return SshServer(port=port, fingerprint=host_key.get_fingerprint("sha256"), server=acceptor)

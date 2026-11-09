@@ -16,6 +16,7 @@ import httpx
 from openwrtgui.guard.bench_guard import ProcessInfo
 from openwrtgui.simfw import SimFirewall
 from openwrtgui.simimage import SimImage
+from openwrtgui.simmodem import SimModem
 from openwrtgui.simnet import SimNetwork
 from openwrtgui.simwifi import SimWifi
 from openwrtgui.store.routers import RouterRecord, RouterStore
@@ -164,8 +165,16 @@ class SimConnector:
                 clock=self._clock,
                 board_json=board.stdout if board is not None else None,
             )
+        modem = SimModem(clock=self._clock) if entry.get("modem") else None
+        if net is not None:
+            net.modem = modem
         return SimState(
-            root_password=entry.get("password") or SIM_ROOT_PASSWORD, wifi=wifi, net=net, fw=fw, image=image
+            root_password=entry.get("password") or SIM_ROOT_PASSWORD,
+            wifi=wifi,
+            net=net,
+            fw=fw,
+            image=image,
+            modem=modem,
         )
 
     def state(self, host: str) -> SimState:

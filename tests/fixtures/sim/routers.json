@@ -18,7 +18,8 @@
     "auth": "key",
     "fw": "ap1.json",
     "image": "mini-r35692.bin",
-    "upper": "overlay/ap1.json"
+    "upper": "overlay/ap1.json",
+    "modem": true
   },
   {
     "id": "ap2",
@@ -31,7 +32,8 @@
     "fw": "ap2.json",
     "auth": "key",
     "image": "mini-r35692.bin",
-    "upper": "overlay/ap2.json"
+    "upper": "overlay/ap2.json",
+    "modem": true
   },
   {
     "id": "ap3",
@@ -43,7 +45,8 @@
     "net": "ap3.uci",
     "auth": "none",
     "image": "mini-r35692.bin",
-    "upper": "overlay/ap3.json"
+    "upper": "overlay/ap3.json",
+    "modem": true
   },
   {
     "id": "new",
