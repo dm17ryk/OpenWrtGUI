@@ -5,11 +5,13 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
+from openwrtgui.guard.writes import run_audited
 from openwrtgui.net.apply import ApplyRunner
 from openwrtgui.paths import DataDir
 from openwrtgui.store.routers import RouterRecord, RouterStore
@@ -27,6 +29,19 @@ NO_ZONES = "This router lists no time zones (LuCI's rpcd plugin is missing): onl
 
 
 NO_CONNTRACK = "The connection table is not available: nf_conntrack is not loaded"
+DiagTool = Literal["ping", "traceroute", "nslookup"]
+_DIAG: dict[str, Callable[[str], str]] = {"ping": s.ping, "traceroute": s.traceroute, "nslookup": s.nslookup}
+DIAG_TIMEOUT_S = s.DIAG_LIMIT_S + 5.0  # the router's own `timeout -s KILL` ends it first
+
+
+class DiagResult(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    tool: DiagTool
+    target: str
+    command: str
+    output: str  # stdout, then stderr: a bad address is a result, not an error
+    exit_status: int
 
 
 class Connections(BaseModel):
@@ -106,6 +121,28 @@ class SystemService:
         if not result.ok:
             return Connections(rows=[], note=NO_CONNTRACK)
         return Connections(rows=parse_conntrack(result.stdout))
+
+    # ---------------------------------------------------------------- diagnostics (D4)
+    async def diagnose(self, router_id: str, tool: DiagTool, target: str) -> DiagResult:
+        """Run on the router, no preview, audited; refused during a run (traffic from a router under test)."""
+        if tool not in _DIAG:
+            raise ValueError(f"{tool!r} is not one of {', '.join(_DIAG)}")
+        command = _DIAG[tool](target)  # checks the target before anything is sent
+        self._guard.require_clear()
+        rec, t = await self._transport(router_id)
+        done = await run_audited(
+            t,
+            command,
+            router_id=rec.id,
+            screen=SCREEN,
+            guard=self._guard,
+            audit=self._audit,
+            timeout=DIAG_TIMEOUT_S,
+        )
+        output = done.stdout + (done.stderr if done.stderr else "")
+        return DiagResult(
+            tool=tool, target=target, command=command, output=output, exit_status=done.exit_status
+        )
 
     async def zone_strings(self, router_id: str) -> dict[str, str]:
         """Zone name -> TZ string, the router's list plus UTC."""

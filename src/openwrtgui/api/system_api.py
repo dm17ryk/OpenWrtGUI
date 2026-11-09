@@ -5,10 +5,11 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
 from openwrtgui.api.deps import get_ctx, require_token
 from openwrtgui.context import AppContext
-from openwrtgui.system.service import Connections, TimeZones
+from openwrtgui.system.service import Connections, DiagResult, DiagTool, TimeZones
 from openwrtgui.system.services import ServiceRow
 from openwrtgui.system.state import LogEntry, LogKind, ProcessList, SystemOverview
 
@@ -43,6 +44,16 @@ async def processes(router_id: str, ctx: Ctx) -> ProcessList:
 @router.get("/services")
 async def services(router_id: str, ctx: Ctx) -> list[ServiceRow]:
     return await ctx.system.services(_known(ctx, router_id))
+
+
+class DiagnoseIn(BaseModel):
+    tool: DiagTool
+    target: str = Field(max_length=253)
+
+
+@router.post("/diagnose")
+async def diagnose(router_id: str, body: DiagnoseIn, ctx: Ctx) -> DiagResult:
+    return await ctx.system.diagnose(_known(ctx, router_id), body.tool, body.target)
 
 
 @router.get("/connections")
