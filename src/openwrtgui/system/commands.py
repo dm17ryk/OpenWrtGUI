@@ -12,8 +12,11 @@ HOSTNAME = re.compile(r"[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?")  # one RFC
 NTP_SERVER = re.compile(r"(?!-)[A-Za-z0-9.:-]{1,253}")  # a host name or an address, never an option
 TARGET = NTP_SERVER
 SERVICE = re.compile(r"(?!\.)[A-Za-z0-9._-]{1,64}")
-InitAction = Literal["start", "stop", "restart", "enable", "disable"]
-INIT_ACTIONS: tuple[InitAction, ...] = ("start", "stop", "restart", "enable", "disable")
+# the Services tab offers the first five; `reload` is what a System settings apply sends (D5)
+InitAction = Literal["start", "stop", "restart", "enable", "disable", "reload"]
+INIT_ACTIONS: tuple[InitAction, ...] = ("start", "stop", "restart", "enable", "disable", "reload")
+ServiceAction = Literal["start", "stop", "restart", "enable", "disable"]
+SERVICE_ACTIONS: tuple[ServiceAction, ...] = ("start", "stop", "restart", "enable", "disable")
 FilePath = Literal["/etc/rc.local", "/etc/crontabs/root"]
 FILES: tuple[FilePath, ...] = ("/etc/rc.local", "/etc/crontabs/root")
 MAX_FILE = 8 * 1024

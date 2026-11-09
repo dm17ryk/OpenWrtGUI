@@ -1,0 +1,15 @@
+Sun Nov  8 09:00:01 2026 daemon.info procd: - init complete -
+Sun Nov  8 09:00:02 2026 daemon.notice netifd: Interface 'lan' is now up
+Sun Nov  8 09:00:02 2026 daemon.notice netifd: Interface 'loopback' is now up
+Sun Nov  8 09:00:04 2026 daemon.info dnsmasq[1644]: started, version 2.90 cachesize 1000
+Sun Nov  8 09:00:05 2026 daemon.notice netifd: Interface 'lte' is now up
+Sun Nov  8 09:00:06 2026 daemon.info dnsmasq[1644]: using nameserver 10.64.12.1#53
+Sun Nov  8 09:00:09 2026 user.notice dwr921-internet-led: internet up via lte
+Sun Nov  8 09:01:11 2026 daemon.err uhttpd[1821]: luci: accepted login on / for root from 192.168.1.10
+Sun Nov  8 09:05:00 2026 daemon.warn odhcpd[1700]: No default route present, overriding ra_lifetime to 0!
+Sun Nov  8 15:29:02 2026 authpriv.info dropbear[24543]: Child connection from 192.168.1.10:53498
+Sun Nov  8 15:29:02 2026 authpriv.notice dropbear[24543]: Pubkey auth succeeded for 'root' with ssh-rsa key from 192.168.1.10:53498
+Sun Nov  8 15:29:10 2026 daemon.notice netifd: radio0 (24611): wifi-scripts: Tearing down phy0
+Sun Nov  8 15:29:11 2026 daemon.notice netifd: radio0 (24624): wifi-scripts: Setting country code to IL
+Sun Nov  8 15:29:12 2026 authpriv.info dropbear[24543]: Exit (root) from <192.168.1.10:53498>: Disconnect received
+Sun Nov  8 15:30:00 2026 cron.info crond[2600]: crond (busybox 1.37.0) started, log level 5

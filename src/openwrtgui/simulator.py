@@ -18,6 +18,7 @@ from openwrtgui.simfw import SimFirewall
 from openwrtgui.simimage import SimImage
 from openwrtgui.simmodem import SimModem
 from openwrtgui.simnet import SimNetwork
+from openwrtgui.simsystem import SimSystem
 from openwrtgui.simwifi import SimWifi
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import (
@@ -175,6 +176,28 @@ class SimConnector:
             fw=fw,
             image=image,
             modem=modem,
+            system=self._system(entry, net, image),
+        )
+
+    def _system(
+        self, entry: dict[str, Any], net: SimNetwork | None, image: SimImage | None
+    ) -> SimSystem | None:
+        """The System screen's side of a simulated router (v0.6b); wizard-only routers have none."""
+        if net is None:
+            return None
+        recorded = sim_commands(self._sim_dir, entry["id"])
+        board, info = recorded.get("ubus call system board"), recorded.get("ubus call system info")
+        folder = self._sim_dir / "system"
+        texts = (
+            {p.stem: p.read_text(encoding="utf-8") for p in folder.glob("*.txt")} if folder.is_dir() else {}
+        )
+        return SimSystem(
+            clock=self._clock,
+            net=net,
+            image=image,
+            board_json=board.stdout if board is not None else None,
+            info_json=info.stdout if info is not None else None,
+            texts=texts,
         )
 
     def state(self, host: str) -> SimState:
