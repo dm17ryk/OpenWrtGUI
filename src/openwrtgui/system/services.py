@@ -65,7 +65,7 @@ def check_rc_local(text: str) -> str:
     return text.rstrip("\n") + "\n"
 
 
-class ServiceRow(BaseModel):
+class SystemServiceRow(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     name: str
@@ -76,9 +76,9 @@ class ServiceRow(BaseModel):
     protected: str | None  # why only restart is offered; None: every action is
 
 
-def service_rows(rc: list[RcService]) -> list[ServiceRow]:
+def service_rows(rc: list[RcService]) -> list[SystemServiceRow]:
     return [
-        ServiceRow(
+        SystemServiceRow(
             name=r.name,
             enabled=r.enabled,
             running=r.running,

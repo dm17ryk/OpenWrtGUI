@@ -192,6 +192,34 @@ export type LteSample = {
 }
 /** Messages on /ws/lte/{router}. */
 export type LteMessage = { type: 'lte'; sample: LteSample } | { type: 'lte-idle'; reason: string }
+export type SystemOverview = S['SystemOverview']
+export type LogEntry = S['LogEntry']
+export type ProcessList = S['ProcessList']
+export type ProcessRow = S['ProcessRow']
+export type SystemServiceRow = S['SystemServiceRow']
+export type ServiceAction = S['SystemServiceIn']['action']
+export type Connections = S['Connections']
+export type Connection = S['Connection']
+export type TimeZones = S['TimeZones']
+export type SystemSettingsOut = S['SettingsOut']
+export type SystemSettingsIn = S['SettingsIn']
+export type CronState = S['CronState']
+export type CronTask = S['CronTask']
+export type RebootJob = S['RebootJob']
+export type BackupFile = S['BackupFile']
+export type DiagResult = S['DiagResult']
+export type DiagTool = S['DiagnoseIn']['tool']
+export type SystemSample = {
+  t: number
+  load1: number | null
+  load5: number | null
+  load15: number | null
+  connections: number | null
+  /** interface -> [rx, tx] bytes per second since the last sample */
+  rates: Record<string, [number, number]>
+}
+/** Messages on /ws/system/{router}. */
+export type SystemMessage = { type: 'system'; sample: SystemSample } | { type: 'system-idle'; reason: string }
 export type Security = SsidState['security']
 type ModesIn = S['ModesIn']
 

@@ -17,7 +17,7 @@ from openwrtgui.system.commands import ServiceAction
 from openwrtgui.system.cron import CronState
 from openwrtgui.system.reboot import RebootBusy, RebootJob
 from openwrtgui.system.service import Connections, DiagResult, DiagTool, TimeZones
-from openwrtgui.system.services import ServiceRow
+from openwrtgui.system.services import SystemServiceRow
 from openwrtgui.system.settings import LogProto, SystemSettings
 from openwrtgui.system.state import LogEntry, LogKind, ProcessList, SystemOverview
 
@@ -50,7 +50,7 @@ async def processes(router_id: str, ctx: Ctx) -> ProcessList:
 
 
 @router.get("/services")
-async def services(router_id: str, ctx: Ctx) -> list[ServiceRow]:
+async def services(router_id: str, ctx: Ctx) -> list[SystemServiceRow]:
     return await ctx.system.services(_known(ctx, router_id))
 
 
@@ -106,22 +106,22 @@ async def settings_apply(router_id: str, body: SettingsApplyIn, ctx: Ctx) -> Net
     return await ctx.system.apply_settings(_known(ctx, router_id), domain, body.digest)
 
 
-class ServiceIn(BaseModel):
+class SystemServiceIn(BaseModel):
     name: str = Field(max_length=64)
     action: ServiceAction
 
 
-class ServiceApplyIn(ServiceIn, Digest):
+class SystemServiceApplyIn(SystemServiceIn, Digest):
     pass
 
 
 @router.post("/service/preview")
-async def service_preview(router_id: str, body: ServiceIn, ctx: Ctx) -> NetPlanOut:
+async def service_preview(router_id: str, body: SystemServiceIn, ctx: Ctx) -> NetPlanOut:
     return NetPlanOut.of(await ctx.system.plan_service(_known(ctx, router_id), body.name, body.action))
 
 
 @router.post("/service/apply")
-async def service_apply(router_id: str, body: ServiceApplyIn, ctx: Ctx) -> NetApplyResult:
+async def service_apply(router_id: str, body: SystemServiceApplyIn, ctx: Ctx) -> NetApplyResult:
     return await ctx.system.apply_service(_known(ctx, router_id), body.name, body.action, body.digest)
 
 

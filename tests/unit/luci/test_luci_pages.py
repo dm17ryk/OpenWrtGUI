@@ -104,6 +104,29 @@ def test_page_views_mark_native() -> None:
     assert iptables is None or iptables.native is None
 
 
+def test_system_pages_are_native() -> None:
+    """v0.6b D11: these LuCI pages have the System screen; access, mounts, LEDs wait for v0.6c."""
+    views = {v.path: v for v in page_views(parse_menu(MENUS))}
+    for path in (
+        "admin/status/logs/syslog",
+        "admin/status/logs/dmesg",
+        "admin/status/processes",
+        "admin/status/realtime/load",
+        "admin/status/realtime/bandwidth",
+        "admin/status/realtime/connections",
+        "admin/system/system",
+        "admin/system/startup",
+        "admin/system/crontab",
+        "admin/system/reboot",
+        "admin/system/flash",
+        "admin/network/diagnostics",
+    ):
+        assert views[path].native == "system", path
+    for path in ("admin/system/leds", "admin/system/mounts", "admin/system/admin/sshkeys"):
+        assert views[path].native is None, path
+    assert views["admin/status/realtime/wireless"].native is None  # RF live is its own screen, not this page
+
+
 def test_page_groups_fall_back_to_the_package() -> None:
     pages = {p.path: p for p in parse_menu(MENUS)}
     assert page_groups(pages["admin/network/wireless"], ACL)[0] == "luci-mod-network-config"

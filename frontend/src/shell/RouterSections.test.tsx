@@ -38,8 +38,10 @@ test('lists the router screens and folds the LuCI pages into one list', async ()
     'Ports & VLANs',
     'Firewall',
     'Faults & capture',
+    'System',
     'Terminal',
   ])
+  expect(within(nav).getByRole('link', { name: 'System' })).toHaveAttribute('href', '/routers/ap2/system')
   expect(within(nav).getByRole('link', { name: 'Ports & VLANs' })).toHaveAttribute('href', '/routers/ap2/ports')
   expect(within(nav).getByRole('link', { name: 'Firewall' })).toHaveAttribute('href', '/routers/ap2/firewall')
   expect(within(nav).getByRole('link', { name: 'Wi-Fi' })).toHaveAttribute('aria-current', 'page')

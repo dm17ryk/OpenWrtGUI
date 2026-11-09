@@ -50,7 +50,7 @@ from openwrtgui.system.reboot import (
 )
 from openwrtgui.system.services import (
     SETTLE_S,
-    ServiceRow,
+    SystemServiceRow,
     action_holds,
     action_warnings,
     check_action,
@@ -171,7 +171,7 @@ class SystemService:
         rows, cpu, column = parse_top(await self._stdout(t, s.TOP))
         return ProcessList(rows=rows, cpu=cpu, column=column)
 
-    async def services(self, router_id: str) -> list[ServiceRow]:
+    async def services(self, router_id: str) -> list[SystemServiceRow]:
         _rec, t = await self._transport(router_id)
         return service_rows(parse_rc_list(await self._stdout(t, s.RC_LIST)))
 

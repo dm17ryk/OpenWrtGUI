@@ -27,6 +27,21 @@ NATIVE: dict[str, str] = {
     "admin/network/firewall/ipsets": "firewall",
     "admin/network/firewall/custom": "firewall",
     "admin/status/nftables": "firewall",
+    # v0.6b D11: the System screen (access, mounts and LEDs stay LuCI's until v0.6c)
+    "admin/status/logs": "system",
+    "admin/status/logs/syslog": "system",
+    "admin/status/logs/dmesg": "system",
+    "admin/status/processes": "system",
+    "admin/status/realtime": "system",
+    "admin/status/realtime/load": "system",
+    "admin/status/realtime/bandwidth": "system",
+    "admin/status/realtime/connections": "system",
+    "admin/system/system": "system",
+    "admin/system/startup": "system",
+    "admin/system/crontab": "system",
+    "admin/system/reboot": "system",
+    "admin/system/flash": "system",
+    "admin/network/diagnostics": "system",
 }
 
 
