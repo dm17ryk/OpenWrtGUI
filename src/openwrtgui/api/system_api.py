@@ -12,6 +12,7 @@ from openwrtgui.api.net_api import Digest, NetPlanOut
 from openwrtgui.context import AppContext
 from openwrtgui.net.apply import NetApplyResult
 from openwrtgui.system.commands import ServiceAction
+from openwrtgui.system.cron import CronState
 from openwrtgui.system.service import Connections, DiagResult, DiagTool, TimeZones
 from openwrtgui.system.services import ServiceRow
 from openwrtgui.system.settings import LogProto, SystemSettings
@@ -146,6 +147,21 @@ async def rc_local_preview(router_id: str, body: TextIn, ctx: Ctx) -> NetPlanOut
 @router.post("/rc-local/apply")
 async def rc_local_apply(router_id: str, body: TextApplyIn, ctx: Ctx) -> NetApplyResult:
     return await ctx.system.apply_rc_local(_known(ctx, router_id), body.text, body.digest)
+
+
+@router.get("/crontab")
+async def crontab(router_id: str, ctx: Ctx) -> CronState:
+    return await ctx.system.crontab(_known(ctx, router_id))
+
+
+@router.post("/crontab/preview")
+async def crontab_preview(router_id: str, body: TextIn, ctx: Ctx) -> NetPlanOut:
+    return NetPlanOut.of(await ctx.system.plan_crontab(_known(ctx, router_id), body.text))
+
+
+@router.post("/crontab/apply")
+async def crontab_apply(router_id: str, body: TextApplyIn, ctx: Ctx) -> NetApplyResult:
+    return await ctx.system.apply_crontab(_known(ctx, router_id), body.text, body.digest)
 
 
 class DiagnoseIn(BaseModel):

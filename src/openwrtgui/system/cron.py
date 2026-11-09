@@ -6,6 +6,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from pydantic import BaseModel, ConfigDict
+
 _MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
 _DAYS = ("sun", "mon", "tue", "wed", "thu", "fri", "sat")
 # name, lowest, highest, names (index 0 = lowest), message
@@ -86,3 +88,38 @@ def check_crontab(text: str) -> str:
     parse_crontab(text)
     lines = text.splitlines()
     return "".join(f"{line}\n" for line in lines)
+
+
+class CronTask(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    minute: str
+    hour: str
+    day: str
+    month: str
+    weekday: str
+    command: str
+
+
+class CronState(BaseModel):
+    """The crontab as the router has it ("" without a file: no tasks) and cron's own state."""
+
+    model_config = ConfigDict(frozen=True)
+
+    text: str
+    tasks: list[CronTask]
+    cron_enabled: bool
+    cron_running: bool
+    note: str | None = None  # a line crond cannot read (written by hand on the router)
+
+
+def read_tasks(text: str) -> tuple[list[CronTask], str | None]:
+    try:
+        entries = parse_crontab(text)
+    except ValueError as exc:
+        return [], f"crond cannot read {exc}"
+    return [CronTask(**e.__dict__) for e in entries if isinstance(e, CronLine)], None
+
+
+def has_tasks(text: str) -> bool:
+    return any(isinstance(e, CronLine) for e in parse_crontab(text))

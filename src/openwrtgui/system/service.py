@@ -25,6 +25,7 @@ from openwrtgui.net.apply import (
 from openwrtgui.paths import DataDir
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.system import commands as s
+from openwrtgui.system.cron import CronState, check_crontab, has_tasks, read_tasks
 from openwrtgui.system.parse import (
     Connection,
     RcService,
@@ -56,6 +57,7 @@ NO_ZONES = "This router lists no time zones (LuCI's rpcd plugin is missing): onl
 
 
 NO_CONNTRACK = "The connection table is not available: nf_conntrack is not loaded"
+CRONTAB_FILE: s.FilePath = "/etc/crontabs/root"
 DiagTool = Literal["ping", "traceroute", "nslookup"]
 _DIAG: dict[str, Callable[[str], str]] = {"ping": s.ping, "traceroute": s.traceroute, "nslookup": s.nslookup}
 DIAG_TIMEOUT_S = s.DIAG_LIMIT_S + 5.0  # the router's own `timeout -s KILL` ends it first
@@ -269,18 +271,22 @@ class SystemService:
             plan = await self._service_plan(rec, t, name, action)
 
             async def verify(t2: Transport) -> list[NetCheck]:
-                waited = 0.0
-                while True:
-                    ok, detail = action_holds(await self._rc_row(t2, name), action)
-                    if ok or waited >= SETTLE_S:
-                        break
-                    await self._sleep(1.0)
-                    waited += 1.0
-                return [NetCheck(f"service {name}", ok, detail if ok else f"{detail} after {SETTLE_S:g} s")]
+                return [await self._settled(t2, name, action, f"service {name}")]
 
             return Planned(plan, verify)
 
         return await self._runner.run_planned(rec, make, digest)
+
+    async def _settled(self, t: Transport, name: str, action: s.ServiceAction, check: str) -> NetCheck:
+        """`rc list` re-read each second until it shows what the action does, SETTLE_S at most."""
+        waited = 0.0
+        while True:
+            ok, detail = action_holds(await self._rc_row(t, name), action)
+            if ok or waited >= SETTLE_S:
+                break
+            await self._sleep(1.0)
+            waited += 1.0
+        return NetCheck(check, ok, detail if ok else f"{detail} after {SETTLE_S:g} s")
 
     async def rc_local(self, router_id: str) -> str:
         """The file as the router has it; "" when there is none."""
@@ -307,6 +313,63 @@ class SystemService:
 
             async def verify(t2: Transport) -> list[NetCheck]:
                 return [await file_check(t2, s.RC_LOCAL, wanted)]
+
+            return Planned(plan, verify)
+
+        return await self._runner.run_planned(rec, make, digest)
+
+    # ---------------------------------------------------------------- scheduled tasks (D7)
+    async def crontab(self, router_id: str) -> CronState:
+        _rec, t = await self._transport(router_id)
+        text = await self._stdout(t, s.CRONTAB)
+        row = await self._rc_row(t, "cron")
+        tasks, note = read_tasks(text)
+        return CronState(
+            text=text,
+            tasks=tasks,
+            cron_enabled=row is not None and row.enabled,
+            cron_running=row is not None and row.running,
+            note=note,
+        )
+
+    async def _crontab_plan(self, rec: RouterRecord, t: Transport, text: str) -> tuple[NetPlan, str, bool]:
+        """(plan, the file as it reads back, whether cron must run): the write, `cron enable` only when
+        disabled, then `cron restart`."""
+        wanted = check_crontab(text)
+        command = s.write_file(CRONTAB_FILE, wanted)  # OWG and size refused before anything is sent
+        expected = wanted or "\n"  # the heredoc writes at least its one (empty) line
+        current = await self._stdout(t, s.CRONTAB)
+        if current == expected or (not wanted.strip() and not current.strip()):
+            raise ValueError(NOTHING)
+        row = await self._rc_row(t, "cron")
+        enable = [s.init("cron", "enable")] if row is not None and not row.enabled else []
+        plan = net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config=None,
+            ops=[],
+            current={},
+            commands=[command, *enable],
+            reloads=[s.init("cron", "restart")],
+        )
+        return plan, expected, has_tasks(wanted)
+
+    async def plan_crontab(self, router_id: str, text: str) -> NetPlan:
+        rec, t = await self._transport(router_id)
+        return (await self._crontab_plan(rec, t, text))[0]
+
+    async def apply_crontab(self, router_id: str, text: str, digest: str | None) -> NetApplyResult:
+        """Proof: the file reads back as sent, and cron runs once there is a task (it idles without)."""
+        rec = self._record(router_id)
+
+        async def make(t: Transport) -> Planned:
+            plan, expected, tasks = await self._crontab_plan(rec, t, text)
+
+            async def verify(t2: Transport) -> list[NetCheck]:
+                checks = [await file_check(t2, s.CRONTAB, expected)]
+                if tasks:
+                    checks.append(await self._settled(t2, "cron", "start", "cron"))
+                return checks
 
             return Planned(plan, verify)
 
