@@ -40,6 +40,7 @@ from openwrtgui.lte.at import IDENTITY, find_at_port
 from openwrtgui.net.commands import network_reads
 from openwrtgui.probe.commands import DESCRIBE_COMMANDS, FAULT_RECORDS, STATUS_COMMANDS, wireless_validate
 from openwrtgui.rf.parse import parse_station_dump
+from openwrtgui.system import commands as sc
 from openwrtgui.transport.base import CommandResult
 from openwrtgui.transport.ssh import HostKeyStore, SshTransport
 from openwrtgui.wifi.parse import parse_iw_dev
@@ -64,6 +65,23 @@ SETS: dict[str, tuple[str, ...]] = {
     "network": network_reads("switch0"),
     # The Firewall screen's reads and what the router can do for faults (reads; `nft -c` commits nothing)
     "firewall": (*FIREWALL_READS, *CAPABILITY_READS, FW4_PRINT, FAULT_RECORDS, *FAMILY_CHECKS.values()),
+    # the System screen's reads; of the backup only its size (the archive holds secrets)
+    "system": (
+        sc.BOARD,
+        sc.INFO,
+        sc.UCI_SYSTEM,
+        sc.RC_LIST,
+        sc.TIMEZONES,
+        sc.TOP,
+        sc.DMESG,
+        sc.logread(100),
+        sc.RC_LOCAL,
+        sc.CRONTAB,
+        sc.TZ_FILE,
+        sc.LIVE,
+        sc.CONNTRACK,
+        sc.BACKUP_SIZE,
+    ),
 }
 FILES = {
     "probe": "commands.json",
@@ -73,6 +91,7 @@ FILES = {
     "firewall": "firewall.json",
     "discovery": "discovery.json",
     "lte": "lte.json",
+    "system": "system.json",
 }
 LTE_LIST = "ls /dev/ttyUSB* /dev/cdc-wdm*"
 # the AT reads the LTE screen makes on the AT port (only queries: nothing changes the modem)

@@ -185,6 +185,29 @@ async def _close(self: Replay) -> None:
     return None
 
 
+def test_system_set_records_the_reads_not_the_backup() -> None:
+    from openwrtgui.system import commands as s
+
+    assert rf.SETS["system"] == (
+        s.BOARD,
+        s.INFO,
+        s.UCI_SYSTEM,
+        s.RC_LIST,
+        s.TIMEZONES,
+        s.TOP,
+        s.DMESG,
+        s.logread(100),
+        s.RC_LOCAL,
+        s.CRONTAB,
+        s.TZ_FILE,
+        s.LIVE,
+        s.CONNTRACK,
+        s.BACKUP_SIZE,
+    )
+    assert s.BACKUP not in rf.SETS["system"]  # the archive holds secrets: only its size is recorded
+    assert rf.out_file(Path("tests/fixtures/ap2"), "system") == Path("tests/fixtures/ap2/system.json")
+
+
 LTE_LIST = "ls /dev/ttyUSB* /dev/cdc-wdm*"
 
 
