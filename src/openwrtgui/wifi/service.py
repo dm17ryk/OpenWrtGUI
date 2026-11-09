@@ -33,7 +33,7 @@ from openwrtgui.wifi.compile import (
 )
 from openwrtgui.wifi.model import CCK_BASIC_KBPS, OFDM_BASIC_KBPS, ModeSelection, RadioRequest
 from openwrtgui.wifi.options import OptionEdit, OptionRow, compile_edits, option_rows
-from openwrtgui.wifi.parse import parse_beacon_rates, parse_iw_dev, parse_iw_dev_info
+from openwrtgui.wifi.parse import IwDevInfo, parse_beacon_rates, parse_iw_dev, parse_iw_dev_info
 from openwrtgui.wifi.state import RadioState, WifiState, modes_from_uci, read_uci, read_wifi, ssid_sections
 from openwrtgui.wifi.stations import Station, del_client_command, read_stations
 
@@ -474,6 +474,17 @@ class WifiService:
             await self._sleep(self._poll_s)
             waited += self._poll_s
 
+    async def _operating(self, t: Transport, ifname: str) -> IwDevInfo:
+        """`iw dev X info` once the AP interface operates. netifd reports the radio up while hostapd may still
+        be in COUNTRY_UPDATE (AP2, 2026-11-09): no channel yet, and `set bitrates` fails."""
+        waited = 0.0
+        while True:
+            info = parse_iw_dev_info((await t.run(f"iw dev {ifname} info")).stdout)
+            if info.channel is not None or waited >= self._settle_timeout_s:
+                return info
+            await self._sleep(self._poll_s)
+            waited += self._poll_s
+
     async def _verify(self, rec: RouterRecord, t: Transport, plan: WifiPlan) -> list[Check]:
         expect = plan.expect
         settled: dict[str, Any] | None = (
@@ -503,11 +514,11 @@ class WifiService:
         if ifname is None:
             return [Check("radio", False, "no AP interface came up")]
         checks = [Check("radio", True, f"up on {ifname}")]
+        info = await self._operating(t, ifname)
         mask_check = Check("TX mask", None, "not changed")
         if plan.mask_args is not None:
             done = await self._run(t, rec, mask_command(ifname, plan.mask_args), source="app")
             mask_check = Check("TX mask", done.ok, "cleared" if not plan.mask_args else plan.mask_args)
-        info = parse_iw_dev_info((await t.run(f"iw dev {ifname} info")).stdout)
         if plan.mask_args and mask_check.ok and info.ifindex is not None:
             self._mask_marks[(rec.id, ifname)] = info.ifindex
         elif plan.mask_args == "":
