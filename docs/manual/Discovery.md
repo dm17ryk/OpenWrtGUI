@@ -110,4 +110,5 @@ A card has one button per command; pick one, fill in its parameters, check the e
 
 The init scripts of custom packages and those added after flashing: the package they come from, running and
 enabled state, with **Start**, **Stop** and **Restart**, each previewed and proven by reading the state back. They
-wait while Bench Guard shows a run. Other services come with the System screen.
+wait while Bench Guard shows a run. Every other init script, and enabling or disabling one at boot, is on
+[System › Services](System#services).

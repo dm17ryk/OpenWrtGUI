@@ -335,6 +335,19 @@ The wizard described in section 5.
     unpinned connection before accepting the new key; built and tested in the simulator only (O17).
   - reboot
 - Status: overview, routes, system log, kernel log, processes, realtime load/bandwidth/connections, diagnostics (ping, traceroute, nslookup run on the router).
+- *v0.6b note* (plan `docs/superpowers/plans/2026-11-09-v0.6b-system.md`, D1-D12): one System screen with a
+  tab per LuCI page (`?tab=`). Reads are LuCI's own (`ubus call system board|info`, `logread -l`, `dmesg -r`,
+  `top -bn1`, `ubus call rc list`, `luci getTimezones`, `/proc`), each its own exec, a part that fails named.
+  Live load, bandwidth and connection count every 3 s; the connection table on request (500 rows at most).
+  Diagnostics are audited, not previewed, and wait for a harness run. System settings go through the plain
+  uci apply with `system reload`, `sysntpd restart` or `log restart` and are proven by the saved config, the
+  live host name and `/tmp/TZ`; UTC is offered as `GMT0` (the router's list has no UTC). Services are proven
+  by re-reading `rc list` within 10 s (a one-shot by its exit status); dropbear, rpcd, uhttpd, network,
+  firewall and log are restart only. `rc.local` (must end with `exit 0`) and the crontab (every field
+  checked) are written whole through the audited heredoc, 8 KiB at most. The reboot is armed by the
+  router-side timer and done only on a fresh uptime (300 s limit). The backup is `sysupgrade -b -` saved
+  user-only in the data folder; the audit log names the file, never its content. Processes are read-only.
+  Access, SSH keys, HTTP(S), LEDs, mount points, restore and reset to defaults are v0.6c.
 
 ### 7.12 App settings and updates (12)
 - Updates (section 9), theme (System / Light / Dark), data folder, known devices (name ↔ MACs: the panel's ETH and Wi-Fi MACs are unrelated).

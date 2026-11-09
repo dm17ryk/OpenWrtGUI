@@ -22,6 +22,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   run. Modem details from `AT+CGMI`, `AT+CGMM`, `AT+CGMR`; the IMEI only on Reveal, never stored or audited.
 - Network and DHCP: the LTE interface's row links to the LTE screen, and **bring up at boot** (`auto`) can be
   set on any interface.
+- System screen per router, one tab per LuCI page it replaces: the overview (model, firmware, kernel, host
+  name, time, uptime, load, memory, storage); live load, per-interface bandwidth and connection count every
+  3 s; the connection table on request; the system and kernel logs with a text and level filter and Follow;
+  processes; ping, traceroute and nslookup from the router (audited, waiting for a harness run).
+- System and time: host name, time zone from the router's own list (plus UTC), NTP client, server and
+  servers, log buffer and remote syslog, previewed and proven by the saved config, the host name the router
+  answers with and its time zone.
+- Services: every init script with Start, Stop, Restart, Enable and Disable, proven by reading the state
+  back; the services the app goes through (dropbear, rpcd, uhttpd, network, firewall, log) offer Restart
+  only, with the reason. `rc.local` and the crontab are edited as text, every crontab field checked before
+  anything is sent; cron is enabled and restarted when needed.
+- Backup: the router's configuration archive saved in the data folder, readable by the user only, listed
+  and downloaded. Reboot: armed by a router-side timer, then followed until the router answers with a
+  fresh uptime (not back after 5 minutes is reported).
+- LuCI's logs, processes, realtime graphs, system, startup, scheduled tasks, reboot, backup and diagnostics
+  pages now open the System screen.
+
+### Fixed
+
+- A list replaced on a named uci section (for example the NTP servers) was reported as not saved although
+  the router had it.
 
 ## [0.5.0] - 2026-11-08
 
