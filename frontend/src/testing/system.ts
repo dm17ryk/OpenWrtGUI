@@ -2,6 +2,7 @@
 import type {
   Connections,
   CronState,
+  DiagResult,
   LogEntry,
   NetPlan,
   ProcessList,
@@ -697,4 +698,12 @@ export const AP2_REBOOT_PLAN: NetPlan = {
   "rollback": false,
   "target_host": null,
   "digest": "5ca0ea30cacc3626"
+}
+
+export const AP2_PING: DiagResult = {
+  "tool": "ping",
+  "target": "192.168.1.10",
+  "command": "timeout -s KILL 25 ping -c 4 -W 2 '192.168.1.10'",
+  "output": "PING 192.168.1.10 (192.168.1.10): 56 data bytes\n64 bytes from 192.168.1.10: seq=0 ttl=64 time=0.512 ms\n64 bytes from 192.168.1.10: seq=1 ttl=64 time=0.513 ms\n64 bytes from 192.168.1.10: seq=2 ttl=64 time=0.514 ms\n64 bytes from 192.168.1.10: seq=3 ttl=64 time=0.515 ms\n\n--- 192.168.1.10 ping statistics ---\n4 packets transmitted, 4 packets received, 0% loss\n",
+  "exit_status": 0
 }

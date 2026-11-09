@@ -101,8 +101,8 @@ function ConnectionsCard({ routerId }: { routerId: string }) {
       {conns.error && <div className="note x">{conns.error instanceof ApiError ? conns.error.detail : String(conns.error)}</div>}
       {conns.data?.note && <div className="note">{conns.data.note}</div>}
       {conns.data && !conns.data.note && (
-        <div className="table-wrap">
-          <table aria-label="Connections">
+        <div className="scroll-x">
+          <table className="tbl" aria-label="Connections">
             <thead>
               <tr>
                 <th>Protocol</th>

@@ -5,9 +5,17 @@ import type { RouterDetail, SystemOverview } from '../../api/types'
 import { Help } from '../../help/Help'
 import { HELP } from '../../help/topics'
 import { RouterSections } from '../../shell/RouterSections'
+import { DiagnosticsTab } from './DiagnosticsTab'
+import { LogsTab } from './LogsTab'
+import { ProcessesTab } from './ProcessesTab'
 import { StatusTab } from './StatusTab'
 
-const TABS = [['status', 'Status']] as const
+const TABS = [
+  ['status', 'Status'],
+  ['logs', 'Logs'],
+  ['processes', 'Processes'],
+  ['diagnostics', 'Diagnostics'],
+] as const
 type Tab = (typeof TABS)[number][0]
 
 /** System (spec 7.11): the router's own state and system settings, one tab per LuCI page it replaces (D1). */
@@ -47,6 +55,9 @@ export function SystemScreen() {
           {overview.data && <StatusTab routerId={id} overview={overview.data} />}
         </>
       )}
+      {tab === 'logs' && <LogsTab routerId={id} />}
+      {tab === 'processes' && <ProcessesTab routerId={id} />}
+      {tab === 'diagnostics' && <DiagnosticsTab routerId={id} />}
     </main>
   )
 }
