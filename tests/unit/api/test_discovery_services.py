@@ -56,7 +56,7 @@ async def test_stop_and_start_are_proven(ctx: AppContext) -> None:
 async def test_only_custom_services(ctx: AppContext) -> None:
     import_mini(ctx)
     with pytest.raises(
-        ValueError, match=r"^dropbear is not a custom service; it is managed on System › Services \(v0\.6\)$"
+        ValueError, match=r"^dropbear is not a custom service; it is managed on System › Services$"
     ):
         await ctx.discovery.plan_service("ap1", "dropbear", "restart")
 

@@ -13,6 +13,7 @@ from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.guard.writes import run_audited
 from openwrtgui.net.apply import (
+    NOTHING,
     ApplyRunner,
     NetApplyResult,
     NetCheck,
@@ -26,13 +27,22 @@ from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.system import commands as s
 from openwrtgui.system.parse import (
     Connection,
+    RcService,
     parse_board,
     parse_conntrack,
     parse_rc_list,
     parse_timezones,
     parse_top,
 )
-from openwrtgui.system.services import ServiceRow, service_rows
+from openwrtgui.system.services import (
+    SETTLE_S,
+    ServiceRow,
+    action_holds,
+    action_warnings,
+    check_action,
+    check_rc_local,
+    service_rows,
+)
 from openwrtgui.system.settings import SystemSettings, current_settings, settings_ops
 from openwrtgui.system.state import LogEntry, LogKind, ProcessList, SystemOverview, log_entries, read_overview
 from openwrtgui.transport.base import Transport
@@ -73,6 +83,14 @@ class TimeZones(BaseModel):
 
     zones: list[str]  # UTC first (the router's list has none: LuCI adds it), then the router's, sorted
     note: str | None = None
+
+
+async def file_check(t: Transport, read: str, wanted: str) -> NetCheck:
+    """`saved`: the file read back is exactly what was sent."""
+    result = await t.run(read)
+    if result.ok and result.stdout == wanted:
+        return NetCheck("saved", True, "the router has the new file")
+    return NetCheck("saved", False, "the file read back differs" if result.ok else "the file does not read")
 
 
 class SystemService:
@@ -213,6 +231,82 @@ class SystemService:
                     tz = (await self._stdout(t2, s.TZ_FILE)).strip()
                     checks.append(NetCheck("time zone", tz == zones[req.zonename], tz or "no answer"))
                 return checks
+
+            return Planned(plan, verify)
+
+        return await self._runner.run_planned(rec, make, digest)
+
+    # ---------------------------------------------------------------- services and rc.local (D6, D7)
+    async def _rc_row(self, t: Transport, name: str) -> RcService | None:
+        return next((r for r in parse_rc_list(await self._stdout(t, s.RC_LIST)) if r.name == name), None)
+
+    async def _service_plan(
+        self, rec: RouterRecord, t: Transport, name: str, action: s.ServiceAction
+    ) -> NetPlan:
+        s.init(name, action)  # the name and action first: nothing odd reaches the router
+        command = check_action(await self._rc_row(t, name), name, action, rec.name)
+        return net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config=None,
+            ops=[],
+            current={},
+            commands=[command],
+            warnings=action_warnings(name, action, rec.name),
+        )
+
+    async def plan_service(self, router_id: str, name: str, action: s.ServiceAction) -> NetPlan:
+        rec, t = await self._transport(router_id)
+        return await self._service_plan(rec, t, name, action)
+
+    async def apply_service(
+        self, router_id: str, name: str, action: s.ServiceAction, digest: str | None
+    ) -> NetApplyResult:
+        """Proof: `rc list` shows the new state within SETTLE_S (a one-shot: its exit status)."""
+        rec = self._record(router_id)
+
+        async def make(t: Transport) -> Planned:
+            plan = await self._service_plan(rec, t, name, action)
+
+            async def verify(t2: Transport) -> list[NetCheck]:
+                waited = 0.0
+                while True:
+                    ok, detail = action_holds(await self._rc_row(t2, name), action)
+                    if ok or waited >= SETTLE_S:
+                        break
+                    await self._sleep(1.0)
+                    waited += 1.0
+                return [NetCheck(f"service {name}", ok, detail if ok else f"{detail} after {SETTLE_S:g} s")]
+
+            return Planned(plan, verify)
+
+        return await self._runner.run_planned(rec, make, digest)
+
+    async def rc_local(self, router_id: str) -> str:
+        """The file as the router has it; "" when there is none."""
+        _rec, t = await self._transport(router_id)
+        return await self._stdout(t, s.RC_LOCAL)
+
+    async def _rc_local_plan(self, rec: RouterRecord, t: Transport, text: str) -> tuple[NetPlan, str]:
+        wanted = check_rc_local(text)
+        command = s.write_file("/etc/rc.local", wanted)  # OWG and size refused before anything is sent
+        if await self._stdout(t, s.RC_LOCAL) == wanted:
+            raise ValueError(NOTHING)
+        plan = net_plan(router_id=rec.id, screen=SCREEN, config=None, ops=[], current={}, commands=[command])
+        return plan, wanted
+
+    async def plan_rc_local(self, router_id: str, text: str) -> NetPlan:
+        rec, t = await self._transport(router_id)
+        return (await self._rc_local_plan(rec, t, text))[0]
+
+    async def apply_rc_local(self, router_id: str, text: str, digest: str | None) -> NetApplyResult:
+        rec = self._record(router_id)
+
+        async def make(t: Transport) -> Planned:
+            plan, wanted = await self._rc_local_plan(rec, t, text)
+
+            async def verify(t2: Transport) -> list[NetCheck]:
+                return [await file_check(t2, s.RC_LOCAL, wanted)]
 
             return Planned(plan, verify)
 

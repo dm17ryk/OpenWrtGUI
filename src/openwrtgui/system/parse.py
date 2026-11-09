@@ -72,6 +72,7 @@ class RcService:
     stop: int | None
     enabled: bool
     running: bool
+    instance: bool = True  # False: a one-shot (rc list has no "running": procd keeps no instance of it)
 
 
 @dataclass(frozen=True)
@@ -261,6 +262,7 @@ def parse_rc_list(text: str) -> list[RcService]:
             stop=_int(v.get("stop")),
             enabled=v.get("enabled") is True,
             running=v.get("running") is True,
+            instance="running" in v,
         )
         for name, v in data.items()
         if isinstance(v, dict)

@@ -11,6 +11,7 @@ from openwrtgui.api.deps import get_ctx, require_token
 from openwrtgui.api.net_api import Digest, NetPlanOut
 from openwrtgui.context import AppContext
 from openwrtgui.net.apply import NetApplyResult
+from openwrtgui.system.commands import ServiceAction
 from openwrtgui.system.service import Connections, DiagResult, DiagTool, TimeZones
 from openwrtgui.system.services import ServiceRow
 from openwrtgui.system.settings import LogProto, SystemSettings
@@ -99,6 +100,52 @@ async def settings_preview(router_id: str, body: SettingsIn, ctx: Ctx) -> NetPla
 async def settings_apply(router_id: str, body: SettingsApplyIn, ctx: Ctx) -> NetApplyResult:
     domain = SettingsIn(**body.model_dump(exclude={"digest"})).to_domain()
     return await ctx.system.apply_settings(_known(ctx, router_id), domain, body.digest)
+
+
+class ServiceIn(BaseModel):
+    name: str = Field(max_length=64)
+    action: ServiceAction
+
+
+class ServiceApplyIn(ServiceIn, Digest):
+    pass
+
+
+@router.post("/service/preview")
+async def service_preview(router_id: str, body: ServiceIn, ctx: Ctx) -> NetPlanOut:
+    return NetPlanOut.of(await ctx.system.plan_service(_known(ctx, router_id), body.name, body.action))
+
+
+@router.post("/service/apply")
+async def service_apply(router_id: str, body: ServiceApplyIn, ctx: Ctx) -> NetApplyResult:
+    return await ctx.system.apply_service(_known(ctx, router_id), body.name, body.action, body.digest)
+
+
+class TextIn(BaseModel):
+    text: str = Field(max_length=16 * 1024)  # the service says "at most 8 KiB" in its own words
+
+
+class TextApplyIn(TextIn, Digest):
+    pass
+
+
+class TextOut(BaseModel):
+    text: str
+
+
+@router.get("/rc-local")
+async def rc_local(router_id: str, ctx: Ctx) -> TextOut:
+    return TextOut(text=await ctx.system.rc_local(_known(ctx, router_id)))
+
+
+@router.post("/rc-local/preview")
+async def rc_local_preview(router_id: str, body: TextIn, ctx: Ctx) -> NetPlanOut:
+    return NetPlanOut.of(await ctx.system.plan_rc_local(_known(ctx, router_id), body.text))
+
+
+@router.post("/rc-local/apply")
+async def rc_local_apply(router_id: str, body: TextApplyIn, ctx: Ctx) -> NetApplyResult:
+    return await ctx.system.apply_rc_local(_known(ctx, router_id), body.text, body.digest)
 
 
 class DiagnoseIn(BaseModel):
