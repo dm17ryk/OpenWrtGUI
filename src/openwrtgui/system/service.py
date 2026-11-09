@@ -12,15 +12,32 @@ from pydantic import BaseModel, ConfigDict
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.guard.writes import run_audited
-from openwrtgui.net.apply import ApplyRunner
+from openwrtgui.net.apply import (
+    ApplyRunner,
+    NetApplyResult,
+    NetCheck,
+    NetPlan,
+    Planned,
+    net_plan,
+    saved_check,
+)
 from openwrtgui.paths import DataDir
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.system import commands as s
-from openwrtgui.system.parse import Connection, parse_conntrack, parse_rc_list, parse_timezones, parse_top
+from openwrtgui.system.parse import (
+    Connection,
+    parse_board,
+    parse_conntrack,
+    parse_rc_list,
+    parse_timezones,
+    parse_top,
+)
 from openwrtgui.system.services import ServiceRow, service_rows
+from openwrtgui.system.settings import SystemSettings, current_settings, settings_ops
 from openwrtgui.system.state import LogEntry, LogKind, ProcessList, SystemOverview, log_entries, read_overview
 from openwrtgui.transport.base import Transport
 from openwrtgui.transport.pool import ConnectionPool
+from openwrtgui.uci import parse_uci_show
 
 SCREEN = "System"
 UTC = "UTC"
@@ -144,10 +161,62 @@ class SystemService:
             tool=tool, target=target, command=command, output=output, exit_status=done.exit_status
         )
 
+    async def _zones(self, t: Transport) -> dict[str, str]:
+        return {UTC: UTC_TZ} | parse_timezones(await self._stdout(t, s.TIMEZONES))
+
     async def zone_strings(self, router_id: str) -> dict[str, str]:
         """Zone name -> TZ string, the router's list plus UTC."""
         _rec, t = await self._transport(router_id)
-        return {UTC: UTC_TZ} | parse_timezones(await self._stdout(t, s.TIMEZONES))
+        return await self._zones(t)
+
+    # ---------------------------------------------------------------- system and time (D5)
+    async def _uci(self, t: Transport) -> dict[str, str]:
+        result = await t.run(s.UCI_SYSTEM)
+        if not result.ok:
+            raise ValueError(
+                f"The router's system config does not read: {result.stderr.strip() or result.exit_status}"
+            )
+        return parse_uci_show(result.stdout)
+
+    async def settings(self, router_id: str) -> SystemSettings:
+        _rec, t = await self._transport(router_id)
+        return current_settings(await self._uci(t))
+
+    async def _settings_plan(
+        self, rec: RouterRecord, t: Transport, req: SystemSettings
+    ) -> tuple[NetPlan, dict[str, str], dict[str, str]]:
+        uci = await self._uci(t)
+        zones = await self._zones(t) if req.zonename is not None else {}
+        ops, reloads = settings_ops(uci, req, zones)
+        plan = net_plan(
+            router_id=rec.id, screen=SCREEN, config="system", ops=ops, current=uci, reloads=reloads
+        )
+        return plan, uci, zones
+
+    async def plan_settings(self, router_id: str, req: SystemSettings) -> NetPlan:
+        rec, t = await self._transport(router_id)
+        return (await self._settings_plan(rec, t, req))[0]
+
+    async def apply_settings(self, router_id: str, req: SystemSettings, digest: str | None) -> NetApplyResult:
+        rec = self._record(router_id)
+
+        async def make(t: Transport) -> Planned:
+            plan, uci, zones = await self._settings_plan(rec, t, req)
+
+            async def verify(t2: Transport) -> list[NetCheck]:
+                checks = [await saved_check(t2, s.UCI_SYSTEM, plan.ops, uci)]
+                if req.hostname is not None:
+                    board = parse_board(await self._stdout(t2, s.BOARD))
+                    live = board.hostname if board else None
+                    checks.append(NetCheck("hostname", live == req.hostname, live or "no answer"))
+                if req.zonename is not None:
+                    tz = (await self._stdout(t2, s.TZ_FILE)).strip()
+                    checks.append(NetCheck("time zone", tz == zones[req.zonename], tz or "no answer"))
+                return checks
+
+            return Planned(plan, verify)
+
+        return await self._runner.run_planned(rec, make, digest)
 
     async def timezones(self, router_id: str) -> TimeZones:
         zones = await self.zone_strings(router_id)

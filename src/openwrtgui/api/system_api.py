@@ -8,9 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from openwrtgui.api.deps import get_ctx, require_token
+from openwrtgui.api.net_api import Digest, NetPlanOut
 from openwrtgui.context import AppContext
+from openwrtgui.net.apply import NetApplyResult
 from openwrtgui.system.service import Connections, DiagResult, DiagTool, TimeZones
 from openwrtgui.system.services import ServiceRow
+from openwrtgui.system.settings import LogProto, SystemSettings
 from openwrtgui.system.state import LogEntry, LogKind, ProcessList, SystemOverview
 
 router = APIRouter(
@@ -44,6 +47,58 @@ async def processes(router_id: str, ctx: Ctx) -> ProcessList:
 @router.get("/services")
 async def services(router_id: str, ctx: Ctx) -> list[ServiceRow]:
     return await ctx.system.services(_known(ctx, router_id))
+
+
+class SettingsIn(BaseModel):
+    """None leaves a field as it is; log_ip "" removes the remote syslog."""
+
+    hostname: str | None = Field(default=None, max_length=63)
+    zonename: str | None = Field(default=None, max_length=64)
+    ntp_client: bool | None = None
+    ntp_server: bool | None = None
+    ntp_servers: list[str] | None = Field(default=None, max_length=16)
+    log_size: int | None = None
+    log_ip: str | None = Field(default=None, max_length=15)
+    log_port: int | None = None
+    log_proto: LogProto | None = None
+
+    def to_domain(self) -> SystemSettings:
+        servers = tuple(self.ntp_servers) if self.ntp_servers is not None else None
+        fields = self.model_dump(exclude={"ntp_servers"})
+        return SystemSettings(**fields, ntp_servers=servers)
+
+
+class SettingsApplyIn(SettingsIn, Digest):
+    pass
+
+
+class SettingsOut(BaseModel):
+    hostname: str | None
+    zonename: str | None
+    ntp_client: bool | None
+    ntp_server: bool | None
+    ntp_servers: list[str]
+    log_size: int | None
+    log_ip: str | None
+    log_port: int | None
+    log_proto: LogProto | None
+
+
+@router.get("/settings")
+async def settings(router_id: str, ctx: Ctx) -> SettingsOut:
+    s = await ctx.system.settings(_known(ctx, router_id))
+    return SettingsOut(**{**s.__dict__, "ntp_servers": list(s.ntp_servers or ())})
+
+
+@router.post("/settings/preview")
+async def settings_preview(router_id: str, body: SettingsIn, ctx: Ctx) -> NetPlanOut:
+    return NetPlanOut.of(await ctx.system.plan_settings(_known(ctx, router_id), body.to_domain()))
+
+
+@router.post("/settings/apply")
+async def settings_apply(router_id: str, body: SettingsApplyIn, ctx: Ctx) -> NetApplyResult:
+    domain = SettingsIn(**body.model_dump(exclude={"digest"})).to_domain()
+    return await ctx.system.apply_settings(_known(ctx, router_id), domain, body.digest)
 
 
 class DiagnoseIn(BaseModel):
