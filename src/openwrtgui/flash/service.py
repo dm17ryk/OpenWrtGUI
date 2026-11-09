@@ -29,6 +29,7 @@ from openwrtgui.probe.commands import RELEASE, SYSTEM_BOARD
 from openwrtgui.probe.identity import parse_release
 from openwrtgui.store.routers import ReflashPending, RouterRecord, RouterStore
 from openwrtgui.transport.base import CommandResult, HostKeyChanged, Transport, TransportError
+from openwrtgui.transport.comeback import wait_for_reboot
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.wifi.service import PreviewChanged
 
@@ -304,41 +305,40 @@ class FlashService:
 
     async def _come_back(self, rec: RouterRecord, req: FlashRequest, board: str, armed_at: float) -> None:
         self._update(rec.id, phase="wait")
-        async with self._pool.hold(rec.id) as token:
-            await self._pool.drop(rec.id)
-            while True:
-                await self._sleep(self.every_s)
-                elapsed = self._monotonic() - armed_at
-                if elapsed > self.come_back_s:
-                    raise _Failed(
-                        f"{rec.name} did not come back within {_duration(self.come_back_s)}. It may still be "
-                        "writing flash: do not power it off; check its LEDs, then try Reconnect."
-                    )
-                try:
-                    await self._pool.drop(rec.id)
-                    t = await self._pool.get(rec, token=token)
-                    uptime = float((await t.run("cat /proc/uptime")).stdout.split()[0])
-                    revision = parse_release((await t.run(RELEASE)).stdout).get("DISTRIB_REVISION", "")
-                    answered = json.loads((await t.run(SYSTEM_BOARD)).stdout or "{}")
-                except HostKeyChanged as exc:
-                    raise _Failed(str(exc)) from exc
-                except (TransportError, ValueError, IndexError):
-                    continue
-                if uptime >= elapsed:
-                    continue  # still the old system: the timer starts sysupgrade 2 s after it was armed
-                self._update(rec.id, phase="prove")
-                found = str(answered.get("board_name", ""))
-                if found != board:
-                    raise _Failed(f"{rec.name} answers as {found or 'an unknown board'}, not {board}")
-                if revision != req.revision:
-                    raise _Failed(
-                        f"{rec.name} came back on {revision or 'an unknown revision'}, not {req.revision}"
-                    )
-                minutes, seconds = divmod(int(elapsed), 60)
-                self._discovery.forget(rec.id)
-                self._update(
-                    rec.id,
-                    phase="done",
-                    detail=f"Flashed {rec.name} with {req.revision} in {minutes} min {seconds} s",
-                )
-                return
+
+        async def prove(t: Transport, uptime: float) -> tuple[str, str]:
+            revision = parse_release((await t.run(RELEASE)).stdout).get("DISTRIB_REVISION", "")
+            answered = json.loads((await t.run(SYSTEM_BOARD)).stdout or "{}")
+            return revision, str(answered.get("board_name", ""))
+
+        try:  # the timer starts sysupgrade 2 s after it was armed: until then the old system answers
+            back = await wait_for_reboot(
+                self._pool,
+                rec,
+                armed_at=armed_at,
+                clock=self._monotonic,
+                sleep=self._sleep,
+                every_s=self.every_s,
+                limit_s=self.come_back_s,
+                prove=prove,
+            )
+        except HostKeyChanged as exc:
+            raise _Failed(str(exc)) from exc
+        if back is None or back.proof is None:
+            raise _Failed(
+                f"{rec.name} did not come back within {_duration(self.come_back_s)}. It may still be "
+                "writing flash: do not power it off; check its LEDs, then try Reconnect."
+            )
+        self._update(rec.id, phase="prove")
+        revision, found = back.proof
+        if found != board:
+            raise _Failed(f"{rec.name} answers as {found or 'an unknown board'}, not {board}")
+        if revision != req.revision:
+            raise _Failed(f"{rec.name} came back on {revision or 'an unknown revision'}, not {req.revision}")
+        minutes, seconds = divmod(int(back.elapsed_s), 60)
+        self._discovery.forget(rec.id)
+        self._update(
+            rec.id,
+            phase="done",
+            detail=f"Flashed {rec.name} with {req.revision} in {minutes} min {seconds} s",
+        )
