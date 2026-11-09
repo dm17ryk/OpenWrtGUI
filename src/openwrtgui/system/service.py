@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import time
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Literal
@@ -35,6 +37,15 @@ from openwrtgui.system.parse import (
     parse_timezones,
     parse_top,
 )
+from openwrtgui.system.reboot import (
+    EVERY_S,
+    LIMIT_S,
+    RebootBusy,
+    RebootJob,
+    not_back,
+    reboot_command,
+    reboot_warnings,
+)
 from openwrtgui.system.services import (
     SETTLE_S,
     ServiceRow,
@@ -47,8 +58,12 @@ from openwrtgui.system.services import (
 from openwrtgui.system.settings import SystemSettings, current_settings, settings_ops
 from openwrtgui.system.state import LogEntry, LogKind, ProcessList, SystemOverview, log_entries, read_overview
 from openwrtgui.transport.base import Transport
+from openwrtgui.transport.comeback import Back, wait_for_reboot
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.uci import parse_uci_show
+from openwrtgui.wifi.service import PreviewChanged
+
+log = logging.getLogger(__name__)
 
 SCREEN = "System"
 UTC = "UTC"
@@ -107,6 +122,7 @@ class SystemService:
         data: DataDir,
         clock: Callable[[], datetime] = datetime.now,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         self._pool = pool
         self._routers = routers
@@ -116,6 +132,11 @@ class SystemService:
         self._data = data
         self._clock = clock
         self._sleep = sleep
+        self._monotonic = monotonic
+        self.every_s = EVERY_S  # how often the come-back wait asks
+        self.reboot_limit_s = LIMIT_S
+        self._reboots: dict[str, RebootJob] = {}
+        self._tasks: set[asyncio.Task[None]] = set()
 
     def _record(self, router_id: str) -> RouterRecord:
         rec = self._routers.get(router_id)
@@ -374,6 +395,80 @@ class SystemService:
             return Planned(plan, verify)
 
         return await self._runner.run_planned(rec, make, digest)
+
+    # ---------------------------------------------------------------- reboot (D8)
+    async def plan_reboot(self, router_id: str) -> NetPlan:
+        rec = self._record(router_id)
+        return net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config=None,
+            ops=[],
+            current={},
+            commands=[reboot_command()],
+            warnings=reboot_warnings(rec.name),
+        )
+
+    def reboot_job(self, router_id: str) -> RebootJob | None:
+        return self._reboots.get(router_id)
+
+    def rebooting(self, router_id: str) -> bool:
+        job = self._reboots.get(router_id)
+        return job is not None and job.phase in ("armed", "waiting")
+
+    async def start_reboot(self, router_id: str, digest: str) -> RebootJob:
+        """Arm the timer (audited, under the write lock), then wait for the router in the background."""
+        rec = self._record(router_id)
+        if self.rebooting(rec.id):
+            raise RebootBusy(f"{rec.name} is already rebooting")
+        self._guard.require_clear()
+        plan = await self.plan_reboot(rec.id)
+        if plan.digest != digest:
+            raise PreviewChanged(rec.name)
+        t = await self._pool.get(rec)
+        async with self._pool.write_lock(rec.id):
+            armed = await run_audited(
+                t, plan.lines[0], router_id=rec.id, screen=SCREEN, guard=self._guard, audit=self._audit
+            )
+        if not armed.ok:
+            reason = (armed.stderr or armed.stdout).strip() or f"exit {armed.exit_status}"
+            raise ValueError(f"{rec.name} did not arm the reboot: {reason}")
+        armed_at = self._monotonic()
+        job = RebootJob(router_id=rec.id, phase="armed", started_at=self._clock())
+        self._reboots[rec.id] = job
+        task = asyncio.create_task(self._come_back(rec, armed_at))
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return job
+
+    def _update_reboot(self, router_id: str, **fields: object) -> None:
+        self._reboots[router_id] = self._reboots[router_id].model_copy(update=fields)
+
+    async def _come_back(self, rec: RouterRecord, armed_at: float) -> None:
+        self._update_reboot(rec.id, phase="waiting")
+        try:
+            back: Back[None] | None = await wait_for_reboot(
+                self._pool,
+                rec,
+                armed_at=armed_at,
+                clock=self._monotonic,
+                sleep=self._sleep,
+                every_s=self.every_s,
+                limit_s=self.reboot_limit_s,
+            )
+        except Exception as exc:  # the job must end in a phase the screen shows, whatever broke
+            log.exception("reboot of %s: the come-back wait failed", rec.id)
+            self._update_reboot(rec.id, phase="not back", error=str(exc) or type(exc).__name__)
+            return
+        if back is None:
+            self._update_reboot(rec.id, phase="not back", error=not_back(rec.name, self.reboot_limit_s))
+            return
+        self._update_reboot(
+            rec.id,
+            phase="back",
+            uptime_s=back.uptime_s,
+            detail=f"{rec.name} is back after {back.elapsed_s:.0f} s (uptime {back.uptime_s:.0f} s)",
+        )
 
     async def timezones(self, router_id: str) -> TimeZones:
         zones = await self.zone_strings(router_id)

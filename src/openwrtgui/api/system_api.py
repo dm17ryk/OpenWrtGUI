@@ -13,6 +13,7 @@ from openwrtgui.context import AppContext
 from openwrtgui.net.apply import NetApplyResult
 from openwrtgui.system.commands import ServiceAction
 from openwrtgui.system.cron import CronState
+from openwrtgui.system.reboot import RebootBusy, RebootJob
 from openwrtgui.system.service import Connections, DiagResult, DiagTool, TimeZones
 from openwrtgui.system.services import ServiceRow
 from openwrtgui.system.settings import LogProto, SystemSettings
@@ -162,6 +163,24 @@ async def crontab_preview(router_id: str, body: TextIn, ctx: Ctx) -> NetPlanOut:
 @router.post("/crontab/apply")
 async def crontab_apply(router_id: str, body: TextApplyIn, ctx: Ctx) -> NetApplyResult:
     return await ctx.system.apply_crontab(_known(ctx, router_id), body.text, body.digest)
+
+
+@router.get("/reboot")
+async def reboot_job(router_id: str, ctx: Ctx) -> RebootJob | None:
+    return ctx.system.reboot_job(_known(ctx, router_id))
+
+
+@router.post("/reboot/preview")
+async def reboot_preview(router_id: str, ctx: Ctx) -> NetPlanOut:
+    return NetPlanOut.of(await ctx.system.plan_reboot(_known(ctx, router_id)))
+
+
+@router.post("/reboot/start")
+async def reboot_start(router_id: str, body: Digest, ctx: Ctx) -> RebootJob:
+    try:
+        return await ctx.system.start_reboot(_known(ctx, router_id), body.digest)
+    except RebootBusy as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 class DiagnoseIn(BaseModel):
