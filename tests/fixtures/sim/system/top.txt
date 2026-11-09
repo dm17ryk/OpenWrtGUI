@@ -1,19 +1,18 @@
-Mem: 26388K used, 28716K free, 1852K shrd, 2108K buff, 15216K cached
+Mem: 44164K used, 10940K free, 1856K shrd, 0K buff, 16264K cached
 CPU:   0% usr   9% sys   0% nic  90% idle   0% io   0% irq   0% sirq
-Load average: 0.16 0.03 0.01 2/52 25700
-  PID  PPID USER     STAT   VSZ %VSZ %CPU COMMAND
-25700 25699 root     R     1452   3%   9% top -bn1
- 1582     1 root     S     3000   5%   1% /sbin/netifd -l 2
- 1517  1513 network  S     8652  16%   0% /usr/sbin/wpa_supplicant -n -s -g /var/run/wpa_supplicant/global
-22547 22544 network  S     8680  16%   0% /usr/sbin/hostapd -s -g /var/run/hostapd/global
- 1644  1642 dnsmasq  S     3804   7%   0% /usr/sbin/dnsmasq -C /var/etc/dnsmasq.conf.cfg01411c -k
- 1096     1 root     S     2236   4%   0% /sbin/rpcd -s /var/run/ubus/ubus.sock -t 30
- 1821     1 root     S     2232   4%   0% /usr/sbin/uhttpd -f -h /www -r OpenWrt -x /cgi-bin -u /ubus
- 1018     1 logd     S     2088   4%   0% /sbin/logd -S 128
-    1     0 root     S     1828   3%   0% /sbin/procd
- 2464     1 root     S     1568   3%   0% {dwr921-internet} /bin/sh /usr/sbin/dwr921-internet-led
- 2675  2650 ntp      S     1448   3%   0% /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug -p 0.openwrt.pool.ntp.org
- 2600     1 root     S     1448   3%   0% /usr/sbin/crond -f -c /etc/crontabs -l 5
- 1402     1 root     S     1364   2%   0% /usr/sbin/dropbear -F -P /var/run/dropbear.main.pid -p 22 -K 300 -T 3
-  500     1 ubus     S     1328   2%   0% /sbin/ubusd
+Load average: 0.13 0.08 0.04 2/54 18424
+  PID  PPID USER     STAT   RSS %RSS %CPU COMMAND
+18424 18423 root     R     1108   2%   9% top -bn1
+22547 22544 network  S     4796   9%   0% /usr/sbin/hostapd -s -g /var/run/hostapd/global
+ 1517  1513 network  S     3072   6%   0% /usr/sbin/wpa_supplicant -n -s -g /var/run/wpa_supplicant/global
+ 1582     1 root     S     2180   4%   0% /sbin/netifd -l 2
+ 1096     1 root     S     1908   3%   0% /sbin/rpcd -s /var/run/ubus/ubus.sock -t 30
+ 1644  1642 dnsmasq  S     1752   3%   0% /usr/sbin/dnsmasq -C /var/etc/dnsmasq.conf.cfg01411c -k
+ 1821     1 root     S     1460   3%   0% /usr/sbin/uhttpd -f -h /www -r OpenWrt -x /cgi-bin -u /ubus
+ 1018     1 logd     S     1312   2%   0% /sbin/logd -S 128
+    1     0 root     S     1228   2%   0% /sbin/procd
+ 2464     1 root     S     1040   2%   0% {dwr921-internet} /bin/sh /usr/sbin/dwr921-internet-led
+ 2675  2650 ntp      S      908   2%   0% /usr/sbin/ntpd -n -N -S /usr/sbin/ntpd-hotplug -p 0.openwrt.pool.ntp.org
+ 1402     1 root     S      896   2%   0% /usr/sbin/dropbear -F -P /var/run/dropbear.main.pid -p 22 -K 300 -T 3
+  500     1 ubus     S      780   1%   0% /sbin/ubusd
     2     0 root     SW       0   0%   0% [kthreadd]

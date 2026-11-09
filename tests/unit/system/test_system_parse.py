@@ -42,7 +42,7 @@ INFO = {
 TOP = """Mem: 26388K used, 28716K free, 1852K shrd, 2108K buff, 15216K cached
 CPU:   0% usr   9% sys   0% nic  90% idle   0% io   0% irq   0% sirq
 Load average: 0.16 0.03 0.01 2/52 25700
-  PID  PPID USER     STAT   VSZ %VSZ %CPU COMMAND
+  PID  PPID USER     STAT   RSS %RSS %CPU COMMAND
  1582     1 root     S     3000   5%   0% /sbin/netifd -l 2
 25700 25699 root     R     1452   3%   9% top -bn1
  1517  1513 network  S    10.2m  19%   1% /usr/sbin/wpa_supplicant -n -s -g /var/run/wpa_supplicant/global
@@ -118,11 +118,11 @@ def test_dmesg_raw_line() -> None:
 
 
 def test_top_rows_and_cpu_line() -> None:
-    rows, cpu = parse_top(TOP)
+    rows, cpu, column = parse_top(TOP)
     assert cpu == "0% usr   9% sys   0% nic  90% idle   0% io   0% irq   0% sirq"
     assert [r.pid for r in rows] == [25700, 1517, 1582, 2]  # by CPU, then by VSZ
     top = rows[0]
-    assert (top.ppid, top.user, top.state, top.vsz_kib, top.vsz_pct, top.cpu_pct, top.command) == (
+    assert (top.ppid, top.user, top.state, top.mem_kib, top.mem_pct, top.cpu_pct, top.command) == (
         25699,
         "root",
         "R",
@@ -131,8 +131,9 @@ def test_top_rows_and_cpu_line() -> None:
         9.0,
         "top -bn1",
     )
-    assert rows[1].vsz_kib == 10445  # 10.2m = 10444.8 KiB
-    assert parse_top("") == ([], None)
+    assert column == "RSS"  # this busybox build shows resident memory, not VSZ (AP2, 2026-11-09)
+    assert rows[1].mem_kib == 10445  # 10.2m = 10444.8 KiB
+    assert parse_top("") == ([], None, None)
 
 
 def test_rc_list() -> None:

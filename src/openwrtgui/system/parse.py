@@ -59,8 +59,8 @@ class ProcessRow:
     ppid: int
     user: str
     state: str
-    vsz_kib: int
-    vsz_pct: float
+    mem_kib: int  # RSS or VSZ: `parse_top` says which column this busybox build prints
+    mem_pct: float
     cpu_pct: float
     command: str
 
@@ -205,25 +205,31 @@ def parse_dmesg(text: str) -> list[KernelLine]:
     return out
 
 
-def _vsz_kib(text: str) -> int:
-    """busybox top prints VSZ in KiB, or with an m/g suffix once it is wide."""
+def _mem_kib(text: str) -> int:
+    """busybox top prints memory in KiB, or with an m/g suffix once it is wide."""
     unit = {"m": 1024, "g": 1024 * 1024}.get(text[-1:].lower())
     return round(float(text[:-1]) * unit) if unit else int(text)
 
 
 _TOP_ROW = re.compile(
-    r"\s*(?P<pid>\d+)\s+(?P<ppid>\d+)\s+(?P<user>\S+)\s+(?P<state>\S+(?: [<N])?)\s+(?P<vsz>[\d.]+[mg]?)\s+"
-    r"(?P<vszp>\d+)%\s+(?P<cpu>\d+)%\s+(?P<command>.*)"
+    r"\s*(?P<pid>\d+)\s+(?P<ppid>\d+)\s+(?P<user>\S+)\s+(?P<state>\S+(?: [<N])?)\s+(?P<mem>[\d.]+[mg]?)\s+"
+    r"(?P<memp>\d+)%\s+(?P<cpu>\d+)%\s+(?P<command>.*)"
 )
+_TOP_HEADER = re.compile(r"\s*PID\s+PPID\s+USER\s+STAT\s+(?P<column>RSS|VSZ)\s+%(?:RSS|VSZ)\s+%CPU\s+COMMAND")
 
 
-def parse_top(text: str) -> tuple[list[ProcessRow], str | None]:
-    """`top -bn1`: the process rows (by CPU, then by memory) and the CPU line's figures."""
+def parse_top(text: str) -> tuple[list[ProcessRow], str | None, str | None]:
+    """`top -bn1`: the process rows (by CPU, then by memory), the CPU line's figures, and the memory column
+    the build prints (AP2's busybox shows RSS; others VSZ)."""
     cpu: str | None = None
+    column: str | None = None
     rows: list[ProcessRow] = []
     for line in text.splitlines():
         if line.startswith("CPU:"):
             cpu = line[len("CPU:") :].strip()
+            continue
+        if header := _TOP_HEADER.fullmatch(line):
+            column = header.group("column")
             continue
         m = _TOP_ROW.fullmatch(line)
         if m is None:
@@ -234,14 +240,14 @@ def parse_top(text: str) -> tuple[list[ProcessRow], str | None]:
                 ppid=int(m.group("ppid")),
                 user=m.group("user"),
                 state=m.group("state"),
-                vsz_kib=_vsz_kib(m.group("vsz")),
-                vsz_pct=float(m.group("vszp")),
+                mem_kib=_mem_kib(m.group("mem")),
+                mem_pct=float(m.group("memp")),
                 cpu_pct=float(m.group("cpu")),
                 command=m.group("command"),
             )
         )
-    rows.sort(key=lambda r: (-r.cpu_pct, -r.vsz_kib, r.pid))
-    return rows, cpu
+    rows.sort(key=lambda r: (-r.cpu_pct, -r.mem_kib, r.pid))
+    return rows, cpu, column
 
 
 def parse_rc_list(text: str) -> list[RcService]:

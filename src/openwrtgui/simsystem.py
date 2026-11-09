@@ -23,39 +23,44 @@ if TYPE_CHECKING:
     from openwrtgui.simimage import SimImage
     from openwrtgui.simnet import SimNetwork
 
-# AP2's init scripts (fact sheet 2026-11-09): name -> [enabled, running]
-_DAEMONS = (
-    "cron",
-    "dnsmasq",
-    "dropbear",
-    "log",
-    "network",
-    "rpcd",
-    "sysntpd",
-    "uhttpd",
-    "urngd",
-    "wpad",
+# AP2's init scripts as `rc list` showed them (2026-11-09): name -> (start, enabled). Daemons run while
+# enabled; cron only while a crontab exists; the rest run once at boot (procd keeps no instance of them).
+_DAEMONS = frozenset(
+    {"cron", "dnsmasq", "dropbear", "log", "network", "rpcd", "sysntpd", "uhttpd", "urngd", "wpad"}
 )
-_ONESHOTS = (
-    "boot",
-    "bootcount",
-    "done",
-    "firewall",
-    "gpio_switch",
-    "led",
-    "openssl",
-    "packet_steering",
-    "sysctl",
-    "sysfixtime",
-    "system",
-    "ucitrack",
-    "umount",
-    "urandom_seed",
-)
-_DISABLED = ("odhcpd", "radius", "socat")
-_START = {"boot": 10, "system": 10, "log": 12, "network": 20, "dnsmasq": 19, "firewall": 19, "cron": 50}
+_NO_INSTANCE = frozenset({"boot", "bootcount", "done", "led", "openssl", "sysctl", "sysfixtime", "umount"})
+_AP2: dict[str, tuple[int | None, bool]] = {
+    "boot": (10, True),
+    "bootcount": (99, True),
+    "cron": (50, True),
+    "dnsmasq": (19, True),
+    "done": (95, True),
+    "dropbear": (19, True),
+    "firewall": (19, True),
+    "gpio_switch": (94, True),
+    "led": (96, True),
+    "log": (12, True),
+    "network": (20, True),
+    "odhcpd": (35, False),
+    "openssl": (13, True),
+    "packet_steering": (25, True),
+    "radius": (30, True),
+    "rpcd": (12, True),
+    "socat": (99, True),
+    "sysctl": (11, True),
+    "sysfixtime": (0, True),
+    "sysntpd": (98, True),
+    "system": (10, True),
+    "ucitrack": (80, True),
+    "uhttpd": (50, True),
+    "umount": (None, False),
+    "urandom_seed": (99, True),
+    "urngd": (0, True),
+    "wpad": (19, True),
+}
+# a few of the router's 445 zones (AP2's list has no "UTC": LuCI adds that one itself)
 TIMEZONES = {
-    "UTC": "UTC0",
+    "Etc/GMT": "GMT0",
     "Asia/Jerusalem": "IST-2IDT,M3.4.4/26,M10.5.0",
     "Europe/London": "GMT0BST,M3.5.0/1,M10.5.0",
     "Europe/Berlin": "CET-1CEST,M3.5.0,M10.5.0/3",
@@ -111,16 +116,25 @@ class SimSystem:
         self._board = json.loads(board_json) if board_json else {}
         self._info = json.loads(info_json) if info_json else {}
         self._texts = dict(texts or {})
-        self._services: dict[str, list[bool]] = {name: [True, True] for name in _DAEMONS}
-        self._services |= {name: [True, False] for name in _ONESHOTS}
-        self._services |= {name: [False, False] for name in _DISABLED}
         self._files: dict[str, str] = {"/etc/rc.local": RC_LOCAL}
+        self._services: dict[str, list[bool]] = {
+            name: [enabled, self._runs_at_boot(name, enabled)] for name, (_start, enabled) in _AP2.items()
+        }
         self._start = clock()
         self._boot_at = clock() - 86400.0  # used only without an image (the image keeps the real one)
         self._boot_seen = self._booted()
         self._applied = self._committed()
 
     # ---------------------------------------------------------------- state
+    def _runs_at_boot(self, name: str, enabled: bool) -> bool:
+        return self._starts(name) and enabled
+
+    def _starts(self, name: str) -> bool:
+        """What `start` leaves running: a daemon, and cron only with a crontab (its init script checks)."""
+        if name == "cron":
+            return bool(self._files.get("/etc/crontabs/root", "").strip())
+        return name in _DAEMONS
+
     def _booted(self) -> float:
         return self._image.boot_at if self._image is not None else self._boot_at
 
@@ -147,16 +161,21 @@ class SimSystem:
             self._boot_seen = booted
             self._applied = self._committed()
             for name, state in self._services.items():
-                state[1] = state[0] and name in _DAEMONS
+                state[1] = self._runs_at_boot(name, state[0])
 
     def _rc(self) -> dict[str, dict[str, Any]]:
         out: dict[str, dict[str, Any]] = {}
         custom = self._image.custom_services if self._image is not None else {}
         for name, (enabled, running) in sorted(self._services.items()):
-            out[name] = {"start": _START.get(name, 50), "enabled": enabled, "running": running}
+            start = _AP2.get(name, (50, True))[0]
+            row: dict[str, Any] = {} if start is None else {"start": start}
+            row["enabled"] = enabled
+            if name not in _NO_INSTANCE:
+                row["running"] = running
+            out[name] = row
         for name, (running, enabled) in custom.items():
-            out[name] = {"start": 95, "enabled": enabled, "running": running}
-        return out
+            out[name] = {"start": 97, "enabled": enabled, "running": running}
+        return dict(sorted(out.items()))
 
     # ---------------------------------------------------------------- the archive
     def backup(self) -> bytes:
@@ -244,7 +263,7 @@ class SimSystem:
         if action in ("enable", "disable"):
             state[0] = action == "enable"
         elif action in ("start", "restart"):
-            state[1] = name in _DAEMONS
+            state[1] = self._starts(name)
         elif action == "stop":
             state[1] = False
         if name == "system" and action in ("reload", "restart", "start"):

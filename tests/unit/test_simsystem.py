@@ -73,6 +73,7 @@ async def test_sim_services_follow_actions() -> None:
     t = _ap2(Clock())
     services = _services(await _out(t, s.RC_LIST))
     assert services["sysntpd"] == (True, True) and services["odhcpd"] == (False, False)
+    assert services["cron"] == (True, False)  # as on AP2: crond does not start while no crontab exists
     assert (
         services["dropbear"] == (True, True) and "dwr921-internet-led" in services
     )  # the image's custom one
@@ -133,8 +134,8 @@ async def test_sim_reads_and_diagnostics() -> None:
     t = _ap2(clock)
     assert parse_logread(await _out(t, s.logread(100)))
     assert parse_dmesg(await _out(t, s.DMESG))
-    rows, cpu = parse_top(await _out(t, s.TOP))
-    assert rows and cpu
+    rows, cpu, column = parse_top(await _out(t, s.TOP))
+    assert rows and cpu and column == "RSS"
     first = parse_live(await _out(t, s.LIVE), clock.now)
     clock.now += 3
     second = parse_live(await _out(t, s.LIVE), clock.now)
