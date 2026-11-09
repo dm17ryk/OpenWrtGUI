@@ -2,14 +2,14 @@
 restored.
 
 uv run pytest -m hardware tests/hardware/test_ap2_wifi_faults.py --router 192.168.1.2 --identity <key> \
-    --known-hosts <file> --allow-writes --txctl-told --adb-station <serial> -v -s
+    --known-hosts <file> --allow-writes --txctl-told --adb-station <serial> [--o16-channel 11] -v -s
 
-Run it only in a radio window the txctl session agreed to (OwgTest, channel 6, at most 15 minutes), with the
-phone's owner at hand. The radio goes on air with a key made for this run, so only the phone joins. The
-phone runs a user build, where `cmd wifi connect-network` is root-only, so the test gives it the SSID as a
-network suggestion over adb; the first time, the owner unlocks the phone and taps Allow on its
-suggested-networks prompt for Shell (the approval stays). The suggestion is removed at the end. The test
-always writes back the exact
+Run it only in a radio window the txctl session agreed to (OwgTest, channel 6 or the --o16-channel agreed
+with whoever measures on the bench, at most 15 minutes), with the phone's owner at hand. The radio goes on
+air with a key made for this run, so only the phone joins. The phone runs a user build, where
+`cmd wifi connect-network` is root-only, so the test gives it the SSID as a network suggestion over adb; the
+first time, the owner unlocks the phone and taps Allow on its suggested-networks prompt for Shell (the
+approval stays). The suggestion is removed at the end. The test always writes back the exact
 /etc/config/wireless it found, reloads the radio and checks it is parked; `fw_window` then checks the
 firewall, nft tables, qdiscs, /tmp/owg and the switch ports are as found.
 """
@@ -183,7 +183,7 @@ async def test_wifi_faults_on_air(fw_window: FwWindow, request: pytest.FixtureRe
         before = await _uci_wireless(t)
         key = _Hidden(secrets.token_urlsafe(16))
         try:
-            await _faults_on_air(fw_window, t, phone, key)
+            await _faults_on_air(fw_window, t, phone, key, request.config.getoption("--o16-channel"))
         finally:
             try:
                 await phone.forget(TEST_SSID)
@@ -200,13 +200,13 @@ async def test_wifi_faults_on_air(fw_window: FwWindow, request: pytest.FixtureRe
         await t.close()
 
 
-async def _faults_on_air(w: FwWindow, t: Transport, phone: AdbStation, key: str) -> None:
+async def _faults_on_air(w: FwWindow, t: Transport, phone: AdbStation, key: str, channel: int) -> None:
     on = await w.wifi.apply(
         AP2,
         RadioRequest(
             radio="radio0",
             modes=ModeSelection("set", frozenset({"n20"})),
-            channels=ChannelSelection("set", frozenset({6})),
+            channels=ChannelSelection("set", frozenset({channel})),
             txpower=TxPowerSetting("auto"),
             ssids=(SsidRequest(section="default_radio0", ssid=TEST_SSID, key=key),),
         ),

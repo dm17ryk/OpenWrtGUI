@@ -37,6 +37,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     group.addoption(
         "--adb-station", help="adb serial of the phone that joins the test SSID (Wi-Fi faults on air, O16)"
     )
+    group.addoption(
+        "--o16-channel",
+        type=int,
+        default=6,
+        help="2.4 GHz channel for the O16 test SSID, as agreed for the radio window (default 6)",
+    )
 
 
 @pytest.fixture
