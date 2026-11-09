@@ -104,6 +104,33 @@ async def lte_live(ws: WebSocket, router_id: str) -> None:
         sampler.unsubscribe(queue)
 
 
+@router.websocket("/ws/system/{router_id}")
+async def system_live(ws: WebSocket, router_id: str) -> None:
+    """Load, bandwidth and connections every 3 s while the System screen's Status tab is open (v0.6b D3)."""
+    ctx = await ws_accept(ws)
+    if ctx is None:
+        return
+    if ctx.routers.get(router_id) is None:
+        await ws.close(code=WS_NOT_FOUND)
+        return
+    sampler = ctx.system_live.sampler(router_id)
+    queue = sampler.subscribe()
+
+    async def send_samples() -> None:
+        while True:
+            await ws.send_json(wire(await queue.get()))
+
+    sender = asyncio.create_task(send_samples())
+    try:
+        while True:
+            await ws.receive_json()  # nothing to ask; reading notices the close
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+    finally:
+        sender.cancel()
+        sampler.unsubscribe(queue)
+
+
 @router.websocket("/ws/terminal/{router_id}")
 async def terminal(ws: WebSocket, router_id: str) -> None:
     ctx = await ws_accept(ws)

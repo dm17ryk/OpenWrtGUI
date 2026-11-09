@@ -14,7 +14,7 @@ from openwrtgui.net.apply import ApplyRunner
 from openwrtgui.paths import DataDir
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.system import commands as s
-from openwrtgui.system.parse import parse_rc_list, parse_timezones, parse_top
+from openwrtgui.system.parse import Connection, parse_conntrack, parse_rc_list, parse_timezones, parse_top
 from openwrtgui.system.services import ServiceRow, service_rows
 from openwrtgui.system.state import LogEntry, LogKind, ProcessList, SystemOverview, log_entries, read_overview
 from openwrtgui.transport.base import Transport
@@ -24,6 +24,16 @@ SCREEN = "System"
 UTC = "UTC"
 UTC_TZ = "GMT0"  # OpenWrt's own default for zonename UTC (AP2: zonename='UTC', timezone='GMT0')
 NO_ZONES = "This router lists no time zones (LuCI's rpcd plugin is missing): only UTC can be chosen"
+
+
+NO_CONNTRACK = "The connection table is not available: nf_conntrack is not loaded"
+
+
+class Connections(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    rows: list[Connection]  # at most 500 (AP2 has ~7 MB free RAM)
+    note: str | None = None
 
 
 class TimeZones(BaseModel):
@@ -89,6 +99,13 @@ class SystemService:
     async def services(self, router_id: str) -> list[ServiceRow]:
         _rec, t = await self._transport(router_id)
         return service_rows(parse_rc_list(await self._stdout(t, s.RC_LIST)))
+
+    async def connections(self, router_id: str) -> Connections:
+        _rec, t = await self._transport(router_id)
+        result = await t.run(s.CONNTRACK)
+        if not result.ok:
+            return Connections(rows=[], note=NO_CONNTRACK)
+        return Connections(rows=parse_conntrack(result.stdout))
 
     async def zone_strings(self, router_id: str) -> dict[str, str]:
         """Zone name -> TZ string, the router's list plus UTC."""

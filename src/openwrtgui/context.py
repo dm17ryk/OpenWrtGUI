@@ -41,6 +41,7 @@ from openwrtgui.simulator import SimConnector, seed_routers, sim_http_client, si
 from openwrtgui.store.keys import AppKey, load_or_create_app_key
 from openwrtgui.store.routers import RouterRecord, RouterStore, router_key_paths
 from openwrtgui.store.settings import SettingsStore
+from openwrtgui.system.sampler import SystemHub
 from openwrtgui.system.service import SystemService
 from openwrtgui.terminal import TerminalSession
 from openwrtgui.transport.base import Transport
@@ -80,6 +81,7 @@ class AppContext:
     lte: LteService
     lte_live: LteHub
     system: SystemService
+    system_live: SystemHub
     token: str
     port: int
     mode: Literal["real", "simulator"]
@@ -309,6 +311,7 @@ def build_context(
         lte=lte,
         lte_live=LteHub(pool=pool, routers=routers, locate=lte.modem_device),
         system=SystemService(pool=pool, routers=routers, guard=guard, audit=audit, runner=runner, data=data),
+        system_live=SystemHub(pool=pool, routers=routers),
         token=token,
         port=port,
         mode="simulator" if simulator is not None else "real",

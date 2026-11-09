@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from openwrtgui.api.deps import get_ctx, require_token
 from openwrtgui.context import AppContext
-from openwrtgui.system.service import TimeZones
+from openwrtgui.system.service import Connections, TimeZones
 from openwrtgui.system.services import ServiceRow
 from openwrtgui.system.state import LogEntry, LogKind, ProcessList, SystemOverview
 
@@ -43,6 +43,11 @@ async def processes(router_id: str, ctx: Ctx) -> ProcessList:
 @router.get("/services")
 async def services(router_id: str, ctx: Ctx) -> list[ServiceRow]:
     return await ctx.system.services(_known(ctx, router_id))
+
+
+@router.get("/connections")
+async def connections(router_id: str, ctx: Ctx) -> Connections:
+    return await ctx.system.connections(_known(ctx, router_id))
 
 
 @router.get("/timezones")
