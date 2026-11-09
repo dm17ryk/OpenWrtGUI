@@ -3,7 +3,21 @@
 
 from __future__ import annotations
 
+import re
 from typing import Literal
+
+from openwrtgui.uci import shell_quote
+
+HOSTNAME = re.compile(r"[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?")  # one RFC 1123 label
+NTP_SERVER = re.compile(r"(?!-)[A-Za-z0-9.:-]{1,253}")  # a host name or an address, never an option
+TARGET = NTP_SERVER
+SERVICE = re.compile(r"(?!\.)[A-Za-z0-9._-]{1,64}")
+InitAction = Literal["start", "stop", "restart", "enable", "disable"]
+INIT_ACTIONS: tuple[InitAction, ...] = ("start", "stop", "restart", "enable", "disable")
+FilePath = Literal["/etc/rc.local", "/etc/crontabs/root"]
+FILES: tuple[FilePath, ...] = ("/etc/rc.local", "/etc/crontabs/root")
+MAX_FILE = 8 * 1024
+DIAG_LIMIT_S = 25  # D4: a diagnostic never runs longer, whatever the network does
 
 BOARD = "ubus call system board"
 INFO = "ubus call system info"
@@ -29,3 +43,46 @@ def logread(lines: LogLength) -> str:
     if lines not in LOG_LENGTHS:
         raise ValueError(f"The system log is read in {', '.join(map(str, LOG_LENGTHS))} lines")
     return f"logread -l {lines}"
+
+
+def _checked(rule: re.Pattern[str], value: str, what: str) -> str:
+    if not rule.fullmatch(value):
+        raise ValueError(f"{value!r} is not {what}")
+    return value
+
+
+def init(name: str, action: InitAction) -> str:
+    if action not in INIT_ACTIONS:
+        raise ValueError(f"{action!r} is not one of {', '.join(INIT_ACTIONS)}")
+    return f"/etc/init.d/{_checked(SERVICE, name, 'a service name')} {action}"
+
+
+def _diag(program: str, target: str) -> str:
+    host = _checked(TARGET, target, "a host name or an address")
+    return f"timeout -s KILL {DIAG_LIMIT_S} {program} {shell_quote(host)}"
+
+
+def ping(target: str) -> str:
+    return _diag("ping -c 4 -W 2", target)
+
+
+def traceroute(target: str) -> str:
+    return _diag("traceroute -m 15 -w 2 -q 1 -n", target)
+
+
+def nslookup(target: str) -> str:
+    return _diag("nslookup", target)
+
+
+def write_file(path: FilePath, text: str) -> str:
+    """The whole file as one heredoc (D7): what the preview shows is what the router gets."""
+    from openwrtgui.fw.tables import heredoc  # here: fw imports net.apply, which reaches the guard
+
+    if path not in FILES:
+        raise ValueError(f"The System screen writes only {', '.join(FILES)}")
+    if len(text.encode()) > MAX_FILE:
+        raise ValueError("The file is at most 8 KiB")
+    head = f"cat > {path}"
+    if path == "/etc/crontabs/root":
+        head = f"mkdir -p /etc/crontabs && {head}"
+    return heredoc(head, text.rstrip("\n"))
