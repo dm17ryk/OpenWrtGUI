@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
+import json
 from datetime import timedelta
+from typing import cast
 
 import pytest
 from fwenv import FwEnv
 
-from openwrtgui.faults.model import FaultRequest, NetemParams, TargetRef
+from openwrtgui.faults.model import FaultRequest, FaultTarget, NetemParams, TargetRef
 from openwrtgui.faults.service import FaultsService, caps_from
 from openwrtgui.fw.nft import parse_ruleset_json
 from openwrtgui.guard.bench_guard import GuardLocked
+from openwrtgui.net.apply import NetCheck
 from openwrtgui.probe.status import read_status
 from openwrtgui.simfw import SimFirewall
-from openwrtgui.transport.base import CommandResult
+from openwrtgui.transport.base import CommandResult, Transport
 
 PANEL = TargetRef(None, "192.168.1.30")
 FAR = TargetRef("02:00:00:00:00:01", "192.168.1.250")
@@ -192,6 +195,27 @@ async def test_a_ban_cleared_early_is_lifted_and_its_timer_sends_nothing(env: Fw
     assert cleared.verified, cleared
     assert "f4:12:fa:f3:57:68" not in (await t.run("ubus call hostapd.phy0-ap0 list_bans")).stdout
     assert (await faults.state("ap1")).armed == ()
+
+
+class _Rejoining:
+    """AP2, 2026-11-09: right after a deauth hostapd still lists the phone, no longer associated, and the
+    phone is associated again by the next look a second later."""
+
+    def __init__(self, mac: str) -> None:
+        self.mac, self.looks = mac, 0
+
+    async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
+        self.looks += 1
+        assoc = self.looks > 1
+        flags = {"auth": assoc, "assoc": assoc, "authorized": assoc}
+        return CommandResult(command, json.dumps({"freq": 2437, "clients": {self.mac.upper(): flags}}), "", 0)
+
+
+async def test_deauth_counts_a_station_listed_but_no_longer_associated(env: FwEnv) -> None:
+    target = FaultTarget(None, "f4:12:fa:f3:57:68", None, "phy0-ap0", "phy0-ap0")
+    t = cast(Transport, _Rejoining("f4:12:fa:f3:57:68"))
+    check = await _faults(env)._client_check(t, target, banned=False)
+    assert check == NetCheck("deauth", True, "f4:12:fa:f3:57:68 left phy0-ap0")
 
 
 async def test_a_fault_that_fails_to_clear_stays_listed(env: FwEnv, monkeypatch: pytest.MonkeyPatch) -> None:

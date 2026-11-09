@@ -120,9 +120,11 @@ async def _arm(w: FwWindow, req: FaultRequest) -> NetApplyResult:
     return await w.faults.apply_fault(AP2, req, plan.digest)
 
 
-async def _clients(t: Transport, ifname: str) -> set[str]:
+async def _associated(t: Transport, ifname: str) -> set[str]:
+    """The stations hostapd has associated. A deauthenticated one stays listed, no longer associated, for
+    about a second (AP2, 2026-11-09: the phone was still listed right after the ban)."""
     clients = (await ubus_call(t, f"hostapd.{ifname}", "get_clients") or {}).get("clients", {})
-    return {k.lower() for k in clients}
+    return {k.lower() for k, v in clients.items() if isinstance(v, dict) and v.get("assoc")}
 
 
 async def _test_bss(t: Transport) -> str:
@@ -220,7 +222,7 @@ async def _faults_on_air(w: FwWindow, t: Transport, phone: AdbStation, key: str)
     print(f"\nstation {station.mac} on {station.via}")
     _proven(await _arm(w, FaultRequest("ban", TargetRef(station.mac, None), ban_s=BAN_S)))
     for _ in range(10):
-        assert station.mac not in await _clients(t, station.via), "joined while banned"
+        assert station.mac not in await _associated(t, station.via), "joined while banned"
         await asyncio.sleep(2)
     await asyncio.sleep(BAN_S - 15)  # about 35 s after the ban
     bans = await ubus_call(t, f"hostapd.{station.via}", "list_bans")

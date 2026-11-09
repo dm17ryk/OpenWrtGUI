@@ -6,7 +6,13 @@ from pathlib import Path
 
 from openwrtgui.probe.describe import describe_router
 from openwrtgui.transport.fake import ReplayTransport, load_commands
-from openwrtgui.wifi.parse import parse_freqlist, parse_ht_mcs, parse_txpowerlist, parse_uci_show
+from openwrtgui.wifi.parse import (
+    parse_freqlist,
+    parse_ht_mcs,
+    parse_phy_channels,
+    parse_txpowerlist,
+    parse_uci_show,
+)
 from openwrtgui.wifi.state import read_wifi
 
 AP2 = Path(__file__).resolve().parents[1] / "fixtures" / "ap2"
@@ -19,6 +25,10 @@ def _json(command: str) -> dict[str, object]:
 
 def test_freqlist_is_channels_1_to_13_for_il() -> None:
     assert parse_freqlist(_json('ubus call iwinfo freqlist \'{"device":"radio0"}\'')) == tuple(range(1, 14))
+
+
+def test_phy_channels_are_1_to_13_for_il() -> None:
+    assert parse_phy_channels(PARKED["iw phy phy0 info"].stdout) == tuple(range(1, 14))
 
 
 def test_txpowerlist_tops_out_at_20_dbm() -> None:

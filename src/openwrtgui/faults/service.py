@@ -466,7 +466,10 @@ class FaultsService:
             if attempt:
                 await self._sleep(1.0)
             clients = (await ubus_call(t, f"hostapd.{ifname}", "get_clients") or {}).get("clients", {})
-            if mac not in {k.lower() for k in clients}:
+            flags = {k.lower(): v for k, v in clients.items()}.get(mac)
+            # hostapd lists a deauthenticated station, no longer associated, for about a second, and a phone
+            # may join again by the next look (AP2, 2026-11-09); without the flag it counts as associated
+            if flags is None or (isinstance(flags, dict) and flags.get("assoc", True) is False):
                 return NetCheck("deauth", True, f"{mac} left {ifname}")
         return NetCheck("deauth", None, "still listed or re-joined")
 

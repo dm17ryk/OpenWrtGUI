@@ -11,6 +11,9 @@ from openwrtgui.uci import parse_uci_show as parse_uci_show  # the Wi-Fi tests i
 
 _CHANNEL = re.compile(r"channel (\d+) \((\d+) MHz\)(?:, width: (\d+) MHz( \(no HT\))?)?")
 _MCS = re.compile(r"HT TX/RX MCS rate indexes supported:\s*(.+)")
+# `* 2412.0 MHz [1] (20.0 dBm)`, `* 2484.0 MHz [14] (disabled)`, `... (no IR)`; older iw: "passive scanning"
+_PHY_FREQ = re.compile(r"\*\s+\d+(?:\.\d+)?\s+MHz\s+\[(\d+)\](.*)")
+_NOT_USABLE = ("disabled", "no ir", "passive scanning", "no ibss")
 # The rate right after the timestamp. A radio's own beacons (TX path) have no "<freq> MHz" after it.
 _BEACON_RATE = re.compile(r"\S+ (\d+(?:\.\d+)?) Mb/s ")
 
@@ -113,6 +116,18 @@ def parse_ht_mcs(iw_phy_info: str) -> tuple[int, ...]:
         elif part.isdigit():
             indexes.append(int(part))
     return tuple(indexes)
+
+
+def parse_phy_channels(iw_phy_info: str) -> tuple[int, ...]:
+    """The channels the kernel lets the radio use, from `iw phy X info` (its Frequencies lists): not disabled
+    and not no-IR. The kernel's list wins over iwinfo's `restricted` flag, which on AP2 (2026-11-09) marked
+    usable channels 6 and 9 as no-IR."""
+    out: list[int] = []
+    for line in iw_phy_info.splitlines():
+        m = _PHY_FREQ.match(line.strip())
+        if m and not any(flag in m.group(2).lower() for flag in _NOT_USABLE):
+            out.append(int(m.group(1)))
+    return tuple(out)
 
 
 def parse_freqlist(result: Mapping[str, Any]) -> tuple[int, ...]:
