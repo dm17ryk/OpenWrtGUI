@@ -7,6 +7,8 @@ import pytest
 
 from openwrtgui.context import AppContext
 from openwrtgui.guard.bench_guard import GuardLocked
+from openwrtgui.simsystem import SimSystem
+from openwrtgui.transport.base import CommandResult
 
 WARNING = (
     "This restarts AP2 · office's network: devices and this app lose AP2 · office for a few seconds; "
@@ -82,6 +84,25 @@ async def test_unknown_service(ctx: AppContext) -> None:
         await ctx.system.plan_service("ap2", "nosuch", "start")
     with pytest.raises(ValueError, match="is not a service name"):
         await ctx.system.plan_service("ap2", "../x", "start")
+
+
+async def test_a_failed_service_list_read_is_named(ctx: AppContext, monkeypatch: pytest.MonkeyPatch) -> None:
+    """rpcd down: the screen says the list does not read, not 'no services' or 'not an init script'."""
+    original = SimSystem.answer
+
+    def failing(self: SimSystem, command: str) -> CommandResult | None:
+        if command == "ubus call rc list":
+            return CommandResult(command, "", "Command failed: Not found\n", 4)
+        return original(self, command)
+
+    monkeypatch.setattr(SimSystem, "answer", failing)
+    message = "^The router's service list does not read: Command failed: Not found$"
+    with pytest.raises(ValueError, match=message):
+        await ctx.system.services("ap2")
+    with pytest.raises(ValueError, match=message):
+        await ctx.system.plan_service("ap2", "sysntpd", "restart")
+    with pytest.raises(ValueError, match=message):
+        await ctx.system.crontab("ap2")
 
 
 async def test_services_wait_for_the_run(ctx_guard_live: AppContext) -> None:

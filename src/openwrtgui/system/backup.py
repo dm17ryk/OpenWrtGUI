@@ -17,7 +17,6 @@ from openwrtgui.system import commands as s
 from openwrtgui.transport.base import Streamer, Transport
 
 GZIP = b"\x1f\x8b"
-_NAME = re.compile(r"[a-z0-9-]{1,32}-\d{8}-\d{6}\.tar\.gz")
 CHUNK = 65536
 
 
@@ -37,11 +36,12 @@ def backup_name(router_id: str, now: datetime) -> str:
     return f"{router_id}-{now:%Y%m%d-%H%M%S}.tar.gz"
 
 
-def listing(folder: Path) -> list[BackupFile]:
-    """The router's saved archives, newest first."""
+def listing(folder: Path, router_id: str) -> list[BackupFile]:
+    """The router's saved archives, newest first: names this app gave them (any id length)."""
     if not folder.is_dir():
         return []
-    files = [p for p in folder.iterdir() if p.is_file() and _NAME.fullmatch(p.name)]
+    name = re.compile(rf"{re.escape(router_id)}-\d{{8}}-\d{{6}}\.tar\.gz")
+    files = [p for p in folder.iterdir() if p.is_file() and name.fullmatch(p.name)]
     out = [
         BackupFile(
             name=p.name,

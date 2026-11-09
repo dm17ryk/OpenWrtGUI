@@ -69,7 +69,8 @@ function CronForm({ routerId, short, state }: { routerId: string; short: string;
       setRaw(null)
     }
   }
-  const numbers = new Map(rows.filter((r) => r.kind === 'task').map((r, i) => [r.id, i + 1]))
+  // a task is named by its line in the file: the router's refusals say "line N"
+  const numbers = new Map(rows.map((r, i) => [r.id, i + 1]))
   return (
     <>
       <div className="row">
@@ -104,7 +105,10 @@ function CronForm({ routerId, short, state }: { routerId: string; short: string;
               )
             }
             return (
-              <div key={r.id} className="row" role="group" aria-label={`Task ${numbers.get(r.id) ?? ''}`}>
+              <div key={r.id} className="row" role="group" aria-label={`Line ${numbers.get(r.id) ?? ''}`}>
+                <span className="mono muted" style={{ alignSelf: 'flex-end', paddingBottom: 10 }}>
+                  {numbers.get(r.id)}
+                </span>
                 {FIELDS.map(([f, label]) => (
                   <label key={f} className="field" style={{ width: 84 }}>
                     <span>{label}</span>

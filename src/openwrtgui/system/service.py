@@ -75,6 +75,7 @@ NO_ZONES = "This router lists no time zones (LuCI's rpcd plugin is missing): onl
 
 NO_CONNTRACK = "The connection table is not available: nf_conntrack is not loaded"
 CRONTAB_FILE: s.FilePath = "/etc/crontabs/root"
+RC_UNREAD = "The router's service list does not read"
 DiagTool = Literal["ping", "traceroute", "nslookup"]
 _DIAG: dict[str, Callable[[str], str]] = {"ping": s.ping, "traceroute": s.traceroute, "nslookup": s.nslookup}
 DIAG_TIMEOUT_S = s.DIAG_LIMIT_S + 5.0  # the router's own `timeout -s KILL` ends it first
@@ -173,7 +174,7 @@ class SystemService:
 
     async def services(self, router_id: str) -> list[SystemServiceRow]:
         _rec, t = await self._transport(router_id)
-        return service_rows(parse_rc_list(await self._stdout(t, s.RC_LIST)))
+        return service_rows(await self._rc(t))
 
     async def connections(self, router_id: str) -> Connections:
         _rec, t = await self._transport(router_id)
@@ -262,8 +263,16 @@ class SystemService:
         return await self._runner.run_planned(rec, make, digest)
 
     # ---------------------------------------------------------------- services and rc.local (D6, D7)
+    async def _rc(self, t: Transport) -> list[RcService]:
+        """`rc list`; a read the router refuses is named, never shown as "no services"."""
+        result = await t.run(s.RC_LIST)
+        if not result.ok:
+            reason = (result.stderr or result.stdout).strip() or f"exit {result.exit_status}"
+            raise ValueError(f"{RC_UNREAD}: {reason}")
+        return parse_rc_list(result.stdout)
+
     async def _rc_row(self, t: Transport, name: str) -> RcService | None:
-        return next((r for r in parse_rc_list(await self._stdout(t, s.RC_LIST)) if r.name == name), None)
+        return next((r for r in await self._rc(t) if r.name == name), None)
 
     async def _service_plan(
         self, rec: RouterRecord, t: Transport, name: str, action: s.ServiceAction
@@ -304,7 +313,10 @@ class SystemService:
         """`rc list` re-read each second until it shows what the action does, SETTLE_S at most."""
         waited = 0.0
         while True:
-            ok, detail = action_holds(await self._rc_row(t, name), action)
+            try:
+                ok, detail = action_holds(await self._rc_row(t, name), action)
+            except ValueError:  # the change ran: a list that does not read is "not proven", not an error
+                ok, detail = False, "the service list does not read"
             if ok or waited >= SETTLE_S:
                 break
             await self._sleep(1.0)
@@ -496,13 +508,13 @@ class SystemService:
 
     async def backups(self, router_id: str) -> list[BackupFile]:
         rec = self._record(router_id)
-        return listing(backup_dir(self._data.root, rec.id))
+        return listing(backup_dir(self._data.root, rec.id), rec.id)
 
     def backup_path(self, router_id: str, name: str) -> Path:
         """Only a name the listing shows: nothing else under the data folder is served."""
         rec = self._record(router_id)
         folder = backup_dir(self._data.root, rec.id)
-        if name not in {b.name for b in listing(folder)}:
+        if name not in {b.name for b in listing(folder, rec.id)}:
             raise LookupError(f"No backup {name} of {rec.name}")
         return folder / name
 
