@@ -24,12 +24,14 @@ NO_HOSTAPD = "Failed to connect to hostapd - wpa_ctrl_open: No such file or dire
 _UBUS = re.compile(r"^ubus call (\S+) (\S+)(?: '(.*)')?$")
 _BOOL_OPTIONS = {"disabled", "legacy_rates", "noscan"}
 _INT_OPTIONS = {"cell_density", "txpower"}
+# Channels 1-13 usable and 14 disabled, as the routers list them for country IL (AP2, recorded 2026-11-05)
+_FREQUENCIES = "".join(f"\t\t\t* {2407 + 5 * ch}.0 MHz [{ch}] (20.0 dBm)\n" for ch in range(1, 14))
 _PHY_INFO = (
     "Wiphy {phy}\n\twiphy index: 0\n\tmax # scan SSIDs: 4\n\tBand 1:\n\t\tCapabilities: 0x2ce\n"
     "\t\t\tHT20/HT40\n\t\tHT TX/RX MCS rate indexes supported: 0-15\n"
     "\t\tBitrates (non-HT):\n\t\t\t* 1.0 Mbps\n\t\t\t* 2.0 Mbps (short preamble supported)\n"
-    "\t\tFrequencies:\n\t\t\t* 2412.0 MHz [1] (20.0 dBm)\n\tsupported interface modes:\n"
-    "\t\t * managed\n\t\t * AP\n\t\t * monitor\n"
+    "\t\tFrequencies:\n" + _FREQUENCIES + "\t\t\t* 2484.0 MHz [14] (disabled)\n"
+    "\tsupported interface modes:\n\t\t * managed\n\t\t * AP\n\t\t * monitor\n"
 )
 
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from conftest import WifiEnv
@@ -206,6 +208,34 @@ class _CountryUpdate:
 
     def __getattr__(self, name: str) -> object:
         return getattr(self._inner, name)
+
+
+class _RestrictedByIwinfo:
+    """AP2, 2026-11-09: iwinfo's freqlist marked channels 6 and 9 restricted (no_ir, indoor_only) while the
+    kernel's own list (`iw phy phy0 info`) had them usable."""
+
+    def __init__(self, inner: Transport) -> None:
+        self._inner = inner
+
+    async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
+        done = await self._inner.run(command, timeout=timeout)
+        if command.startswith("ubus call iwinfo freqlist"):
+            data = json.loads(done.stdout)
+            for f in data["results"]:
+                f["restricted"] = f["channel"] in (6, 9)
+            return CommandResult(command, json.dumps(data), "", 0)
+        return done
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._inner, name)
+
+
+async def test_the_kernels_channel_list_wins_over_iwinfos_flags(env: WifiEnv) -> None:
+    env.wrap.append(lambda t: _RestrictedByIwinfo(t))  # type: ignore[arg-type, return-value]
+    [radio] = (await env.service.state("ap2")).radios
+    assert radio.limits.channels == tuple(range(1, 14))
+    plan = await env.service.plan("ap2", N20_CH6)
+    assert "uci set wireless.radio0.channel='6'" in plan.lines
 
 
 async def test_apply_waits_for_the_ap_interface_to_operate(env: WifiEnv) -> None:

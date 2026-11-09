@@ -28,6 +28,7 @@ from openwrtgui.wifi.parse import (
     parse_freqlist,
     parse_ht_mcs,
     parse_iw_dev_info,
+    parse_phy_channels,
     parse_txpowerlist,
     parse_uci_show,
 )
@@ -154,7 +155,11 @@ async def read_wifi(
         p = f"wireless.{name}."
         phy = str((await ubus_call(t, "iwinfo", "phyname", {"section": name}) or {}).get("phyname", "phy0"))
         band = uci.get(p + "band") or str(st.get("config", {}).get("band", "2g"))
-        allowed = parse_freqlist(await ubus_call(t, "iwinfo", "freqlist", {"device": name}) or {})
+        phy_info = (await t.run(f"iw phy {phy} info")).stdout
+        # The kernel's list first (Dmitry, 2026-11-09); iwinfo's only where iw lists no frequencies
+        allowed = parse_phy_channels(phy_info) or parse_freqlist(
+            await ubus_call(t, "iwinfo", "freqlist", {"device": name}) or {}
+        )
         limits = RadioLimits(
             band=band,
             phy=phy,
@@ -163,7 +168,7 @@ async def read_wifi(
             txpower_dbm=parse_txpowerlist(
                 await ubus_call(t, "iwinfo", "txpowerlist", {"device": name}) or {}
             ),
-            mcs=parse_ht_mcs((await t.run(f"iw phy {phy} info")).stdout),
+            mcs=parse_ht_mcs(phy_info),
             country=uci.get(p + "country", "00"),
             sae=sae,
         )

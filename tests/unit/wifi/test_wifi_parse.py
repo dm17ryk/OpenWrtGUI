@@ -8,6 +8,7 @@ from openwrtgui.wifi.parse import (
     parse_ht_mcs,
     parse_iw_dev,
     parse_iw_dev_info,
+    parse_phy_channels,
     parse_txpowerlist,
     parse_uci_show,
 )
@@ -54,6 +55,19 @@ def test_ht_mcs() -> None:
     assert parse_ht_mcs("\t\tHT TX/RX MCS rate indexes supported: 0-15\n") == tuple(range(16))
     assert parse_ht_mcs("\t\tHT TX/RX MCS rate indexes supported: 0-7, 32\n") == (*range(8), 32)
     assert parse_ht_mcs("") == ()
+
+
+PHY_INFO = (
+    "Wiphy phy0\n\tBand 1:\n\t\tBitrates (non-HT):\n\t\t\t* 1.0 Mbps\n\t\t\t* 6.0 Mbps\n"
+    "\t\tFrequencies:\n\t\t\t* 2412.0 MHz [1] (20.0 dBm)\n\t\t\t* 2437.0 MHz [6] (20.0 dBm)\n"
+    "\t\t\t* 2467.0 MHz [12] (20.0 dBm) (no IR)\n\t\t\t* 2484.0 MHz [14] (disabled)\n"
+    "\tvalid interface combinations:\n\t\t * #{ AP } <= 4, total <= 4, #channels <= 1\n"
+)
+
+
+def test_phy_channels_skip_disabled_and_no_ir() -> None:
+    assert parse_phy_channels(PHY_INFO) == (1, 6)
+    assert parse_phy_channels("") == ()
 
 
 def test_freqlist_skips_restricted() -> None:
