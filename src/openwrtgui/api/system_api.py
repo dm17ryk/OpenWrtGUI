@@ -5,12 +5,14 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from openwrtgui.api.deps import get_ctx, require_token
 from openwrtgui.api.net_api import Digest, NetPlanOut
 from openwrtgui.context import AppContext
 from openwrtgui.net.apply import NetApplyResult
+from openwrtgui.system.backup import BackupFile
 from openwrtgui.system.commands import ServiceAction
 from openwrtgui.system.cron import CronState
 from openwrtgui.system.reboot import RebootBusy, RebootJob
@@ -181,6 +183,25 @@ async def reboot_start(router_id: str, body: Digest, ctx: Ctx) -> RebootJob:
         return await ctx.system.start_reboot(_known(ctx, router_id), body.digest)
     except RebootBusy as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/backup")
+async def backup(router_id: str, ctx: Ctx) -> BackupFile:
+    return await ctx.system.create_backup(_known(ctx, router_id))
+
+
+@router.get("/backups")
+async def backups(router_id: str, ctx: Ctx) -> list[BackupFile]:
+    return await ctx.system.backups(_known(ctx, router_id))
+
+
+@router.get("/backups/{name}", response_class=FileResponse)
+async def backup_file(router_id: str, name: str, ctx: Ctx) -> FileResponse:
+    try:
+        path = ctx.system.backup_path(_known(ctx, router_id), name)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return FileResponse(path, media_type="application/gzip", filename=path.name)
 
 
 class DiagnoseIn(BaseModel):

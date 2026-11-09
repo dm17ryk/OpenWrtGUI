@@ -7,6 +7,7 @@ import logging
 import time
 from collections.abc import Awaitable, Callable
 from datetime import datetime
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -27,6 +28,7 @@ from openwrtgui.net.apply import (
 from openwrtgui.paths import DataDir
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.system import commands as s
+from openwrtgui.system.backup import BackupFile, backup_dir, backup_name, listing, save_archive
 from openwrtgui.system.cron import CronState, check_crontab, has_tasks, read_tasks
 from openwrtgui.system.parse import (
     Connection,
@@ -469,6 +471,40 @@ class SystemService:
             uptime_s=back.uptime_s,
             detail=f"{rec.name} is back after {back.elapsed_s:.0f} s (uptime {back.uptime_s:.0f} s)",
         )
+
+    # ---------------------------------------------------------------- backup (D9)
+    async def create_backup(self, router_id: str) -> BackupFile:
+        """Allowed during a run: it changes nothing on the router. One audit line names the file."""
+        rec, t = await self._transport(router_id)
+        name = backup_name(rec.id, self._clock())
+        path = backup_dir(self._data.root, rec.id) / name
+        if path.exists():
+            raise ValueError(f"A backup of {rec.name} was saved this second already")
+        total, status, problem = await save_archive(t, path)
+        self._audit.record(
+            router=rec.id,
+            screen=SCREEN,
+            command=f"{s.BACKUP}  # saved to {name}"
+            if not problem
+            else f"{s.BACKUP}  # not saved: {problem}",
+            exit_status=status,
+            source="user",
+        )
+        if problem:
+            raise ValueError(f"{rec.name} gave no backup: {problem}")
+        return BackupFile(name=name, size=total, created_at=self._clock().astimezone())
+
+    async def backups(self, router_id: str) -> list[BackupFile]:
+        rec = self._record(router_id)
+        return listing(backup_dir(self._data.root, rec.id))
+
+    def backup_path(self, router_id: str, name: str) -> Path:
+        """Only a name the listing shows: nothing else under the data folder is served."""
+        rec = self._record(router_id)
+        folder = backup_dir(self._data.root, rec.id)
+        if name not in {b.name for b in listing(folder)}:
+            raise LookupError(f"No backup {name} of {rec.name}")
+        return folder / name
 
     async def timezones(self, router_id: str) -> TimeZones:
         zones = await self.zone_strings(router_id)
