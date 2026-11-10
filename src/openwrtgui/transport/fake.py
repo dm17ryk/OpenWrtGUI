@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from openwrtgui.simimage import SimImage
     from openwrtgui.simmodem import SimModem
     from openwrtgui.simnet import SimNetwork
+    from openwrtgui.simsystem import SimSystem
     from openwrtgui.simwifi import SimWifi
 
 INSTALL_KEY_PREFIX = "mkdir -p /etc/dropbear && "
@@ -34,6 +35,7 @@ class SimState:
     fw: SimFirewall | None = None
     image: SimImage | None = None
     modem: SimModem | None = None
+    system: SimSystem | None = None
     generation_seen: int = 0  # the image's flash generation whose reset (keys, password) was applied
 
 
@@ -126,6 +128,10 @@ class ReplayTransport:
             read = self.state.image.stream(command)
             if read is not None:
                 return BytesStream(read, 0)
+        if self.state is not None and self.state.system is not None:
+            archive = self.state.system.stream(command)
+            if archive is not None:
+                return BytesStream(archive, 0)
         data = self.state.fw.stream(command) if self.state is not None and self.state.fw is not None else None
         if data is None:
             return BytesStream(b"", 1, "tcpdump: no such device\n")
@@ -156,6 +162,8 @@ class ReplayTransport:
         if self.state.image is not None and (answered := self.state.image.answer(command)) is not None:
             return answered
         if self.state.modem is not None and (answered := self.state.modem.answer(command)) is not None:
+            return answered
+        if self.state.system is not None and (answered := self.state.system.answer(command)) is not None:
             return answered
         if self.state.net is not None and (answered := self.state.net.answer(command)) is not None:
             return answered

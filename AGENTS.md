@@ -93,6 +93,13 @@ pwsh -File tools/build_windows.ps1        # PyInstaller build + self-check (vers
   until a power cycle). AP2 ends as found: `uci show network` as before and lte up as before. Never type a
   SIM PIN or an APN password, and never write the IMEI to a log, a file or the audit log. AT queries and the
   LTE screen's reads are reads.
+- **A System write on AP2** (host name, time zone, NTP or log settings, a service action, an `rc.local` or
+  crontab edit, a diagnostic) is a write window: only with the owner's OK in this session, the txctl session
+  told (a network, firewall, wpad or dnsmasq restart reloads AP2's network), Bench Guard clear. **A reboot**
+  needs its own OK. AP2 ends as found: `uci -X show system`, `/etc/rc.local`, `/etc/crontabs/root` (or its
+  absence) and every service's enabled and running state as before. The System screen's reads are reads. A
+  backup is a read too, but the archive holds secrets (password hash, host keys, the app's key line, Wi-Fi
+  keys): never put one in a fixture, a log, the audit log or a commit, and remove a test backup afterwards.
 - While Bench Guard reports a live run (`dima_night`, `rh_soak`, `overnight_wifi`, `txlab_*`,
   `voip_chain`, lock files, run SSIDs), every router is read-only. Do not work around it.
 - Agents **never type router passwords**. Where a password is needed, the owner types it.

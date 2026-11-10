@@ -300,7 +300,7 @@ class DiscoveryService:
         rec, t, desc, profile = await self._context(router_id)
         state = await self._read(rec, t, desc, profile)
         if name not in {s.name for s in state.services}:
-            raise ValueError(f"{name} is not a custom service; it is managed on System › Services (v0.6)")
+            raise ValueError(f"{name} is not a custom service; it is managed on System › Services")
         command = service_command(name, action)
         return net_plan(router_id=rec.id, screen=SCREEN, config=None, ops=[], current={}, commands=[command])
 

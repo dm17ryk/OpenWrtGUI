@@ -16,6 +16,7 @@ import { DiscoveryScreen } from './screens/discovery/DiscoveryScreen'
 import { FaultsScreen } from './screens/faults/FaultsScreen'
 import { FirewallScreen } from './screens/fw/FirewallScreen'
 import { LteScreen } from './screens/lte/LteScreen'
+import { SystemScreen } from './screens/system/SystemScreen'
 import { PortsScreen } from './screens/ports/PortsScreen'
 import { RfLive } from './screens/rf/RfLive'
 import { WifiScreen } from './screens/wifi/WifiScreen'
@@ -66,6 +67,7 @@ export function App() {
         <Route path="/routers/:id/luci" element={<LuciPage />} />
         <Route path="/routers/:id/network" element={<NetworkScreen />} />
         <Route path="/routers/:id/lte" element={<LteScreen />} />
+        <Route path="/routers/:id/system" element={<SystemScreen />} />
         <Route path="/routers/:id/ports" element={<PortsScreen />} />
         <Route path="/routers/:id/firewall" element={<FirewallScreen />} />
         <Route path="/routers/:id/faults" element={<FaultsScreen />} />

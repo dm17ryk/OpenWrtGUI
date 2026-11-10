@@ -1,0 +1,11 @@
+<5>[    0.000000] Linux version 6.18.41 (builder@buildhost) (mipsel-openwrt-linux-musl-gcc 14.3.0) #0 Sun Nov  1 00:00:00 2026
+<6>[    0.000000] SoC Type: MediaTek MT7620N ver:2 eco:6
+<6>[    0.000000] CPU0 revision is: 00019650 (MIPS 24KEc)
+<6>[    0.000000] Memory: 54840K/65536K available
+<6>[    2.345678] rt2800_wmac 10180000.wmac: loaded eeprom from mtd
+<6>[    3.456789] mtk_soc_eth 10100000.ethernet eth0: mediatek frame engine at 0xb0100000, irq 5
+<4>[    8.765432] jffs2: notice: (433) jffs2_build_xattr_subsystem: complete building xattr subsystem
+<6>[   12.000000] usb 1-1: new high-speed USB device number 2 using ehci-platform
+<6>[   13.100000] qmi_wwan 1-1:1.4: cdc-wdm0: USB WDM device
+<6>[   13.200000] option 1-1:1.0: GSM modem (1-port) converter detected
+<6>[   20.500000] br-lan: port 1(eth0.1) entered forwarding state

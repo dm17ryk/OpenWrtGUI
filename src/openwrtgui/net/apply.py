@@ -244,6 +244,19 @@ def _holds(op: UciOp, shown: Mapping[str, str]) -> bool:
     return op.value not in items  # del_list
 
 
+def _replaced(ops: Sequence[UciOp]) -> dict[str, list[str]]:
+    """Lists a plan replaces (a delete, then add_list on the same path): path -> the new items."""
+    out: dict[str, list[str]] = {}
+    for op in ops:
+        if "$" in op.path:
+            continue
+        if op.op == "delete":
+            out[op.path] = []
+        elif op.op == "add_list" and op.path in out:
+            out[op.path].append(op.value or "")
+    return {path: items for path, items in out.items() if items}
+
+
 def _sections(shown: Mapping[str, str], config: str) -> dict[str, tuple[str, dict[str, str]]]:
     """{section: (type, {option: value})} of one config in a `uci -X show` map."""
     out: dict[str, tuple[str, dict[str, str]]] = {}
@@ -302,7 +315,9 @@ async def saved_check(
             by_section.setdefault((parts[0], parts[1]), []).append(op)
             continue
         rest.append(op)
-    wrong = [op.path for op in rest if not _holds(op, shown)]
+    lists = _replaced(rest)
+    wrong = [op.path for op in rest if op.path not in lists and not _holds(op, shown)]
+    wrong += [path for path, items in lists.items() if shown.get(path, "").split() != items]
     for (config, section), section_ops in by_section.items():
         assert before is not None
         type_, options = _sections(before, config)[section]

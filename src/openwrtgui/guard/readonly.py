@@ -7,11 +7,13 @@ import shlex
 
 from openwrtgui.discovery.commands import OVERLAY_LS, ROM_LS
 from openwrtgui.lte.commands import TTY_LIST
+from openwrtgui.system.commands import BACKUP_SIZE
 
 # "&" also covers "&&" and "|&": a single & starts a second command in the background.
 _FORBIDDEN = (";", "&", "||", ">", "<", "`", "$(", "\n")
-# Discovery's own reads (v0.5), as exact texts: they need `-exec ls` and a stderr redirect.
-_EXACT = frozenset({OVERLAY_LS, ROM_LS, TTY_LIST})
+# Discovery's own reads (v0.5), as exact texts: they need `-exec ls` and a stderr redirect. The System
+# screen's backup size (v0.6b): the archive goes to wc only, nothing is written on the router.
+_EXACT = frozenset({OVERLAY_LS, ROM_LS, TTY_LIST, BACKUP_SIZE})
 _FIRMWARE_HASH = re.compile(
     r"dd if=/dev/mtdblock\d{1,2} bs=65536 count=\d{1,6} 2>/dev/null \| head -c \d{1,10} \| sha256sum"
 )
@@ -63,6 +65,7 @@ _UBUS_READ_METHODS = frozenset(
         "countrylist",
         "get_validate",
         "get_proto_handlers",
+        "getTimezones",  # the System screen's time zone list (LuCI's own read)
     ]
 )
 _FIND_ACTIONS = frozenset({"-delete", "-exec", "-execdir", "-ok", "-okdir"})

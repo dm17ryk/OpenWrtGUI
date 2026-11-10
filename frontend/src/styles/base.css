@@ -397,6 +397,20 @@ h2 {
   border-bottom: 1px solid var(--line);
   white-space: nowrap;
 }
+.th-sort {
+  all: unset;
+  cursor: pointer;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+.th-sort:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.tbl th[aria-sort] .th-sort {
+  color: var(--ink);
+}
 .tbl td {
   padding: 10px;
   border-bottom: 1px solid var(--line2);

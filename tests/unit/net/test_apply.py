@@ -481,6 +481,22 @@ async def test_saved_check_still_catches_a_change_the_router_does_not_hold() -> 
     assert check == NetCheck("saved", False, "not as asked: dhcp.cfg03a1b2")
 
 
+async def test_saved_check_reads_a_replaced_list_of_a_named_section_as_its_new_items() -> None:
+    """delete + add_list on `system.ntp.server` replaces the list: the router holds the new items only."""
+    ops = [
+        UciOp("delete", "system.ntp.server"),
+        UciOp("add_list", "system.ntp.server", "pool.ntp.org"),
+        UciOp("add_list", "system.ntp.server", "192.168.1.10"),
+    ]
+    before = parse_uci_show("system.ntp=timeserver\nsystem.ntp.server='0.openwrt.pool.ntp.org'\n")
+    done = "system.ntp=timeserver\nsystem.ntp.server='pool.ntp.org' '192.168.1.10'\n"
+    check = await saved_check(Shown(done), "uci -X show system", ops, before)  # type: ignore[arg-type]
+    assert check == NetCheck("saved", True, "the router has the change")
+    kept = "system.ntp=timeserver\nsystem.ntp.server='0.openwrt.pool.ntp.org' 'pool.ntp.org' '192.168.1.10'\n"
+    check = await saved_check(Shown(kept), "uci -X show system", ops, before)  # type: ignore[arg-type]
+    assert check == NetCheck("saved", False, "not as asked: system.ntp.server")
+
+
 async def test_service_check_waits_for_the_restart() -> None:
     """AP2, 2026-11-06: right after a DNS change dnsmasq was being restarted under its section's new name, so
     an immediate look found no running instance; a moment later it ran."""

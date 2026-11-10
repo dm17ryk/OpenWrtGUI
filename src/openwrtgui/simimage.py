@@ -25,7 +25,8 @@ from openwrtgui.probe.identity import parse_release
 from openwrtgui.transport.base import CommandResult
 from openwrtgui.uci import shell_quote
 
-NOT_MINE = frozenset({"network", "dhcp", "firewall", "wireless"})  # the network and Wi-Fi simulators' configs
+# the network and Wi-Fi simulators' configs (system: the network simulator holds it for the System screen)
+NOT_MINE = frozenset({"network", "dhcp", "firewall", "wireless", "system"})
 REBOOT_S = 20.0  # how long a simulated flash keeps the router away (tests shorten it)
 SYSUPGRADE_CONF = (
     "## This file contains files and directories that should\n## be preserved during an upgrade.\n"
@@ -142,8 +143,33 @@ class SimImage:
             return False
         if self._clock() < self._reboot_until:
             return True
-        self._finish_flash()
+        if self._pending is None:
+            self._finish_reboot()
+        else:
+            self._finish_flash()
         return False
+
+    @property
+    def boot_at(self) -> float:
+        return self._boot_at
+
+    @property
+    def custom_services(self) -> dict[str, list[bool]]:
+        """The bench's own services: name -> [running, enabled] (the System screen's rc list shows them)."""
+        return self._services
+
+    def reboot(self, seconds: float | None = None) -> None:
+        """A plain reboot (the System screen's, v0.6b): away for `seconds`, then back with a fresh uptime."""
+        away = seconds if seconds is not None else (REBOOT_S if self._reboot_s is None else self._reboot_s)
+        self._reboot_until = self._clock() + away
+
+    def _finish_reboot(self) -> None:
+        assert self._reboot_until is not None
+        self._boot_at = self._reboot_until
+        self._reboot_until = None
+        self._tmp = {}  # /tmp is RAM
+        for state in self._services.values():
+            state[0] = state[1]  # an enabled service starts at boot
 
     def _finish_flash(self) -> None:
         assert self._pending is not None and self._reboot_until is not None
