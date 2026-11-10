@@ -22,6 +22,15 @@ CHUNK = 65536
 
 
 IMPORTED = "-imported"
+OWG_KEPT = "/etc/owg/"  # the line a flash that keeps settings adds (v0.5 D5)
+UPLOAD_NAME = re.compile(r"[A-Za-z0-9._ ()-]{1,200}")
+
+
+class KeptFiles(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    text: str  # /etc/sysupgrade.conf ("" when there is none)
+    listed: tuple[str, ...]  # `sysupgrade -l`: every file a backup holds now
 
 
 class BackupFile(BaseModel):

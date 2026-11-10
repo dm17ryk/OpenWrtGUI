@@ -13,12 +13,12 @@ from openwrtgui.api.net_api import Digest, NetPlanOut
 from openwrtgui.context import AppContext
 from openwrtgui.net.apply import NetApplyResult
 from openwrtgui.system.archive import MAX_ARCHIVE
-from openwrtgui.system.backup import BackupFile
+from openwrtgui.system.backup import BackupFile, KeptFiles
 from openwrtgui.system.commands import ServiceAction
 from openwrtgui.system.cron import CronState
 from openwrtgui.system.reboot import RebootBusy, RebootJob
 from openwrtgui.system.restore import RestoreCheck
-from openwrtgui.system.service import Connections, DiagResult, DiagTool, KeptFiles, TimeZones
+from openwrtgui.system.service import Connections, DiagResult, DiagTool, TimeZones
 from openwrtgui.system.services import SystemServiceRow
 from openwrtgui.system.settings import LogProto, SystemSettings
 from openwrtgui.system.state import LogEntry, LogKind, ProcessList, SystemOverview
@@ -183,6 +183,26 @@ async def reboot_preview(router_id: str, ctx: Ctx) -> NetPlanOut:
 async def reboot_start(router_id: str, body: Digest, ctx: Ctx) -> RebootJob:
     try:
         return await ctx.system.start_reboot(_known(ctx, router_id), body.digest)
+    except RebootBusy as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+class ResetStartIn(Digest):
+    confirm_name: str = Field(max_length=128)
+    alone: bool
+
+
+@router.post("/reset/preview")
+async def reset_preview(router_id: str, ctx: Ctx) -> NetPlanOut:
+    return NetPlanOut.of(await ctx.system.plan_reset(_known(ctx, router_id)))
+
+
+@router.post("/reset/start")
+async def reset_start(router_id: str, body: ResetStartIn, ctx: Ctx) -> RebootJob:
+    try:
+        return await ctx.system.start_reset(
+            _known(ctx, router_id), body.digest, body.confirm_name, body.alone
+        )
     except RebootBusy as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 

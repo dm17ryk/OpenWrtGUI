@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-import re
 import time
 from collections.abc import Awaitable, Callable, Collection, Coroutine
 from datetime import datetime
@@ -28,11 +27,14 @@ from openwrtgui.net.apply import (
     saved_check,
 )
 from openwrtgui.paths import DataDir
-from openwrtgui.store.routers import RouterRecord, RouterStore
+from openwrtgui.store.routers import ReflashPending, RouterRecord, RouterStore
 from openwrtgui.system import commands as s
 from openwrtgui.system.archive import ArchiveInfo, read_archive, restore_refusals
 from openwrtgui.system.backup import (
+    OWG_KEPT,
+    UPLOAD_NAME,
     BackupFile,
+    KeptFiles,
     backup_dir,
     backup_name,
     check_kept,
@@ -61,12 +63,18 @@ from openwrtgui.system.reboot import (
     reboot_warnings,
 )
 from openwrtgui.system.restore import (
+    FACTORY_ADDRESS,
+    RESET_LIMIT_S,
     RestoreCheck,
     differing,
     listed_ok,
+    not_reset,
     provable,
+    reset_done,
+    reset_warnings,
     restore_lines,
     restore_warnings,
+    wait_until_gone,
 )
 from openwrtgui.system.services import (
     SETTLE_S,
@@ -110,17 +118,6 @@ class DiagResult(BaseModel):
     command: str
     output: str  # stdout, then stderr: a bad address is a result, not an error
     exit_status: int
-
-
-OWG_KEPT = "/etc/owg/"  # the line a flash that keeps settings adds (v0.5 D5)
-UPLOAD_NAME = re.compile(r"[A-Za-z0-9._ ()-]{1,200}")
-
-
-class KeptFiles(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    text: str  # /etc/sysupgrade.conf ("" when there is none)
-    listed: tuple[str, ...]  # `sysupgrade -l`: every file a backup holds now
 
 
 class Connections(BaseModel):
@@ -551,6 +548,59 @@ class SystemService:
             else:
                 detail += "; every restored file matches the backup"
         self._update_reboot(rec.id, phase="back", uptime_s=back.uptime_s, detail=detail, error=error)
+
+    # ---------------------------------------------------------------- reset to defaults (D12, simulator only)
+    async def plan_reset(self, router_id: str) -> NetPlan:
+        rec = self._record(router_id)
+        clash = next(
+            (r.name for r in self._routers.list() if r.id != rec.id and r.host == FACTORY_ADDRESS), None
+        )
+        return net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config=None,
+            ops=[],
+            current={},
+            commands=[s.firstboot_command()],
+            warnings=reset_warnings(rec.name, clash),
+        )
+
+    async def start_reset(self, router_id: str, digest: str, confirm_name: str, alone: bool) -> RebootJob:
+        """Only with the router's name typed and the "alone on this PC" tick; done when it stops answering,
+        and its entry then waits for Add again (the flash-without-settings marker, reason reset)."""
+        rec = self._record(router_id)
+        if confirm_name != rec.name or not alone:
+            raise ValueError(
+                f"Type the router's name ({rec.name}) and tick that it is alone on this PC's network"
+            )
+        plan = await self.plan_reset(rec.id)
+        identity: list[str] = []
+
+        async def arm(t: Transport) -> None:
+            board = parse_board(await self._stdout(t, s.BOARD))
+            identity[:] = [(board.board_name or "") if board else "", (board.revision or "") if board else ""]
+            await self._run(t, rec, plan.lines[0], "did not arm the reset")
+
+        async def wait(r: RouterRecord, armed_at: float) -> None:
+            self._update_reboot(r.id, phase="waiting")
+            gone = await wait_until_gone(
+                self._pool,
+                r,
+                armed_at=armed_at,
+                clock=self._monotonic,
+                sleep=self._sleep,
+                every_s=self.every_s,
+            )
+            if not gone:
+                self._update_reboot(r.id, phase="not reset", error=not_reset(r.name, RESET_LIMIT_S))
+                return
+            marker = ReflashPending(board=identity[0], revision=identity[1], at=self._clock(), reason="reset")
+            current = self._routers.get(r.id)
+            if current is not None:
+                self._routers.upsert(current.model_copy(update={"reflashed": marker}))
+            self._update_reboot(r.id, phase="reset", detail=reset_done(r.name))
+
+        return await self._start(rec, "reset", plan, digest, arm, wait)
 
     # ---------------------------------------------------------------- restore (D11)
     def _restore_input(self, rec: RouterRecord, name: str) -> tuple[bytes, ArchiveInfo, list[str]]:
