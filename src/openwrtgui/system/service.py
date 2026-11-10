@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import time
 from collections.abc import Awaitable, Callable
 from datetime import datetime
@@ -28,7 +29,16 @@ from openwrtgui.net.apply import (
 from openwrtgui.paths import DataDir
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.system import commands as s
-from openwrtgui.system.backup import BackupFile, backup_dir, backup_name, listing, save_archive
+from openwrtgui.system.archive import read_archive
+from openwrtgui.system.backup import (
+    BackupFile,
+    backup_dir,
+    backup_name,
+    check_kept,
+    listing,
+    save_archive,
+    save_upload,
+)
 from openwrtgui.system.cron import CronState, check_crontab, has_tasks, read_tasks
 from openwrtgui.system.parse import (
     Connection,
@@ -89,6 +99,17 @@ class DiagResult(BaseModel):
     command: str
     output: str  # stdout, then stderr: a bad address is a result, not an error
     exit_status: int
+
+
+OWG_KEPT = "/etc/owg/"  # the line a flash that keeps settings adds (v0.5 D5)
+UPLOAD_NAME = re.compile(r"[A-Za-z0-9._ ()-]{1,200}")
+
+
+class KeptFiles(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    text: str  # /etc/sysupgrade.conf ("" when there is none)
+    listed: tuple[str, ...]  # `sysupgrade -l`: every file a backup holds now
 
 
 class Connections(BaseModel):
@@ -517,6 +538,73 @@ class SystemService:
         if name not in {b.name for b in listing(folder, rec.id)}:
             raise LookupError(f"No backup {name} of {rec.name}")
         return folder / name
+
+    # ---------------------------------------------------------------- files kept in a backup (D10)
+    async def kept_files(self, router_id: str) -> KeptFiles:
+        _rec, t = await self._transport(router_id)
+        listed = await self._stdout(t, s.BACKUP_LIST)
+        return KeptFiles(text=await self._stdout(t, s.KEPT), listed=tuple(listed.split()))
+
+    async def _kept_plan(self, rec: RouterRecord, t: Transport, text: str) -> tuple[NetPlan, str]:
+        wanted = check_kept(text)
+        command = s.write_file("/etc/sysupgrade.conf", wanted)  # OWG and size refused before anything is sent
+        current = await self._stdout(t, s.KEPT)
+        if current == wanted:
+            raise ValueError(NOTHING)
+        warnings = []
+        if OWG_KEPT in current.split() and OWG_KEPT not in wanted.split():
+            warnings.append(
+                f"A flash that keeps settings adds {OWG_KEPT} back (the app's own files on {rec.name})."
+            )
+        plan = net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config=None,
+            ops=[],
+            current={},
+            commands=[command],
+            warnings=warnings,
+        )
+        return plan, wanted
+
+    async def plan_kept_files(self, router_id: str, text: str) -> NetPlan:
+        rec, t = await self._transport(router_id)
+        return (await self._kept_plan(rec, t, text))[0]
+
+    async def apply_kept_files(self, router_id: str, text: str, digest: str | None) -> NetApplyResult:
+        rec = self._record(router_id)
+
+        async def make(t: Transport) -> Planned:
+            plan, wanted = await self._kept_plan(rec, t, text)
+
+            async def verify(t2: Transport) -> list[NetCheck]:
+                return [await file_check(t2, s.KEPT, wanted)]
+
+            return Planned(plan, verify)
+
+        return await self._runner.run_planned(rec, make, digest)
+
+    # ---------------------------------------------------------------- importing a backup file (D11)
+    async def import_backup(self, router_id: str, data: bytes, filename: str) -> BackupFile:
+        """A backup from the PC into the router's list, checked first (read_archive); the bytes are never
+        logged. Changes nothing on the router, so it works during a run."""
+        rec = self._record(router_id)
+        if not UPLOAD_NAME.fullmatch(filename):
+            raise ValueError("That file name is not taken (letters, digits, spaces and . _ ( ) -)")
+        read_archive(data)
+        name = backup_name(rec.id, self._clock(), imported=True)
+        path = backup_dir(self._data.root, rec.id) / name
+        if path.exists():
+            raise ValueError(f"A backup of {rec.name} was imported this second already")
+        await save_upload(path, data)
+        self._audit.record(
+            router=rec.id,
+            screen=SCREEN,
+            command=f"import {filename} ({len(data)} bytes)  # saved to {name}",
+            exit_status=0,
+            source="user",
+        )
+        return BackupFile(name=name, size=len(data), created_at=self._clock().astimezone(), imported=True)
 
     async def timezones(self, router_id: str) -> TimeZones:
         zones = await self.zone_strings(router_id)

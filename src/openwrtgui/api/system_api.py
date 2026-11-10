@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -12,11 +12,12 @@ from openwrtgui.api.deps import get_ctx, require_token
 from openwrtgui.api.net_api import Digest, NetPlanOut
 from openwrtgui.context import AppContext
 from openwrtgui.net.apply import NetApplyResult
+from openwrtgui.system.archive import MAX_ARCHIVE
 from openwrtgui.system.backup import BackupFile
 from openwrtgui.system.commands import ServiceAction
 from openwrtgui.system.cron import CronState
 from openwrtgui.system.reboot import RebootBusy, RebootJob
-from openwrtgui.system.service import Connections, DiagResult, DiagTool, TimeZones
+from openwrtgui.system.service import Connections, DiagResult, DiagTool, KeptFiles, TimeZones
 from openwrtgui.system.services import SystemServiceRow
 from openwrtgui.system.settings import LogProto, SystemSettings
 from openwrtgui.system.state import LogEntry, LogKind, ProcessList, SystemOverview
@@ -193,6 +194,46 @@ async def backup(router_id: str, ctx: Ctx) -> BackupFile:
 @router.get("/backups")
 async def backups(router_id: str, ctx: Ctx) -> list[BackupFile]:
     return await ctx.system.backups(_known(ctx, router_id))
+
+
+async def _archive_body(request: Request) -> bytes:
+    """The raw body, refused past the archive limit before it is all read."""
+    too_big = HTTPException(status_code=413, detail="A backup archive is at most 4 MiB")
+    declared = request.headers.get("content-length")
+    if declared is not None and declared.isdigit() and int(declared) > MAX_ARCHIVE:
+        raise too_big
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > MAX_ARCHIVE:
+            raise too_big
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
+@router.post("/backups/import")
+async def import_backup(
+    router_id: str, request: Request, ctx: Ctx, x_file_name: Annotated[str, Header()] = "backup.tar.gz"
+) -> BackupFile:
+    """A backup file from the PC (raw body, its name in X-File-Name), checked, then listed (D11)."""
+    _known(ctx, router_id)
+    return await ctx.system.import_backup(router_id, await _archive_body(request), x_file_name)
+
+
+@router.get("/kept-files")
+async def kept_files(router_id: str, ctx: Ctx) -> KeptFiles:
+    return await ctx.system.kept_files(_known(ctx, router_id))
+
+
+@router.post("/kept-files/preview")
+async def kept_files_preview(router_id: str, body: TextIn, ctx: Ctx) -> NetPlanOut:
+    return NetPlanOut.of(await ctx.system.plan_kept_files(_known(ctx, router_id), body.text))
+
+
+@router.post("/kept-files/apply")
+async def kept_files_apply(router_id: str, body: TextApplyIn, ctx: Ctx) -> NetApplyResult:
+    return await ctx.system.apply_kept_files(_known(ctx, router_id), body.text, body.digest)
 
 
 @router.get("/backups/{name}", response_class=FileResponse)
