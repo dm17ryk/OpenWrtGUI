@@ -208,6 +208,23 @@ def test_system_set_records_the_reads_not_the_backup() -> None:
     assert rf.out_file(Path("tests/fixtures/ap2"), "system") == Path("tests/fixtures/ap2/system.json")
 
 
+def test_sanitize_hides_key_comments() -> None:
+    # a public key's comment names a person and a PC (AP2's: an account at a laptop); the repo is public
+    ed = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
+    text = (
+        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDGqApjSOX9aNDZ azuread\\someone@SOME-LAPTOP\n"
+        f'command="x" {ed} bob@pc\n'
+        f"{ed} openwrtgui@BENCH\n"
+        f"{ed}\n"
+    )
+    assert rf.sanitize(text) == (
+        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDGqApjSOX9aNDZ user@pc\n"
+        f'command="x" {ed} user@pc\n'
+        f"{ed} openwrtgui@BENCH\n"
+        f"{ed}\n"
+    )
+
+
 def test_access_set_records_no_password_digest() -> None:
     from openwrtgui.net.commands import INTERFACE_DUMP
     from openwrtgui.system import commands as s

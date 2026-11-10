@@ -136,6 +136,12 @@ DISCOVERY_READS = (
 )
 _IMEI = re.compile(r"\b\d{15}\b")
 _ICCID = re.compile(r"\b\d{18,20}\b")
+# A public key's comment names a person and a PC; this repo is public. The app's own comment stays.
+_KEY_COMMENT = re.compile(
+    r"^(.*?(?:ssh-(?:rsa|dss|ed25519)|ecdsa-sha2-nistp\d+|sk-\S+@openssh\.com) [A-Za-z0-9+/=]{16,})"
+    r" +(?!openwrtgui@)\S.*$",
+    re.M,
+)
 
 
 class Runner(Protocol):
@@ -143,8 +149,9 @@ class Runner(Protocol):
 
 
 def sanitize(text: str) -> str:
-    """The audit log's masking (uci `.key='…'` and JSON `"key": "…"`), plus IMEIs."""
-    return _IMEI.sub("<imei>", _ICCID.sub("<iccid>", mask(text, ())))
+    """The audit log's masking (uci `.key='…'` and JSON `"key": "…"`), plus IMEIs and key comments."""
+    masked = _IMEI.sub("<imei>", _ICCID.sub("<iccid>", mask(text, ())))
+    return _KEY_COMMENT.sub(r"\1 user@pc", masked)
 
 
 async def wifi_on_commands(t: Runner) -> tuple[str, ...]:
