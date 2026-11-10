@@ -136,12 +136,48 @@ DISCOVERY_READS = (
 )
 _IMEI = re.compile(r"\b\d{15}\b")
 _ICCID = re.compile(r"\b\d{18,20}\b")
-# A public key's comment names a person and a PC; this repo is public. The app's own comment stays.
-_KEY_COMMENT = re.compile(
-    r"^(.*?(?:ssh-(?:rsa|dss|ed25519)|ecdsa-sha2-nistp\d+|sk-\S+@openssh\.com) [A-Za-z0-9+/=]{16,})"
-    r" +(?!openwrtgui@)\S.*$",
+# A public key names the PC it logs in from, and its comment a person and a PC; this repo is public. Each key
+# in a recording becomes one of these throwaways (made for the recorder, their private parts discarded): the
+# n-th distinct key of a type gets the n-th throwaway, so a recording keeps how many keys there were.
+PLACEHOLDER_KEYS: dict[str, tuple[str, ...]] = {
+    "ssh-rsa": (
+        "AAAAB3NzaC1yc2EAAAADAQABAAABAQDkuVGF3sVWo1QoDphEpeUMG2dTbO52IbAh3weBtyT2yoKLMHoMTv6OuWf3EPShQgPKLko37wg"
+        "VJSJxPrhMnHJy627TPAULUM3VAvr4EbPsTSkG0Or9bZYzxnVZN37TU2IUScZykhbmIWErrBtCw5JMfKC83hHO6GBt37XPv60uCw9GeG"
+        "E5s5NhESfRs+FWVNToLccMBF1R+q0jZB4l8tmVFEtirlx0KaOf1bg69PfwPfNw3GdHfRH6YsOyDlmq6S+69OylkW6hcAC9kXhOuNa2S"
+        "aJ7agkJEn6aNK6GGt/0dbLJkROjQvstCsDbBl3hK/mSl1CVsA4M3uct6upcJYO3",
+        "AAAAB3NzaC1yc2EAAAADAQABAAABAQChVjFKSOurvga57S45fJ66rXoXxIbwxqfYH6XKfHzRqk0ZpZ2EZjHzoqwQ1C/4g2puc/qlRo4"
+        "/DQgqITeqz/bzd/eTaGWL0RrRSgG0hUyKbHvAt0qUkMn84cLvmy03xN1e6AnTkQOSQgC3d5807oCerkPjyjAQOuXOjhQxavkcwxhiTV"
+        "+9xj75xjIckPBYxo2wPeHBo9hwepAoKlgwS8DHwp5cPvhBG2jvQWObLSSSfUHUb8Deo1KA6cw0fm23ny0OjpElo1QGawEWqRgEhXa4r"
+        "Q/7Bp15B7rQPCmbozKjE/4gy1iZ69OYZVJIIxmSEcP692RE2VAuuzGRu1oc0R0h",
+    ),
+    "ssh-ed25519": (
+        "AAAAC3NzaC1lZDI1NTE5AAAAIBoghaIZ+QAK8HYJ5BzQBS8fr0z1Jz8c0gLP20NlIEQi",
+        "AAAAC3NzaC1lZDI1NTE5AAAAIEeN2gEjAeD8LVkj/gTQDSxOcPCD5IPg87e/h53vQKLn",
+    ),
+}
+_KEY_LINE = re.compile(
+    r"^(?P<options>.*?)(?P<type>ssh-(?:rsa|dss|ed25519)|ecdsa-sha2-nistp\d+|sk-\S+@openssh\.com)"
+    r" (?P<blob>[A-Za-z0-9+/=]{16,})(?P<comment> +\S.*)?$",
     re.M,
 )
+
+
+def _replace_keys(text: str) -> str:
+    seen: dict[str, list[str]] = {}
+
+    def one(m: re.Match[str]) -> str:
+        key_type = m.group("type") if m.group("type") in PLACEHOLDER_KEYS else "ssh-ed25519"
+        distinct = seen.setdefault(key_type, [])
+        if m.group("blob") not in distinct:
+            distinct.append(m.group("blob"))
+        throwaways = PLACEHOLDER_KEYS[key_type]
+        blob = throwaways[distinct.index(m.group("blob")) % len(throwaways)]
+        comment = (m.group("comment") or "").strip()
+        if comment:
+            comment = " openwrtgui@pc" if comment.startswith("openwrtgui@") else " user@pc"
+        return f"{m.group('options')}{key_type} {blob}{comment}"
+
+    return _KEY_LINE.sub(one, text)
 
 
 class Runner(Protocol):
@@ -149,9 +185,8 @@ class Runner(Protocol):
 
 
 def sanitize(text: str) -> str:
-    """The audit log's masking (uci `.key='…'` and JSON `"key": "…"`), plus IMEIs and key comments."""
-    masked = _IMEI.sub("<imei>", _ICCID.sub("<iccid>", mask(text, ())))
-    return _KEY_COMMENT.sub(r"\1 user@pc", masked)
+    """The audit log's masking (uci `.key='…'` and JSON `"key": "…"`), plus IMEIs and public keys."""
+    return _replace_keys(_IMEI.sub("<imei>", _ICCID.sub("<iccid>", mask(text, ()))))
 
 
 async def wifi_on_commands(t: Runner) -> tuple[str, ...]:
