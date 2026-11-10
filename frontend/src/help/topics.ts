@@ -78,6 +78,8 @@ export const HELP = {
   systemSshKeys: 'System#ssh-keys',
   systemHttp: 'System#https-access',
   systemRepoKeys: 'System#repository-keys',
+  systemLeds: 'System#leds',
+  systemMounts: 'System#mount-points',
   // Ports, VLANs, mirroring
   ports: 'Ports-and-VLANs',
   portsPanel: 'Ports-and-VLANs#front-panel',

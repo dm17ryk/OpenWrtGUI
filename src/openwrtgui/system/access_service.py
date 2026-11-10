@@ -54,7 +54,16 @@ from openwrtgui.system.access import (
     ssh_ops,
 )
 from openwrtgui.system.commands import OWNER
-from openwrtgui.system.leds import LedChange, LedInfo, LedRow, led_ops, parse_led_sections, parse_leds
+from openwrtgui.system.leds import (
+    NETDEV_MODES,
+    TRIGGER_OPTIONS,
+    LedChange,
+    LedInfo,
+    LedRow,
+    led_ops,
+    parse_led_sections,
+    parse_leds,
+)
 from openwrtgui.system.mounts import Mount, Usage, parse_df, parse_mounts
 from openwrtgui.system.sshkeys import (
     FINGERPRINT,
@@ -112,6 +121,8 @@ class LedState(BaseModel):
     rows: list[LedRow]
     devices: list[str]
     missing: tuple[str, ...]
+    trigger_options: dict[str, tuple[str, ...]] = dict(TRIGGER_OPTIONS)  # a trigger left out takes none
+    netdev_modes: tuple[str, ...] = NETDEV_MODES
 
 
 class MountState(BaseModel):

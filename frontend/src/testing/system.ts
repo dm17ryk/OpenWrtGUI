@@ -3,7 +3,9 @@ import type {
   Connections,
   CronState,
   DiagResult,
+  LedState,
   LogEntry,
+  MountState,
   NetApplyResult,
   NetPlan,
   ProcessList,
@@ -837,6 +839,372 @@ export const AP2_HTTP_OFF_PLAN: NetPlan = {
   "rollback": false,
   "target_host": null,
   "digest": "f3dbefd9c54686ac"
+}
+
+export const AP2_LEDS: LedState = {
+  "leds": [
+    {
+      "sysfs": "green:3g",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "none",
+      "brightness": 0,
+      "max_brightness": 1
+    },
+    {
+      "sysfs": "green:4g",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "none",
+      "brightness": 1,
+      "max_brightness": 1
+    },
+    {
+      "sysfs": "green:internet",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "none",
+      "brightness": 0,
+      "max_brightness": 1
+    },
+    {
+      "sysfs": "green:lan",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "switch0",
+      "brightness": 1,
+      "max_brightness": 1
+    },
+    {
+      "sysfs": "green:sigstrength",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "none",
+      "brightness": 1,
+      "max_brightness": 1
+    },
+    {
+      "sysfs": "green:wifi",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "none",
+      "brightness": 0,
+      "max_brightness": 1
+    },
+    {
+      "sysfs": "red:sigstrength",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "none",
+      "brightness": 0,
+      "max_brightness": 1
+    },
+    {
+      "sysfs": "rt2800soc-phy0::assoc",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "none",
+      "brightness": 0,
+      "max_brightness": 255
+    },
+    {
+      "sysfs": "rt2800soc-phy0::quality",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "none",
+      "brightness": 0,
+      "max_brightness": 255
+    },
+    {
+      "sysfs": "rt2800soc-phy0::radio",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "none",
+      "brightness": 0,
+      "max_brightness": 255
+    }
+  ],
+  "rows": [
+    {
+      "section": "led_lan",
+      "name": "lan",
+      "sysfs": "green:lan",
+      "trigger": "switch0",
+      "default": null,
+      "delayon": null,
+      "delayoff": null,
+      "inverted": null,
+      "dev": null,
+      "mode": [],
+      "port_mask": "0x0f",
+      "speed_mask": null
+    }
+  ],
+  "devices": [
+    "br-lan",
+    "eth0",
+    "eth0.1",
+    "eth0.2",
+    "lo",
+    "teql0",
+    "wwan0"
+  ],
+  "missing": [],
+  "trigger_options": {
+    "none": [
+      "default"
+    ],
+    "timer": [
+      "delayon",
+      "delayoff"
+    ],
+    "heartbeat": [
+      "inverted"
+    ],
+    "netdev": [
+      "dev",
+      "mode"
+    ],
+    "switch0": [
+      "port_mask",
+      "speed_mask"
+    ],
+    "switch1": [
+      "port_mask",
+      "speed_mask"
+    ]
+  },
+  "netdev_modes": [
+    "link",
+    "link_10",
+    "link_100",
+    "link_1000",
+    "link_2500",
+    "link_5000",
+    "link_10000",
+    "half_duplex",
+    "full_duplex",
+    "tx",
+    "rx"
+  ]
+}
+
+export const AP2_MOUNTS: MountState = {
+  "mounts": [
+    {
+      "device": "/dev/root",
+      "target": "/rom",
+      "fstype": "squashfs",
+      "options": "ro,relatime,errors=continue"
+    },
+    {
+      "device": "proc",
+      "target": "/proc",
+      "fstype": "proc",
+      "options": "rw,nosuid,nodev,noexec,relatime"
+    },
+    {
+      "device": "sysfs",
+      "target": "/sys",
+      "fstype": "sysfs",
+      "options": "rw,nosuid,nodev,noexec,relatime"
+    },
+    {
+      "device": "tmpfs",
+      "target": "/tmp",
+      "fstype": "tmpfs",
+      "options": "rw,nosuid,nodev,noatime"
+    },
+    {
+      "device": "/dev/mtdblock6",
+      "target": "/overlay",
+      "fstype": "jffs2",
+      "options": "rw,noatime"
+    },
+    {
+      "device": "overlayfs:/overlay",
+      "target": "/",
+      "fstype": "overlay",
+      "options": "rw,noatime,lowerdir=/,upperdir=/overlay/upper,workdir=/overlay/work"
+    },
+    {
+      "device": "tmpfs",
+      "target": "/dev",
+      "fstype": "tmpfs",
+      "options": "rw,nosuid,noexec,noatime,size=512k,mode=755"
+    }
+  ],
+  "usage": [
+    {
+      "filesystem": "/dev/root",
+      "size_kib": 8192,
+      "used_kib": 8192,
+      "available_kib": 0,
+      "use_pct": 100,
+      "target": "/rom"
+    },
+    {
+      "filesystem": "tmpfs",
+      "size_kib": 27552,
+      "used_kib": 1856,
+      "available_kib": 25696,
+      "use_pct": 7,
+      "target": "/tmp"
+    },
+    {
+      "filesystem": "/dev/mtdblock6",
+      "size_kib": 5056,
+      "used_kib": 396,
+      "available_kib": 4660,
+      "use_pct": 8,
+      "target": "/overlay"
+    },
+    {
+      "filesystem": "overlayfs:/overlay",
+      "size_kib": 5056,
+      "used_kib": 396,
+      "available_kib": 4660,
+      "use_pct": 8,
+      "target": "/"
+    },
+    {
+      "filesystem": "tmpfs",
+      "size_kib": 512,
+      "used_kib": 0,
+      "available_kib": 512,
+      "use_pct": 0,
+      "target": "/dev"
+    }
+  ],
+  "block": false
+}
+
+export const AP2_LED_PLAN: NetPlan = {
+  "router_id": "ap2",
+  "screen": "System",
+  "lines": [
+    "set -e",
+    "uci set system.led_lan.trigger='netdev'",
+    "uci set system.led_lan.dev='eth0.2'",
+    "uci set system.led_lan.mode='link tx rx'",
+    "uci -q delete system.led_lan.port_mask",
+    "uci commit system",
+    "/etc/init.d/led restart"
+  ],
+  "warnings": [],
+  "rollback": false,
+  "target_host": null,
+  "digest": "f7c7c46046893117"
 }
 
 export const AP2_SSH_ADD_PLAN: NetPlan = {

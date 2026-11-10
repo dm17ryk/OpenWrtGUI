@@ -4675,8 +4675,55 @@ export interface components {
             leds: components["schemas"]["LedInfo"][];
             /** Missing */
             missing: string[];
+            /**
+             * Netdev Modes
+             * @default [
+             *       "link",
+             *       "link_10",
+             *       "link_100",
+             *       "link_1000",
+             *       "link_2500",
+             *       "link_5000",
+             *       "link_10000",
+             *       "half_duplex",
+             *       "full_duplex",
+             *       "tx",
+             *       "rx"
+             *     ]
+             */
+            netdev_modes: string[];
             /** Rows */
             rows: components["schemas"]["LedRow"][];
+            /**
+             * Trigger Options
+             * @default {
+             *       "heartbeat": [
+             *         "inverted"
+             *       ],
+             *       "netdev": [
+             *         "dev",
+             *         "mode"
+             *       ],
+             *       "none": [
+             *         "default"
+             *       ],
+             *       "switch0": [
+             *         "port_mask",
+             *         "speed_mask"
+             *       ],
+             *       "switch1": [
+             *         "port_mask",
+             *         "speed_mask"
+             *       ],
+             *       "timer": [
+             *         "delayon",
+             *         "delayoff"
+             *       ]
+             *     }
+             */
+            trigger_options: {
+                [key: string]: string[];
+            };
         };
         /** LiveRoute */
         LiveRoute: {

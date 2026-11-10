@@ -63,6 +63,10 @@ async def test_leds_of_ap2(ctx: AppContext) -> None:
     assert len(state.leds) == 10
     assert [(r.section, r.sysfs, r.trigger) for r in state.rows] == [("led_lan", "green:lan", "switch0")]
     assert "eth0.2" in state.devices and state.missing == ()
+    # the screen shows each trigger's own options from here (one table, the one led_ops checks against)
+    assert state.trigger_options["timer"] == ("delayon", "delayoff")
+    assert "default-on" not in state.trigger_options  # a trigger left out takes no options
+    assert state.netdev_modes[:2] == ("link", "link_10")
 
 
 async def test_mounts_without_block(ctx: AppContext) -> None:

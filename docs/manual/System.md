@@ -131,6 +131,23 @@ because such a task would silently never run. **Apply** writes the file, enables
 restarts it; the proof is the file read back and cron running. A router without a crontab simply has no tasks:
 cron idles until there is one.
 
+## LEDs
+
+LuCI's LED Configuration page: the LED actions (`led` sections of the system config) that
+`/etc/init.d/led` applies. Each row has a name, the LED (from the router's own list, with what it does now),
+the trigger (from that LED's triggers), and the options that trigger takes: on or off for none, the on and
+off times for timer, inverted for heartbeat, the device and the modes (link, tx, rx…) for netdev, and the
+port and speed masks for a switch trigger. **Add LED action** adds a row and **Remove** drops one at Apply.
+The preview shows the exact `uci` lines and `/etc/init.d/led restart`; the proof is the saved config and each
+LED's active trigger read back from the router. A router without LuCI's rpcd plugin cannot list its LEDs and
+says so.
+
+## Mount points
+
+What is mounted where (device, type and mount options) and how full each file system is (size, used, free).
+The view is read only. Editing `/etc/config/fstab` needs the block-mount package, which the bench images do
+not have; the screen says so when it is missing.
+
 ## Backup
 
 **Create backup** saves the router's configuration archive (`sysupgrade -b`, the same archive LuCI's backup
