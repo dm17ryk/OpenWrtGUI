@@ -114,3 +114,38 @@ def test_allowed(cmd: str) -> None:
 @pytest.mark.parametrize("cmd", REFUSED)
 def test_refused(cmd: str) -> None:
     assert not is_read_only_command(cmd)
+
+
+def _access_reads() -> list[str]:
+    from openwrtgui.system import commands as s
+
+    return [
+        s.UCI_DROPBEAR,
+        s.UCI_UHTTPD,
+        s.UCI_RPCD,
+        s.KEYS_READ,
+        s.APK_KEYS,
+        s.OPKG_KEYS,
+        s.LEDS,
+        s.NET_DEVICES,
+        s.MOUNTS,
+        s.DF,
+        s.HAS_BLOCK,
+        s.KEPT,
+        s.BACKUP_LIST,
+        s.LISTENERS,
+        s.PASSWORD_DIGEST,
+    ]
+
+
+def test_access_reads_pass_the_read_only_check() -> None:
+    for cmd in _access_reads():
+        assert is_read_only_command(cmd), cmd
+    for cmd in (
+        "passwd root",
+        "firstboot -r -y",
+        "sysupgrade --restore-backup /tmp/owg/restore.tar.gz",
+        "/etc/init.d/led restart",
+        "cat > /etc/dropbear/authorized_keys",
+    ):
+        assert not is_read_only_command(cmd), cmd

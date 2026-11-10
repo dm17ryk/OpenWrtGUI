@@ -38,6 +38,28 @@ CONNTRACK = "head -n 500 /proc/net/nf_conntrack"  # AP2 has ~7 MB free RAM: the 
 BACKUP = "sysupgrade -b -"  # the archive on stdout (D9): it holds secrets, never recorded or logged
 BACKUP_SIZE = "sysupgrade -b - | wc -c"  # what the recorder keeps of it
 
+# v0.6c reads (Access, LEDs, mount points, the files kept in a backup): LuCI's own on this image
+UCI_DROPBEAR = "uci -X show dropbear"
+UCI_UHTTPD = "uci -X show uhttpd"
+UCI_RPCD = "uci -X show rpcd"
+AUTHORIZED_KEYS = "/etc/dropbear/authorized_keys"
+KEYS_READ = f"cat {AUTHORIZED_KEYS}"  # public keys only
+APK_KEYS = "ls -1 /etc/apk/keys"
+OPKG_KEYS = "ls -1 /etc/opkg/keys"
+LEDS = "ubus call luci getLEDs"
+NET_DEVICES = "ls -1 /sys/class/net"
+MOUNTS = "cat /proc/mounts"
+DF = "df -k"
+HAS_BLOCK = "test -x /sbin/block"  # LuCI shows Mount points only with block-mount (D8)
+KEPT = "cat /etc/sysupgrade.conf"
+BACKUP_LIST = "sysupgrade -l"
+LISTENERS = "cat /proc/net/tcp /proc/net/tcp6"
+# A digest of root's shadow field (D2): proves a password change without the hash leaving the router.
+# Derived from a secret: compared live, never recorded, logged or shown.
+PASSWORD_DIGEST = """awk -F: '$1=="root"{print $2}' /etc/shadow | sha256sum"""
+# the digest of a lone newline: root has no password
+EMPTY_DIGEST = "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+
 LogLength = Literal[100, 500, 2000]
 LOG_LENGTHS: tuple[LogLength, ...] = (100, 500, 2000)
 

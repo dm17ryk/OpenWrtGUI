@@ -37,7 +37,7 @@ from openwrtgui.fw.commands import FIREWALL_READS, FW4_PRINT
 from openwrtgui.guard.audit import mask
 from openwrtgui.lte import commands as lc
 from openwrtgui.lte.at import IDENTITY, find_at_port
-from openwrtgui.net.commands import network_reads
+from openwrtgui.net.commands import INTERFACE_DUMP, network_reads
 from openwrtgui.probe.commands import DESCRIBE_COMMANDS, FAULT_RECORDS, STATUS_COMMANDS, wireless_validate
 from openwrtgui.rf.parse import parse_station_dump
 from openwrtgui.system import commands as sc
@@ -82,6 +82,24 @@ SETS: dict[str, tuple[str, ...]] = {
         sc.CONNTRACK,
         sc.BACKUP_SIZE,
     ),
+    # v0.6c: public keys only; the password digest is compared live, never recorded
+    "access": (
+        sc.UCI_DROPBEAR,
+        sc.UCI_UHTTPD,
+        sc.UCI_RPCD,
+        sc.KEYS_READ,
+        sc.APK_KEYS,
+        sc.OPKG_KEYS,
+        sc.LEDS,
+        sc.NET_DEVICES,
+        sc.MOUNTS,
+        sc.DF,
+        sc.HAS_BLOCK,
+        sc.KEPT,
+        sc.BACKUP_LIST,
+        sc.LISTENERS,
+        INTERFACE_DUMP,
+    ),
 }
 FILES = {
     "probe": "commands.json",
@@ -92,6 +110,7 @@ FILES = {
     "discovery": "discovery.json",
     "lte": "lte.json",
     "system": "system.json",
+    "access": "access.json",
 }
 LTE_LIST = "ls /dev/ttyUSB* /dev/cdc-wdm*"
 # the AT reads the LTE screen makes on the AT port (only queries: nothing changes the modem)

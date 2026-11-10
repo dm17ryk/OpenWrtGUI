@@ -208,6 +208,32 @@ def test_system_set_records_the_reads_not_the_backup() -> None:
     assert rf.out_file(Path("tests/fixtures/ap2"), "system") == Path("tests/fixtures/ap2/system.json")
 
 
+def test_access_set_records_no_password_digest() -> None:
+    from openwrtgui.net.commands import INTERFACE_DUMP
+    from openwrtgui.system import commands as s
+
+    assert rf.SETS["access"] == (
+        s.UCI_DROPBEAR,
+        s.UCI_UHTTPD,
+        s.UCI_RPCD,
+        s.KEYS_READ,
+        s.APK_KEYS,
+        s.OPKG_KEYS,
+        s.LEDS,
+        s.NET_DEVICES,
+        s.MOUNTS,
+        s.DF,
+        s.HAS_BLOCK,
+        s.KEPT,
+        s.BACKUP_LIST,
+        s.LISTENERS,
+        INTERFACE_DUMP,
+    )
+    # a digest of root's hash is still derived from a secret: compared live, never recorded
+    assert s.PASSWORD_DIGEST not in rf.SETS["access"]
+    assert rf.out_file(Path("tests/fixtures/ap2"), "access") == Path("tests/fixtures/ap2/access.json")
+
+
 LTE_LIST = "ls /dev/ttyUSB* /dev/cdc-wdm*"
 
 
