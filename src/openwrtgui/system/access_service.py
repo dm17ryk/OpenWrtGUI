@@ -54,7 +54,7 @@ from openwrtgui.system.access import (
     ssh_ops,
 )
 from openwrtgui.system.commands import OWNER
-from openwrtgui.system.leds import LedInfo, LedRow, parse_led_sections, parse_leds
+from openwrtgui.system.leds import LedChange, LedInfo, LedRow, led_ops, parse_led_sections, parse_leds
 from openwrtgui.system.mounts import Mount, Usage, parse_df, parse_mounts
 from openwrtgui.system.sshkeys import (
     FINGERPRINT,
@@ -449,6 +449,61 @@ class AccessService:
                     ),
                     await self._still_logs_in(rec),
                 ]
+
+            return Planned(plan, verify)
+
+        return await self._runner.run_planned(rec, make, digest)
+
+    # ---------------------------------------------------------------- LEDs (D9)
+    async def _leds_plan(
+        self, rec: RouterRecord, t: Transport, change: LedChange
+    ) -> tuple[NetPlan, dict[str, str]]:
+        leds = await t.run(s.LEDS)
+        if not leds.ok:
+            raise ValueError(f"{rec.name} does not list its LEDs (LuCI's rpcd plugin is missing)")
+        text = await self._stdout(t, s.UCI_SYSTEM)
+        devices = (await self._stdout(t, s.NET_DEVICES)).split()
+        ops = led_ops(
+            parse_led_sections(text), change, parse_leds(leds.stdout), devices, router_name=rec.name
+        )
+        current = parse_uci_show(text)
+        plan = net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config="system",
+            ops=ops,
+            current=current,
+            reloads=[s.init("led", "restart")],
+        )
+        return plan, current
+
+    async def plan_leds(self, router_id: str, change: LedChange) -> NetPlan:
+        rec, t = await self._transport(router_id)
+        return (await self._leds_plan(rec, t, change))[0]
+
+    async def _active(self, t: Transport, rows: list[LedRow]) -> list[NetCheck]:
+        """`LED <name>`: each LED's active trigger is its row's (/etc/init.d/led applied them)."""
+        checks: list[NetCheck] = []
+        for _ in range(int(LISTEN_WAIT_S)):
+            active = {i.sysfs: i.active for i in parse_leds(await self._stdout(t, s.LEDS) or "{}")}
+            checks = [
+                NetCheck(f"LED {r.sysfs}", active.get(r.sysfs) == r.trigger, f"trigger {active.get(r.sysfs)}")
+                for r in rows
+            ]
+            if all(c.ok for c in checks):
+                break
+            await self._sleep(1.0)
+        return checks
+
+    async def apply_leds(self, router_id: str, change: LedChange, digest: str | None) -> NetApplyResult:
+        rec = self._record(router_id)
+
+        async def make(t: Transport) -> Planned:
+            plan, current = await self._leds_plan(rec, t, change)
+
+            async def verify(t2: Transport) -> list[NetCheck]:
+                saved = await saved_check(t2, s.UCI_SYSTEM, plan.ops, current)
+                return [saved, *await self._active(t2, change.rows)]
 
             return Planned(plan, verify)
 

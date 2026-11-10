@@ -13,6 +13,7 @@ from openwrtgui.context import AppContext
 from openwrtgui.net.apply import NetApplyResult
 from openwrtgui.system.access import HttpChange, PasswordPolicy, SshChange
 from openwrtgui.system.access_service import AccessState, LedState, MountState
+from openwrtgui.system.leds import LedChange
 from openwrtgui.system.sshkeys import KeysChange
 
 router = APIRouter(
@@ -109,6 +110,20 @@ async def key_owner(router_id: str, body: KeyOwnerIn, ctx: Ctx) -> AccessState:
     _known(ctx, router_id)
     ctx.access.set_key_owner(body.fingerprint, body.owner)
     return await ctx.access.access(router_id)
+
+
+class LedApplyIn(LedChange):
+    digest: str
+
+
+@router.post("/leds/preview")
+async def leds_preview(router_id: str, body: LedChange, ctx: Ctx) -> NetPlanOut:
+    return NetPlanOut.of(await ctx.access.plan_leds(_known(ctx, router_id), body))
+
+
+@router.post("/leds/apply")
+async def leds_apply(router_id: str, body: LedApplyIn, ctx: Ctx) -> NetApplyResult:
+    return await ctx.access.apply_leds(_known(ctx, router_id), LedChange(rows=body.rows), body.digest)
 
 
 class HttpApplyIn(HttpChange):
