@@ -11,7 +11,7 @@ from openwrtgui.api.deps import get_ctx, require_token
 from openwrtgui.api.net_api import Digest, NetPlanOut
 from openwrtgui.context import AppContext
 from openwrtgui.net.apply import NetApplyResult
-from openwrtgui.system.access import PasswordPolicy
+from openwrtgui.system.access import PasswordPolicy, SshChange
 from openwrtgui.system.access_service import AccessState, LedState, MountState
 
 router = APIRouter(
@@ -80,3 +80,18 @@ async def policy_preview(router_id: str, body: PolicyIn, ctx: Ctx) -> NetPlanOut
 @router.post("/password-policy/apply")
 async def policy_apply(router_id: str, body: PolicyApplyIn, ctx: Ctx) -> NetApplyResult:
     return await ctx.access.apply_policy(_known(ctx, router_id), body.to_domain(), body.digest)
+
+
+class SshApplyIn(SshChange):
+    digest: str
+
+
+@router.post("/ssh/preview")
+async def ssh_preview(router_id: str, body: SshChange, ctx: Ctx) -> NetPlanOut:
+    return NetPlanOut.of(await ctx.access.plan_ssh(_known(ctx, router_id), body))
+
+
+@router.post("/ssh/apply")
+async def ssh_apply(router_id: str, body: SshApplyIn, ctx: Ctx) -> NetApplyResult:
+    change = SshChange(instances=body.instances, remove=body.remove)
+    return await ctx.access.apply_ssh(_known(ctx, router_id), change, body.digest)

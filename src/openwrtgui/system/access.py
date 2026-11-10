@@ -76,13 +76,16 @@ def flag(value: str | None, default: bool) -> bool:
     return default
 
 
-def _sections(shown: dict[str, str], kind: str) -> list[str]:
+def _sections(shown: Mapping[str, str], kind: str) -> list[str]:
     return [path for path, value in shown.items() if path.count(".") == 1 and value == kind]
 
 
 def parse_dropbear(show_text: str) -> list[SshInstance]:
     """Every `dropbear` section of `uci -X show dropbear`, with LuCI's defaults where an option is absent."""
-    shown = parse_uci_show(show_text)
+    return dropbear_instances(parse_uci_show(show_text))
+
+
+def dropbear_instances(shown: Mapping[str, str]) -> list[SshInstance]:
     out: list[SshInstance] = []
     for path in _sections(shown, "dropbear"):
         name = path.split(".", 1)[1]
@@ -104,6 +107,136 @@ def parse_dropbear(show_text: str) -> list[SshInstance]:
             )
         )
     return out
+
+
+class SshInstanceIn(BaseModel):
+    """One dropbear instance as the screen sends it: section None is a new one."""
+
+    model_config = ConfigDict(frozen=True)
+
+    section: str | None
+    enable: bool
+    interface: str
+    port: int
+    password_auth: bool
+    root_password_auth: bool
+    gateway_ports: bool
+
+
+class SshChange(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    instances: list[SshInstanceIn]
+    remove: tuple[str, ...] = ()
+
+
+_SSH_FLAGS = (
+    ("password_auth", "PasswordAuth"),
+    ("root_password_auth", "RootPasswordAuth"),
+    ("gateway_ports", "GatewayPorts"),
+)
+
+
+def _flag_value(current: str | None, on: bool, *, onoff: bool) -> str:
+    """A flag in the style its option already has (AP2: PasswordAuth 'on', enable '1')."""
+    style = current.strip().lower() in ("on", "off") if current is not None else onoff
+    if style:
+        return "on" if on else "off"
+    return "1" if on else "0"
+
+
+def _app_checks(item: SshInstanceIn, app: SshInstance, router: str, app_interface: str | None) -> None:
+    where = f"{app.section} (port {app.port})"
+    if not item.enable:
+        raise ValueError(f"The app connects to {router} through {where}: it cannot be turned off here")
+    if item.interface not in ("", app_interface):
+        raise ValueError(
+            f"The app reaches {router} through {app_interface}: {app.section} must listen there or on every "
+            "interface"
+        )
+
+
+def _conflicts(instances: list[SshInstance]) -> None:
+    for port in {i.port for i in instances if i.enable}:
+        on = [i.interface for i in instances if i.enable and i.port == port]
+        if len(on) > 1 and ("" in on or len(set(on)) < len(on)):
+            raise ValueError(f"Two SSH instances would listen on port {port}")
+
+
+def ssh_ops(
+    current: Mapping[str, str],
+    change: SshChange,
+    *,
+    app_instance: str | None,
+    app_interface: str | None,
+    interfaces: set[str],
+    router_name: str,
+) -> tuple[list[UciOp], list[int]]:
+    """The uci ops for a dropbear change, and the ports the enabled instances listen on afterwards. The
+    app's own instance is never turned off, removed or moved off the app's interface (spec 6, own path)."""
+    from openwrtgui.system.commands import IFACE_NAME
+
+    existing = {i.section: i for i in dropbear_instances(current)}
+    for name in change.remove:
+        if name not in existing:
+            raise ValueError(f"No SSH instance {name} on {router_name}")
+        if name == app_instance:
+            where = f"{name} (port {existing[name].port})"
+            raise ValueError(f"The app connects to {router_name} through {where}: it cannot be removed here")
+    final = {name: i for name, i in existing.items() if name not in change.remove}
+    ops: list[UciOp] = []
+    for n, item in enumerate(change.instances, start=1):
+        if not 1 <= item.port <= 65535:
+            raise ValueError("An SSH port is 1-65535")
+        if item.section is not None and item.section not in existing:
+            raise ValueError(f"No SSH instance {item.section} on {router_name}")
+        if item.section is not None and item.section == app_instance:
+            _app_checks(item, existing[item.section], router_name, app_interface)
+        if item.interface and (not IFACE_NAME.fullmatch(item.interface) or item.interface not in interfaces):
+            raise ValueError(f"No interface {item.interface} on {router_name}")
+        values = item.model_dump(exclude={"section"})
+        if item.section is None:
+            base = f"dropbear.$ssh{n}"
+            ops += [
+                UciOp("add", base, "dropbear"),
+                UciOp("set", f"{base}.enable", "1" if item.enable else "0"),
+            ]
+            ops.append(UciOp("set", f"{base}.Port", str(item.port)))
+            if item.interface:
+                ops.append(UciOp("set", f"{base}.Interface", item.interface))
+            ops += [
+                UciOp("set", f"{base}.{opt}", _flag_value(None, getattr(item, attr), onoff=True))
+                for attr, opt in _SSH_FLAGS
+            ]
+            final[base] = SshInstance(section=base, direct_interface="", **values)
+            continue
+        base, old = f"dropbear.{item.section}", existing[item.section]
+        if item.enable != old.enable:
+            ops.append(
+                UciOp(
+                    "set",
+                    f"{base}.enable",
+                    _flag_value(current.get(f"{base}.enable"), item.enable, onoff=False),
+                )
+            )
+        if item.port != old.port:
+            ops.append(UciOp("set", f"{base}.Port", str(item.port)))
+        if item.interface != old.interface:
+            ops.append(
+                UciOp("set", f"{base}.Interface", item.interface)
+                if item.interface
+                else UciOp("delete", f"{base}.Interface")
+            )
+        for attr, opt in _SSH_FLAGS:
+            if getattr(item, attr) != getattr(old, attr):
+                value = _flag_value(current.get(f"{base}.{opt}"), getattr(item, attr), onoff=True)
+                ops.append(UciOp("set", f"{base}.{opt}", value))
+        final[item.section] = SshInstance(
+            section=item.section, direct_interface=old.direct_interface, **values
+        )
+    ops += [UciOp("delete", f"dropbear.{name}") for name in change.remove]
+    _conflicts(list(final.values()))
+    return ops, sorted({i.port for i in final.values() if i.enable})
 
 
 def _list(value: str | None) -> tuple[str, ...]:

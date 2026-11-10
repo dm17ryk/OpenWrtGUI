@@ -3,8 +3,10 @@ apart from SystemService so that file stays small. Every read is its own exec; a
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Literal
 
@@ -15,12 +17,15 @@ from openwrtgui.guard.audit import AuditLog, mask
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.guard.writes import run_audited
 from openwrtgui.net.apply import (
+    ROLLBACK_S,
     ApplyRunner,
     NetApplyResult,
     NetCheck,
     NetPlan,
     Planned,
+    Snapshot,
     net_plan,
+    rollback_warning,
     saved_check,
 )
 from openwrtgui.net.commands import INTERFACE_DUMP
@@ -34,13 +39,16 @@ from openwrtgui.system.access import (
     HttpState,
     PasswordPolicy,
     RepoKey,
+    SshChange,
     SshInstance,
     check_password,
+    dropbear_instances,
     parse_dropbear,
     parse_listeners,
     parse_policy,
     parse_uhttpd,
     policy_ops,
+    ssh_ops,
 )
 from openwrtgui.system.leds import LedInfo, LedRow, parse_led_sections, parse_leds
 from openwrtgui.system.mounts import Mount, Usage, parse_df, parse_mounts
@@ -53,6 +61,7 @@ from openwrtgui.wifi.service import PreviewChanged
 log = logging.getLogger(__name__)
 
 SCREEN = "System"
+LISTEN_WAIT_S = 10.0  # procd restarts dropbear a few seconds after rpcd's apply
 
 
 class SshKeyRow(BaseModel):
@@ -139,7 +148,9 @@ class AccessService:
         runner: ApplyRunner,
         settings: SettingsStore,
         app_key: AppKey,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
+        self._sleep = sleep
         self._pool = pool
         self._routers = routers
         self._guard = guard
@@ -170,17 +181,22 @@ class AccessService:
     def known_keys(self) -> dict[str, str]:
         return {k.fingerprint: k.owner for k in self._settings.load().known_keys}
 
-    async def _app_interface(self, t: Transport, host: str, missing: list[str]) -> str | None:
+    async def _interfaces(self, t: Transport, host: str, missing: list[str]) -> tuple[str | None, set[str]]:
+        """The interface holding the address the app uses, and every interface's name."""
         dump = await t.run(INTERFACE_DUMP)
         if not dump.ok:
             missing.append("interfaces")
-            return None
+            return None, set()
         try:
             live = parse_interface_dump(json.loads(dump.stdout))
         except ValueError:
             missing.append("interfaces")
-            return None
-        return next((i.name for i in live if any(a.ip == host for a in i.ipv4)), None)
+            return None, set()
+        mine = next((i.name for i in live if any(a.ip == host for a in i.ipv4)), None)
+        return mine, {i.name for i in live}
+
+    async def _app_interface(self, t: Transport, host: str, missing: list[str]) -> str | None:
+        return (await self._interfaces(t, host, missing))[0]
 
     def key_rows(self, rec: RouterRecord, text: str) -> list[SshKeyRow]:
         app, known = self.app_fingerprints(rec), self.known_keys()
@@ -323,6 +339,89 @@ class AccessService:
     async def _stdout(self, t: Transport, command: str) -> str:
         result = await t.run(command)
         return result.stdout if result.ok else ""
+
+    # ---------------------------------------------------------------- SSH access (D4)
+    async def _ssh_plan(
+        self, rec: RouterRecord, t: Transport, change: SshChange
+    ) -> tuple[NetPlan, dict[str, str], list[int]]:
+        current = parse_uci_show(await self._stdout(t, s.UCI_DROPBEAR))
+        existing = dropbear_instances(current)
+        interface, names = await self._interfaces(t, rec.host, [])
+        mine = app_instance(existing, rec.port, interface)
+        ops, ports = ssh_ops(
+            current,
+            change,
+            app_instance=mine.section if mine else None,
+            app_interface=interface,
+            interfaces=names,
+            router_name=rec.name,
+        )
+        new_port = next(
+            (i.port for i in change.instances if mine and i.section == mine.section and i.port != mine.port),
+            None,
+        )
+        where = f"{rec.host} port {new_port}" if new_port else rec.host
+        warnings = [rollback_warning(rec.name, where, "SSH settings")]
+        if new_port:
+            warnings.append(
+                f"The app follows {rec.name} to port {new_port}. The firewall must let port {new_port} in "
+                f"from {interface or 'the network this PC is on'}; without a confirm from port {new_port} "
+                f"within {ROLLBACK_S} s the router puts its SSH settings back."
+            )
+        old = {i.section: i for i in existing}
+        if any(
+            i.section in old
+            and (
+                (old[i.section].password_auth and not i.password_auth)
+                or (old[i.section].root_password_auth and not i.root_password_auth)
+            )
+            for i in change.instances
+            if i.section is not None
+        ):
+            warnings.append(f"Scripts that log in to {rec.name} with a password lose SSH access.")
+        plan = net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config="dropbear",
+            ops=ops,
+            current=current,
+            rollback=True,
+            target_port=new_port,
+            warnings=warnings,
+        )
+        return plan, current, ports
+
+    async def plan_ssh(self, router_id: str, change: SshChange) -> NetPlan:
+        rec, t = await self._transport(router_id)
+        return (await self._ssh_plan(rec, t, change))[0]
+
+    async def _listening(self, t: Transport, ports: list[int]) -> NetCheck:
+        """`listening`: dropbear answers on each enabled instance's port (procd reloads it after apply)."""
+        missing = set(ports)
+        for _ in range(int(LISTEN_WAIT_S)):
+            listening = parse_listeners(await self._stdout(t, s.LISTENERS))
+            missing = set(ports) - {port for _, port in listening}
+            if not missing:
+                return NetCheck("listening", True, "SSH listens on port " + ", ".join(map(str, ports)))
+            await self._sleep(1.0)
+        return NetCheck("listening", False, "nothing listens on port " + ", ".join(map(str, sorted(missing))))
+
+    async def apply_ssh(self, router_id: str, change: SshChange, digest: str | None) -> NetApplyResult:
+        """With the rpcd rollback: confirmed only from a new connection (on the new port when it moved)."""
+        rec = self._record(router_id)
+
+        async def make(t: Transport) -> Planned:
+            plan, current, ports = await self._ssh_plan(rec, t, change)
+
+            async def verify(t2: Transport) -> list[NetCheck]:
+                return [
+                    await saved_check(t2, s.UCI_DROPBEAR, plan.ops, current),
+                    await self._listening(t2, ports),
+                ]
+
+            return Planned(plan, verify, Snapshot(s.UCI_DROPBEAR, current))
+
+        return await self._runner.run_planned(rec, make, digest)
 
     async def leds(self, router_id: str) -> LedState:
         _rec, t = await self._transport(router_id)
