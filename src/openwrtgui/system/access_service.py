@@ -37,6 +37,7 @@ from openwrtgui.store.routers import RouterRecord, RouterStore, router_key_paths
 from openwrtgui.store.settings import KnownKey, SettingsStore
 from openwrtgui.system import commands as s
 from openwrtgui.system.access import (
+    HttpChange,
     HttpState,
     PasswordPolicy,
     RepoKey,
@@ -44,6 +45,7 @@ from openwrtgui.system.access import (
     SshInstance,
     check_password,
     dropbear_instances,
+    http_ops,
     parse_dropbear,
     parse_listeners,
     parse_policy,
@@ -447,6 +449,69 @@ class AccessService:
                     ),
                     await self._still_logs_in(rec),
                 ]
+
+            return Planned(plan, verify)
+
+        return await self._runner.run_planned(rec, make, digest)
+
+    # ---------------------------------------------------------------- HTTP(S) access (D6)
+    async def _http_plan(
+        self, rec: RouterRecord, t: Transport, change: HttpChange
+    ) -> tuple[NetPlan, dict[str, str], HttpState]:
+        text = await self._stdout(t, s.UCI_UHTTPD)
+        current, http = parse_uci_show(text), parse_uhttpd(text)
+        listening = parse_listeners(await self._stdout(t, s.LISTENERS))
+        served = bool(https_ports(http) & {port for _, port in listening})
+        ops = http_ops(http, change, https_served=served, router_name=rec.name)
+        warnings = [f"uhttpd restarts: LuCI on {rec.name} is away for a second, in browsers and in this app."]
+        if change.luci_on_network is False:
+            warnings.append(
+                f"LuCI is no longer reachable from the network at {rec.name}'s addresses. LuCI pages in this "
+                "app keep working: they come in through the app's SSH connection."
+            )
+        if change.redirect_https:
+            warnings.append(
+                f"Browsers that open http://{rec.host} are sent to https://{rec.host}. LuCI pages in this "
+                "app follow."
+            )
+        plan = net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config="uhttpd",
+            ops=ops,
+            current=current,
+            reloads=[s.init("uhttpd", "restart")],
+            warnings=warnings,
+        )
+        return plan, current, parse_uhttpd(text)
+
+    async def plan_http(self, router_id: str, change: HttpChange) -> NetPlan:
+        rec, t = await self._transport(router_id)
+        return (await self._http_plan(rec, t, change))[0]
+
+    async def _web_check(self, t: Transport, on_network: bool | None) -> NetCheck:
+        """`listening`: uhttpd listens where the switch says, loopback kept; polled while it restarts."""
+        detail = "uhttpd does not listen on 127.0.0.1:80"
+        for _ in range(int(LISTEN_WAIT_S)):
+            web = {a for a, port in parse_listeners(await self._stdout(t, s.LISTENERS)) if port == 80}
+            loop = "127.0.0.1" in web or "0.0.0.0" in web
+            outside = bool(web - {"127.0.0.1", "::1"})
+            if loop and (on_network is None or outside == on_network):
+                where = "every address" if outside else "loopback only"
+                return NetCheck("listening", True, f"uhttpd listens on {where}")
+            detail = f"uhttpd listens on {', '.join(sorted(web)) or 'nothing'}"
+            await self._sleep(1.0)
+        return NetCheck("listening", False, detail)
+
+    async def apply_http(self, router_id: str, change: HttpChange, digest: str | None) -> NetApplyResult:
+        rec = self._record(router_id)
+
+        async def make(t: Transport) -> Planned:
+            plan, current, _http = await self._http_plan(rec, t, change)
+
+            async def verify(t2: Transport) -> list[NetCheck]:
+                saved = await saved_check(t2, s.UCI_UHTTPD, plan.ops, current)
+                return [saved, await self._web_check(t2, change.luci_on_network)]
 
             return Planned(plan, verify)
 

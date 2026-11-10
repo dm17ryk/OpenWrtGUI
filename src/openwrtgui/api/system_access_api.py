@@ -11,7 +11,7 @@ from openwrtgui.api.deps import get_ctx, require_token
 from openwrtgui.api.net_api import Digest, NetPlanOut
 from openwrtgui.context import AppContext
 from openwrtgui.net.apply import NetApplyResult
-from openwrtgui.system.access import PasswordPolicy, SshChange
+from openwrtgui.system.access import HttpChange, PasswordPolicy, SshChange
 from openwrtgui.system.access_service import AccessState, LedState, MountState
 from openwrtgui.system.sshkeys import KeysChange
 
@@ -109,6 +109,21 @@ async def key_owner(router_id: str, body: KeyOwnerIn, ctx: Ctx) -> AccessState:
     _known(ctx, router_id)
     ctx.access.set_key_owner(body.fingerprint, body.owner)
     return await ctx.access.access(router_id)
+
+
+class HttpApplyIn(HttpChange):
+    digest: str
+
+
+@router.post("/http/preview")
+async def http_preview(router_id: str, body: HttpChange, ctx: Ctx) -> NetPlanOut:
+    return NetPlanOut.of(await ctx.access.plan_http(_known(ctx, router_id), body))
+
+
+@router.post("/http/apply")
+async def http_apply(router_id: str, body: HttpApplyIn, ctx: Ctx) -> NetApplyResult:
+    change = HttpChange(redirect_https=body.redirect_https, luci_on_network=body.luci_on_network)
+    return await ctx.access.apply_http(_known(ctx, router_id), change, body.digest)
 
 
 class SshApplyIn(SshChange):

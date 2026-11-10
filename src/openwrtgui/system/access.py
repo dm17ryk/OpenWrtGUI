@@ -262,6 +262,42 @@ def parse_uhttpd(show_text: str) -> HttpState:
     )
 
 
+class HttpChange(BaseModel):
+    """None leaves a switch as it is."""
+
+    model_config = ConfigDict(frozen=True)
+
+    redirect_https: bool | None = None
+    luci_on_network: bool | None = None
+
+
+def _replace_list(path: str, now: tuple[str, ...], wanted: tuple[str, ...]) -> list[UciOp]:
+    if set(now) == set(wanted):
+        return []
+    return [UciOp("delete", path), *(UciOp("add_list", path, item) for item in wanted)]
+
+
+def http_ops(current: HttpState, change: HttpChange, *, https_served: bool, router_name: str) -> list[UciOp]:
+    """uhttpd's two switches (D6). LuCI off the network keeps loopback: the app's LuCI pages need it."""
+    ops: list[UciOp] = []
+    if change.luci_on_network is not None:
+        http, https = (
+            (LISTEN_ALL_HTTP, LISTEN_ALL_HTTPS)
+            if change.luci_on_network
+            else (LISTEN_LOOP_HTTP, LISTEN_LOOP_HTTPS)
+        )
+        ops += _replace_list("uhttpd.main.listen_http", current.listen_http, http)
+        ops += _replace_list("uhttpd.main.listen_https", current.listen_https, https)
+    if change.redirect_https is not None:
+        if change.redirect_https and not current.redirect_https and not https_served:
+            raise ValueError(
+                f"{router_name} serves no HTTPS (nothing listens on its HTTPS port): turning the redirect on "
+                "would leave LuCI unreachable"
+            )
+        ops.append(UciOp("set", "uhttpd.main.redirect_https", "1" if change.redirect_https else "0"))
+    return ops
+
+
 def _address(hex_address: str) -> str:
     raw = bytes.fromhex(hex_address)
     if len(raw) == 4:

@@ -204,7 +204,11 @@ class LuciBridgeService:
         try:
             upstream = await self._upstream_factory(rec, t)
             proxy = BridgeProxy(
-                upstream_port=upstream.port, secret=secret, sid=sid, on_use=lambda: self._touch(bridge_id)
+                upstream_port=upstream.port,
+                secret=secret,
+                sid=sid,
+                on_use=lambda: self._touch(bridge_id),
+                scheme=upstream.scheme,
             )
             port = await proxy.start()
         except BaseException:  # leave nothing behind: no session, no SSH forward, no listener
