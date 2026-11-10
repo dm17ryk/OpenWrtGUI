@@ -17,6 +17,7 @@ from openwrtgui.system.backup import BackupFile
 from openwrtgui.system.commands import ServiceAction
 from openwrtgui.system.cron import CronState
 from openwrtgui.system.reboot import RebootBusy, RebootJob
+from openwrtgui.system.restore import RestoreCheck
 from openwrtgui.system.service import Connections, DiagResult, DiagTool, KeptFiles, TimeZones
 from openwrtgui.system.services import SystemServiceRow
 from openwrtgui.system.settings import LogProto, SystemSettings
@@ -182,6 +183,40 @@ async def reboot_preview(router_id: str, ctx: Ctx) -> NetPlanOut:
 async def reboot_start(router_id: str, body: Digest, ctx: Ctx) -> RebootJob:
     try:
         return await ctx.system.start_reboot(_known(ctx, router_id), body.digest)
+    except RebootBusy as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+class RestoreIn(BaseModel):
+    name: str = Field(max_length=128)
+
+
+class RestoreStartIn(RestoreIn, Digest):
+    pass
+
+
+@router.post("/restore/check")
+async def restore_check(router_id: str, body: RestoreIn, ctx: Ctx) -> RestoreCheck:
+    try:
+        return await ctx.system.check_restore(_known(ctx, router_id), body.name)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/restore/preview")
+async def restore_preview(router_id: str, body: RestoreIn, ctx: Ctx) -> NetPlanOut:
+    try:
+        return NetPlanOut.of(await ctx.system.plan_restore(_known(ctx, router_id), body.name))
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/restore/start")
+async def restore_start(router_id: str, body: RestoreStartIn, ctx: Ctx) -> RebootJob:
+    try:
+        return await ctx.system.start_restore(_known(ctx, router_id), body.name, body.digest)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except RebootBusy as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 

@@ -11,7 +11,9 @@ from pydantic import BaseModel, ConfigDict
 
 from openwrtgui.timer import arm_command
 
-RebootPhase = Literal["armed", "waiting", "back", "not back"]
+# reset and not reset are a reset to defaults' (v0.6c D12): it ends when the router is gone, or is not
+RebootPhase = Literal["armed", "waiting", "back", "not back", "reset", "not reset"]
+JobKind = Literal["reboot", "restore", "reset"]
 TIMER = "reboot"
 ARM_S = 2
 LIMIT_S = 300.0  # D8: a router that is not back by then needs a person
@@ -28,6 +30,7 @@ class RebootJob(BaseModel):
     router_id: str
     phase: RebootPhase
     started_at: datetime
+    kind: JobKind = "reboot"  # one job per router, whatever its kind (409)
     uptime_s: float | None = None  # once back: the fresh uptime that proves the reboot
     detail: str | None = None
     error: str | None = None

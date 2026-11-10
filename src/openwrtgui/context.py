@@ -283,6 +283,25 @@ def build_context(
         net=net,
     )
     lte = LteService(pool=pool, routers=routers, guard=guard, audit=audit, net=net)
+    access = AccessService(
+        pool=pool,
+        routers=routers,
+        guard=guard,
+        audit=audit,
+        runner=runner,
+        settings=settings,
+        app_key=app_key,
+    )
+    system = SystemService(
+        pool=pool,
+        routers=routers,
+        guard=guard,
+        audit=audit,
+        runner=runner,
+        data=data,
+        host_keys=host_keys,
+        app_keys=access.app_fingerprints,
+    )
     return AppContext(
         data=data,
         settings=settings,
@@ -312,17 +331,9 @@ def build_context(
         flash=flash,
         lte=lte,
         lte_live=LteHub(pool=pool, routers=routers, locate=lte.modem_device),
-        system=SystemService(pool=pool, routers=routers, guard=guard, audit=audit, runner=runner, data=data),
+        system=system,
         system_live=SystemHub(pool=pool, routers=routers),
-        access=AccessService(
-            pool=pool,
-            routers=routers,
-            guard=guard,
-            audit=audit,
-            runner=runner,
-            settings=settings,
-            app_key=app_key,
-        ),
+        access=access,
         token=token,
         port=port,
         mode="simulator" if simulator is not None else "real",

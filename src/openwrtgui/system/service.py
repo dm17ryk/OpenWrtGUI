@@ -3,19 +3,20 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import re
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Collection, Coroutine
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
-from openwrtgui.guard.writes import run_audited
+from openwrtgui.guard.writes import run_audited, run_audited_upload
 from openwrtgui.net.apply import (
     NOTHING,
     ApplyRunner,
@@ -29,7 +30,7 @@ from openwrtgui.net.apply import (
 from openwrtgui.paths import DataDir
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.system import commands as s
-from openwrtgui.system.archive import read_archive
+from openwrtgui.system.archive import ArchiveInfo, read_archive, restore_refusals
 from openwrtgui.system.backup import (
     BackupFile,
     backup_dir,
@@ -52,11 +53,20 @@ from openwrtgui.system.parse import (
 from openwrtgui.system.reboot import (
     EVERY_S,
     LIMIT_S,
+    JobKind,
     RebootBusy,
     RebootJob,
     not_back,
     reboot_command,
     reboot_warnings,
+)
+from openwrtgui.system.restore import (
+    RestoreCheck,
+    differing,
+    listed_ok,
+    provable,
+    restore_lines,
+    restore_warnings,
 )
 from openwrtgui.system.services import (
     SETTLE_S,
@@ -69,9 +79,10 @@ from openwrtgui.system.services import (
 )
 from openwrtgui.system.settings import SystemSettings, current_settings, settings_ops
 from openwrtgui.system.state import LogEntry, LogKind, ProcessList, SystemOverview, log_entries, read_overview
-from openwrtgui.transport.base import Transport
+from openwrtgui.transport.base import Transport, TransportError
 from openwrtgui.transport.comeback import Back, wait_for_reboot
 from openwrtgui.transport.pool import ConnectionPool
+from openwrtgui.transport.ssh import HostKeyStore
 from openwrtgui.uci import parse_uci_show
 from openwrtgui.wifi.service import PreviewChanged
 
@@ -147,7 +158,11 @@ class SystemService:
         clock: Callable[[], datetime] = datetime.now,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         monotonic: Callable[[], float] = time.monotonic,
+        host_keys: HostKeyStore | None = None,
+        app_keys: Callable[[RouterRecord], Collection[str]] = lambda rec: (),
     ) -> None:
+        self._host_keys = host_keys  # a restore checks the archive's host key against the pinned one
+        self._app_keys = app_keys  # the keys this app logs in with: a restore must keep one
         self._pool = pool
         self._routers = routers
         self._guard = guard
@@ -451,38 +466,67 @@ class SystemService:
         job = self._reboots.get(router_id)
         return job is not None and job.phase in ("armed", "waiting")
 
-    async def start_reboot(self, router_id: str, digest: str) -> RebootJob:
-        """Arm the timer (audited, under the write lock), then wait for the router in the background."""
-        rec = self._record(router_id)
-        if self.rebooting(rec.id):
-            raise RebootBusy(f"{rec.name} is already rebooting")
+    async def _run(self, t: Transport, rec: RouterRecord, command: str, what: str) -> None:
+        """One audited step of a job; a refusal is a ValueError naming the step."""
+        done = await run_audited(
+            t, command, router_id=rec.id, screen=SCREEN, guard=self._guard, audit=self._audit
+        )
+        if not done.ok:
+            reason = (done.stderr or done.stdout).strip() or f"exit {done.exit_status}"
+            raise ValueError(f"{rec.name} {what}: {reason}")
+
+    async def _start(
+        self,
+        rec: RouterRecord,
+        kind: JobKind,
+        plan: NetPlan,
+        digest: str,
+        steps: Callable[[Transport], Awaitable[None]],
+        wait: Callable[[RouterRecord, float], Coroutine[Any, Any, None]],
+    ) -> RebootJob:
+        """One job per router, whatever its kind: the check is under the write lock, so two starts at once
+        never both arm (v0.6b minor). The steps run audited; the wait runs in the background."""
+        busy = RebootBusy(f"{rec.name} is already rebooting")
+        if self.rebooting(rec.id):  # at once: a running job holds the pool, so get() would wait for its end
+            raise busy
         self._guard.require_clear()
-        plan = await self.plan_reboot(rec.id)
         if plan.digest != digest:
             raise PreviewChanged(rec.name)
         t = await self._pool.get(rec)
         async with self._pool.write_lock(rec.id):
-            armed = await run_audited(
-                t, plan.lines[0], router_id=rec.id, screen=SCREEN, guard=self._guard, audit=self._audit
-            )
-        if not armed.ok:
-            reason = (armed.stderr or armed.stdout).strip() or f"exit {armed.exit_status}"
-            raise ValueError(f"{rec.name} did not arm the reboot: {reason}")
-        armed_at = self._monotonic()
-        job = RebootJob(router_id=rec.id, phase="armed", started_at=self._clock())
-        self._reboots[rec.id] = job
-        task = asyncio.create_task(self._come_back(rec, armed_at))
+            if self.rebooting(rec.id):  # again under the lock: two starts at once never both arm
+                raise busy
+            await steps(t)
+            armed_at = self._monotonic()
+            job = RebootJob(router_id=rec.id, kind=kind, phase="armed", started_at=self._clock())
+            self._reboots[rec.id] = job
+        task = asyncio.create_task(wait(rec, armed_at))
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
         return job
 
+    async def start_reboot(self, router_id: str, digest: str) -> RebootJob:
+        """Arm the timer (audited, under the write lock), then wait for the router in the background."""
+        rec = self._record(router_id)
+        plan = await self.plan_reboot(rec.id)
+
+        async def arm(t: Transport) -> None:
+            await self._run(t, rec, plan.lines[0], "did not arm the reboot")
+
+        return await self._start(rec, "reboot", plan, digest, arm, self._come_back)
+
     def _update_reboot(self, router_id: str, **fields: object) -> None:
         self._reboots[router_id] = self._reboots[router_id].model_copy(update=fields)
 
-    async def _come_back(self, rec: RouterRecord, armed_at: float) -> None:
+    async def _come_back(
+        self,
+        rec: RouterRecord,
+        armed_at: float,
+        prove: Callable[[Transport, float], Awaitable[list[str]]] | None = None,
+    ) -> None:
         self._update_reboot(rec.id, phase="waiting")
         try:
-            back: Back[None] | None = await wait_for_reboot(
+            back: Back[list[str]] | None = await wait_for_reboot(
                 self._pool,
                 rec,
                 armed_at=armed_at,
@@ -490,6 +534,7 @@ class SystemService:
                 sleep=self._sleep,
                 every_s=self.every_s,
                 limit_s=self.reboot_limit_s,
+                prove=prove,
             )
         except Exception as exc:  # the job must end in a phase the screen shows, whatever broke
             log.exception("reboot of %s: the come-back wait failed", rec.id)
@@ -498,12 +543,103 @@ class SystemService:
         if back is None:
             self._update_reboot(rec.id, phase="not back", error=not_back(rec.name, self.reboot_limit_s))
             return
-        self._update_reboot(
-            rec.id,
-            phase="back",
-            uptime_s=back.uptime_s,
-            detail=f"{rec.name} is back after {back.elapsed_s:.0f} s (uptime {back.uptime_s:.0f} s)",
+        detail = f"{rec.name} is back after {back.elapsed_s:.0f} s (uptime {back.uptime_s:.0f} s)"
+        error = None
+        if prove is not None:
+            if back.proof:
+                error = "These files differ from the backup: " + ", ".join(back.proof)
+            else:
+                detail += "; every restored file matches the backup"
+        self._update_reboot(rec.id, phase="back", uptime_s=back.uptime_s, detail=detail, error=error)
+
+    # ---------------------------------------------------------------- restore (D11)
+    def _restore_input(self, rec: RouterRecord, name: str) -> tuple[bytes, ArchiveInfo, list[str]]:
+        data = self.backup_path(rec.id, name).read_bytes()  # LookupError: not in the router's list
+        info = read_archive(data)
+        pinned = self._host_keys.get(rec.host, rec.port) if self._host_keys is not None else None
+        refusals = restore_refusals(
+            info, router_name=rec.name, address=rec.host, pinned=pinned, app=self._app_keys(rec)
         )
+        return data, info, refusals
+
+    def _created(self, rec: RouterRecord, name: str) -> datetime:
+        return next(
+            b.created_at for b in listing(backup_dir(self._data.root, rec.id), rec.id) if b.name == name
+        )
+
+    async def check_restore(self, router_id: str, name: str) -> RestoreCheck:
+        rec = self._record(router_id)
+        data, info, refusals = self._restore_input(rec, name)
+        return RestoreCheck(
+            files=tuple(f.path for f in info.files),
+            warnings=restore_warnings(rec.name, self._created(rec, name)),
+            refusals=tuple(refusals),
+        )
+
+    def _restore_plan(self, rec: RouterRecord, name: str) -> tuple[NetPlan, bytes, ArchiveInfo]:
+        data, info, refusals = self._restore_input(rec, name)
+        if refusals:
+            raise ValueError("Not restored: " + "; ".join(refusals))
+        plan = net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config=None,
+            ops=[],
+            current={},
+            commands=restore_lines(name, data),
+            warnings=restore_warnings(rec.name, self._created(rec, name)),
+        )
+        return plan, data, info
+
+    async def plan_restore(self, router_id: str, name: str) -> NetPlan:
+        return self._restore_plan(self._record(router_id), name)[0]
+
+    async def start_restore(self, router_id: str, name: str, digest: str) -> RebootJob:
+        """Upload, list, restore, arm the reboot; then the come-back with the files proven. A step that
+        fails removes the uploaded archive (it holds the router's secrets) and starts no job."""
+        rec = self._record(router_id)
+        plan, data, info = self._restore_plan(rec, name)
+        files = provable(info)
+
+        async def steps(t: Transport) -> None:
+            sent = await run_audited_upload(
+                t,
+                s.UPLOAD_RESTORE,
+                data,
+                name=name,
+                router_id=rec.id,
+                screen=SCREEN,
+                guard=self._guard,
+                audit=self._audit,
+            )
+            if not sent.ok:
+                raise ValueError(f"The backup did not reach {rec.name}: {(sent.stderr or '').strip()}")
+            try:
+                listed = await t.run(s.LIST_RESTORE)
+                if not listed.ok or not listed_ok(listed.stdout, info):
+                    raise ValueError(f"{rec.name} does not read the backup: {(listed.stderr or '').strip()}")
+                await self._run(t, rec, s.RESTORE, "refused the restore")
+                await self._run(t, rec, reboot_command(), "restored the files but did not arm the reboot")
+            except (ValueError, TransportError):
+                with contextlib.suppress(TransportError):
+                    await run_audited(
+                        t,
+                        s.REMOVE_RESTORE,
+                        router_id=rec.id,
+                        screen=SCREEN,
+                        guard=self._guard,
+                        audit=self._audit,
+                        require_guard=False,
+                    )
+                raise
+
+        async def prove(t: Transport, uptime: float) -> list[str]:
+            return await differing(t, files)
+
+        async def wait(r: RouterRecord, armed_at: float) -> None:
+            await self._come_back(r, armed_at, prove)
+
+        return await self._start(rec, "restore", plan, digest, steps, wait)
 
     # ---------------------------------------------------------------- backup (D9)
     async def create_backup(self, router_id: str) -> BackupFile:
