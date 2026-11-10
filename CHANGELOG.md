@@ -23,6 +23,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Network and DHCP: the LTE interface's row links to the LTE screen, and **bring up at boot** (`auto`) can be
   set on any interface.
 
+### Fixed
+
+- A Wi-Fi change waits for the AP interface to come up before it sets the TX mask and checks the channel.
+  Before, it could report "not verified" while hostapd was still setting the country (#45).
+- A deauth counts as proven once hostapd lists the station as no longer associated, so a phone that joins
+  again within a second no longer leaves the deauth unproven (#45).
+- The channels a radio offers come from the kernel's list. iwinfo's flags had marked usable channels
+  restricted (#45).
+
 ## [0.5.0] - 2026-11-08
 
 Image import and Discovery.
