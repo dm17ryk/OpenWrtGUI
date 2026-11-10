@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from typing import Literal
 
 from openwrtgui.uci import shell_quote
@@ -17,8 +18,22 @@ InitAction = Literal["start", "stop", "restart", "enable", "disable", "reload"]
 INIT_ACTIONS: tuple[InitAction, ...] = ("start", "stop", "restart", "enable", "disable", "reload")
 ServiceAction = Literal["start", "stop", "restart", "enable", "disable"]
 SERVICE_ACTIONS: tuple[ServiceAction, ...] = ("start", "stop", "restart", "enable", "disable")
-FilePath = Literal["/etc/rc.local", "/etc/crontabs/root"]
-FILES: tuple[FilePath, ...] = ("/etc/rc.local", "/etc/crontabs/root")
+FilePath = Literal[
+    "/etc/rc.local", "/etc/crontabs/root", "/etc/dropbear/authorized_keys", "/etc/sysupgrade.conf"
+]
+FILES: tuple[FilePath, ...] = (
+    "/etc/rc.local",
+    "/etc/crontabs/root",
+    "/etc/dropbear/authorized_keys",
+    "/etc/sysupgrade.conf",
+)
+# v0.6c rules
+IFACE_NAME = re.compile(r"[A-Za-z0-9_]{1,15}")
+LED_NAME = re.compile(r"[A-Za-z0-9 _.:-]{1,32}")
+HEX_MASK = re.compile(r"0[xX][0-9a-fA-F]{1,8}")
+KEPT_PATH = re.compile(r"/[^\s'\"\\]{0,255}")
+OWNER = re.compile(r"[A-Za-z0-9 ._-]{1,40}")
+_DIGEST_PATH = re.compile(r"/[A-Za-z0-9._/@+-]{1,255}")
 MAX_FILE = 8 * 1024
 DIAG_LIMIT_S = 25  # D4: a diagnostic never runs longer, whatever the network does
 
@@ -59,6 +74,14 @@ LISTENERS = "cat /proc/net/tcp /proc/net/tcp6"
 PASSWORD_DIGEST = """awk -F: '$1=="root"{print $2}' /etc/shadow | sha256sum"""
 # the digest of a lone newline: root has no password
 EMPTY_DIGEST = "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+
+# v0.6c writes
+PASSWD = "passwd root"  # the password goes twice on stdin, never into a command line (D2)
+RESTORE_FILE = "/tmp/owg/restore.tar.gz"
+UPLOAD_RESTORE = f"mkdir -p /tmp/owg && cat > {RESTORE_FILE}"
+LIST_RESTORE = f"tar -tzf {RESTORE_FILE}"
+RESTORE = f"sysupgrade --restore-backup {RESTORE_FILE}"
+REMOVE_RESTORE = f"rm -f {RESTORE_FILE}"
 
 LogLength = Literal[100, 500, 2000]
 LOG_LENGTHS: tuple[LogLength, ...] = (100, 500, 2000)
@@ -110,4 +133,25 @@ def write_file(path: FilePath, text: str) -> str:
     head = f"cat > {path}"
     if path == "/etc/crontabs/root":
         head = f"mkdir -p /etc/crontabs && {head}"
-    return heredoc(head, text.rstrip("\n"))
+    if path == AUTHORIZED_KEYS:
+        head = f"mkdir -p /etc/dropbear && {head}"
+    command = heredoc(head, text.rstrip("\n"))
+    if path == AUTHORIZED_KEYS:
+        # dropbear refuses keys others can write: the mode is set again after the write (D5)
+        first, _, rest = command.partition("\n")
+        command = f"{first} && chmod 600 {AUTHORIZED_KEYS}\n{rest}"
+    return command
+
+
+def file_digests(paths: Sequence[str]) -> str:
+    """`sha256sum` of absolute paths (a restore's proof, D11); each path matches a plain-path rule first."""
+    if not paths:
+        raise ValueError("No files to compare")
+    return "sha256sum " + " ".join(shell_quote(_checked(_DIGEST_PATH, p, "an absolute path")) for p in paths)
+
+
+def firstboot_command() -> str:
+    """Reset to defaults through the router-side timer (D12): the exec returns before the router erases."""
+    from openwrtgui.timer import arm_command
+
+    return arm_command("firstboot", 2, ["firstboot -r -y"])
