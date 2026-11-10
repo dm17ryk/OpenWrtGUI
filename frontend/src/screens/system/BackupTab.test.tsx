@@ -2,12 +2,13 @@ import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-quer
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import { apiFetch, downloadFile } from '../../api/client'
+import { apiFetch, downloadFile, postBytes } from '../../api/client'
 import type { BackupFile, RebootJob } from '../../api/types'
 import { AP2_REBOOT_PLAN } from '../../testing/system'
 import { BackupTab } from './BackupTab'
 
 const SAVED: BackupFile = { name: 'ap2-20261109-120000.tar.gz', size: 7424, created_at: '2026-11-09T12:00:00+02:00', imported: false }
+const IMPORTED: BackupFile = { name: 'ap2-20261110-090000-imported.tar.gz', size: 1235, created_at: '2026-11-10T09:00:00+02:00', imported: true }
 const JOB = { kind: 'reboot' as const, router_id: 'ap2', started_at: '2026-11-09T12:00:00', uptime_s: null, detail: null, error: null }
 let backups: BackupFile[] = []
 let jobs: Array<RebootJob | null> = [null]
@@ -19,6 +20,10 @@ vi.mock('../../api/client', async (orig) => {
   return {
     ...actual,
     downloadFile: vi.fn(async () => undefined),
+    postBytes: vi.fn(async () => {
+      backups = [IMPORTED]
+      return IMPORTED
+    }),
     apiFetch: vi.fn(async (path: string) => {
       if (path === '/api/routers/ap2/system/backups') return backups
       if (path === '/api/routers/ap2/system') {
@@ -117,4 +122,15 @@ test('refreshes the overview when a reboot is back', async () => {
   await vi.advanceTimersByTimeAsync(2100)
   expect(await screen.findByText('AP2 · office is back after 63 s (uptime 41 s)')).toBeInTheDocument()
   await waitFor(() => expect(overviewReads).toBe(2)) // the old uptime is not left on screen
+})
+
+test('a backup file from the PC is imported and listed as imported', async () => {
+  const user = userEvent.setup()
+  renderTab()
+  await screen.findByText('No backups of AP2 saved yet.')
+  await user.upload(screen.getByLabelText('Import backup…'), new File([new Uint8Array([0x1f, 0x8b])], 'ap2-old.tgz'))
+  expect(postBytes).toHaveBeenCalledWith('/api/routers/ap2/system/backups/import', expect.any(ArrayBuffer), 'ap2-old.tgz')
+  const row = within(await screen.findByRole('table', { name: 'Backups' })).getByRole('row', { name: /imported/ })
+  expect(row).toHaveTextContent('from this PC')
+  expect(screen.getByLabelText('Import backup…')).toHaveAttribute('accept', '.tar.gz,.tgz')
 })

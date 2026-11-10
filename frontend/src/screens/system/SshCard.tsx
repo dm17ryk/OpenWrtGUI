@@ -106,11 +106,13 @@ export function SshCard({ routerId, short, access }: Props) {
               const choices = isApp ? ['', ...(access.app_interface ? [access.app_interface] : [])] : ['', ...access.interfaces]
               if (!choices.includes(row.interface)) choices.push(row.interface)
               const isGone = removed.includes(row.name)
+              const direct = row.section ? old.get(row.section)?.direct_interface : ''
               return (
                 <tr key={row.name} className={isGone ? 'flag' : undefined}>
                   <td>
                     <span className="mono">{row.name}</span>
                     {isApp && <div className="muted">The app connects here</div>}
+                    {direct && <div className="muted">{`DirectInterface ${direct} (kept as it is)`}</div>}
                     {isGone && <div className="muted">removed at Apply</div>}
                   </td>
                   <td>{flag(row, 'enable', 'Enable', isApp)}</td>

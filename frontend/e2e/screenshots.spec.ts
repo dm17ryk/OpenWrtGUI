@@ -14,6 +14,7 @@ const SCREENS: ReadonlyArray<readonly [string, string, string]> = [
   ['firewall', '/routers/ap1/firewall', 'Filtering model'],
   ['faults', '/routers/ap1/faults', 'Faults and capture'],
   ['system', '/routers/ap1/system', 'Overview'],
+  ['system-access', '/routers/ap1/system?tab=access', 'Router password'],
   ['luci-page', '/routers/ap1/luci?page=admin%2Fnetwork%2Fdiagnostics', 'Changed via LuCI since you opened this page'],
   ['terminal', '/terminal/ap2', 'Command'],
   ['audit-log', '/audit', 'Audit log'],

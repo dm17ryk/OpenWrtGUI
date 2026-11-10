@@ -348,6 +348,27 @@ The wizard described in section 5.
   router-side timer and done only on a fresh uptime (300 s limit). The backup is `sysupgrade -b -` saved
   user-only in the data folder; the audit log names the file, never its content. Processes are read-only.
   Access, SSH keys, HTTP(S), LEDs, mount points, restore and reset to defaults are v0.6c.
+- *v0.6c note* (plan `docs/superpowers/plans/2026-11-10-v0.6c-system.md`, D1-D15): three new tabs (Access,
+  LEDs, Mount points) and a bigger Backup tab; LuCI's `admin/system/admin` pages and `leds` open natively,
+  `mounts` stays LuCI's. The root password goes on `passwd root`'s stdin, never in a command line, plan,
+  audit line or answer, checked first against LuCI's `rpcd.policy`; proof is a digest of root's shadow field
+  that changed, the hash never leaving the router (D2; on AP2 only with a router-side restore timer, D3).
+  Every dropbear change applies with the rpcd rollback and is confirmed from a new connection; the app's own
+  instance cannot be disabled, removed or moved off the app's interface, and a port change is followed (D4).
+  `authorized_keys` is written whole, each key labelled App, Harness (named in `Settings.known_keys`) or
+  Other; the app's key cannot be removed and a new login proves the app still gets in (D5). HTTP(S) is two
+  switches, `redirect_https` (refused while nothing serves HTTPS) and LuCI on the network or loopback only;
+  loopback always stays for the bridge, which follows the redirect over TLS (D6). Repository keys and mount
+  points are read only (D7, D8; fstab waits for block-mount). LED actions follow LuCI's trigger plugins and
+  are proven by the active trigger (D9). `/etc/sysupgrade.conf` is edited as text beside `sysupgrade -l`
+  (D10). A restore takes only a backup from the app's list (its own or an imported one, checked on the PC)
+  and is refused before anything is sent when the archive's host key is not the pinned one, it moves the
+  router off its address, or it lacks the app's key; proof is a fresh uptime and every file's sha256 (D11).
+  Reset to defaults is `firstboot -r -y` through the router-side timer, needs the router's name and an
+  "alone on this PC's network" tick, ends when the router stops answering and marks it to be added again;
+  simulator only, never on AP2 (D12). Signals, the rpcd user's password, uhttpd's other options and fstab
+  editing are not in v0.6c (D13). The seven v0.6b deferred minors are fixed test-first (D14). Two AP2
+  windows: a read-only recording and, with Dmitry's OK, the writes of O20 (D15).
 
 ### 7.12 App settings and updates (12)
 - Updates (section 9), theme (System / Light / Dark), data folder, known devices (name ↔ MACs: the panel's ETH and Wi-Fi MACs are unrelated).
@@ -478,6 +499,7 @@ Each milestone gets its own implementation plan. The first plan covers v0.1 Foun
 | O17 | Flash from the app on AP2: upload and validate in `/tmp/owg`, then a flash that keeps settings, the come-back and the revision proof, and flashing back. Flash without keeping settings is simulator-only (AP2 would return as 192.168.1.1, clashing with AP1) | Open: built and tested in the simulator (unit tests and the e2e flash of the simulated AP2); needs Dmitry's OK for an AP2 write window, the txctl session told and its run over. **2026-11-08 read-only recording on AP2** (`tests/fixtures/ap2/discovery.json`): AP2 runs exactly the bench image (its firmware partition's first 11 255 254 bytes hash to the image's, read in 13.8 s; no package added, removed or changed); `validate_firmware_image` and `sysupgrade` are there; /tmp has 27 012 kB free, but **MemAvailable is 8 148 kB** (MemFree 12 224 kB, file cache 14 508 kB), below the flash rule's image + 4 MiB (15 104 kB), so the app refuses to flash AP2 as it stands. Deciding the rule (for example counting clean file cache, or stopping services first) is the owner's call before the window |
 | O18 | LTE actions on AP2: connect, disconnect, the modem reboot (low_power, online), a settings change through the interface plan, an AT query | Done 2026-11-09 (`tests/hardware/test_ap2_lte.py`, 4/4, AP2 as found): disconnect 3.6 s, connect 14.4 s, modem reboot 25.4 s, metric 20 → 21 and back about 14 s each with the rollback confirmed, `AT+CSQ` OK. The read-only recording before it (`tests/fixtures/ap2/lte.json`) found and fixed three things: QMI's operator name is not valid UTF-8 (it closed the SSH connection; the transport now reads it as U+FFFD), the AT port is `/dev/ttyUSB1` and `/dev/ttyUSB3` never takes bytes (microcom needs `timeout -s KILL`; the image's `dwr921-at-probe` hangs there), and the BM806C drops the third of a burst of AT commands (identity reads go one each). lte_4 has no DHCP lease on AP2 (pending), so LTE shows no IPv4 address |
 | O19 | System writes on AP2: the hostname and back, a scheduled task added and removed, a service restart, a backup; the reboot and back | Done 2026-11-09 22:41-22:44 except the reboot (`tests/hardware/test_ap2_system.py`, 4/4, AP2 as found after each test: `uci -X show system`, `/etc/rc.local`, the crontab, every service's enabled and running state, the live hostname, `/tmp/TZ`, radio0 disabled; nothing on air). Hostname `OpenWrt` → `owg-test` and back in 0.3 s each, saved and live hostname proven. A `*/30` task added in 7.7 s (file read back, cron running), removed in 4.2 s. AP2 had no `/etc/crontabs/root`; removing the last task leaves an empty file (as LuCI does), which keeps crond running idle, so the test put the absence back by hand. `sysntpd` restarted in 8.1 s (proven running). Backup 7 428 bytes in 4.8 s (gzip), deleted after. The reboot test (`--allow-reboot`) waits for Dmitry's own OK |
+| O20 | System access writes on AP2 (v0.6c D15): an LED trigger and back, the HTTPS redirect and LuCI off the network and back (a bridged LuCI page opened each way), a throwaway SSH key added and removed, the SSH port 22 → 2222 followed and back, a kept-files line, the policy section, the password (D3, `--allow-password`) and a restore of AP2's own fresh backup (`--allow-reboot`, its own OK). Reset to defaults never runs on AP2 | Run `tests/hardware/test_ap2_access.py` in a write window with Dmitry's OK, Bench Guard clear and the txctl session told before the SSH and HTTP(S) reloads; record the times here. Pending: the read-only recording (`--set access`, `tests/fixtures/ap2/access.json`) is in; the writes wait for that OK |
 
 ## 14. Out of scope
 

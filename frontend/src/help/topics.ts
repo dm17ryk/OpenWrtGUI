@@ -80,6 +80,10 @@ export const HELP = {
   systemRepoKeys: 'System#repository-keys',
   systemLeds: 'System#leds',
   systemMounts: 'System#mount-points',
+  systemImport: 'System#import-a-backup',
+  systemRestore: 'System#restore',
+  systemKept: 'System#files-kept-in-a-backup',
+  systemReset: 'System#reset-to-defaults',
   // Ports, VLANs, mirroring
   ports: 'Ports-and-VLANs',
   portsPanel: 'Ports-and-VLANs#front-panel',

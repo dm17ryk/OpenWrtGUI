@@ -16,6 +16,7 @@ import { AccessTab } from './AccessTab'
 
 const PASSWORD = 'Bench-only-7'
 const calls: Array<{ method: string; path: string; body?: unknown }> = []
+let access = AP2_ACCESS
 const base = '/api/routers/ap2/system'
 
 vi.mock('../../api/client', async (orig) => {
@@ -24,7 +25,7 @@ vi.mock('../../api/client', async (orig) => {
     ...actual,
     apiFetch: vi.fn(async (path: string) => {
       calls.push({ method: 'GET', path })
-      if (path === `${base}/access`) return AP2_ACCESS
+      if (path === `${base}/access`) return access
       throw new Error(`unexpected ${path}`)
     }),
     postJson: vi.fn(async (path: string, body?: unknown) => {
@@ -46,6 +47,7 @@ vi.mock('../../api/client', async (orig) => {
 
 beforeEach(() => {
   calls.length = 0
+  access = AP2_ACCESS
 })
 
 function renderTab() {
@@ -158,4 +160,11 @@ test('the repository keys are listed by name', async () => {
   renderTab()
   const repo = await screen.findByRole('list', { name: 'Repository keys' })
   expect(within(repo).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['openwrt-snapshots.pem (apk)', 'public-key.pem (apk)'])
+})
+
+test("an instance's DirectInterface is shown and kept as it is", async () => {
+  access = { ...AP2_ACCESS, ssh: [{ ...AP2_ACCESS.ssh[0], direct_interface: 'br-lan' }] }
+  renderTab()
+  const main = within(await screen.findByRole('table', { name: 'SSH instances' })).getByRole('row', { name: /main/ })
+  expect(within(main).getByText('DirectInterface br-lan (kept as it is)')).toBeInTheDocument()
 })

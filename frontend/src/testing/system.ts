@@ -1,14 +1,17 @@
 // Generated from the simulator (sim ap2); do not edit by hand.
 import type {
+  BackupFile,
   Connections,
   CronState,
   DiagResult,
+  KeptFiles,
   LedState,
   LogEntry,
   MountState,
   NetApplyResult,
   NetPlan,
   ProcessList,
+  RestoreCheck,
   SystemAccessState,
   SystemOverview,
   SystemServiceRow,
@@ -1205,6 +1208,88 @@ export const AP2_LED_PLAN: NetPlan = {
   "rollback": false,
   "target_host": null,
   "digest": "f7c7c46046893117"
+}
+
+export const AP2_BACKUP: BackupFile = {
+  "name": "ap2-20261110-120000.tar.gz",
+  "size": 1235,
+  "created_at": "2026-11-10T12:00:00+02:00",
+  "imported": false
+}
+
+export const AP2_RESTORE_CHECK: RestoreCheck = {
+  "files": [
+    "/etc/config/system",
+    "/etc/config/network",
+    "/etc/config/dropbear",
+    "/etc/config/uhttpd",
+    "/etc/rc.local",
+    "/etc/dropbear/authorized_keys",
+    "/etc/sysupgrade.conf"
+  ],
+  "warnings": [
+    "AP2 · office's settings become the backup's (2026-11-10 12:00): every file in it replaces the router's own",
+    "AP2 · office is offline for about 60-90 s while it restarts",
+    "LTE and Wi-Fi come back with the router; the LuCI bridge and the terminal reconnect by themselves"
+  ],
+  "refusals": []
+}
+
+export const AP2_RESTORE_PLAN: NetPlan = {
+  "router_id": "ap2",
+  "screen": "System",
+  "lines": [
+    "mkdir -p /tmp/owg && cat > /tmp/owg/restore.tar.gz  # stdin: ap2-20261110-120000.tar.gz (1235 B, sha256 e03be7d15fde)",
+    "tar -tzf /tmp/owg/restore.tar.gz",
+    "sysupgrade --restore-backup /tmp/owg/restore.tar.gz",
+    "mkdir -p /tmp/owg && start-stop-daemon -S -b -m -p /tmp/owg/reboot.pid -x /bin/sh -- -c 'sleep 2; reboot; rm -f /tmp/owg/reboot.*'"
+  ],
+  "warnings": [
+    "AP2 · office's settings become the backup's (2026-11-10 12:00): every file in it replaces the router's own",
+    "AP2 · office is offline for about 60-90 s while it restarts",
+    "LTE and Wi-Fi come back with the router; the LuCI bridge and the terminal reconnect by themselves"
+  ],
+  "rollback": false,
+  "target_host": null,
+  "digest": "17d98f7372308e07"
+}
+
+export const AP2_KEPT: KeptFiles = {
+  "text": "## This file contains files and directories that should\n## be preserved during an upgrade.\n",
+  "listed": [
+    "/etc/config/dropbear"
+  ]
+}
+
+export const AP2_KEPT_PLAN: NetPlan = {
+  "router_id": "ap2",
+  "screen": "System",
+  "lines": [
+    "cat > /etc/sysupgrade.conf <<'OWG'",
+    "## This file contains files and directories that should",
+    "## be preserved during an upgrade.",
+    "/etc/owg-extra.conf",
+    "OWG"
+  ],
+  "warnings": [],
+  "rollback": false,
+  "target_host": null,
+  "digest": "1f0b653d07c3db43"
+}
+
+export const AP2_RESET_PLAN: NetPlan = {
+  "router_id": "ap2",
+  "screen": "System",
+  "lines": [
+    "mkdir -p /tmp/owg && start-stop-daemon -S -b -m -p /tmp/owg/firstboot.pid -x /bin/sh -- -c 'sleep 2; firstboot -r -y; rm -f /tmp/owg/firstboot.*'"
+  ],
+  "warnings": [
+    "AP2 · office erases every setting and comes back as 192.168.1.1 with no password and a new host key: that address clashes with AP1 · bench",
+    "Connect AP2 · office alone to this PC before you go on, then add it again"
+  ],
+  "rollback": false,
+  "target_host": null,
+  "digest": "976056ffd9b3a199"
 }
 
 export const AP2_SSH_ADD_PLAN: NetPlan = {

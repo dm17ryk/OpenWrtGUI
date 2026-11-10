@@ -2,7 +2,8 @@
 
 The System screen shows a router's own state and changes its system settings: the overview, live load and
 traffic, the logs and processes, network diagnostics, host name and time, the router's password and its SSH
-and web access, services and the startup script, scheduled tasks, a backup and a reboot. Open it from the router's sections. Each part is a tab; the tab you
+and web access, services and the startup script, scheduled tasks, the LEDs, the mount points, a backup with its
+restore, a reboot and a reset to defaults. Open it from the router's sections. Each part is a tab; the tab you
 are on is in the address (`?tab=logs`), so a link opens the same tab.
 
 ![System](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/system.png)
@@ -154,7 +155,32 @@ not have; the screen says so when it is missing.
 gives) in the app's data folder, readable by your Windows user only, and lists it with its size and time;
 **Download** saves a copy where you choose. The archive holds the router's password hash, its SSH host keys,
 this app's key and the Wi-Fi keys: keep it like a password. The audit log names the file, never its content.
-Restoring a backup comes with a later version.
+
+## Import a backup
+
+**Import backup…** brings a backup file from this PC into the router's list (`.tar.gz` or `.tgz`, 4 MiB at
+most), for instance one LuCI saved. The app reads it on the PC first and refuses anything that is not a gzip
+tar of plain files and folders under `etc/` (no links, devices, absolute paths or `..`); nothing goes to the
+router. It is saved beside the router's own backups, readable by your Windows user only, and marked "imported
+from this PC".
+
+## Restore
+
+Pick a backup from the list and **Check** it: the app reads the archive and lists its files, or says why it is
+refused. A restore is refused before anything is sent when the backup is another router's (its SSH host key is
+not this router's), when it would move the router off the address the app reaches it at, or when its
+authorized keys lack the app's key (the app could not log in afterwards). The preview follows: the upload to
+`/tmp/owg/restore.tar.gz` (one audited line; the bytes are never logged), `tar -tzf`,
+`sysupgrade --restore-backup` and the reboot timer. **Restore and reboot** asks once more, then the screen
+follows the reboot as the Reboot card does. Done means a fresh uptime and every restored file matching the
+backup by its sha256. If a step fails before the reboot, the uploaded archive is removed from the router.
+
+## Files kept in a backup
+
+`/etc/sysupgrade.conf`, edited as text: one absolute path (a file or a folder) or `#` comment per line, 8 KiB
+at most. A backup, and a flash that keeps settings, holds the config files changed since flashing plus these.
+Beside it is what a backup holds now (`sysupgrade -l`). The preview is the whole new file; the proof is the
+file read back. Removing the `/etc/owg/` line warns that a flash that keeps settings puts it back.
 
 ## Reboot
 
@@ -163,4 +189,14 @@ returns (and is audited) before the router goes down. The screen then follows th
 back once the router answers with an uptime younger than the time since the reboot was armed (the only proof
 that it really restarted). A router not back after 5 minutes is reported "not back": check its power and LEDs,
 then Reconnect. LTE and Wi-Fi come back with the router; the LuCI bridge and the terminal reconnect by
-themselves.
+themselves. A router runs one job at a time: a reboot, a restore or a reset.
+
+## Reset to defaults
+
+**Preview reset** shows the exact command: the router arms a timer that runs `firstboot -r -y` 2 seconds
+later, which erases every setting. The router then comes back like a new one, at 192.168.1.1 with no password
+and a new host key, which clashes with any other router at that address (AP1 on the bench). So **Start reset**
+waits until you type the router's name and tick that it is alone on this PC's network. Done means the router
+stopped answering at its address (within 120 seconds); its entry then shows "Reset to defaults: add it again"
+under Needs attention, with **Add again**. Nothing more can be proven on the old address. On the bench this
+runs in the simulator only, never on AP2.
