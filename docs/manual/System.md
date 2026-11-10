@@ -1,8 +1,8 @@
 # System
 
 The System screen shows a router's own state and changes its system settings: the overview, live load and
-traffic, the logs and processes, network diagnostics, host name and time, services and the startup script,
-scheduled tasks, a backup and a reboot. Open it from the router's sections. Each part is a tab; the tab you
+traffic, the logs and processes, network diagnostics, host name and time, the router's password and its SSH
+and web access, services and the startup script, scheduled tasks, a backup and a reboot. Open it from the router's sections. Each part is a tab; the tab you
 are on is in the address (`?tab=logs`), so a link opens the same tab.
 
 ![System](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/system.png)
@@ -57,6 +57,56 @@ router's own list, plus UTC), the NTP client and server and the NTP servers to a
 preview shows the exact `uci` commands and the init scripts that put them in effect (`system reload`,
 `sysntpd restart`, `log restart`); none of them touches the network, so there is no rollback. **Apply**
 proves the change: the saved config, the host name the router answers with, and the time zone it uses.
+
+## Router password
+
+The Access tab sets root's password, the one LuCI and password SSH logins use. Type it twice; it stays in the
+page only, never in an address, the audit log or an answer, and both fields clear once the router answered.
+The preview is `passwd root` whatever the password is: Apply sends the password on that command's input, never
+on its command line. The proof is root's password hash: it must have changed. The app itself logs in with its
+key and is not affected; a script that logs in with the old password stops working. When the router's
+password policy is on, its rules are listed above the fields and a password that breaks one is refused before
+anything is sent.
+
+## Password policy
+
+LuCI's Password Policy page (`rpcd.policy`): whether new passwords are checked, a minimum length, and whether
+a digit, upper and lower case letters, or a special character are needed. A router without a policy has none
+until Apply creates it. The policy checks the passwords set in this app and in LuCI; it does not change the
+password the router has now.
+
+## SSH access
+
+dropbear's instances, one row each: on or off, the port, the interface it listens on (all interfaces or one),
+password logins, root password logins, and gateway ports. **Add instance** adds a row; **Remove** drops one
+at Apply. The instance the app connects through is marked "The app connects here": it cannot be turned off or
+removed here, and it listens on the app's interface or on all of them. A change applies with a 60 s rollback:
+the app must reach the router again on a new connection and confirm, or the router puts its SSH settings back
+by itself. When the app's own port changes, the app follows it to the new port (the firewall must let it in).
+The proof is the saved config and dropbear listening on every enabled port.
+
+## SSH keys
+
+`/etc/dropbear/authorized_keys`, one row per line: the key type, its comment, its SHA256 fingerprint and who
+uses it. **App** is the key this app logs in with: it has no Remove. **Harness** is a key you named with
+**Owner…** (the name is kept in the app's settings, nothing is sent to the router); **Other** is any other
+key. **Add key** takes a pasted public key line; a private key, or a key the router has already, is refused.
+The preview is the whole new file. The proof is the file read back, every new key in it, and a new login with
+the app's key.
+
+## HTTP(S) access
+
+LuCI's HTTP(S) Access page: **Redirect HTTP to HTTPS**, and **LuCI on the network** (off: uhttpd listens on
+the router's own address 127.0.0.1 only, so browsers on the network no longer reach LuCI; LuCI pages in this
+app keep working, they come in through the app's SSH connection). The redirect stays off on a router that
+serves no HTTPS, or LuCI would become unreachable. A router whose uhttpd keeps its own addresses (a custom
+listen list) says so; switching LuCI on or off here replaces that list. uhttpd restarts at Apply; the proof is
+the saved config and uhttpd listening where the switch says.
+
+## Repository keys
+
+The names of the keys the package manager trusts (`/etc/apk/keys`, or `/etc/opkg/keys` on older firmware).
+They are shown, never changed here.
 
 ## Services
 

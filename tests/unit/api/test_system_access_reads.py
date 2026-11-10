@@ -37,6 +37,7 @@ async def test_access_of_ap2(ctx: AppContext) -> None:
     assert a.policy is None  # AP2 has no rpcd.policy section
     assert [(i.section, i.port, i.enable) for i in a.ssh] == [("main", 22, True)]
     assert (a.app_instance, a.app_interface) == ("main", "lan")
+    assert "lan" in a.interfaces and a.interfaces == sorted(a.interfaces)  # the SSH card's interface list
     labels = {k.comment: k.label for k in a.keys if k.type}
     assert labels["bench@lab"] == "other"
     app = [k for k in a.keys if k.label == "app"]

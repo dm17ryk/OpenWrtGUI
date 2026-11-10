@@ -97,6 +97,7 @@ class SystemAccessState(BaseModel):
     ssh: list[SshInstance]
     app_instance: str | None  # the dropbear instance this app connects through
     app_interface: str | None  # the interface holding the address the app uses
+    interfaces: list[str]  # every interface's name: what an SSH instance can listen on
     keys: list[SshKeyRow]
     http: HttpState
     https_served: bool  # something listens on uhttpd's HTTPS port (AP2: no)
@@ -207,9 +208,6 @@ class AccessService:
         mine = next((i.name for i in live if any(a.ip == host for a in i.ipv4)), None)
         return mine, {i.name for i in live}
 
-    async def _app_interface(self, t: Transport, host: str, missing: list[str]) -> str | None:
-        return (await self._interfaces(t, host, missing))[0]
-
     def key_rows(self, rec: RouterRecord, text: str) -> list[SshKeyRow]:
         app, known = self.app_fingerprints(rec), self.known_keys()
         rows: list[SshKeyRow] = []
@@ -234,7 +232,7 @@ class AccessService:
         http = parse_uhttpd(await read(s.UCI_UHTTPD, "uhttpd"))
         policy = parse_policy(await read(s.UCI_RPCD, "rpcd"))
         listening = parse_listeners(await read(s.LISTENERS, "listeners"))
-        interface = await self._app_interface(t, rec.host, missing)
+        interface, names = await self._interfaces(t, rec.host, missing)
         keys = await t.run(s.KEYS_READ)  # no file: no keys (dropbear's own default), not a failed read
         if not keys.ok and "No such file" not in keys.stderr:
             missing.append("authorized keys")
@@ -255,6 +253,7 @@ class AccessService:
             ssh=dropbear,
             app_instance=mine.section if mine else None,
             app_interface=interface,
+            interfaces=sorted(names),
             keys=self.key_rows(rec, keys.stdout if keys.ok else ""),
             http=http,
             https_served=bool(served),

@@ -7,6 +7,7 @@ import type {
   NetApplyResult,
   NetPlan,
   ProcessList,
+  SystemAccessState,
   SystemOverview,
   SystemServiceRow,
   SystemSettingsOut,
@@ -707,6 +708,250 @@ export const AP2_PING: DiagResult = {
   "command": "timeout -s KILL 25 ping -c 4 -W 2 '192.168.1.10'",
   "output": "PING 192.168.1.10 (192.168.1.10): 56 data bytes\n64 bytes from 192.168.1.10: seq=0 ttl=64 time=0.512 ms\n64 bytes from 192.168.1.10: seq=1 ttl=64 time=0.513 ms\n64 bytes from 192.168.1.10: seq=2 ttl=64 time=0.514 ms\n64 bytes from 192.168.1.10: seq=3 ttl=64 time=0.515 ms\n\n--- 192.168.1.10 ping statistics ---\n4 packets transmitted, 4 packets received, 0% loss\n",
   "exit_status": 0
+}
+
+export const AP2_ACCESS: SystemAccessState = {
+  "password": "set",
+  "policy": null,
+  "ssh": [
+    {
+      "section": "main",
+      "enable": true,
+      "interface": "",
+      "direct_interface": "",
+      "port": 22,
+      "password_auth": true,
+      "root_password_auth": true,
+      "gateway_ports": false
+    }
+  ],
+  "app_instance": "main",
+  "app_interface": "lan",
+  "interfaces": [
+    "lan",
+    "loopback",
+    "lte",
+    "lte_4",
+    "wan",
+    "wan6"
+  ],
+  "keys": [
+    {
+      "index": 0,
+      "type": "ssh-ed25519",
+      "comment": "openwrtgui@pc",
+      "options": null,
+      "fingerprint": "SHA256:lbmsoA0yIEcEiVDRnMWuzm+nV+3ZEEpVIURqFoeSspg",
+      "label": "app",
+      "owner": null,
+      "text": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAOhB7/zzhC+HXDdGOdLwJln5NYwm6UNXx3chmQSVTG4 openwrtgui@pc"
+    },
+    {
+      "index": 1,
+      "type": "ssh-ed25519",
+      "comment": "bench@lab",
+      "options": null,
+      "fingerprint": "SHA256:PhSyJpZMizMZGDkACk9L7f0XBVYIHH+LiILkLpqJz5g",
+      "label": "other",
+      "owner": null,
+      "text": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJvWfggOSyIPKEhT8VoBxUhNS6R/ehRIvdYmnQWrmKsS bench@lab"
+    }
+  ],
+  "http": {
+    "redirect_https": false,
+    "luci_on_network": true,
+    "listen_http": [
+      "0.0.0.0:80",
+      "[::]:80"
+    ],
+    "listen_https": [
+      "0.0.0.0:443",
+      "[::]:443"
+    ],
+    "loopback_kept": true
+  },
+  "https_served": false,
+  "repo_keys": [
+    {
+      "name": "openwrt-snapshots.pem",
+      "kind": "apk"
+    },
+    {
+      "name": "public-key.pem",
+      "kind": "apk"
+    }
+  ],
+  "missing": []
+}
+
+export const AP2_PASSWORD_PLAN: NetPlan = {
+  "router_id": "ap2",
+  "screen": "System",
+  "lines": [
+    "passwd root"
+  ],
+  "warnings": [
+    "LuCI and SSH password logins on AP2 · office use the new password. The app logs in with its key and is not affected. A script that logs in to AP2 · office with the old password stops working."
+  ],
+  "rollback": false,
+  "target_host": null,
+  "digest": "8a046637def20dd0"
+}
+
+export const AP2_NEW_KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEeN2gEjAeD8LVkj/gTQDSxOcPCD5IPg87e/h53vQKLn user@pc"
+
+export const AP2_KEY_ADD_PLAN: NetPlan = {
+  "router_id": "ap2",
+  "screen": "System",
+  "lines": [
+    "mkdir -p /etc/dropbear && cat > /etc/dropbear/authorized_keys <<'OWG' && chmod 600 /etc/dropbear/authorized_keys",
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAOhB7/zzhC+HXDdGOdLwJln5NYwm6UNXx3chmQSVTG4 openwrtgui@pc",
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJvWfggOSyIPKEhT8VoBxUhNS6R/ehRIvdYmnQWrmKsS bench@lab",
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEeN2gEjAeD8LVkj/gTQDSxOcPCD5IPg87e/h53vQKLn user@pc",
+    "OWG"
+  ],
+  "warnings": [],
+  "rollback": false,
+  "target_host": null,
+  "digest": "5a16ae07f9426199"
+}
+
+export const AP2_HTTP_OFF_PLAN: NetPlan = {
+  "router_id": "ap2",
+  "screen": "System",
+  "lines": [
+    "set -e",
+    "uci -q delete uhttpd.main.listen_http",
+    "uci add_list uhttpd.main.listen_http='127.0.0.1:80'",
+    "uci add_list uhttpd.main.listen_http='[::1]:80'",
+    "uci -q delete uhttpd.main.listen_https",
+    "uci add_list uhttpd.main.listen_https='127.0.0.1:443'",
+    "uci add_list uhttpd.main.listen_https='[::1]:443'",
+    "uci commit uhttpd",
+    "/etc/init.d/uhttpd restart"
+  ],
+  "warnings": [
+    "uhttpd restarts: LuCI on AP2 · office is away for a second, in browsers and in this app.",
+    "LuCI is no longer reachable from the network at AP2 · office's addresses. LuCI pages in this app keep working: they come in through the app's SSH connection."
+  ],
+  "rollback": false,
+  "target_host": null,
+  "digest": "f3dbefd9c54686ac"
+}
+
+export const AP2_SSH_ADD_PLAN: NetPlan = {
+  "router_id": "ap2",
+  "screen": "System",
+  "lines": [
+    "ubus call session create '{\"timeout\":300}'",
+    "ubus call session grant '{\"objects\":[[\"dropbear\",\"read\"],[\"dropbear\",\"write\"]],\"scope\":\"uci\",\"ubus_rpc_session\":\"<session>\"}'",
+    "set -e",
+    "mkdir -p /var/run/rpcd/uci-<session>",
+    "ssh1=$(uci -P /var/run/rpcd/uci-<session> add dropbear dropbear)",
+    "uci -P /var/run/rpcd/uci-<session> set dropbear.$ssh1.enable='1'",
+    "uci -P /var/run/rpcd/uci-<session> set dropbear.$ssh1.Port='2222'",
+    "uci -P /var/run/rpcd/uci-<session> set dropbear.$ssh1.PasswordAuth='on'",
+    "uci -P /var/run/rpcd/uci-<session> set dropbear.$ssh1.RootPasswordAuth='on'",
+    "uci -P /var/run/rpcd/uci-<session> set dropbear.$ssh1.GatewayPorts='off'",
+    "ubus call uci apply '{\"rollback\":true,\"timeout\":60,\"ubus_rpc_session\":\"<session>\"}'",
+    "ubus call uci confirm '{\"ubus_rpc_session\":\"<session>\"}'",
+    "ubus call session destroy '{\"ubus_rpc_session\":\"<session>\"}'"
+  ],
+  "warnings": [
+    "Applies with a 60 s rollback: if the app cannot reach AP2 · office at 192.168.1.2 again and confirm, the router restores its previous SSH settings by itself."
+  ],
+  "rollback": true,
+  "target_host": null,
+  "digest": "c0f08d7ddd035deb"
+}
+
+export const AP2_ACCESS_OWNED: SystemAccessState = {
+  "password": "set",
+  "policy": null,
+  "ssh": [
+    {
+      "section": "main",
+      "enable": true,
+      "interface": "",
+      "direct_interface": "",
+      "port": 22,
+      "password_auth": true,
+      "root_password_auth": true,
+      "gateway_ports": false
+    }
+  ],
+  "app_instance": "main",
+  "app_interface": "lan",
+  "interfaces": [
+    "lan",
+    "loopback",
+    "lte",
+    "lte_4",
+    "wan",
+    "wan6"
+  ],
+  "keys": [
+    {
+      "index": 0,
+      "type": "ssh-ed25519",
+      "comment": "openwrtgui@pc",
+      "options": null,
+      "fingerprint": "SHA256:lbmsoA0yIEcEiVDRnMWuzm+nV+3ZEEpVIURqFoeSspg",
+      "label": "app",
+      "owner": null,
+      "text": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAOhB7/zzhC+HXDdGOdLwJln5NYwm6UNXx3chmQSVTG4 openwrtgui@pc"
+    },
+    {
+      "index": 1,
+      "type": "ssh-ed25519",
+      "comment": "bench@lab",
+      "options": null,
+      "fingerprint": "SHA256:PhSyJpZMizMZGDkACk9L7f0XBVYIHH+LiILkLpqJz5g",
+      "label": "harness",
+      "owner": "bench-harness",
+      "text": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJvWfggOSyIPKEhT8VoBxUhNS6R/ehRIvdYmnQWrmKsS bench@lab"
+    }
+  ],
+  "http": {
+    "redirect_https": false,
+    "luci_on_network": true,
+    "listen_http": [
+      "0.0.0.0:80",
+      "[::]:80"
+    ],
+    "listen_https": [
+      "0.0.0.0:443",
+      "[::]:443"
+    ],
+    "loopback_kept": true
+  },
+  "https_served": false,
+  "repo_keys": [
+    {
+      "name": "openwrt-snapshots.pem",
+      "kind": "apk"
+    },
+    {
+      "name": "public-key.pem",
+      "kind": "apk"
+    }
+  ],
+  "missing": []
+}
+
+export const AP2_PASSWORD_RESULT: NetApplyResult = {
+  "router_id": "ap2",
+  "applied": true,
+  "verified": true,
+  "checks": [
+    {
+      "name": "password",
+      "ok": true,
+      "detail": "the router's password hash changed"
+    }
+  ],
+  "error": null,
+  "host": "192.168.1.2"
 }
 
 export const AP2_HOSTNAME_RESULT: NetApplyResult = {

@@ -5,6 +5,7 @@ import type { RouterDetail, SystemOverview } from '../../api/types'
 import { Help } from '../../help/Help'
 import { HELP } from '../../help/topics'
 import { RouterSections } from '../../shell/RouterSections'
+import { AccessTab } from './AccessTab'
 import { BackupTab } from './BackupTab'
 import { CronTab } from './CronTab'
 import { DiagnosticsTab } from './DiagnosticsTab'
@@ -20,6 +21,7 @@ const TABS = [
   ['processes', 'Processes'],
   ['diagnostics', 'Diagnostics'],
   ['settings', 'System and time'],
+  ['access', 'Access'],
   ['services', 'Services'],
   ['cron', 'Scheduled tasks'],
   ['backup', 'Backup and reboot'],
@@ -67,6 +69,7 @@ export function SystemScreen() {
       {tab === 'processes' && <ProcessesTab routerId={id} />}
       {tab === 'diagnostics' && <DiagnosticsTab routerId={id} />}
       {tab === 'settings' && <SettingsTab routerId={id} routerName={name} />}
+      {tab === 'access' && <AccessTab routerId={id} routerName={name} />}
       {tab === 'services' && <ServicesTab routerId={id} routerName={name} />}
       {tab === 'cron' && <CronTab routerId={id} routerName={name} />}
       {tab === 'backup' && <BackupTab routerId={id} routerName={name} />}

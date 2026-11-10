@@ -72,6 +72,12 @@ export const HELP = {
   systemCron: 'System#scheduled-tasks',
   systemBackup: 'System#backup',
   systemReboot: 'System#reboot',
+  systemPassword: 'System#router-password',
+  systemPolicy: 'System#password-policy',
+  systemSsh: 'System#ssh-access',
+  systemSshKeys: 'System#ssh-keys',
+  systemHttp: 'System#https-access',
+  systemRepoKeys: 'System#repository-keys',
   // Ports, VLANs, mirroring
   ports: 'Ports-and-VLANs',
   portsPanel: 'Ports-and-VLANs#front-panel',

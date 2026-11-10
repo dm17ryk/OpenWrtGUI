@@ -19,7 +19,7 @@ let autoLoginFails = false
 let hostKey: SessionView = sessionView('host_key')
 const REFLASHED: RouterItem = {
   ...AP1,
-  record: { ...AP1.record, host: '192.168.1.4', reflashed: { board: 'dlink,dwr-921-c3-uboot', revision: 'r35700-0c0ffee000', at: '2026-11-08T12:00:00' } },
+  record: { ...AP1.record, host: '192.168.1.4', reflashed: { board: 'dlink,dwr-921-c3-uboot', revision: 'r35700-0c0ffee000', at: '2026-11-08T12:00:00', reason: 'flash' as const } },
 }
 
 vi.mock('../api/client', async (orig) => {

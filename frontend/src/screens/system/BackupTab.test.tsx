@@ -7,8 +7,8 @@ import type { BackupFile, RebootJob } from '../../api/types'
 import { AP2_REBOOT_PLAN } from '../../testing/system'
 import { BackupTab } from './BackupTab'
 
-const SAVED: BackupFile = { name: 'ap2-20261109-120000.tar.gz', size: 7424, created_at: '2026-11-09T12:00:00+02:00' }
-const JOB = { router_id: 'ap2', started_at: '2026-11-09T12:00:00', uptime_s: null, detail: null, error: null }
+const SAVED: BackupFile = { name: 'ap2-20261109-120000.tar.gz', size: 7424, created_at: '2026-11-09T12:00:00+02:00', imported: false }
+const JOB = { kind: 'reboot' as const, router_id: 'ap2', started_at: '2026-11-09T12:00:00', uptime_s: null, detail: null, error: null }
 let backups: BackupFile[] = []
 let jobs: Array<RebootJob | null> = [null]
 let overviewReads = 0
