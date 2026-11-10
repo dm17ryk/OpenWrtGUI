@@ -22,8 +22,13 @@ class AppKey:
     fingerprint: str
 
 
+def user_only_mode(path: Path) -> int:
+    """The POSIX mode for the current user only: a folder keeps its search bit, or nothing goes inside."""
+    return 0o700 if path.is_dir() else 0o600
+
+
 def restrict_to_user(path: Path) -> None:
-    """Make the private key readable by the current user only."""
+    """Make a file (the private key, a backup) or a folder (the backups) usable by the current user only."""
     if sys.platform == "win32":
         user = os.environ.get("USERNAME") or getpass.getuser()
         subprocess.run(
@@ -32,7 +37,7 @@ def restrict_to_user(path: Path) -> None:
             capture_output=True,
         )
     else:
-        path.chmod(0o600)
+        path.chmod(user_only_mode(path))
 
 
 def load_or_create_app_key(keys_dir: Path, comment: str | None = None) -> AppKey:
