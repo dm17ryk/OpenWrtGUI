@@ -40,6 +40,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="allow the test that reboots AP2 (the owner's own OK for it: AP2 is away about 90 s)",
     )
     group.addoption(
+        "--allow-password",
+        action="store_true",
+        help="allow the test that changes AP2's root password and puts it back (the owner's own OK, D3)",
+    )
+    group.addoption(
         "--adb-station", help="adb serial of the phone that joins the test SSID (Wi-Fi faults on air, O16)"
     )
     group.addoption(
