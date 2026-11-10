@@ -102,6 +102,11 @@ class ConnectionPool:
                 slot.health = RouterHealth(online=True, since=now, error=None)
             return slot.transport
 
+    async def fresh(self, router: RouterRecord) -> Transport:
+        """A new connection of its own, the shared one left as it is (a login proof, v0.6c): the caller
+        closes it."""
+        return await self._factory(router)
+
     def mark_failed(self, router_id: str, exc: Exception) -> None:
         """Record a failure: drop the transport and back off before the next attempt."""
         slot = self._slot(router_id)

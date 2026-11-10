@@ -32,6 +32,16 @@ _LINE = re.compile(
 )
 
 KeyLabel = Literal["app", "harness", "other"]
+FINGERPRINT = re.compile(r"SHA256:[A-Za-z0-9+/]{43}")
+
+
+class KeysChange(BaseModel):
+    """Keys to add (public key lines) and to remove (by fingerprint)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    add: tuple[str, ...] = ()
+    remove: tuple[str, ...] = ()
 
 
 class KeyLine(BaseModel):

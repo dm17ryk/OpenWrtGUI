@@ -41,3 +41,12 @@ def test_corrupt_settings_fall_back_to_defaults_and_keep_a_copy(tmp_path: Path) 
     p.write_text("{oops", encoding="utf-8")
     assert SettingsStore(p).load().theme == "system"
     assert (tmp_path / "settings.json.bad").read_text(encoding="utf-8") == "{oops"
+
+
+def test_known_keys_round_trip(tmp_path: Path) -> None:
+    from openwrtgui.store.settings import KnownKey, Settings, SettingsStore
+
+    store = SettingsStore(tmp_path / "settings.json")
+    assert store.load().known_keys == []
+    store.save(Settings(known_keys=[KnownKey(fingerprint="SHA256:abc", owner="dima_night")]))
+    assert store.load().known_keys == [KnownKey(fingerprint="SHA256:abc", owner="dima_night")]

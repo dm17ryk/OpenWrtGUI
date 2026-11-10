@@ -17,6 +17,7 @@ from openwrtgui.guard.audit import AuditLog, mask
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.guard.writes import run_audited
 from openwrtgui.net.apply import (
+    NOTHING,
     ROLLBACK_S,
     ApplyRunner,
     NetApplyResult,
@@ -33,7 +34,7 @@ from openwrtgui.net.parse import parse_interface_dump
 from openwrtgui.probe.commands import ROOT_PASSWORD_STATE
 from openwrtgui.store.keys import AppKey
 from openwrtgui.store.routers import RouterRecord, RouterStore, router_key_paths
-from openwrtgui.store.settings import SettingsStore
+from openwrtgui.store.settings import KnownKey, SettingsStore
 from openwrtgui.system import commands as s
 from openwrtgui.system.access import (
     HttpState,
@@ -50,10 +51,19 @@ from openwrtgui.system.access import (
     policy_ops,
     ssh_ops,
 )
+from openwrtgui.system.commands import OWNER
 from openwrtgui.system.leds import LedInfo, LedRow, parse_led_sections, parse_leds
 from openwrtgui.system.mounts import Mount, Usage, parse_df, parse_mounts
-from openwrtgui.system.sshkeys import KeyLabel, label, parse_authorized_keys
-from openwrtgui.transport.base import Transport
+from openwrtgui.system.sshkeys import (
+    FINGERPRINT,
+    KeyLabel,
+    KeysChange,
+    check_key_line,
+    label,
+    parse_authorized_keys,
+    render_authorized_keys,
+)
+from openwrtgui.transport.base import Transport, TransportError
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.uci import parse_uci_show
 from openwrtgui.wifi.service import PreviewChanged
@@ -339,6 +349,108 @@ class AccessService:
     async def _stdout(self, t: Transport, command: str) -> str:
         result = await t.run(command)
         return result.stdout if result.ok else ""
+
+    # ---------------------------------------------------------------- SSH keys (D5)
+    def set_key_owner(self, fingerprint: str, owner: str | None) -> None:
+        """Name a harness's key (Settings.known_keys); None forgets it. Nothing is sent to a router."""
+        if not FINGERPRINT.fullmatch(fingerprint):
+            raise ValueError(f"{fingerprint!r} is not a SHA256 key fingerprint")
+        if owner is not None and not OWNER.fullmatch(owner):
+            raise ValueError("An owner is 1-40 letters, digits, spaces, dots, dashes or underscores")
+        settings = self._settings.load()
+        keys = [k for k in settings.known_keys if k.fingerprint != fingerprint]
+        if owner is not None:
+            keys.append(KnownKey(fingerprint=fingerprint, owner=owner))
+        self._settings.save(settings.model_copy(update={"known_keys": keys}))
+
+    async def _keys_plan(
+        self, rec: RouterRecord, t: Transport, change: KeysChange
+    ) -> tuple[NetPlan, str, set[str]]:
+        result = await t.run(s.KEYS_READ)
+        if not result.ok and "No such file" not in result.stderr:
+            raise ValueError(f"{s.AUTHORIZED_KEYS} does not read: {result.stderr.strip()}")
+        rows = self.key_rows(rec, result.stdout if result.ok else "")
+        by_print = {r.fingerprint: r for r in rows if r.fingerprint}
+        warnings: list[str] = []
+        for fingerprint in change.remove:
+            row = by_print.get(fingerprint)
+            if row is None:
+                raise ValueError(f"No key {fingerprint} on {rec.name}")
+            if row.label == "app":
+                raise ValueError(f"The app logs in to {rec.name} with this key: it cannot be removed here")
+            if row.label == "harness":
+                warnings.append(f"{row.owner} uses this key: it can no longer log in to {rec.name}")
+        kept = [r.text for r in rows if r.fingerprint is None or r.fingerprint not in change.remove]
+        present = {r.fingerprint for r in rows if r.fingerprint and r.fingerprint not in change.remove}
+        added: set[str] = set()
+        for line in change.add:
+            key = check_key_line(line)
+            assert key.fingerprint is not None
+            if key.fingerprint in present or key.fingerprint in added:
+                raise ValueError(f"This key is on {rec.name} already ({key.fingerprint})")
+            added.add(key.fingerprint)
+            kept.append(key.text)
+        text = render_authorized_keys(kept)
+        if text == (result.stdout if result.ok else ""):
+            raise ValueError(NOTHING)
+        command = s.write_file("/etc/dropbear/authorized_keys", text)
+        plan = net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config=None,
+            ops=[],
+            current={},
+            commands=[command],
+            warnings=warnings,
+        )
+        return plan, text, added
+
+    async def plan_keys(self, router_id: str, change: KeysChange) -> NetPlan:
+        rec, t = await self._transport(router_id)
+        return (await self._keys_plan(rec, t, change))[0]
+
+    async def _still_logs_in(self, rec: RouterRecord) -> NetCheck:
+        """A new connection with the app's key runs a command: the write did not lock the app out."""
+        try:
+            t = await self._pool.fresh(rec)
+        except TransportError as exc:
+            return NetCheck("the app still logs in", False, f"a new login failed: {exc}")
+        try:
+            ok = (await t.run("true")).ok
+        finally:
+            await t.close()
+        return NetCheck(
+            "the app still logs in", ok, "a new login with the app's key works" if ok else "refused"
+        )
+
+    async def apply_keys(self, router_id: str, change: KeysChange, digest: str | None) -> NetApplyResult:
+        rec = self._record(router_id)
+
+        async def make(t: Transport) -> Planned:
+            plan, text, added = await self._keys_plan(rec, t, change)
+
+            async def verify(t2: Transport) -> list[NetCheck]:
+                read = await t2.run(s.KEYS_READ)
+                saved = read.ok and read.stdout == text
+                present = {k.fingerprint for k in parse_authorized_keys(read.stdout if read.ok else "")}
+                missing = added - present
+                return [
+                    NetCheck(
+                        "saved",
+                        saved,
+                        "the router has the new file" if saved else "the file read back differs",
+                    ),
+                    NetCheck(
+                        "added",
+                        not missing,
+                        "every new key is there" if not missing else "a new key is missing",
+                    ),
+                    await self._still_logs_in(rec),
+                ]
+
+            return Planned(plan, verify)
+
+        return await self._runner.run_planned(rec, make, digest)
 
     # ---------------------------------------------------------------- SSH access (D4)
     async def _ssh_plan(
