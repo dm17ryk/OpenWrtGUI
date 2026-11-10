@@ -102,13 +102,15 @@ async def save_archive(t: Transport, path: Path) -> tuple[int, int | None, str]:
     """Stream the archive into `path` (made user-only before a byte lands): (bytes, exit status, problem).
     The file is removed again when the router gave no archive."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    restrict_to_user(path.parent)
+    await asyncio.to_thread(restrict_to_user, path.parent)  # icacls blocks: never on the event loop
     part = path.with_name(path.name + ".part")
     total = 0
     problem = ""
+    sink_opened = False
     try:
         with part.open("xb") as sink:
-            restrict_to_user(part)
+            sink_opened = True
+            await asyncio.to_thread(restrict_to_user, part)
             stream = await cast(Streamer, t).stream(s.BACKUP)
             try:
                 while chunk := await stream.read(CHUNK):
@@ -120,8 +122,9 @@ async def save_archive(t: Transport, path: Path) -> tuple[int, int | None, str]:
             finally:
                 await stream.close()
     except BaseException:  # a lost connection, a full disk: no half archive (secrets) stays behind
-        with contextlib.suppress(OSError):
-            part.unlink()
+        if sink_opened:  # a part file another backup is writing (FileExistsError) is not this one's
+            with contextlib.suppress(OSError):
+                part.unlink()
         raise
     status = stream.exit_status
     if not problem and status not in (0, None):

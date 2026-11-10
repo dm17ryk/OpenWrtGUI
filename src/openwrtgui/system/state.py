@@ -9,7 +9,14 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from openwrtgui.system import commands as s
-from openwrtgui.system.parse import ProcessRow, parse_board, parse_dmesg, parse_info, parse_logread
+from openwrtgui.system.parse import (
+    Connection,
+    ProcessRow,
+    parse_board,
+    parse_dmesg,
+    parse_info,
+    parse_logread,
+)
 from openwrtgui.transport.base import Transport
 
 KERNEL_LEVELS = ("emerg", "alert", "crit", "err", "warning", "notice", "info", "debug")
@@ -113,3 +120,30 @@ def log_entries(text: str, kind: LogKind) -> list[LogEntry]:
         )
         for e in parse_dmesg(text)
     ]
+
+
+DiagTool = Literal["ping", "traceroute", "nslookup"]
+
+
+class DiagResult(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    tool: DiagTool
+    target: str
+    command: str
+    output: str  # stdout, then stderr: a bad address is a result, not an error
+    exit_status: int
+
+
+class Connections(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    rows: list[Connection]  # at most 500 (AP2 has ~7 MB free RAM)
+    note: str | None = None
+
+
+class TimeZones(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    zones: list[str]  # UTC first (the router's list has none: LuCI adds it), then the router's, sorted
+    note: str | None = None

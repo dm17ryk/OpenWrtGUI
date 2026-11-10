@@ -18,10 +18,18 @@ from openwrtgui.system.commands import ServiceAction
 from openwrtgui.system.cron import CronState
 from openwrtgui.system.reboot import RebootBusy, RebootJob
 from openwrtgui.system.restore import RestoreCheck
-from openwrtgui.system.service import Connections, DiagResult, DiagTool, TimeZones
 from openwrtgui.system.services import SystemServiceRow
 from openwrtgui.system.settings import LogProto, SystemSettings
-from openwrtgui.system.state import LogEntry, LogKind, ProcessList, SystemOverview
+from openwrtgui.system.state import (
+    Connections,
+    DiagResult,
+    DiagTool,
+    LogEntry,
+    LogKind,
+    ProcessList,
+    SystemOverview,
+    TimeZones,
+)
 
 router = APIRouter(
     prefix="/api/routers/{router_id}/system", dependencies=[Depends(require_token)], tags=["system"]

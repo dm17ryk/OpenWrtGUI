@@ -1,8 +1,8 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within } from '@testing-library/react'
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import { downloadFile } from '../../api/client'
+import { apiFetch, downloadFile } from '../../api/client'
 import type { BackupFile, RebootJob } from '../../api/types'
 import { AP2_REBOOT_PLAN } from '../../testing/system'
 import { BackupTab } from './BackupTab'
@@ -11,6 +11,7 @@ const SAVED: BackupFile = { name: 'ap2-20261109-120000.tar.gz', size: 7424, crea
 const JOB = { router_id: 'ap2', started_at: '2026-11-09T12:00:00', uptime_s: null, detail: null, error: null }
 let backups: BackupFile[] = []
 let jobs: Array<RebootJob | null> = [null]
+let overviewReads = 0
 const calls: Array<{ path: string; body: unknown }> = []
 
 vi.mock('../../api/client', async (orig) => {
@@ -20,6 +21,10 @@ vi.mock('../../api/client', async (orig) => {
     downloadFile: vi.fn(async () => undefined),
     apiFetch: vi.fn(async (path: string) => {
       if (path === '/api/routers/ap2/system/backups') return backups
+      if (path === '/api/routers/ap2/system') {
+        overviewReads += 1
+        return {}
+      }
       if (path === '/api/routers/ap2/system/reboot') return jobs.length > 1 ? jobs.shift() : jobs[0]
       if (path === '/api/guard') return { live: false, reasons: [], checked_at: '2026-11-09T12:00:00' }
       throw new Error(`unexpected ${path}`)
@@ -47,12 +52,20 @@ beforeEach(() => {
   backups = []
   jobs = [null]
   calls.length = 0
+  overviewReads = 0
 })
 afterEach(() => vi.useRealTimers())
+
+function Overview() {
+  // what the System screen's header and Status tab read: the uptime shown there
+  useQuery({ queryKey: ['system', 'ap2'], queryFn: () => apiFetch('/api/routers/ap2/system') })
+  return null
+}
 
 function renderTab() {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <Overview />
       <BackupTab routerId="ap2" routerName="AP2 · office" />
     </QueryClientProvider>,
   )
@@ -90,4 +103,18 @@ test('a reboot is confirmed, then followed: armed, waiting, back with the new up
   expect(await screen.findByText(/Waiting for AP2 to answer/)).toBeInTheDocument()
   await vi.advanceTimersByTimeAsync(2100)
   expect(await screen.findByText('AP2 · office is back after 63 s (uptime 41 s)')).toBeInTheDocument()
+})
+
+test('refreshes the overview when a reboot is back', async () => {
+  vi.useFakeTimers({ shouldAdvanceTime: true })
+  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+  renderTab()
+  await waitFor(() => expect(overviewReads).toBe(1))
+  await user.click(await screen.findByRole('button', { name: 'Preview reboot' }))
+  await user.click(await screen.findByRole('button', { name: 'Reboot AP2' }))
+  await user.click(within(screen.getByRole('group', { name: 'Confirm reboot' })).getByRole('button', { name: 'Reboot now' }))
+  await vi.advanceTimersByTimeAsync(2100)
+  await vi.advanceTimersByTimeAsync(2100)
+  expect(await screen.findByText('AP2 · office is back after 63 s (uptime 41 s)')).toBeInTheDocument()
+  await waitFor(() => expect(overviewReads).toBe(2)) // the old uptime is not left on screen
 })

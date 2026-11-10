@@ -9,9 +9,7 @@ import time
 from collections.abc import Awaitable, Callable, Collection, Coroutine
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Literal
-
-from pydantic import BaseModel, ConfigDict
+from typing import Any
 
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
@@ -44,7 +42,6 @@ from openwrtgui.system.backup import (
 )
 from openwrtgui.system.cron import CronState, check_crontab, has_tasks, read_tasks
 from openwrtgui.system.parse import (
-    Connection,
     RcService,
     parse_board,
     parse_conntrack,
@@ -86,7 +83,18 @@ from openwrtgui.system.services import (
     service_rows,
 )
 from openwrtgui.system.settings import SystemSettings, current_settings, settings_ops
-from openwrtgui.system.state import LogEntry, LogKind, ProcessList, SystemOverview, log_entries, read_overview
+from openwrtgui.system.state import (
+    Connections,
+    DiagResult,
+    DiagTool,
+    LogEntry,
+    LogKind,
+    ProcessList,
+    SystemOverview,
+    TimeZones,
+    log_entries,
+    read_overview,
+)
 from openwrtgui.transport.base import Transport, TransportError
 from openwrtgui.transport.comeback import Back, wait_for_reboot
 from openwrtgui.transport.pool import ConnectionPool
@@ -105,33 +113,8 @@ NO_ZONES = "This router lists no time zones (LuCI's rpcd plugin is missing): onl
 NO_CONNTRACK = "The connection table is not available: nf_conntrack is not loaded"
 CRONTAB_FILE: s.FilePath = "/etc/crontabs/root"
 RC_UNREAD = "The router's service list does not read"
-DiagTool = Literal["ping", "traceroute", "nslookup"]
 _DIAG: dict[str, Callable[[str], str]] = {"ping": s.ping, "traceroute": s.traceroute, "nslookup": s.nslookup}
 DIAG_TIMEOUT_S = s.DIAG_LIMIT_S + 5.0  # the router's own `timeout -s KILL` ends it first
-
-
-class DiagResult(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    tool: DiagTool
-    target: str
-    command: str
-    output: str  # stdout, then stderr: a bad address is a result, not an error
-    exit_status: int
-
-
-class Connections(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    rows: list[Connection]  # at most 500 (AP2 has ~7 MB free RAM)
-    note: str | None = None
-
-
-class TimeZones(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    zones: list[str]  # UTC first (the router's list has none: LuCI adds it), then the router's, sorted
-    note: str | None = None
 
 
 async def file_check(t: Transport, read: str, wanted: str) -> NetCheck:
@@ -357,9 +340,12 @@ class SystemService:
         return NetCheck(check, ok, detail if ok else f"{detail} after {SETTLE_S:g} s")
 
     async def rc_local(self, router_id: str) -> str:
-        """The file as the router has it; "" when there is none."""
+        """The file as the router has it; "" when there is none, and a read the router refuses is named."""
         _rec, t = await self._transport(router_id)
-        return await self._stdout(t, s.RC_LOCAL)
+        result = await t.run(s.RC_LOCAL)
+        if not result.ok and "No such file" not in result.stderr:
+            raise ValueError(f"/etc/rc.local does not read: {result.stderr.strip() or result.exit_status}")
+        return result.stdout if result.ok else ""
 
     async def _rc_local_plan(self, rec: RouterRecord, t: Transport, text: str) -> tuple[NetPlan, str]:
         wanted = check_rc_local(text)
@@ -406,8 +392,22 @@ class SystemService:
         wanted = check_crontab(text)
         command = s.write_file(CRONTAB_FILE, wanted)  # OWG and size refused before anything is sent
         expected = wanted or "\n"  # the heredoc writes at least its one (empty) line
-        current = await self._stdout(t, s.CRONTAB)
-        if current == expected or (not wanted.strip() and not current.strip()):
+        read = await t.run(s.CRONTAB)
+        current = read.stdout if read.ok else ""
+        if not wanted.strip():  # no task, no comment: back to no crontab at all, as AP2 was found (D14)
+            if not read.ok:
+                raise ValueError(NOTHING)
+            remove = net_plan(
+                router_id=rec.id,
+                screen=SCREEN,
+                config=None,
+                ops=[],
+                current={},
+                commands=[s.REMOVE_CRONTAB],
+                reloads=[s.init("cron", "restart")],
+            )
+            return remove, "", False
+        if current == expected:
             raise ValueError(NOTHING)
         row = await self._rc_row(t, "cron")
         enable = [s.init("cron", "enable")] if row is not None and not row.enabled else []
@@ -434,6 +434,9 @@ class SystemService:
             plan, expected, tasks = await self._crontab_plan(rec, t, text)
 
             async def verify(t2: Transport) -> list[NetCheck]:
+                if plan.commands == (s.REMOVE_CRONTAB,):
+                    gone = not (await t2.run(s.CRONTAB)).ok
+                    return [NetCheck("removed", gone, "the router has no crontab" if gone else "it is there")]
                 checks = [await file_check(t2, s.CRONTAB, expected)]
                 if tasks:
                     checks.append(await self._settled(t2, "cron", "start", "cron"))
@@ -458,6 +461,15 @@ class SystemService:
 
     def reboot_job(self, router_id: str) -> RebootJob | None:
         return self._reboots.get(router_id)
+
+    def busy(self, router_id: str) -> str | None:
+        """Why the router cannot be read now (a job holds it), for the live sampler; None when it can."""
+        job = self._reboots.get(router_id)
+        rec = self._routers.get(router_id)
+        if job is None or rec is None or job.phase not in ("armed", "waiting"):
+            return None
+        doing = {"reboot": "is rebooting", "restore": "is restoring a backup", "reset": "is resetting"}
+        return f"{rec.name} {doing[job.kind]}"
 
     def rebooting(self, router_id: str) -> bool:
         job = self._reboots.get(router_id)
@@ -699,7 +711,10 @@ class SystemService:
         path = backup_dir(self._data.root, rec.id) / name
         if path.exists():
             raise ValueError(f"A backup of {rec.name} was saved this second already")
-        total, status, problem = await save_archive(t, path)
+        try:
+            total, status, problem = await save_archive(t, path)
+        except FileExistsError as exc:  # another backup of this second is still streaming
+            raise ValueError(f"A backup of {rec.name} was saved this second already") from exc
         self._audit.record(
             router=rec.id,
             screen=SCREEN,

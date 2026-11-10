@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ApiError, apiFetch, downloadFile, postJson } from '../../api/client'
 import type { BackupFile, NetPlan, RebootJob } from '../../api/types'
 import { PreviewApply } from '../../components/PreviewApply'
@@ -107,6 +107,11 @@ function RebootCard({ routerId, short }: { routerId: string; short: string }) {
     refetchInterval: (q) => (q.state.data && (q.state.data.phase === 'armed' || q.state.data.phase === 'waiting') ? POLL_MS : false),
   })
   const running = job.data != null && (job.data.phase === 'armed' || job.data.phase === 'waiting')
+  const phase = job.data?.phase
+  useEffect(() => {
+    // the router came back: the overview's uptime (and the rest of what it shows) is read again
+    if (phase === 'back') void client.invalidateQueries({ queryKey: ['system', routerId] })
+  }, [phase, routerId, client])
   const preview = async (): Promise<void> => {
     setError(null)
     try {

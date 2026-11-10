@@ -48,7 +48,9 @@ class SystemSampler:
         clock: Callable[[], datetime] = datetime.now,
         sleep: Callable[[float], Awaitable[Any]] = asyncio.sleep,
         interval_s: float = INTERVAL_S,
+        busy: Callable[[str], str | None] = lambda router_id: None,
     ) -> None:
+        self._busy = busy  # a reboot, restore or reset holds the router: say so, do not wait in pool.get
         self.router_id = router_id
         self._pool = pool
         self._routers = routers
@@ -102,6 +104,8 @@ class SystemSampler:
         rec = self._routers.get(self.router_id)
         if rec is None:
             return {"type": "system-idle", "reason": f"{self.router_id} was removed"}
+        if (why := self._busy(self.router_id)) is not None:
+            return {"type": "system-idle", "reason": why}
         try:
             t = await self._pool.get(rec)
             result = await t.run(s.LIVE)
@@ -126,14 +130,23 @@ class SystemSampler:
 class SystemHub:
     """One sampler per router, shared by every client watching it."""
 
-    def __init__(self, *, pool: ConnectionPool, routers: RouterStore) -> None:
+    def __init__(
+        self,
+        *,
+        pool: ConnectionPool,
+        routers: RouterStore,
+        busy: Callable[[str], str | None] = lambda router_id: None,
+    ) -> None:
         self._pool = pool
         self._routers = routers
+        self._busy = busy
         self._samplers: dict[str, SystemSampler] = {}
 
     def sampler(self, router_id: str) -> SystemSampler:
         if router_id not in self._samplers:
-            self._samplers[router_id] = SystemSampler(router_id, pool=self._pool, routers=self._routers)
+            self._samplers[router_id] = SystemSampler(
+                router_id, pool=self._pool, routers=self._routers, busy=self._busy
+            )
         return self._samplers[router_id]
 
     def close_all(self) -> None:

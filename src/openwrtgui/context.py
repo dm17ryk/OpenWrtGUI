@@ -332,7 +332,7 @@ def build_context(
         lte=lte,
         lte_live=LteHub(pool=pool, routers=routers, locate=lte.modem_device),
         system=system,
-        system_live=SystemHub(pool=pool, routers=routers),
+        system_live=SystemHub(pool=pool, routers=routers, busy=system.busy),
         access=access,
         token=token,
         port=port,

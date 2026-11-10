@@ -244,6 +244,9 @@ class SimSystem:
         if m := _WRITE.fullmatch(c):
             self._files[m.group(1)] = m.group(2) + "\n"
             return _ok(c)
+        if c == s.REMOVE_CRONTAB:
+            self._files.pop("/etc/crontabs/root", None)
+            return _ok(c)
         if c == s.LIVE:
             return _ok(c, self._live())
         if c == s.CONNTRACK:

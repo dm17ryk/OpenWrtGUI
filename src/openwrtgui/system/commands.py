@@ -46,6 +46,7 @@ TOP = "top -bn1"
 DMESG = "dmesg -r"
 RC_LOCAL = "cat /etc/rc.local"
 CRONTAB = "cat /etc/crontabs/root"
+REMOVE_CRONTAB = "rm -f /etc/crontabs/root"  # an emptied crontab: back to no file (v0.6c D14)
 TZ_FILE = "cat /tmp/TZ"
 # one exec for the live charts (D3): load, bytes per interface, the connection count
 LIVE = "cat /proc/loadavg /proc/net/dev /proc/sys/net/netfilter/nf_conntrack_count"
