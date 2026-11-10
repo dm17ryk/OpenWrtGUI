@@ -5,9 +5,13 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from openwrtgui.api.deps import get_ctx, require_token
+from openwrtgui.api.net_api import Digest, NetPlanOut
 from openwrtgui.context import AppContext
+from openwrtgui.net.apply import NetApplyResult
+from openwrtgui.system.access import PasswordPolicy
 from openwrtgui.system.access_service import AccessState, LedState, MountState
 
 router = APIRouter(
@@ -35,3 +39,44 @@ async def leds(router_id: str, ctx: Ctx) -> LedState:
 @router.get("/mounts")
 async def mounts(router_id: str, ctx: Ctx) -> MountState:
     return await ctx.access.mounts(_known(ctx, router_id))
+
+
+class PasswordIn(Digest):
+    """The new password: checked by the service (no field limits here, so a refusal never echoes it)."""
+
+    password: str
+
+
+@router.post("/password/preview")
+async def password_preview(router_id: str, ctx: Ctx) -> NetPlanOut:
+    return NetPlanOut.of(await ctx.access.plan_password(_known(ctx, router_id)))
+
+
+@router.post("/password/apply")
+async def password_apply(router_id: str, body: PasswordIn, ctx: Ctx) -> NetApplyResult:
+    return await ctx.access.apply_password(_known(ctx, router_id), body.password, body.digest)
+
+
+class PolicyIn(BaseModel):
+    enabled: bool = False
+    pw_length: int = 0
+    digits: bool = False
+    uc_lc: bool = False
+    special_characters: bool = False
+
+    def to_domain(self) -> PasswordPolicy:
+        return PasswordPolicy(**self.model_dump(exclude={"digest"}))
+
+
+class PolicyApplyIn(PolicyIn, Digest):
+    pass
+
+
+@router.post("/password-policy/preview")
+async def policy_preview(router_id: str, body: PolicyIn, ctx: Ctx) -> NetPlanOut:
+    return NetPlanOut.of(await ctx.access.plan_policy(_known(ctx, router_id), body.to_domain()))
+
+
+@router.post("/password-policy/apply")
+async def policy_apply(router_id: str, body: PolicyApplyIn, ctx: Ctx) -> NetApplyResult:
+    return await ctx.access.apply_policy(_known(ctx, router_id), body.to_domain(), body.digest)

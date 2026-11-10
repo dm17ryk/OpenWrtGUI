@@ -5,11 +5,12 @@ image read exactly these (`system/dropbear.js`, `uhttpd.js`, `pwpolicy.js`)."""
 from __future__ import annotations
 
 import ipaddress
+from collections.abc import Mapping
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-from openwrtgui.uci import parse_uci_show
+from openwrtgui.uci import UciOp, parse_uci_show
 
 _TRUE = frozenset({"1", "on", "yes", "true", "enabled"})
 _FALSE = frozenset({"0", "off", "no", "false", "disabled"})
@@ -169,6 +170,29 @@ def parse_policy(show_text: str) -> PasswordPolicy | None:
         uc_lc=flag(get("uc_lc"), False),
         special_characters=flag(get("special_characters"), False),
     )
+
+
+def policy_ops(current: Mapping[str, str], policy: PasswordPolicy) -> list[UciOp]:
+    """LuCI's Password Policy page: the named `rpcd.policy` section, flags removed when off (rmempty)."""
+    if not 0 <= policy.pw_length <= MAX_PASSWORD:
+        raise ValueError(f"A minimum length is 0-{MAX_PASSWORD} characters")
+    base = "rpcd.policy"
+    ops: list[UciOp] = []
+    if current.get(base) != "policy":
+        ops.append(UciOp("set", base, "policy"))
+    ops.append(UciOp("set", f"{base}.enabled", "1" if policy.enabled else "0"))
+
+    def optional(option: str, value: str | None) -> None:
+        if value is not None:
+            ops.append(UciOp("set", f"{base}.{option}", value))
+        elif f"{base}.{option}" in current:
+            ops.append(UciOp("delete", f"{base}.{option}"))
+
+    optional("pw_length", str(policy.pw_length) if policy.pw_length > 0 else None)
+    optional("digits", "1" if policy.digits else None)
+    optional("uc_lc", "1" if policy.uc_lc else None)
+    optional("special_characters", "1" if policy.special_characters else None)
+    return ops
 
 
 def check_password(password: str, policy: PasswordPolicy | None) -> None:

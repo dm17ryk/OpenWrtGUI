@@ -11,9 +11,18 @@ from typing import Literal
 import asyncssh
 from pydantic import BaseModel, ConfigDict
 
-from openwrtgui.guard.audit import AuditLog
+from openwrtgui.guard.audit import AuditLog, mask
 from openwrtgui.guard.bench_guard import BenchGuard
-from openwrtgui.net.apply import ApplyRunner
+from openwrtgui.guard.writes import run_audited
+from openwrtgui.net.apply import (
+    ApplyRunner,
+    NetApplyResult,
+    NetCheck,
+    NetPlan,
+    Planned,
+    net_plan,
+    saved_check,
+)
 from openwrtgui.net.commands import INTERFACE_DUMP
 from openwrtgui.net.parse import parse_interface_dump
 from openwrtgui.probe.commands import ROOT_PASSWORD_STATE
@@ -26,16 +35,20 @@ from openwrtgui.system.access import (
     PasswordPolicy,
     RepoKey,
     SshInstance,
+    check_password,
     parse_dropbear,
     parse_listeners,
     parse_policy,
     parse_uhttpd,
+    policy_ops,
 )
 from openwrtgui.system.leds import LedInfo, LedRow, parse_led_sections, parse_leds
 from openwrtgui.system.mounts import Mount, Usage, parse_df, parse_mounts
 from openwrtgui.system.sshkeys import KeyLabel, label, parse_authorized_keys
 from openwrtgui.transport.base import Transport
 from openwrtgui.transport.pool import ConnectionPool
+from openwrtgui.uci import parse_uci_show
+from openwrtgui.wifi.service import PreviewChanged
 
 log = logging.getLogger(__name__)
 
@@ -220,6 +233,96 @@ class AccessService:
             repo_keys=repo,
             missing=tuple(missing),
         )
+
+    # ---------------------------------------------------------------- password and policy (D2)
+    def _password_plan(self, rec: RouterRecord) -> NetPlan:
+        return net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config=None,
+            ops=[],
+            current={},
+            commands=[s.PASSWD],
+            warnings=[
+                f"LuCI and SSH password logins on {rec.name} use the new password. The app logs in with "
+                f"its key and is not affected. A script that logs in to {rec.name} with the old password "
+                "stops working."
+            ],
+        )
+
+    async def plan_password(self, router_id: str) -> NetPlan:
+        return self._password_plan(self._record(router_id))
+
+    async def _digest(self, t: Transport) -> str | None:
+        """A digest of root's hash: compared here, never logged or returned."""
+        result = await t.run(s.PASSWORD_DIGEST)
+        return result.stdout.split()[0] if result.ok and result.stdout.split() else None
+
+    async def apply_password(self, router_id: str, password: str, digest: str | None) -> NetApplyResult:
+        """`passwd root` with the password twice on stdin; proof: root's hash changed. The password is in no
+        command line, plan, audit line, result or error."""
+        rec, t = await self._transport(router_id)
+        check_password(password, parse_policy(await self._stdout(t, s.UCI_RPCD)))
+        plan = self._password_plan(rec)
+        self._guard.require_clear()
+        if digest != plan.digest:
+            raise PreviewChanged(rec.name)
+        async with self._pool.write_lock(rec.id):
+            t = await self._pool.get(rec)
+            before = await self._digest(t)
+            result = await run_audited(
+                t,
+                s.PASSWD,
+                router_id=rec.id,
+                screen=SCREEN,
+                guard=self._guard,
+                audit=self._audit,
+                secrets=(password,),
+                stdin=f"{password}\n{password}\n",
+            )
+            if not result.ok:
+                reason = mask(
+                    (result.stderr or result.stdout).strip() or f"exit {result.exit_status}", (password,)
+                )
+                error = f"The router refused the new password: {reason}"
+                return NetApplyResult(rec.id, False, False, (), error, rec.host)
+            after = await self._digest(t)
+        changed = after is not None and after not in (before, s.EMPTY_DIGEST)
+        detail = (
+            "the router's password hash changed" if changed else "the router's password hash did not change"
+        )
+        return NetApplyResult(rec.id, True, changed, (NetCheck("password", changed, detail),), None, rec.host)
+
+    async def _policy_plan(
+        self, rec: RouterRecord, t: Transport, policy: PasswordPolicy
+    ) -> tuple[NetPlan, dict[str, str]]:
+        current = parse_uci_show(await self._stdout(t, s.UCI_RPCD))
+        ops = policy_ops(current, policy)
+        plan = net_plan(router_id=rec.id, screen=SCREEN, config="rpcd", ops=ops, current=current)
+        return plan, current
+
+    async def plan_policy(self, router_id: str, policy: PasswordPolicy) -> NetPlan:
+        rec, t = await self._transport(router_id)
+        return (await self._policy_plan(rec, t, policy))[0]
+
+    async def apply_policy(
+        self, router_id: str, policy: PasswordPolicy, digest: str | None
+    ) -> NetApplyResult:
+        rec = self._record(router_id)
+
+        async def make(t: Transport) -> Planned:
+            plan, current = await self._policy_plan(rec, t, policy)
+
+            async def verify(t2: Transport) -> list[NetCheck]:
+                return [await saved_check(t2, s.UCI_RPCD, plan.ops, current)]
+
+            return Planned(plan, verify)
+
+        return await self._runner.run_planned(rec, make, digest)
+
+    async def _stdout(self, t: Transport, command: str) -> str:
+        result = await t.run(command)
+        return result.stdout if result.ok else ""
 
     async def leds(self, router_id: str) -> LedState:
         _rec, t = await self._transport(router_id)

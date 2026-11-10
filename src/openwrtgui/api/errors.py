@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from openwrtgui.api.models import GuardOut
@@ -64,3 +65,9 @@ def install(app: FastAPI) -> None:
     @app.exception_handler(ValueError)
     async def value_error(request: Request, exc: ValueError) -> JSONResponse:
         return JSONResponse(status_code=422, content={"detail": str(exc)})
+
+    @app.exception_handler(RequestValidationError)
+    async def bad_body(request: Request, exc: RequestValidationError) -> JSONResponse:
+        """FastAPI's own 422 without the input it echoes: a body may hold a password or a key (v0.6c)."""
+        errors = [{k: v for k, v in e.items() if k in ("type", "loc", "msg")} for e in exc.errors()]
+        return JSONResponse(status_code=422, content={"detail": jsonable_encoder(errors)})
