@@ -14,6 +14,7 @@ import asyncssh
 import httpx
 
 from openwrtgui.guard.bench_guard import ProcessInfo
+from openwrtgui.simaccess import SimAccess
 from openwrtgui.simfw import SimFirewall
 from openwrtgui.simimage import SimImage
 from openwrtgui.simmodem import SimModem
@@ -102,6 +103,18 @@ def _public_lines(key_paths: Sequence[Path]) -> list[str]:
     return lines
 
 
+def _seed_key(state: SimState, key_paths: Sequence[Path]) -> None:
+    """A router added with a key has that key in its authorized_keys (onboarding put it there), so the SSH
+    keys tab shows the app's key (v0.6c). A key file that cannot be read is left out."""
+    try:
+        lines = _public_lines(key_paths[:1])
+    except KeyFileError:
+        return
+    for line in lines:
+        if line not in state.authorized_keys:
+            state.authorized_keys.insert(0, line)
+
+
 class SimConnector:
     """The wizard's Connector for simulated routers, found by the address they answer on now: the one in
     routers.json, or lan's address once a change moved it. One host key per router, at any address."""
@@ -127,6 +140,8 @@ class SimConnector:
                 state = self._states.get(entry["id"])
                 if state is not None and state.image is not None and state.image.rebooting:
                     raise Unreachable(f"{host}:22: Connection refused")
+                if state is not None and state.access is not None and state.access.gone:
+                    raise Unreachable(f"{host}:22: No route to host")  # reset: it comes back as 192.168.1.1
                 if state is not None and state.net is not None and not state.net.reachable():
                     raise Unreachable(f"{host}:22: No route to host")
                 return entry
@@ -169,7 +184,7 @@ class SimConnector:
         modem = SimModem(clock=self._clock) if entry.get("modem") else None
         if net is not None:
             net.modem = modem
-        return SimState(
+        state = SimState(
             root_password=entry.get("password") or SIM_ROOT_PASSWORD,
             wifi=wifi,
             net=net,
@@ -178,6 +193,16 @@ class SimConnector:
             modem=modem,
             system=self._system(entry, net, image),
         )
+        if net is not None:  # the Access side (v0.6c), as the System side: routers with a network
+            state.access = SimAccess(
+                net=net,
+                state=state,
+                system=state.system,
+                image=image,
+                https=entry.get("https", True),
+                clock=self._clock,
+            )
+        return state
 
     def _system(
         self, entry: dict[str, Any], net: SimNetwork | None, image: SimImage | None
@@ -216,8 +241,15 @@ class SimConnector:
         state = self._states.get(router_id)
         return state.image.generation if state is not None and state.image is not None else 0
 
+    def _check_port(self, host: str, port: int) -> None:
+        """dropbear answers only on the ports its committed config listens on (v0.6c)."""
+        state = self.state(host)
+        if state.access is not None and not state.access.listens_ssh(port):
+            raise Unreachable(f"{host}:{port}: Connection refused")
+
     async def fetch_host_key(self, host: str, port: int = 22) -> HostKeyInfo:
         router_id = self._entry(host)["id"]
+        self._check_port(host, port)
         key_id = (router_id, self._generation(router_id))  # a reflash without settings makes a new host key
         if key_id not in self._host_keys:
             key = asyncssh.generate_private_key("ssh-ed25519")
@@ -252,6 +284,7 @@ class SimConnector:
     ) -> Transport:
         entry = self._entry(host)
         state = self.state(host)
+        self._check_port(host, port)
         if state.root_password is None:
             # Like dropbear with an empty root password: anyone gets in without being checked,
             # which a login that must prove itself (asyncssh disable_trivial_auth) refuses.
@@ -264,6 +297,8 @@ class SimConnector:
             trusted = entry.get("auth") == "key" and self._generation(entry["id"]) == 0
             if not trusted and not any(line in state.authorized_keys for line in _public_lines(key_paths)):
                 raise AuthFailed(f"{host} refused the key")
+            if trusted:
+                _seed_key(state, key_paths)
         else:
             raise AuthFailed(f"{host} refused the login")
         return ReplayTransport(sim_commands(self._sim_dir, entry["id"]), state=state)

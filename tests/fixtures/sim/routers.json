@@ -33,7 +33,8 @@
     "auth": "key",
     "image": "mini-r35692.bin",
     "upper": "overlay/ap2.json",
-    "modem": true
+    "modem": true,
+    "https": false
   },
   {
     "id": "ap3",

@@ -222,6 +222,15 @@ class SimImage:
         ]
         return sorted({p.rsplit("/", 1)[1] for p in names})
 
+    @property
+    def sysupgrade_conf(self) -> str:
+        """/etc/sysupgrade.conf (System edits it, v0.6c; a flash that keeps settings adds a line)."""
+        return self._conf
+
+    @sysupgrade_conf.setter
+    def sysupgrade_conf(self, text: str) -> None:
+        self._conf = text
+
     def _kept(self) -> list[str]:
         keep = ["/etc/sysupgrade.conf"]
         for path, node in self._rom.items():
