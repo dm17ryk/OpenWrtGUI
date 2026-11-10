@@ -12,7 +12,7 @@ from openwrtgui.api.net_api import Digest, NetPlanOut
 from openwrtgui.context import AppContext
 from openwrtgui.net.apply import NetApplyResult
 from openwrtgui.system.access import HttpChange, PasswordPolicy, SshChange
-from openwrtgui.system.access_service import AccessState, LedState, MountState
+from openwrtgui.system.access_service import LedState, MountState, SystemAccessState
 from openwrtgui.system.leds import LedChange
 from openwrtgui.system.sshkeys import KeysChange
 
@@ -29,7 +29,7 @@ def _known(ctx: AppContext, router_id: str) -> str:
 
 
 @router.get("/access")
-async def access(router_id: str, ctx: Ctx) -> AccessState:
+async def access(router_id: str, ctx: Ctx) -> SystemAccessState:
     return await ctx.access.access(_known(ctx, router_id))
 
 
@@ -43,7 +43,7 @@ async def mounts(router_id: str, ctx: Ctx) -> MountState:
     return await ctx.access.mounts(_known(ctx, router_id))
 
 
-class PasswordIn(Digest):
+class RouterPasswordIn(Digest):
     """The new password: checked by the service (no field limits here, so a refusal never echoes it)."""
 
     password: str
@@ -55,7 +55,7 @@ async def password_preview(router_id: str, ctx: Ctx) -> NetPlanOut:
 
 
 @router.post("/password/apply")
-async def password_apply(router_id: str, body: PasswordIn, ctx: Ctx) -> NetApplyResult:
+async def password_apply(router_id: str, body: RouterPasswordIn, ctx: Ctx) -> NetApplyResult:
     return await ctx.access.apply_password(_known(ctx, router_id), body.password, body.digest)
 
 
@@ -105,7 +105,7 @@ class KeyOwnerIn(BaseModel):
 
 
 @router.put("/ssh-keys/owner")
-async def key_owner(router_id: str, body: KeyOwnerIn, ctx: Ctx) -> AccessState:
+async def key_owner(router_id: str, body: KeyOwnerIn, ctx: Ctx) -> SystemAccessState:
     """Name (or forget) a harness's key; the Access state comes back with the new labels."""
     _known(ctx, router_id)
     ctx.access.set_key_owner(body.fingerprint, body.owner)

@@ -89,7 +89,7 @@ class SshKeyRow(BaseModel):
     text: str  # the line itself: a public key
 
 
-class AccessState(BaseModel):
+class SystemAccessState(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     password: Literal["set", "none"] | None
@@ -218,7 +218,7 @@ class AccessService:
             rows.append(SshKeyRow(**line.model_dump(), label=kind, owner=owner))
         return rows
 
-    async def access(self, router_id: str) -> AccessState:
+    async def access(self, router_id: str) -> SystemAccessState:
         rec, t = await self._transport(router_id)
         missing: list[str] = []
 
@@ -249,7 +249,7 @@ class AccessService:
             missing.append("repository keys")
         served = https_ports(http) & {port for _, port in listening}
         mine = app_instance(dropbear, rec.port, interface)
-        return AccessState(
+        return SystemAccessState(
             password=state if state in ("set", "none") else None,  # type: ignore[arg-type]
             policy=policy,
             ssh=dropbear,
