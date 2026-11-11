@@ -3,8 +3,11 @@ that a restore took. The job that waits for the router is the reboot's (reboot.p
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
+import ipaddress
 import re
+import socket
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 
@@ -27,6 +30,20 @@ class RestoreCheck(BaseModel):
     files: tuple[str, ...]
     warnings: tuple[str, ...]
     refusals: tuple[str, ...]
+
+
+async def router_ipv4(host: str) -> str:
+    """The IPv4 address the app reaches a router at: its host when that is an address, else the first IPv4
+    the resolver gives for the name; the name as given when it does not resolve (a check then names it)."""
+    try:
+        return str(ipaddress.IPv4Address(host))
+    except ValueError:
+        pass
+    try:
+        found = await asyncio.get_running_loop().getaddrinfo(host, None, family=socket.AF_INET)
+    except OSError:
+        return host
+    return str(found[0][4][0]) if found else host
 
 
 def restore_lines(name: str, data: bytes) -> list[str]:

@@ -157,6 +157,34 @@ async def test_restore_endpoints(authed: httpx.AsyncClient, ctx: AppContext) -> 
     await wait_job(ctx)
 
 
+async def test_a_router_added_by_name_is_checked_at_its_address(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A router added by host name: the backup's interface addresses are compared with the address the name
+    resolves to, not with the name (PR #48 review: every backup with a network config was refused)."""
+    from openwrtgui.system import jobs
+
+    saved = await ctx.system.create_backup("ap2")
+    rec = ctx.routers.get("ap2")
+    assert rec is not None
+    ctx.routers.upsert(rec.model_copy(update={"host": "ap2.bench.lan"}))
+
+    async def resolve(host: str) -> str:
+        return {"ap2.bench.lan": "192.168.1.2"}.get(host, host)
+
+    monkeypatch.setattr(jobs, "router_ipv4", resolve)
+    check = await ctx.system.check_restore("ap2", saved.name)
+    assert check.refusals == ()
+
+
+async def test_router_ipv4() -> None:
+    from openwrtgui.system.restore import router_ipv4
+
+    assert await router_ipv4("192.168.1.2") == "192.168.1.2"
+    assert await router_ipv4("localhost") == "127.0.0.1"
+    assert await router_ipv4("no-such-host.invalid") == "no-such-host.invalid"  # the refusal then names it
+
+
 async def test_an_import_in_the_same_second_leaves_the_other_alone(
     ctx: AppContext, monkeypatch: pytest.MonkeyPatch
 ) -> None:

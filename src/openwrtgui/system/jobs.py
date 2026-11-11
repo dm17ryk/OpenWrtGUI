@@ -43,6 +43,7 @@ from openwrtgui.system.restore import (
     reset_warnings,
     restore_lines,
     restore_warnings,
+    router_ipv4,
     wait_until_gone,
 )
 from openwrtgui.transport.base import Transport, TransportError
@@ -251,14 +252,16 @@ class JobsMixin:
         return await self._start(rec, "reset", plan, digest, arm, wait)
 
     # ---------------------------------------------------------------- restore (D11)
-    def _restore_input(self, rec: RouterRecord, name: str) -> tuple[bytes, ArchiveInfo, list[str]]:
+    def _restore_input(
+        self, rec: RouterRecord, name: str, address: str
+    ) -> tuple[bytes, ArchiveInfo, list[str]]:
         data = self.backup_path(rec.id, name).read_bytes()  # LookupError: not in the router's list
         info = read_archive(data)
         pinned = self._host_keys.get(rec.host, rec.port) if self._host_keys is not None else None
         refusals = restore_refusals(
             info,
             router_name=rec.name,
-            address=rec.host,
+            address=address,
             port=rec.port,
             pinned=pinned,
             app=self._app_keys(rec),
@@ -272,15 +275,15 @@ class JobsMixin:
 
     async def check_restore(self, router_id: str, name: str) -> RestoreCheck:
         rec = self._record(router_id)
-        data, info, refusals = self._restore_input(rec, name)
+        data, info, refusals = self._restore_input(rec, name, await router_ipv4(rec.host))
         return RestoreCheck(
             files=tuple(f.path for f in info.files),
             warnings=restore_warnings(rec.name, self._created(rec, name)),
             refusals=tuple(refusals),
         )
 
-    def _restore_plan(self, rec: RouterRecord, name: str) -> tuple[NetPlan, bytes, ArchiveInfo]:
-        data, info, refusals = self._restore_input(rec, name)
+    def _restore_plan(self, rec: RouterRecord, name: str, address: str) -> tuple[NetPlan, bytes, ArchiveInfo]:
+        data, info, refusals = self._restore_input(rec, name, address)
         if refusals:
             raise ValueError("Not restored: " + "; ".join(refusals))
         plan = net_plan(
@@ -295,13 +298,14 @@ class JobsMixin:
         return plan, data, info
 
     async def plan_restore(self, router_id: str, name: str) -> NetPlan:
-        return self._restore_plan(self._record(router_id), name)[0]
+        rec = self._record(router_id)
+        return self._restore_plan(rec, name, await router_ipv4(rec.host))[0]
 
     async def start_restore(self, router_id: str, name: str, digest: str) -> RebootJob:
         """Upload, list, restore, arm the reboot; then the come-back with the files proven. A step that
         fails removes the uploaded archive (it holds the router's secrets) and starts no job."""
         rec = self._record(router_id)
-        plan, data, info = self._restore_plan(rec, name)
+        plan, data, info = self._restore_plan(rec, name, await router_ipv4(rec.host))
         files = provable(info)
 
         async def steps(t: Transport) -> None:
