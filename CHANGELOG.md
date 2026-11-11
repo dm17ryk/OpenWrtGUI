@@ -7,6 +7,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-11
+
+LTE and System.
+
+Not yet proven on a real router: the System reboot (O19), a restore from a backup (proven in the simulator
+only), and the HTTPS redirect with the LuCI pages behind it (the bench router serves no HTTPS).
+
 ### Added
 
 - LTE screen per router with an LTE modem: registration, radio, roaming, the operator (from the modem's AT
@@ -55,6 +62,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   configuration now open the System screen. Its Mount Points page still opens in LuCI, where fstab editing
   lives.
 
+### Changed
+
+- Bench Guard also watches for the C8000 memory soak (`mem04_bench.py`) by default. A settings file saved
+  with its own watch list keeps that list.
+
 ### Fixed
 
 - A list replaced on a named uci section (for example the NTP servers) was reported as not saved although
@@ -63,9 +75,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Two backups started in the same second no longer overwrite each other; two reboots started at once arm one.
 - The live System charts idle while the router reboots instead of reporting it unreachable.
 - A startup script the router refuses to read is named as such instead of shown empty.
-
-### Fixed
-
+- LuCI pages open on a router whose web server listens on another port than 80 or 443 (8080, 8443).
 - A Wi-Fi change waits for the AP interface to come up before it sets the TX mask and checks the channel.
   Before, it could report "not verified" while hostapd was still setting the country (#45).
 - A deauth counts as proven once hostapd lists the station as no longer associated, so a phone that joins
@@ -234,7 +244,8 @@ The foundation: install, update, add routers, see them, and stay out of a runnin
 - Router simulator built from recorded router output, used for e2e tests, screenshots and demos.
 - CI, pre-release and release workflows, wiki sync, CodeQL and Dependabot.
 
-[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.6.0
 [0.5.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.5.0
 [0.4.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.4.0
 [0.3.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.3.0
