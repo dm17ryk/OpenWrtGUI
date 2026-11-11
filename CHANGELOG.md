@@ -7,6 +7,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- The GitHub release notes keep characters such as "›": since 0.4.0 they showed a replacement character
+  instead (the 0.4.0, 0.5.0 and 0.6.0 notes are corrected).
+
 ## [0.6.0] - 2026-11-11
 
 LTE and System.

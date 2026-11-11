@@ -55,7 +55,8 @@ jobs:
           $setup = Get-Item "dist/OpenWrtGUI-Setup-$env:BASE.exe"
           $hash = (Get-FileHash -Algorithm SHA256 $setup.FullName).Hash.ToLowerInvariant()
           Set-Content -Path dist/SHA256SUMS.txt -Value "$hash  $($setup.Name)" -Encoding utf8NoBOM
-          uv run python tools/release_notes.py $env:BASE | Set-Content -Path dist/notes.md -Encoding utf8NoBOM
+          # the script writes the file itself: piping it through pwsh turned "›" into U+FFFD (0.4.0-0.6.0)
+          uv run python tools/release_notes.py $env:BASE --out dist/notes.md
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Publish
         env:
