@@ -69,3 +69,15 @@ def test_labels() -> None:
 
 def test_render_nothing() -> None:
     assert render_authorized_keys([]) == ""
+
+
+def test_a_line_written_on_windows_keeps_its_crlf() -> None:
+    """A key pasted from a Windows .pub ends in CRLF; rewriting the file for another key keeps that line as
+    written (AP2, 2026-11-11: removing a test key turned it into LF)."""
+    kept, kept_print = _public("ssh-rsa", "user@pc")
+    gone, gone_print = _public()
+    rows = parse_authorized_keys(f"{kept}\r\n{gone}\n")
+    assert [(r.fingerprint, r.comment) for r in rows] == [(kept_print, "user@pc"), (gone_print, "bob@pc")]
+    left = [r.text for r in rows if r.fingerprint != gone_print]
+    assert render_authorized_keys(left) == f"{kept}\r\n"
+    assert parse_authorized_keys(kept) == parse_authorized_keys(f"{kept}\n")  # no final newline: same rows

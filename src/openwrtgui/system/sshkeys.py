@@ -56,7 +56,7 @@ class KeyLine(BaseModel):
 
 
 def _key(index: int, text: str) -> KeyLine | None:
-    m = _LINE.match(text)
+    m = _LINE.match(text.removesuffix("\r"))
     if not m:
         return None
     options, key_type, blob, comment = m.groups()
@@ -75,8 +75,12 @@ def _key(index: int, text: str) -> KeyLine | None:
 
 
 def parse_authorized_keys(text: str) -> list[KeyLine]:
+    """Each line as written (a CRLF line keeps its CR, so a rewrite leaves it as it was), parsed without."""
     out: list[KeyLine] = []
-    for index, line in enumerate(text.splitlines()):
+    lines = text.split("\n")
+    if lines[-1] == "":
+        lines.pop()  # the final newline ends the last line; it is not an empty line
+    for index, line in enumerate(lines):
         out.append(
             _key(index, line)
             or KeyLine(index=index, text=line, type=None, comment="", options=None, fingerprint=None)
