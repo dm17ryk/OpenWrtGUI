@@ -27,7 +27,8 @@ if TYPE_CHECKING:
     from openwrtgui.simmodem import SimModem
 
 PC_MAC = "08:3a:88:5c:a8:39"
-CONFIGS = ("network", "dhcp", "firewall", "system")  # system: the System screen's plain uci apply (v0.6b)
+# system: the System screen's plain uci apply (v0.6b); dropbear, uhttpd, rpcd: its Access tab (v0.6c)
+CONFIGS = ("network", "dhcp", "firewall", "system", "dropbear", "uhttpd", "rpcd")
 DEFAULT = ""  # the default staging folder (/tmp/.uci)
 SWITCH = "switch0"
 DEVICE_MACS = {"br-lan": "00:0c:43:76:20:17", "eth0.1": "00:0c:43:76:20:17", "eth0.2": "00:0c:43:76:20:16"}
@@ -165,6 +166,11 @@ class SimNetwork:
         """Every config as committed now (after a rollback that came due)."""
         self._expire()
         return dict(self._committed)
+
+    def replace_config(self, config: str, values: dict[str, str]) -> None:
+        """A restored /etc/config/<config> (v0.6c): its sections replace the committed ones."""
+        kept = {k: v for k, v in self._committed.items() if not k.startswith(config + ".")}
+        self._committed = kept | {k: v for k, v in values.items() if k.startswith(config + ".")}
 
     def reachable(self) -> bool:
         """The PC reaches lan: its address is in lan's subnet, its switch port is on and in lan's VLAN,

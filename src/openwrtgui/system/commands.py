@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from typing import Literal
 
 from openwrtgui.uci import shell_quote
@@ -17,8 +18,22 @@ InitAction = Literal["start", "stop", "restart", "enable", "disable", "reload"]
 INIT_ACTIONS: tuple[InitAction, ...] = ("start", "stop", "restart", "enable", "disable", "reload")
 ServiceAction = Literal["start", "stop", "restart", "enable", "disable"]
 SERVICE_ACTIONS: tuple[ServiceAction, ...] = ("start", "stop", "restart", "enable", "disable")
-FilePath = Literal["/etc/rc.local", "/etc/crontabs/root"]
-FILES: tuple[FilePath, ...] = ("/etc/rc.local", "/etc/crontabs/root")
+FilePath = Literal[
+    "/etc/rc.local", "/etc/crontabs/root", "/etc/dropbear/authorized_keys", "/etc/sysupgrade.conf"
+]
+FILES: tuple[FilePath, ...] = (
+    "/etc/rc.local",
+    "/etc/crontabs/root",
+    "/etc/dropbear/authorized_keys",
+    "/etc/sysupgrade.conf",
+)
+# v0.6c rules
+IFACE_NAME = re.compile(r"[A-Za-z0-9_]{1,15}")
+LED_NAME = re.compile(r"[A-Za-z0-9 _.:-]{1,32}")
+HEX_MASK = re.compile(r"0[xX][0-9a-fA-F]{1,8}")
+KEPT_PATH = re.compile(r"/[^\s'\"\\]{0,255}")
+OWNER = re.compile(r"[A-Za-z0-9 ._-]{1,40}")
+_DIGEST_PATH = re.compile(r"/[A-Za-z0-9._/@+-]{1,255}")
 MAX_FILE = 8 * 1024
 DIAG_LIMIT_S = 25  # D4: a diagnostic never runs longer, whatever the network does
 
@@ -31,12 +46,43 @@ TOP = "top -bn1"
 DMESG = "dmesg -r"
 RC_LOCAL = "cat /etc/rc.local"
 CRONTAB = "cat /etc/crontabs/root"
+REMOVE_CRONTAB = "rm -f /etc/crontabs/root"  # an emptied crontab: back to no file (v0.6c D14)
 TZ_FILE = "cat /tmp/TZ"
 # one exec for the live charts (D3): load, bytes per interface, the connection count
 LIVE = "cat /proc/loadavg /proc/net/dev /proc/sys/net/netfilter/nf_conntrack_count"
 CONNTRACK = "head -n 500 /proc/net/nf_conntrack"  # AP2 has ~7 MB free RAM: the table is capped
 BACKUP = "sysupgrade -b -"  # the archive on stdout (D9): it holds secrets, never recorded or logged
 BACKUP_SIZE = "sysupgrade -b - | wc -c"  # what the recorder keeps of it
+
+# v0.6c reads (Access, LEDs, mount points, the files kept in a backup): LuCI's own on this image
+UCI_DROPBEAR = "uci -X show dropbear"
+UCI_UHTTPD = "uci -X show uhttpd"
+UCI_RPCD = "uci -X show rpcd"
+AUTHORIZED_KEYS = "/etc/dropbear/authorized_keys"
+KEYS_READ = f"cat {AUTHORIZED_KEYS}"  # public keys only
+APK_KEYS = "ls -1 /etc/apk/keys"
+OPKG_KEYS = "ls -1 /etc/opkg/keys"
+LEDS = "ubus call luci getLEDs"
+NET_DEVICES = "ls -1 /sys/class/net"
+MOUNTS = "cat /proc/mounts"
+DF = "df -k"
+HAS_BLOCK = "test -x /sbin/block"  # LuCI shows Mount points only with block-mount (D8)
+KEPT = "cat /etc/sysupgrade.conf"
+BACKUP_LIST = "sysupgrade -l"
+LISTENERS = "cat /proc/net/tcp /proc/net/tcp6"
+# A digest of root's shadow field (D2): proves a password change without the hash leaving the router.
+# Derived from a secret: compared live, never recorded, logged or shown.
+PASSWORD_DIGEST = """awk -F: '$1=="root"{print $2}' /etc/shadow | sha256sum"""
+# the digest of a lone newline: root has no password
+EMPTY_DIGEST = "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+
+# v0.6c writes
+PASSWD = "passwd root"  # the password goes twice on stdin, never into a command line (D2)
+RESTORE_FILE = "/tmp/owg/restore.tar.gz"
+UPLOAD_RESTORE = f"mkdir -p /tmp/owg && cat > {RESTORE_FILE}"
+LIST_RESTORE = f"tar -tzf {RESTORE_FILE}"
+RESTORE = f"sysupgrade --restore-backup {RESTORE_FILE}"
+REMOVE_RESTORE = f"rm -f {RESTORE_FILE}"
 
 LogLength = Literal[100, 500, 2000]
 LOG_LENGTHS: tuple[LogLength, ...] = (100, 500, 2000)
@@ -88,4 +134,25 @@ def write_file(path: FilePath, text: str) -> str:
     head = f"cat > {path}"
     if path == "/etc/crontabs/root":
         head = f"mkdir -p /etc/crontabs && {head}"
-    return heredoc(head, text.rstrip("\n"))
+    if path == AUTHORIZED_KEYS:
+        head = f"mkdir -p /etc/dropbear && {head}"
+    command = heredoc(head, text.rstrip("\n"))
+    if path == AUTHORIZED_KEYS:
+        # dropbear refuses keys others can write: the mode is set again after the write (D5)
+        first, _, rest = command.partition("\n")
+        command = f"{first} && chmod 600 {AUTHORIZED_KEYS}\n{rest}"
+    return command
+
+
+def file_digests(paths: Sequence[str]) -> str:
+    """`sha256sum` of absolute paths (a restore's proof, D11); each path matches a plain-path rule first."""
+    if not paths:
+        raise ValueError("No files to compare")
+    return "sha256sum " + " ".join(shell_quote(_checked(_DIGEST_PATH, p, "an absolute path")) for p in paths)
+
+
+def firstboot_command() -> str:
+    """Reset to defaults through the router-side timer (D12): the exec returns before the router erases."""
+    from openwrtgui.timer import arm_command
+
+    return arm_command("firstboot", 2, ["firstboot -r -y"])

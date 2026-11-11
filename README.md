@@ -36,7 +36,9 @@ is connected, and how each router describes itself. It never disturbs a test run
 | **LTE actions** | Connect, Disconnect, and Reboot modem (low power, then online, each read back; never the reset mode that wedges the BM806C). An AT console: queries run any time, other commands ask first and wait for a harness run. |
 | **System status** | Per router: model, firmware, kernel, uptime, load, memory and storage; live load, per-interface bandwidth and connection count; the connection table; the system and kernel logs with filters and Follow; processes; ping, traceroute and nslookup from the router. |
 | **System settings** | Host name, time zone (the router's own list), NTP and the log, previewed and proven; every service with Start, Stop, Restart, Enable and Disable (the app's own path restart only); rc.local and the crontab as text with every line checked before it is sent. |
-| **Backup and reboot** | The router's configuration archive saved readable by you only and downloaded; a reboot armed by a router-side timer and followed until the router answers with a fresh uptime. |
+| **System access** | The root password (typed twice, never logged) and the password policy; SSH instances, with the one the app connects through kept on and the change applied with the router's 60 s rollback; the authorized keys labelled App, Harness or Other; LuCI on or off the network and the HTTPS redirect (the LuCI pages in this app keep working); the repository keys. |
+| **LEDs and mount points** | Each LED action with its LED, trigger and that trigger's options, proven by the LED's active trigger; the mounted file systems with their usage. |
+| **Backup, restore and reset** | The router's configuration archive saved readable by you only, downloaded or imported from the PC; a restore that is refused when it would lock the app out or move the router, then proven file by file after the reboot; the files kept in a backup; a reboot followed until a fresh uptime; a reset to defaults that needs the router's name and an "alone on this network" tick. |
 
 | LTE | System |
 |---|---|

@@ -60,6 +60,53 @@ def test_write_file() -> None:
     )
 
 
+def test_write_file_authorized_keys_chmods() -> None:
+    command = s.write_file("/etc/dropbear/authorized_keys", "ssh-ed25519 AAAA x@y\n")
+    assert command == (
+        "mkdir -p /etc/dropbear && cat > /etc/dropbear/authorized_keys <<'OWG'"
+        " && chmod 600 /etc/dropbear/authorized_keys\nssh-ed25519 AAAA x@y\nOWG"
+    )
+    assert s.write_file("/etc/sysupgrade.conf", "/etc/owg/\n") == (
+        "cat > /etc/sysupgrade.conf <<'OWG'\n/etc/owg/\nOWG"
+    )
+
+
+def test_restore_and_reset_commands() -> None:
+    assert s.UPLOAD_RESTORE == "mkdir -p /tmp/owg && cat > /tmp/owg/restore.tar.gz"
+    assert s.LIST_RESTORE == "tar -tzf /tmp/owg/restore.tar.gz"
+    assert s.RESTORE == "sysupgrade --restore-backup /tmp/owg/restore.tar.gz"
+    assert s.REMOVE_RESTORE == "rm -f /tmp/owg/restore.tar.gz"
+    assert s.PASSWD == "passwd root"
+    assert "firstboot -r -y" in s.firstboot_command()
+    assert s.firstboot_command().startswith(
+        "mkdir -p /tmp/owg && start-stop-daemon -S -b -m -p /tmp/owg/firstboot"
+    )
+
+
+def test_file_digests_quotes_paths() -> None:
+    assert s.file_digests(["/etc/config/system", "/etc/dropbear/authorized_keys"]) == (
+        "sha256sum '/etc/config/system' '/etc/dropbear/authorized_keys'"
+    )
+    for bad in (["etc/config/system"], ["/etc/x y"], ["/etc/x;reboot"], []):
+        with pytest.raises(ValueError):
+            s.file_digests(bad)
+
+
+@pytest.mark.parametrize(
+    ("rule", "good", "bad"),
+    [
+        (s.IFACE_NAME, ["lan", "lte_4", "wan6"], ["", "a b", "x" * 16, "a;b"]),
+        (s.LED_NAME, ["lan", "WAN 2", "green:lan"], ["", "x" * 33, "a'b"]),
+        (s.HEX_MASK, ["0x0f", "0X1F", "0xdeadbeef"], ["ff", "0x", "0x123456789", "0xg"]),
+        (s.KEPT_PATH, ["/etc/owg/", "/etc/example.conf"], ["etc/x", "/etc/a b", "/etc/'x", "/" + "x" * 256]),
+        (s.OWNER, ["dima_night", "txctl v14", "IRAM-1.0"], ["", "x" * 41, "a;b"]),
+    ],
+)
+def test_v06c_rules(rule, good: list[str], bad: list[str]) -> None:  # type: ignore[no-untyped-def]
+    assert all(rule.fullmatch(v) for v in good)
+    assert not any(rule.fullmatch(v) for v in bad)
+
+
 def test_write_file_refuses_owg_and_9_kib() -> None:
     with pytest.raises(ValueError, match="OWG"):
         s.write_file("/etc/rc.local", "echo\nOWG\nexit 0")

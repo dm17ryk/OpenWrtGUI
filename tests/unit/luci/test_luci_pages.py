@@ -105,7 +105,7 @@ def test_page_views_mark_native() -> None:
 
 
 def test_system_pages_are_native() -> None:
-    """v0.6b D11: these LuCI pages have the System screen; access, mounts, LEDs wait for v0.6c."""
+    """v0.6b D11 and v0.6c D1: these LuCI pages have the System screen; Mount points stays LuCI's (D8)."""
     views = {v.path: v for v in page_views(parse_menu(MENUS))}
     for path in (
         "admin/status/logs/syslog",
@@ -120,10 +120,14 @@ def test_system_pages_are_native() -> None:
         "admin/system/reboot",
         "admin/system/flash",
         "admin/network/diagnostics",
+        "admin/system/leds",
+        "admin/system/admin/password",
+        "admin/system/admin/dropbear",
+        "admin/system/admin/sshkeys",
+        "admin/system/admin/uhttpd",
     ):
         assert views[path].native == "system", path
-    for path in ("admin/system/leds", "admin/system/mounts", "admin/system/admin/sshkeys"):
-        assert views[path].native is None, path
+    assert views["admin/system/mounts"].native is None
     assert views["admin/status/realtime/wireless"].native is None  # RF live is its own screen, not this page
 
 

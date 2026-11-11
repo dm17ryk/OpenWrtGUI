@@ -79,6 +79,7 @@ class Bench:
     connections: int = 0
     respond: Callable[[str], CommandResult | None] = lambda command: None
     on_command: Callable[[str], None] = lambda command: None
+    ports: Callable[[int, datetime], bool] = lambda port, now: port == 22  # where dropbear listens
 
 
 class FakeT:
@@ -145,6 +146,8 @@ def env(tmp_path: Path) -> Env:
     async def factory(rec: RouterRecord) -> Transport:
         if not bench.answers_at(rec.host, clock.now()):
             raise Unreachable(f"{rec.host}: no route to host")
+        if not bench.ports(rec.port, clock.now()):
+            raise Unreachable(f"{rec.host}:{rec.port}: connection refused")
         pinned = host_keys.get(rec.host, rec.port)
         if pinned is None:
             raise HostKeyUnknown(rec.host, bench.first_key or bench.key)
@@ -155,7 +158,7 @@ def env(tmp_path: Path) -> Env:
     async def fetch_key(
         host: str, port: int = 22, timeout: float = 10.0, algs: Sequence[str] = ()
     ) -> HostKeyInfo:
-        if not bench.answers_at(host, clock.now()):
+        if not bench.answers_at(host, clock.now()) or not bench.ports(port, clock.now()):
             raise Unreachable(f"{host}: no route to host")
         return bench.key if bench.key.type in algs or not bench.first_key else bench.first_key
 
@@ -784,3 +787,58 @@ async def test_saved_check_finds_a_list_item_of_a_new_section() -> None:
     ]
     check = await saved_check(shown, "uci -X show firewall", ops, {})  # type: ignore[arg-type]
     assert check == NetCheck("saved", True, "the router has the change")
+
+
+# ---------------------------------------------------------------- v0.6c: the router moves to a new SSH port
+DROPBEAR = {"dropbear.main": "dropbear", "dropbear.main.Port": "22"}
+
+
+def _port_plan(port: int = 2222) -> NetPlan:
+    return net_plan(
+        router_id="ap2",
+        screen="System",
+        config="dropbear",
+        ops=[UciOp("set", "dropbear.main.Port", str(port))],
+        current=DROPBEAR,
+        rollback=True,
+        target_port=port,
+    )
+
+
+def _applied(env: Env) -> list[datetime]:
+    applied_at: list[datetime] = []
+
+    def note(command: str) -> None:
+        if command.startswith("ubus call uci apply"):
+            applied_at.append(env.clock.t)
+
+    env.bench.on_command = note
+    return applied_at
+
+
+async def test_rollback_follows_a_new_port(env: Env) -> None:
+    applied_at = _applied(env)
+    env.bench.ports = lambda port, now: port == (2222 if applied_at else 22)
+    result = await _apply(env, _port_plan(), before=None)
+    assert (result.applied, result.verified, result.error) == (True, True, None)
+    assert (env.rec.host, env.rec.port) == ("192.168.1.2", 2222)  # the record follows the router
+    assert env.host_keys.get("192.168.1.2", 2222) == env.bench.key.fingerprint  # the same key, carried
+    reconnected = next(c for c in result.checks if c.name == "reconnected")
+    assert reconnected.detail == "AP2 · office answered at 192.168.1.2 port 2222"
+    confirm = [(n, c) for n, _, c in env.bench.log if c.startswith("ubus call uci confirm")]
+    assert len(confirm) == 1 and confirm[0][0] > 1  # sent over the new connection
+
+
+async def test_a_new_port_that_does_not_answer_rolls_back(env: Env) -> None:
+    applied_at = _applied(env)
+    # nothing answers on 2222 (a firewall drops it); dropbear is back on 22 once rpcd rolls back after 60 s
+    env.bench.ports = lambda port, now: (
+        port == 22 and (not applied_at or now >= applied_at[0] + timedelta(seconds=60))
+    )
+    result = await _apply(env, _port_plan(), before=None)
+    assert result.applied is False
+    assert env.rec.port == 22  # unchanged
+    assert env.host_keys.get("192.168.1.2", 2222) is None
+    assert result.error is not None and "did not answer at 192.168.1.2 port 2222" in result.error
+    assert "restores its previous settings" in result.error
+    assert not any(c.startswith("ubus call uci confirm") for _, _, c in env.bench.log)

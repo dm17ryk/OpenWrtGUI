@@ -16,13 +16,15 @@ from openwrtgui.store import write_atomic
 
 
 class ReflashPending(BaseModel):
-    """Flashed without keeping settings: the router comes back like firstboot and waits for Add again."""
+    """Flashed without keeping settings, or reset to defaults (v0.6c): the router comes back like firstboot
+    and waits for Add again."""
 
     model_config = ConfigDict(frozen=True)
 
     board: str
     revision: str
     at: datetime
+    reason: Literal["flash", "reset"] = "flash"
 
 
 class RouterRecord(BaseModel):

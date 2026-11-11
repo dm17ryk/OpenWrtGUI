@@ -14,12 +14,13 @@ function rows(items: RouterItem[]): Row[] {
     const state = routerState(item)
     const added = item.discovery?.files_added ?? 0
     if (record.reflashed) {
-      // flashed without settings: it answers at 192.168.1.1 with a new key, not at its old address
+      // flashed without settings, or reset to defaults: it answers at 192.168.1.1 with a new key, not at its old address
+      const what = record.reflashed.reason === 'reset' ? 'Reset to defaults' : 'Reflashed without settings'
       out.push({
         key: `${record.id}-reflashed`,
         tag: record.name,
         tagClass: 'b bad',
-        text: `Reflashed without settings: add it again (${record.reflashed.board} ${record.reflashed.revision} at 192.168.1.1, no password).`,
+        text: `${what}: add it again (${record.reflashed.board} ${record.reflashed.revision} at 192.168.1.1, no password).`,
         action: (
           <Link className="btn" to="/add?host=192.168.1.1">
             Add again

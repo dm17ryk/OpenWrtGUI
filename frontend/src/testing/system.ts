@@ -1,12 +1,18 @@
 // Generated from the simulator (sim ap2); do not edit by hand.
 import type {
+  BackupFile,
   Connections,
   CronState,
   DiagResult,
+  KeptFiles,
+  LedState,
   LogEntry,
+  MountState,
   NetApplyResult,
   NetPlan,
   ProcessList,
+  RestoreCheck,
+  SystemAccessState,
   SystemOverview,
   SystemServiceRow,
   SystemSettingsOut,
@@ -707,6 +713,698 @@ export const AP2_PING: DiagResult = {
   "command": "timeout -s KILL 25 ping -c 4 -W 2 '192.168.1.10'",
   "output": "PING 192.168.1.10 (192.168.1.10): 56 data bytes\n64 bytes from 192.168.1.10: seq=0 ttl=64 time=0.512 ms\n64 bytes from 192.168.1.10: seq=1 ttl=64 time=0.513 ms\n64 bytes from 192.168.1.10: seq=2 ttl=64 time=0.514 ms\n64 bytes from 192.168.1.10: seq=3 ttl=64 time=0.515 ms\n\n--- 192.168.1.10 ping statistics ---\n4 packets transmitted, 4 packets received, 0% loss\n",
   "exit_status": 0
+}
+
+export const AP2_ACCESS: SystemAccessState = {
+  "password": "set",
+  "policy": null,
+  "ssh": [
+    {
+      "section": "main",
+      "enable": true,
+      "interface": "",
+      "direct_interface": "",
+      "port": 22,
+      "password_auth": true,
+      "root_password_auth": true,
+      "gateway_ports": false
+    }
+  ],
+  "app_instance": "main",
+  "app_interface": "lan",
+  "interfaces": [
+    "lan",
+    "loopback",
+    "lte",
+    "lte_4",
+    "wan",
+    "wan6"
+  ],
+  "keys": [
+    {
+      "index": 0,
+      "type": "ssh-ed25519",
+      "comment": "openwrtgui@pc",
+      "options": null,
+      "fingerprint": "SHA256:lbmsoA0yIEcEiVDRnMWuzm+nV+3ZEEpVIURqFoeSspg",
+      "label": "app",
+      "owner": null,
+      "text": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAOhB7/zzhC+HXDdGOdLwJln5NYwm6UNXx3chmQSVTG4 openwrtgui@pc"
+    },
+    {
+      "index": 1,
+      "type": "ssh-ed25519",
+      "comment": "bench@lab",
+      "options": null,
+      "fingerprint": "SHA256:PhSyJpZMizMZGDkACk9L7f0XBVYIHH+LiILkLpqJz5g",
+      "label": "other",
+      "owner": null,
+      "text": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJvWfggOSyIPKEhT8VoBxUhNS6R/ehRIvdYmnQWrmKsS bench@lab"
+    }
+  ],
+  "http": {
+    "redirect_https": false,
+    "luci_on_network": true,
+    "listen_http": [
+      "0.0.0.0:80",
+      "[::]:80"
+    ],
+    "listen_https": [
+      "0.0.0.0:443",
+      "[::]:443"
+    ],
+    "loopback_kept": true
+  },
+  "https_served": false,
+  "repo_keys": [
+    {
+      "name": "openwrt-snapshots.pem",
+      "kind": "apk"
+    },
+    {
+      "name": "public-key.pem",
+      "kind": "apk"
+    }
+  ],
+  "missing": []
+}
+
+export const AP2_PASSWORD_PLAN: NetPlan = {
+  "router_id": "ap2",
+  "screen": "System",
+  "lines": [
+    "passwd root"
+  ],
+  "warnings": [
+    "LuCI and SSH password logins on AP2 · office use the new password. The app logs in with its key and is not affected. A script that logs in to AP2 · office with the old password stops working."
+  ],
+  "rollback": false,
+  "target_host": null,
+  "digest": "8a046637def20dd0"
+}
+
+export const AP2_NEW_KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEeN2gEjAeD8LVkj/gTQDSxOcPCD5IPg87e/h53vQKLn user@pc"
+
+export const AP2_KEY_ADD_PLAN: NetPlan = {
+  "router_id": "ap2",
+  "screen": "System",
+  "lines": [
+    "mkdir -p /etc/dropbear && cat > /etc/dropbear/authorized_keys <<'OWG' && chmod 600 /etc/dropbear/authorized_keys",
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAOhB7/zzhC+HXDdGOdLwJln5NYwm6UNXx3chmQSVTG4 openwrtgui@pc",
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJvWfggOSyIPKEhT8VoBxUhNS6R/ehRIvdYmnQWrmKsS bench@lab",
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEeN2gEjAeD8LVkj/gTQDSxOcPCD5IPg87e/h53vQKLn user@pc",
+    "OWG"
+  ],
+  "warnings": [],
+  "rollback": false,
+  "target_host": null,
+  "digest": "5a16ae07f9426199"
+}
+
+export const AP2_HTTP_OFF_PLAN: NetPlan = {
+  "router_id": "ap2",
+  "screen": "System",
+  "lines": [
+    "set -e",
+    "uci -q delete uhttpd.main.listen_http",
+    "uci add_list uhttpd.main.listen_http='127.0.0.1:80'",
+    "uci add_list uhttpd.main.listen_http='[::1]:80'",
+    "uci -q delete uhttpd.main.listen_https",
+    "uci add_list uhttpd.main.listen_https='127.0.0.1:443'",
+    "uci add_list uhttpd.main.listen_https='[::1]:443'",
+    "uci commit uhttpd",
+    "/etc/init.d/uhttpd restart"
+  ],
+  "warnings": [
+    "uhttpd restarts: LuCI on AP2 · office is away for a second, in browsers and in this app.",
+    "LuCI is no longer reachable from the network at AP2 · office's addresses. LuCI pages in this app keep working: they come in through the app's SSH connection."
+  ],
+  "rollback": false,
+  "target_host": null,
+  "digest": "f3dbefd9c54686ac"
+}
+
+export const AP2_LEDS: LedState = {
+  "leds": [
+    {
+      "sysfs": "green:3g",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "none",
+      "brightness": 0,
+      "max_brightness": 1
+    },
+    {
+      "sysfs": "green:4g",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "none",
+      "brightness": 1,
+      "max_brightness": 1
+    },
+    {
+      "sysfs": "green:internet",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "none",
+      "brightness": 0,
+      "max_brightness": 1
+    },
+    {
+      "sysfs": "green:lan",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "switch0",
+      "brightness": 1,
+      "max_brightness": 1
+    },
+    {
+      "sysfs": "green:sigstrength",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "none",
+      "brightness": 1,
+      "max_brightness": 1
+    },
+    {
+      "sysfs": "green:wifi",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "none",
+      "brightness": 0,
+      "max_brightness": 1
+    },
+    {
+      "sysfs": "red:sigstrength",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "none",
+      "brightness": 0,
+      "max_brightness": 1
+    },
+    {
+      "sysfs": "rt2800soc-phy0::assoc",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "none",
+      "brightness": 0,
+      "max_brightness": 255
+    },
+    {
+      "sysfs": "rt2800soc-phy0::quality",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "none",
+      "brightness": 0,
+      "max_brightness": 255
+    },
+    {
+      "sysfs": "rt2800soc-phy0::radio",
+      "triggers": [
+        "none",
+        "timer",
+        "heartbeat",
+        "default-on",
+        "netdev",
+        "switch0",
+        "phy0rx",
+        "phy0tx",
+        "phy0assoc",
+        "phy0radio",
+        "phy0tpt"
+      ],
+      "active": "none",
+      "brightness": 0,
+      "max_brightness": 255
+    }
+  ],
+  "rows": [
+    {
+      "section": "led_lan",
+      "name": "lan",
+      "sysfs": "green:lan",
+      "trigger": "switch0",
+      "default": null,
+      "delayon": null,
+      "delayoff": null,
+      "inverted": null,
+      "dev": null,
+      "mode": [],
+      "port_mask": "0x0f",
+      "speed_mask": null
+    }
+  ],
+  "devices": [
+    "br-lan",
+    "eth0",
+    "eth0.1",
+    "eth0.2",
+    "lo",
+    "teql0",
+    "wwan0"
+  ],
+  "missing": [],
+  "trigger_options": {
+    "none": [
+      "default"
+    ],
+    "timer": [
+      "delayon",
+      "delayoff"
+    ],
+    "heartbeat": [
+      "inverted"
+    ],
+    "netdev": [
+      "dev",
+      "mode"
+    ],
+    "switch0": [
+      "port_mask",
+      "speed_mask"
+    ],
+    "switch1": [
+      "port_mask",
+      "speed_mask"
+    ]
+  },
+  "netdev_modes": [
+    "link",
+    "link_10",
+    "link_100",
+    "link_1000",
+    "link_2500",
+    "link_5000",
+    "link_10000",
+    "half_duplex",
+    "full_duplex",
+    "tx",
+    "rx"
+  ]
+}
+
+export const AP2_MOUNTS: MountState = {
+  "mounts": [
+    {
+      "device": "/dev/root",
+      "target": "/rom",
+      "fstype": "squashfs",
+      "options": "ro,relatime,errors=continue"
+    },
+    {
+      "device": "proc",
+      "target": "/proc",
+      "fstype": "proc",
+      "options": "rw,nosuid,nodev,noexec,relatime"
+    },
+    {
+      "device": "sysfs",
+      "target": "/sys",
+      "fstype": "sysfs",
+      "options": "rw,nosuid,nodev,noexec,relatime"
+    },
+    {
+      "device": "tmpfs",
+      "target": "/tmp",
+      "fstype": "tmpfs",
+      "options": "rw,nosuid,nodev,noatime"
+    },
+    {
+      "device": "/dev/mtdblock6",
+      "target": "/overlay",
+      "fstype": "jffs2",
+      "options": "rw,noatime"
+    },
+    {
+      "device": "overlayfs:/overlay",
+      "target": "/",
+      "fstype": "overlay",
+      "options": "rw,noatime,lowerdir=/,upperdir=/overlay/upper,workdir=/overlay/work"
+    },
+    {
+      "device": "tmpfs",
+      "target": "/dev",
+      "fstype": "tmpfs",
+      "options": "rw,nosuid,noexec,noatime,size=512k,mode=755"
+    }
+  ],
+  "usage": [
+    {
+      "filesystem": "/dev/root",
+      "size_kib": 8192,
+      "used_kib": 8192,
+      "available_kib": 0,
+      "use_pct": 100,
+      "target": "/rom"
+    },
+    {
+      "filesystem": "tmpfs",
+      "size_kib": 27552,
+      "used_kib": 1856,
+      "available_kib": 25696,
+      "use_pct": 7,
+      "target": "/tmp"
+    },
+    {
+      "filesystem": "/dev/mtdblock6",
+      "size_kib": 5056,
+      "used_kib": 396,
+      "available_kib": 4660,
+      "use_pct": 8,
+      "target": "/overlay"
+    },
+    {
+      "filesystem": "overlayfs:/overlay",
+      "size_kib": 5056,
+      "used_kib": 396,
+      "available_kib": 4660,
+      "use_pct": 8,
+      "target": "/"
+    },
+    {
+      "filesystem": "tmpfs",
+      "size_kib": 512,
+      "used_kib": 0,
+      "available_kib": 512,
+      "use_pct": 0,
+      "target": "/dev"
+    }
+  ],
+  "block": false
+}
+
+export const AP2_LED_PLAN: NetPlan = {
+  "router_id": "ap2",
+  "screen": "System",
+  "lines": [
+    "set -e",
+    "uci set system.led_lan.trigger='netdev'",
+    "uci set system.led_lan.dev='eth0.2'",
+    "uci set system.led_lan.mode='link tx rx'",
+    "uci -q delete system.led_lan.port_mask",
+    "uci commit system",
+    "/etc/init.d/led restart"
+  ],
+  "warnings": [],
+  "rollback": false,
+  "target_host": null,
+  "digest": "f7c7c46046893117"
+}
+
+export const AP2_BACKUP: BackupFile = {
+  "name": "ap2-20261110-120000.tar.gz",
+  "size": 1235,
+  "created_at": "2026-11-10T12:00:00+02:00",
+  "imported": false
+}
+
+export const AP2_RESTORE_CHECK: RestoreCheck = {
+  "files": [
+    "/etc/config/system",
+    "/etc/config/network",
+    "/etc/config/dropbear",
+    "/etc/config/uhttpd",
+    "/etc/rc.local",
+    "/etc/dropbear/authorized_keys",
+    "/etc/sysupgrade.conf"
+  ],
+  "warnings": [
+    "AP2 · office's settings become the backup's (2026-11-10 12:00): every file in it replaces the router's own",
+    "AP2 · office is offline for about 60-90 s while it restarts",
+    "LTE and Wi-Fi come back with the router; the LuCI bridge and the terminal reconnect by themselves"
+  ],
+  "refusals": []
+}
+
+export const AP2_RESTORE_PLAN: NetPlan = {
+  "router_id": "ap2",
+  "screen": "System",
+  "lines": [
+    "mkdir -p /tmp/owg && cat > /tmp/owg/restore.tar.gz  # stdin: ap2-20261110-120000.tar.gz (1235 B, sha256 e03be7d15fde)",
+    "tar -tzf /tmp/owg/restore.tar.gz",
+    "sysupgrade --restore-backup /tmp/owg/restore.tar.gz",
+    "mkdir -p /tmp/owg && start-stop-daemon -S -b -m -p /tmp/owg/reboot.pid -x /bin/sh -- -c 'sleep 2; reboot; rm -f /tmp/owg/reboot.*'"
+  ],
+  "warnings": [
+    "AP2 · office's settings become the backup's (2026-11-10 12:00): every file in it replaces the router's own",
+    "AP2 · office is offline for about 60-90 s while it restarts",
+    "LTE and Wi-Fi come back with the router; the LuCI bridge and the terminal reconnect by themselves"
+  ],
+  "rollback": false,
+  "target_host": null,
+  "digest": "17d98f7372308e07"
+}
+
+export const AP2_KEPT: KeptFiles = {
+  "text": "## This file contains files and directories that should\n## be preserved during an upgrade.\n",
+  "listed": [
+    "/etc/config/dropbear"
+  ]
+}
+
+export const AP2_KEPT_PLAN: NetPlan = {
+  "router_id": "ap2",
+  "screen": "System",
+  "lines": [
+    "cat > /etc/sysupgrade.conf <<'OWG'",
+    "## This file contains files and directories that should",
+    "## be preserved during an upgrade.",
+    "/etc/owg-extra.conf",
+    "OWG"
+  ],
+  "warnings": [],
+  "rollback": false,
+  "target_host": null,
+  "digest": "1f0b653d07c3db43"
+}
+
+export const AP2_RESET_PLAN: NetPlan = {
+  "router_id": "ap2",
+  "screen": "System",
+  "lines": [
+    "mkdir -p /tmp/owg && start-stop-daemon -S -b -m -p /tmp/owg/firstboot.pid -x /bin/sh -- -c 'sleep 2; firstboot -r -y; rm -f /tmp/owg/firstboot.*'"
+  ],
+  "warnings": [
+    "AP2 · office erases every setting and comes back as 192.168.1.1 with no password and a new host key: that address clashes with AP1 · bench",
+    "Connect AP2 · office alone to this PC before you go on, then add it again"
+  ],
+  "rollback": false,
+  "target_host": null,
+  "digest": "976056ffd9b3a199"
+}
+
+export const AP2_SSH_ADD_PLAN: NetPlan = {
+  "router_id": "ap2",
+  "screen": "System",
+  "lines": [
+    "ubus call session create '{\"timeout\":300}'",
+    "ubus call session grant '{\"objects\":[[\"dropbear\",\"read\"],[\"dropbear\",\"write\"]],\"scope\":\"uci\",\"ubus_rpc_session\":\"<session>\"}'",
+    "set -e",
+    "mkdir -p /var/run/rpcd/uci-<session>",
+    "ssh1=$(uci -P /var/run/rpcd/uci-<session> add dropbear dropbear)",
+    "uci -P /var/run/rpcd/uci-<session> set dropbear.$ssh1.enable='1'",
+    "uci -P /var/run/rpcd/uci-<session> set dropbear.$ssh1.Port='2222'",
+    "uci -P /var/run/rpcd/uci-<session> set dropbear.$ssh1.PasswordAuth='on'",
+    "uci -P /var/run/rpcd/uci-<session> set dropbear.$ssh1.RootPasswordAuth='on'",
+    "uci -P /var/run/rpcd/uci-<session> set dropbear.$ssh1.GatewayPorts='off'",
+    "ubus call uci apply '{\"rollback\":true,\"timeout\":60,\"ubus_rpc_session\":\"<session>\"}'",
+    "ubus call uci confirm '{\"ubus_rpc_session\":\"<session>\"}'",
+    "ubus call session destroy '{\"ubus_rpc_session\":\"<session>\"}'"
+  ],
+  "warnings": [
+    "Applies with a 60 s rollback: if the app cannot reach AP2 · office at 192.168.1.2 again and confirm, the router restores its previous SSH settings by itself."
+  ],
+  "rollback": true,
+  "target_host": null,
+  "digest": "c0f08d7ddd035deb"
+}
+
+export const AP2_ACCESS_OWNED: SystemAccessState = {
+  "password": "set",
+  "policy": null,
+  "ssh": [
+    {
+      "section": "main",
+      "enable": true,
+      "interface": "",
+      "direct_interface": "",
+      "port": 22,
+      "password_auth": true,
+      "root_password_auth": true,
+      "gateway_ports": false
+    }
+  ],
+  "app_instance": "main",
+  "app_interface": "lan",
+  "interfaces": [
+    "lan",
+    "loopback",
+    "lte",
+    "lte_4",
+    "wan",
+    "wan6"
+  ],
+  "keys": [
+    {
+      "index": 0,
+      "type": "ssh-ed25519",
+      "comment": "openwrtgui@pc",
+      "options": null,
+      "fingerprint": "SHA256:lbmsoA0yIEcEiVDRnMWuzm+nV+3ZEEpVIURqFoeSspg",
+      "label": "app",
+      "owner": null,
+      "text": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAOhB7/zzhC+HXDdGOdLwJln5NYwm6UNXx3chmQSVTG4 openwrtgui@pc"
+    },
+    {
+      "index": 1,
+      "type": "ssh-ed25519",
+      "comment": "bench@lab",
+      "options": null,
+      "fingerprint": "SHA256:PhSyJpZMizMZGDkACk9L7f0XBVYIHH+LiILkLpqJz5g",
+      "label": "harness",
+      "owner": "bench-harness",
+      "text": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJvWfggOSyIPKEhT8VoBxUhNS6R/ehRIvdYmnQWrmKsS bench@lab"
+    }
+  ],
+  "http": {
+    "redirect_https": false,
+    "luci_on_network": true,
+    "listen_http": [
+      "0.0.0.0:80",
+      "[::]:80"
+    ],
+    "listen_https": [
+      "0.0.0.0:443",
+      "[::]:443"
+    ],
+    "loopback_kept": true
+  },
+  "https_served": false,
+  "repo_keys": [
+    {
+      "name": "openwrt-snapshots.pem",
+      "kind": "apk"
+    },
+    {
+      "name": "public-key.pem",
+      "kind": "apk"
+    }
+  ],
+  "missing": []
+}
+
+export const AP2_PASSWORD_RESULT: NetApplyResult = {
+  "router_id": "ap2",
+  "applied": true,
+  "verified": true,
+  "checks": [
+    {
+      "name": "password",
+      "ok": true,
+      "detail": "the router's password hash changed"
+    }
+  ],
+  "error": null,
+  "host": "192.168.1.2"
 }
 
 export const AP2_HOSTNAME_RESULT: NetApplyResult = {

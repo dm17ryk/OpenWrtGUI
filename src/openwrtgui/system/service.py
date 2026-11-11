@@ -5,12 +5,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Collection
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
-
-from pydantic import BaseModel, ConfigDict
 
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
@@ -28,10 +25,22 @@ from openwrtgui.net.apply import (
 from openwrtgui.paths import DataDir
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.system import commands as s
-from openwrtgui.system.backup import BackupFile, backup_dir, backup_name, listing, save_archive
+from openwrtgui.system.archive import read_archive
+from openwrtgui.system.backup import (
+    OWG_KEPT,
+    UPLOAD_NAME,
+    BackupFile,
+    KeptFiles,
+    backup_dir,
+    backup_name,
+    check_kept,
+    listing,
+    save_archive,
+    save_upload,
+)
 from openwrtgui.system.cron import CronState, check_crontab, has_tasks, read_tasks
+from openwrtgui.system.jobs import SCREEN, JobsMixin
 from openwrtgui.system.parse import (
-    Connection,
     RcService,
     parse_board,
     parse_conntrack,
@@ -42,11 +51,7 @@ from openwrtgui.system.parse import (
 from openwrtgui.system.reboot import (
     EVERY_S,
     LIMIT_S,
-    RebootBusy,
     RebootJob,
-    not_back,
-    reboot_command,
-    reboot_warnings,
 )
 from openwrtgui.system.services import (
     SETTLE_S,
@@ -58,16 +63,25 @@ from openwrtgui.system.services import (
     service_rows,
 )
 from openwrtgui.system.settings import SystemSettings, current_settings, settings_ops
-from openwrtgui.system.state import LogEntry, LogKind, ProcessList, SystemOverview, log_entries, read_overview
+from openwrtgui.system.state import (
+    Connections,
+    DiagResult,
+    DiagTool,
+    LogEntry,
+    LogKind,
+    ProcessList,
+    SystemOverview,
+    TimeZones,
+    log_entries,
+    read_overview,
+)
 from openwrtgui.transport.base import Transport
-from openwrtgui.transport.comeback import Back, wait_for_reboot
 from openwrtgui.transport.pool import ConnectionPool
+from openwrtgui.transport.ssh import HostKeyStore
 from openwrtgui.uci import parse_uci_show
-from openwrtgui.wifi.service import PreviewChanged
 
 log = logging.getLogger(__name__)
 
-SCREEN = "System"
 UTC = "UTC"
 UTC_TZ = "GMT0"  # OpenWrt's own default for zonename UTC (AP2: zonename='UTC', timezone='GMT0')
 NO_ZONES = "This router lists no time zones (LuCI's rpcd plugin is missing): only UTC can be chosen"
@@ -76,33 +90,8 @@ NO_ZONES = "This router lists no time zones (LuCI's rpcd plugin is missing): onl
 NO_CONNTRACK = "The connection table is not available: nf_conntrack is not loaded"
 CRONTAB_FILE: s.FilePath = "/etc/crontabs/root"
 RC_UNREAD = "The router's service list does not read"
-DiagTool = Literal["ping", "traceroute", "nslookup"]
 _DIAG: dict[str, Callable[[str], str]] = {"ping": s.ping, "traceroute": s.traceroute, "nslookup": s.nslookup}
 DIAG_TIMEOUT_S = s.DIAG_LIMIT_S + 5.0  # the router's own `timeout -s KILL` ends it first
-
-
-class DiagResult(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    tool: DiagTool
-    target: str
-    command: str
-    output: str  # stdout, then stderr: a bad address is a result, not an error
-    exit_status: int
-
-
-class Connections(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    rows: list[Connection]  # at most 500 (AP2 has ~7 MB free RAM)
-    note: str | None = None
-
-
-class TimeZones(BaseModel):
-    model_config = ConfigDict(frozen=True)
-
-    zones: list[str]  # UTC first (the router's list has none: LuCI adds it), then the router's, sorted
-    note: str | None = None
 
 
 async def file_check(t: Transport, read: str, wanted: str) -> NetCheck:
@@ -113,7 +102,7 @@ async def file_check(t: Transport, read: str, wanted: str) -> NetCheck:
     return NetCheck("saved", False, "the file read back differs" if result.ok else "the file does not read")
 
 
-class SystemService:
+class SystemService(JobsMixin):
     def __init__(
         self,
         *,
@@ -126,7 +115,11 @@ class SystemService:
         clock: Callable[[], datetime] = datetime.now,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         monotonic: Callable[[], float] = time.monotonic,
+        host_keys: HostKeyStore | None = None,
+        app_keys: Callable[[RouterRecord], Collection[str]] = lambda rec: (),
     ) -> None:
+        self._host_keys = host_keys  # a restore checks the archive's host key against the pinned one
+        self._app_keys = app_keys  # the keys this app logs in with: a restore must keep one
         self._pool = pool
         self._routers = routers
         self._guard = guard
@@ -324,9 +317,12 @@ class SystemService:
         return NetCheck(check, ok, detail if ok else f"{detail} after {SETTLE_S:g} s")
 
     async def rc_local(self, router_id: str) -> str:
-        """The file as the router has it; "" when there is none."""
+        """The file as the router has it; "" when there is none, and a read the router refuses is named."""
         _rec, t = await self._transport(router_id)
-        return await self._stdout(t, s.RC_LOCAL)
+        result = await t.run(s.RC_LOCAL)
+        if not result.ok and "No such file" not in result.stderr:
+            raise ValueError(f"/etc/rc.local does not read: {result.stderr.strip() or result.exit_status}")
+        return result.stdout if result.ok else ""
 
     async def _rc_local_plan(self, rec: RouterRecord, t: Transport, text: str) -> tuple[NetPlan, str]:
         wanted = check_rc_local(text)
@@ -373,8 +369,22 @@ class SystemService:
         wanted = check_crontab(text)
         command = s.write_file(CRONTAB_FILE, wanted)  # OWG and size refused before anything is sent
         expected = wanted or "\n"  # the heredoc writes at least its one (empty) line
-        current = await self._stdout(t, s.CRONTAB)
-        if current == expected or (not wanted.strip() and not current.strip()):
+        read = await t.run(s.CRONTAB)
+        current = read.stdout if read.ok else ""
+        if not wanted.strip():  # no task, no comment: back to no crontab at all, as AP2 was found (D14)
+            if not read.ok:
+                raise ValueError(NOTHING)
+            remove = net_plan(
+                router_id=rec.id,
+                screen=SCREEN,
+                config=None,
+                ops=[],
+                current={},
+                commands=[s.REMOVE_CRONTAB],
+                reloads=[s.init("cron", "restart")],
+            )
+            return remove, "", False
+        if current == expected:
             raise ValueError(NOTHING)
         row = await self._rc_row(t, "cron")
         enable = [s.init("cron", "enable")] if row is not None and not row.enabled else []
@@ -401,6 +411,9 @@ class SystemService:
             plan, expected, tasks = await self._crontab_plan(rec, t, text)
 
             async def verify(t2: Transport) -> list[NetCheck]:
+                if plan.commands == (s.REMOVE_CRONTAB,):
+                    gone = not (await t2.run(s.CRONTAB)).ok
+                    return [NetCheck("removed", gone, "the router has no crontab" if gone else "it is there")]
                 checks = [await file_check(t2, s.CRONTAB, expected)]
                 if tasks:
                     checks.append(await self._settled(t2, "cron", "start", "cron"))
@@ -410,80 +423,6 @@ class SystemService:
 
         return await self._runner.run_planned(rec, make, digest)
 
-    # ---------------------------------------------------------------- reboot (D8)
-    async def plan_reboot(self, router_id: str) -> NetPlan:
-        rec = self._record(router_id)
-        return net_plan(
-            router_id=rec.id,
-            screen=SCREEN,
-            config=None,
-            ops=[],
-            current={},
-            commands=[reboot_command()],
-            warnings=reboot_warnings(rec.name),
-        )
-
-    def reboot_job(self, router_id: str) -> RebootJob | None:
-        return self._reboots.get(router_id)
-
-    def rebooting(self, router_id: str) -> bool:
-        job = self._reboots.get(router_id)
-        return job is not None and job.phase in ("armed", "waiting")
-
-    async def start_reboot(self, router_id: str, digest: str) -> RebootJob:
-        """Arm the timer (audited, under the write lock), then wait for the router in the background."""
-        rec = self._record(router_id)
-        if self.rebooting(rec.id):
-            raise RebootBusy(f"{rec.name} is already rebooting")
-        self._guard.require_clear()
-        plan = await self.plan_reboot(rec.id)
-        if plan.digest != digest:
-            raise PreviewChanged(rec.name)
-        t = await self._pool.get(rec)
-        async with self._pool.write_lock(rec.id):
-            armed = await run_audited(
-                t, plan.lines[0], router_id=rec.id, screen=SCREEN, guard=self._guard, audit=self._audit
-            )
-        if not armed.ok:
-            reason = (armed.stderr or armed.stdout).strip() or f"exit {armed.exit_status}"
-            raise ValueError(f"{rec.name} did not arm the reboot: {reason}")
-        armed_at = self._monotonic()
-        job = RebootJob(router_id=rec.id, phase="armed", started_at=self._clock())
-        self._reboots[rec.id] = job
-        task = asyncio.create_task(self._come_back(rec, armed_at))
-        self._tasks.add(task)
-        task.add_done_callback(self._tasks.discard)
-        return job
-
-    def _update_reboot(self, router_id: str, **fields: object) -> None:
-        self._reboots[router_id] = self._reboots[router_id].model_copy(update=fields)
-
-    async def _come_back(self, rec: RouterRecord, armed_at: float) -> None:
-        self._update_reboot(rec.id, phase="waiting")
-        try:
-            back: Back[None] | None = await wait_for_reboot(
-                self._pool,
-                rec,
-                armed_at=armed_at,
-                clock=self._monotonic,
-                sleep=self._sleep,
-                every_s=self.every_s,
-                limit_s=self.reboot_limit_s,
-            )
-        except Exception as exc:  # the job must end in a phase the screen shows, whatever broke
-            log.exception("reboot of %s: the come-back wait failed", rec.id)
-            self._update_reboot(rec.id, phase="not back", error=str(exc) or type(exc).__name__)
-            return
-        if back is None:
-            self._update_reboot(rec.id, phase="not back", error=not_back(rec.name, self.reboot_limit_s))
-            return
-        self._update_reboot(
-            rec.id,
-            phase="back",
-            uptime_s=back.uptime_s,
-            detail=f"{rec.name} is back after {back.elapsed_s:.0f} s (uptime {back.uptime_s:.0f} s)",
-        )
-
     # ---------------------------------------------------------------- backup (D9)
     async def create_backup(self, router_id: str) -> BackupFile:
         """Allowed during a run: it changes nothing on the router. One audit line names the file."""
@@ -492,7 +431,10 @@ class SystemService:
         path = backup_dir(self._data.root, rec.id) / name
         if path.exists():
             raise ValueError(f"A backup of {rec.name} was saved this second already")
-        total, status, problem = await save_archive(t, path)
+        try:
+            total, status, problem = await save_archive(t, path)
+        except FileExistsError as exc:  # another backup of this second is still streaming
+            raise ValueError(f"A backup of {rec.name} was saved this second already") from exc
         self._audit.record(
             router=rec.id,
             screen=SCREEN,
@@ -517,6 +459,87 @@ class SystemService:
         if name not in {b.name for b in listing(folder, rec.id)}:
             raise LookupError(f"No backup {name} of {rec.name}")
         return folder / name
+
+    # ---------------------------------------------------------------- files kept in a backup (D10)
+    async def _kept_text(self, t: Transport) -> str:
+        """/etc/sysupgrade.conf as it is: no file reads as an empty list, any other failed read is refused
+        (a write after it would replace the router's list with only what the screen sent)."""
+        result = await t.run(s.KEPT)
+        if result.ok:
+            return result.stdout
+        if "No such file" in result.stderr:
+            return ""
+        reason = (result.stderr or result.stdout).strip() or f"exit {result.exit_status}"
+        raise ValueError(f"/etc/sysupgrade.conf does not read: {reason}")
+
+    async def kept_files(self, router_id: str) -> KeptFiles:
+        _rec, t = await self._transport(router_id)
+        listed = await self._stdout(t, s.BACKUP_LIST)
+        return KeptFiles(text=await self._kept_text(t), listed=tuple(listed.split()))
+
+    async def _kept_plan(self, rec: RouterRecord, t: Transport, text: str) -> tuple[NetPlan, str]:
+        wanted = check_kept(text)
+        command = s.write_file("/etc/sysupgrade.conf", wanted)  # OWG and size refused before anything is sent
+        current = await self._kept_text(t)
+        if current == wanted:
+            raise ValueError(NOTHING)
+        warnings = []
+        if OWG_KEPT in current.split() and OWG_KEPT not in wanted.split():
+            warnings.append(
+                f"A flash that keeps settings adds {OWG_KEPT} back (the app's own files on {rec.name})."
+            )
+        plan = net_plan(
+            router_id=rec.id,
+            screen=SCREEN,
+            config=None,
+            ops=[],
+            current={},
+            commands=[command],
+            warnings=warnings,
+        )
+        return plan, wanted
+
+    async def plan_kept_files(self, router_id: str, text: str) -> NetPlan:
+        rec, t = await self._transport(router_id)
+        return (await self._kept_plan(rec, t, text))[0]
+
+    async def apply_kept_files(self, router_id: str, text: str, digest: str | None) -> NetApplyResult:
+        rec = self._record(router_id)
+
+        async def make(t: Transport) -> Planned:
+            plan, wanted = await self._kept_plan(rec, t, text)
+
+            async def verify(t2: Transport) -> list[NetCheck]:
+                return [await file_check(t2, s.KEPT, wanted)]
+
+            return Planned(plan, verify)
+
+        return await self._runner.run_planned(rec, make, digest)
+
+    # ---------------------------------------------------------------- importing a backup file (D11)
+    async def import_backup(self, router_id: str, data: bytes, filename: str) -> BackupFile:
+        """A backup from the PC into the router's list, checked first (read_archive); the bytes are never
+        logged. Changes nothing on the router, so it works during a run."""
+        rec = self._record(router_id)
+        if not UPLOAD_NAME.fullmatch(filename):
+            raise ValueError("That file name is not taken (letters, digits, spaces and . _ ( ) -)")
+        read_archive(data)
+        name = backup_name(rec.id, self._clock(), imported=True)
+        path = backup_dir(self._data.root, rec.id) / name
+        try:
+            if path.exists():
+                raise FileExistsError(path)
+            await save_upload(path, data)
+        except FileExistsError as exc:  # also another import of this second still writing its part file
+            raise ValueError(f"A backup of {rec.name} was imported this second already") from exc
+        self._audit.record(
+            router=rec.id,
+            screen=SCREEN,
+            command=f"import {filename} ({len(data)} bytes)  # saved to {name}",
+            exit_status=0,
+            source="user",
+        )
+        return BackupFile(name=name, size=len(data), created_at=self._clock().astimezone(), imported=True)
 
     async def timezones(self, router_id: str) -> TimeZones:
         zones = await self.zone_strings(router_id)

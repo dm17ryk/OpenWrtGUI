@@ -208,6 +208,63 @@ def test_system_set_records_the_reads_not_the_backup() -> None:
     assert rf.out_file(Path("tests/fixtures/ap2"), "system") == Path("tests/fixtures/ap2/system.json")
 
 
+def test_sanitize_replaces_public_keys() -> None:
+    # A public key and its comment name a person and a PC (AP2's: the key this PC logs in with, an account
+    # at a laptop); the repo is public. Each key becomes a fixed throwaway of its type, each comment neutral;
+    # distinct keys stay distinct, so a recording keeps how many keys there were and which repeat.
+    import asyncssh
+
+    rsa = asyncssh.generate_private_key("ssh-rsa", key_size=2048).export_public_key().decode().split()[1]
+    ed1 = asyncssh.generate_private_key("ssh-ed25519").export_public_key().decode().split()[1]
+    ed2 = asyncssh.generate_private_key("ssh-ed25519").export_public_key().decode().split()[1]
+    text = (
+        f"ssh-rsa {rsa} azuread\\someone@SOME-LAPTOP\n"
+        f'command="x" ssh-ed25519 {ed1} bob@pc\n'
+        f"ssh-ed25519 {ed2} openwrtgui@BENCH\n"
+        f"ssh-ed25519 {ed1}\n"
+        "# a comment line\n"
+    )
+    out = rf.sanitize(text)
+    lines = out.splitlines()
+    assert lines[0] == f"ssh-rsa {rf.PLACEHOLDER_KEYS['ssh-rsa'][0]} user@pc"
+    assert lines[1] == f'command="x" ssh-ed25519 {rf.PLACEHOLDER_KEYS["ssh-ed25519"][0]} user@pc'
+    assert lines[2] == f"ssh-ed25519 {rf.PLACEHOLDER_KEYS['ssh-ed25519'][1]} openwrtgui@pc"
+    assert lines[3] == f"ssh-ed25519 {rf.PLACEHOLDER_KEYS['ssh-ed25519'][0]}"  # the same key as line 2
+    assert lines[4] == "# a comment line"
+    for blob in (rsa, ed1, ed2, "someone", "BENCH"):
+        assert blob not in out
+    assert rf.sanitize(out) == out  # a recording sanitized twice stays the same
+    for key_type, blobs in rf.PLACEHOLDER_KEYS.items():
+        for blob in blobs:  # the throwaways are real keys: the parsers read them
+            assert asyncssh.import_public_key(f"{key_type} {blob}").get_fingerprint("sha256")
+
+
+def test_access_set_records_no_password_digest() -> None:
+    from openwrtgui.net.commands import INTERFACE_DUMP
+    from openwrtgui.system import commands as s
+
+    assert rf.SETS["access"] == (
+        s.UCI_DROPBEAR,
+        s.UCI_UHTTPD,
+        s.UCI_RPCD,
+        s.KEYS_READ,
+        s.APK_KEYS,
+        s.OPKG_KEYS,
+        s.LEDS,
+        s.NET_DEVICES,
+        s.MOUNTS,
+        s.DF,
+        s.HAS_BLOCK,
+        s.KEPT,
+        s.BACKUP_LIST,
+        s.LISTENERS,
+        INTERFACE_DUMP,
+    )
+    # a digest of root's hash is still derived from a secret: compared live, never recorded
+    assert s.PASSWORD_DIGEST not in rf.SETS["access"]
+    assert rf.out_file(Path("tests/fixtures/ap2"), "access") == Path("tests/fixtures/ap2/access.json")
+
+
 LTE_LIST = "ls /dev/ttyUSB* /dev/cdc-wdm*"
 
 

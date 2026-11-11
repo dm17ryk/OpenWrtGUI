@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from openwrtgui.transport.base import UPLOAD_CHUNK, CommandResult, ShellChannel, Unreachable
 
 if TYPE_CHECKING:
+    from openwrtgui.simaccess import SimAccess
     from openwrtgui.simfw import SimFirewall
     from openwrtgui.simimage import SimImage
     from openwrtgui.simmodem import SimModem
@@ -36,6 +37,7 @@ class SimState:
     image: SimImage | None = None
     modem: SimModem | None = None
     system: SimSystem | None = None
+    access: SimAccess | None = None  # v0.6c: dropbear, uhttpd, keys, LEDs, restore, reset
     generation_seen: int = 0  # the image's flash generation whose reset (keys, password) was applied
 
 
@@ -111,6 +113,10 @@ class ReplayTransport:
             if progress is not None:
                 progress(min(at + UPLOAD_CHUNK, len(data)))
         self.uploads[command] = data
+        if self.state is not None and self.state.access is not None:
+            taken = self.state.access.upload(command, data)
+            if taken is not None:
+                return taken
         if self.state is not None and self.state.image is not None:
             taken = self.state.image.upload(command, data)
             if taken is not None:
@@ -144,6 +150,8 @@ class ReplayTransport:
         """A rebooting router drops the connection, as a flash does to the app's session."""
         if self.state is not None and self.state.image is not None and self.state.image.rebooting:
             raise Unreachable("the connection was lost: the router is rebooting")
+        if self.state is not None and self.state.access is not None and self.state.access.gone:
+            raise Unreachable("the connection was lost: the router is resetting to defaults")
 
     def _simulate(self, command: str) -> CommandResult | None:
         assert self.state is not None
@@ -162,6 +170,9 @@ class ReplayTransport:
         if self.state.image is not None and (answered := self.state.image.answer(command)) is not None:
             return answered
         if self.state.modem is not None and (answered := self.state.modem.answer(command)) is not None:
+            return answered
+        # access before system: it owns `/etc/init.d/led|uhttpd restart`, which change what it serves
+        if self.state.access is not None and (answered := self.state.access.answer(command)) is not None:
             return answered
         if self.state.system is not None and (answered := self.state.system.answer(command)) is not None:
             return answered

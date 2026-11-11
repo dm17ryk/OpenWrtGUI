@@ -14,7 +14,14 @@ from openwrtgui.store import write_atomic
 log = logging.getLogger(__name__)
 
 DEFAULT_LOCK_FILES = (r"D:\Essence_SC\wifi_ref\iperf_txsweep\voip.lock.own",)
-DEFAULT_PROCESSES = ("dima_night.py", "rh_soak.py", "overnight_wifi*", "txlab_*.py", "voip_chain.py")
+DEFAULT_PROCESSES = (
+    "dima_night.py",
+    "rh_soak.py",
+    "overnight_wifi*",
+    "txlab_*.py",
+    "voip_chain.py",
+    "mem04_bench.py",  # the C8000 memory soak: its calls go over AP1
+)
 
 
 class GuardWatchList(BaseModel):
@@ -47,6 +54,15 @@ class KnownDevice(BaseModel):
     macs: list[str]
 
 
+class KnownKey(BaseModel):
+    """An SSH public key a harness logs in to the routers with (v0.6c D5, O10 for keys), by fingerprint."""
+
+    model_config = ConfigDict(frozen=True)
+
+    fingerprint: str  # SHA256:..., as asyncssh's get_fingerprint("sha256")
+    owner: str
+
+
 DEFAULT_KNOWN_TABLES = (
     KnownTable(
         match="inet fw4 chain BENCHSIPGUARD",
@@ -76,6 +92,7 @@ class Settings(BaseModel):
     guard: GuardWatchList = Field(default_factory=GuardWatchList)
     known_tables: list[KnownTable] = Field(default_factory=lambda: list(DEFAULT_KNOWN_TABLES))
     known_devices: list[KnownDevice] = Field(default_factory=list)
+    known_keys: list[KnownKey] = Field(default_factory=list)
 
 
 class SettingsStore:

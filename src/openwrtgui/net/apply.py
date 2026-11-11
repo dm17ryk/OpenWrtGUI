@@ -79,6 +79,7 @@ class NetPlan:
     # what the timer runs if the app does not cancel it (both may name /tmp/owg/rb-<rollback>.* files).
     backup: tuple[str, ...] = ()
     restore: tuple[str, ...] = ()
+    target_port: int | None = None  # v0.6c: the SSH port the router answers on after the change
 
     @property
     def timer(self) -> bool:
@@ -179,6 +180,7 @@ def net_plan(
     secrets: Sequence[str] = (),
     backup: Sequence[str] = (),
     restore: Sequence[str] = (),
+    target_port: int | None = None,
 ) -> NetPlan:
     """The exact preview: only changes, section deletes last; nothing left is refused with NOTHING."""
     kept = order_for_script(drop_unchanged(ops, current), current)
@@ -211,7 +213,13 @@ def net_plan(
         secrets=tuple(secrets),
         backup=tuple(backup),
         restore=tuple(restore),
+        target_port=target_port,
     )
+
+
+def _where(host: str, port: int, usual: int) -> str:
+    """An address as a result names it: the port only when it is not the record's."""
+    return host if port == usual else f"{host} port {port}"
 
 
 def _settings(plan: NetPlan) -> str:
@@ -613,7 +621,8 @@ class ApplyRunner:
         """After the change: reconnect, see it in effect, confirm; or report the rollback."""
         applied_at = self._clock()
         target = plan.target_host or rec.host
-        t2, why = await self._reconnect(rec, target, applied_at, SETTLE_S)
+        port = plan.target_port or rec.port
+        t2, why = await self._reconnect(rec, target, port, applied_at, SETTLE_S)
         while t2 is not None:
             # Confirm only once the change is seen in effect over the new connection (the verifier polls
             # for it): procd reloads a few seconds after `uci apply`, and a confirm sent before that would
@@ -621,51 +630,56 @@ class ApplyRunner:
             try:
                 checks = await verify(t2)
             except TransportError:  # the change took effect and cut this connection
-                t2, why = await self._reconnect(rec, target, applied_at, self._every_s)
+                t2, why = await self._reconnect(rec, target, port, applied_at, self._every_s)
                 continue
             if any(c.ok is False for c in checks):  # not seen in effect: the router keeps nothing that failed
-                return await self._unproven(rec, plan, target, checks, applied_at, snapshot)
-            return await self._confirm(rec, plan, t2, target, confirm, destroy, checks)
-        return await self._restored(rec, plan, target, why, applied_at, snapshot)
+                return await self._unproven(
+                    rec, plan, _where(target, port, rec.port), checks, applied_at, snapshot
+                )
+            return await self._confirm(rec, plan, t2, target, port, confirm, destroy, checks)
+        return await self._restored(rec, plan, _where(target, port, rec.port), why, applied_at, snapshot)
 
     def _elapsed(self, since: datetime) -> float:
         return (self._clock() - since).total_seconds()
 
-    async def _connect(self, rec: RouterRecord, host: str) -> Transport:
+    async def _connect(self, rec: RouterRecord, host: str, port: int | None = None) -> Transport:
         await self._pool.drop(rec.id)  # no backoff between the attempts of a reconnect window
-        return await self._pool.get(rec.model_copy(update={"host": host}), token=self._holds.get(rec.id))
+        moved = rec.model_copy(update={"host": host, "port": port or rec.port})
+        return await self._pool.get(moved, token=self._holds.get(rec.id))
 
     async def _reconnect(
-        self, rec: RouterRecord, target: str, applied_at: datetime, settle_s: float
+        self, rec: RouterRecord, target: str, port: int, applied_at: datetime, settle_s: float
     ) -> tuple[Transport | None, str | None]:
         await self._pool.drop(rec.id)
         await self._sleep(settle_s)
         carried = False
+        moved = (target, port) != (rec.host, rec.port)
+        where = _where(target, port, rec.port)
         while self._elapsed(applied_at) < self._window_s:
             try:
-                return await self._connect(rec, target), None
+                return await self._connect(rec, target, port), None
             except HostKeyUnknown as exc:
-                if not carried and target != rec.host and await self._carry(rec, target, exc.actual):
+                if not carried and moved and await self._carry(rec, target, port, exc.actual):
                     carried = True
-                    continue  # the same router at its new address: connect again with the key pinned
-                return None, f"{target} answers with a different host key, so it is not {rec.name}"
+                    continue  # the same router at its new address or port: connect again, key pinned
+                return None, f"{where} answers with a different host key, so it is not {rec.name}"
             except HostKeyChanged:
                 pinned = f"the one pinned for {rec.name}"
-                return None, f"{target} answers with a host key that differs from {pinned}"
+                return None, f"{where} answers with a host key that differs from {pinned}"
             except TransportError:
                 await self._sleep(self._every_s)
         return None, None
 
-    async def _carry(self, rec: RouterRecord, target: str, offered: HostKeyInfo) -> bool:
-        """Pin the key at `target` only when it is the key pinned for the old address. A router has one key
-        per type and offers whichever comes first, so ask `target` for the pinned type before comparing."""
+    async def _carry(self, rec: RouterRecord, target: str, port: int, offered: HostKeyInfo) -> bool:
+        """Pin the key at `target`:`port` only when it is the key pinned for the old address. A router has one
+        key per type and offers whichever comes first, so ask for the pinned type before comparing."""
         kind = self._host_keys.key_type(rec.host, rec.port)
         if kind is not None and offered.type != kind:
             try:
-                offered = await self._fetch_key(target, rec.port, algs=[kind])
+                offered = await self._fetch_key(target, port, algs=[kind])
             except TransportError:
                 return False
-        return self._host_keys.carry(rec.host, target, rec.port, offered)
+        return self._host_keys.carry(rec.host, target, rec.port, offered, new_port=port)
 
     async def _confirm(
         self,
@@ -673,11 +687,12 @@ class ApplyRunner:
         plan: NetPlan,
         t: Transport,
         target: str,
+        port: int,
         confirm: str,
         destroy: str | None,
         seen: Sequence[NetCheck],
     ) -> NetApplyResult:
-        checks = [NetCheck("reconnected", True, f"{rec.name} answered at {target}")]
+        checks = [NetCheck("reconnected", True, f"{rec.name} answered at {_where(target, port, rec.port)}")]
         done = await self._run(t, rec, plan, confirm, source="app", require_guard=False)
         if not done.ok:
             checks.append(NetCheck("confirmed", False, _reason(done)))
@@ -688,8 +703,8 @@ class ApplyRunner:
             with contextlib.suppress(TransportError):  # an unreached destroy: the session times out by itself
                 await self._run(t, rec, plan, destroy, source="app", require_guard=False)
         host = rec.host
-        if target != rec.host:
-            self._routers.upsert(rec.model_copy(update={"host": target}))
+        if (target, port) != (rec.host, rec.port):
+            self._routers.upsert(rec.model_copy(update={"host": target, "port": port}))
             host = target
         error: str | None = None
         state = self._guard.state()

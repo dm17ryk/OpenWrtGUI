@@ -117,3 +117,10 @@ def test_update_watch_takes_effect() -> None:
     assert not g.check_local().live
     g.update_watch(watch(processes=["rh_soak.py"]))
     assert g.check_local().live
+
+
+def test_the_mem04_soak_is_a_run_by_default() -> None:
+    """The C8000 memory soak (mem04_bench.py, calls over AP1) keeps every router read-only (2026-11-11)."""
+    soak = ProcessInfo(13664, ("python.exe", "-I", "D:\ab\mem04\mem04_bench.py", "soak"), STARTED)
+    state = BenchGuard(GuardWatchList(), lister=lambda: [soak]).check_local()
+    assert state.live and state.reasons[0].text == "mem04_bench.py started 21:04 (PID 13664)"

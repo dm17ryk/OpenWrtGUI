@@ -27,7 +27,16 @@ NATIVE: dict[str, str] = {
     "admin/network/firewall/ipsets": "firewall",
     "admin/network/firewall/custom": "firewall",
     "admin/status/nftables": "firewall",
-    # v0.6b D11: the System screen (access, mounts and LEDs stay LuCI's until v0.6c)
+    # v0.6b D11: the System screen; v0.6c D1: Administration and LEDs too (Mount points stays LuCI's: its page
+    # needs block-mount, D8)
+    "admin/system/admin": "system",
+    "admin/system/admin/password": "system",
+    "admin/system/admin/pwpolicy": "system",
+    "admin/system/admin/dropbear": "system",
+    "admin/system/admin/sshkeys": "system",
+    "admin/system/admin/uhttpd": "system",
+    "admin/system/admin/repokeys": "system",
+    "admin/system/leds": "system",
     "admin/status/logs": "system",
     "admin/status/logs/syslog": "system",
     "admin/status/logs/dmesg": "system",

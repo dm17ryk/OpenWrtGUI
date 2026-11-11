@@ -13,7 +13,7 @@ The watch list is in [Settings](Settings) → Bench Guard. A run counts as live 
 | Watch | Default entries | Live when |
 |---|---|---|
 | **Lock files** | `D:\Essence_SC\wifi_ref\iperf_txsweep\voip.lock.own` | a `.own` file: a running harness holds its lock; any other file: it exists |
-| **Processes on this PC** | `dima_night.py`, `rh_soak.py`, `overnight_wifi*`, `txlab_*.py`, `voip_chain.py` | a running process matches (`*` is a wildcard) |
+| **Processes on this PC** | `dima_night.py`, `rh_soak.py`, `overnight_wifi*`, `txlab_*.py`, `voip_chain.py`, `mem04_bench.py` | a running process matches (`*` is a wildcard) |
 | **SSIDs on air on a router** | `OpenWrtB`, `OpenWrtC` | a router broadcasts that SSID |
 
 A file ending in `.own` (for example `voip.lock.own`, `dima_night.lock.own`) is a harness's lock sidecar. It

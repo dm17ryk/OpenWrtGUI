@@ -1795,6 +1795,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/system/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Access */
+        get: operations["access_api_routers__router_id__system_access_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/system/backup": {
         parameters: {
             query?: never;
@@ -1823,6 +1840,26 @@ export interface paths {
         get: operations["backups_api_routers__router_id__system_backups_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/backups/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Backup
+         * @description A backup file from the PC (raw body, its name in X-File-Name), checked, then listed (D11).
+         */
+        post: operations["import_backup_api_routers__router_id__system_backups_import_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1931,6 +1968,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/system/http/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Http Apply */
+        post: operations["http_apply_api_routers__router_id__system_http_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/http/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Http Preview */
+        post: operations["http_preview_api_routers__router_id__system_http_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/kept-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Kept Files */
+        get: operations["kept_files_api_routers__router_id__system_kept_files_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/kept-files/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Kept Files Apply */
+        post: operations["kept_files_apply_api_routers__router_id__system_kept_files_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/kept-files/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Kept Files Preview */
+        post: operations["kept_files_preview_api_routers__router_id__system_kept_files_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/leds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Leds */
+        get: operations["leds_api_routers__router_id__system_leds_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/leds/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Leds Apply */
+        post: operations["leds_apply_api_routers__router_id__system_leds_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/leds/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Leds Preview */
+        post: operations["leds_preview_api_routers__router_id__system_leds_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/system/logs": {
         parameters: {
             query?: never;
@@ -1945,6 +2118,91 @@ export interface paths {
         get: operations["logs_api_routers__router_id__system_logs_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/mounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Mounts */
+        get: operations["mounts_api_routers__router_id__system_mounts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/password-policy/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Policy Apply */
+        post: operations["policy_apply_api_routers__router_id__system_password_policy_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/password-policy/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Policy Preview */
+        post: operations["policy_preview_api_routers__router_id__system_password_policy_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/password/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Password Apply */
+        post: operations["password_apply_api_routers__router_id__system_password_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/password/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Password Preview */
+        post: operations["password_preview_api_routers__router_id__system_password_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2070,6 +2328,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/system/reset/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reset Preview */
+        post: operations["reset_preview_api_routers__router_id__system_reset_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/reset/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reset Start */
+        post: operations["reset_start_api_routers__router_id__system_reset_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/restore/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Check */
+        post: operations["restore_check_api_routers__router_id__system_restore_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/restore/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Preview */
+        post: operations["restore_preview_api_routers__router_id__system_restore_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/restore/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Start */
+        post: operations["restore_start_api_routers__router_id__system_restore_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/system/service/apply": {
         parameters: {
             query?: never;
@@ -2166,6 +2509,94 @@ export interface paths {
         put?: never;
         /** Settings Preview */
         post: operations["settings_preview_api_routers__router_id__system_settings_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/ssh-keys/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Keys Apply */
+        post: operations["keys_apply_api_routers__router_id__system_ssh_keys_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/ssh-keys/owner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Key Owner
+         * @description Name (or forget) a harness's key; the Access state comes back with the new labels.
+         */
+        put: operations["key_owner_api_routers__router_id__system_ssh_keys_owner_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/ssh-keys/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Keys Preview */
+        post: operations["keys_preview_api_routers__router_id__system_ssh_keys_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/ssh/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ssh Apply */
+        post: operations["ssh_apply_api_routers__router_id__system_ssh_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/ssh/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ssh Preview */
+        post: operations["ssh_preview_api_routers__router_id__system_ssh_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2677,6 +3108,11 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+            /**
+             * Imported
+             * @default false
+             */
+            imported: boolean;
             /** Name */
             name: string;
             /** Size */
@@ -3781,6 +4217,38 @@ export interface components {
              */
             upserts: components["schemas"]["HostIn"][];
         };
+        /** HttpApplyIn */
+        HttpApplyIn: {
+            /** Digest */
+            digest: string;
+            /** Luci On Network */
+            luci_on_network?: boolean | null;
+            /** Redirect Https */
+            redirect_https?: boolean | null;
+        };
+        /**
+         * HttpChange
+         * @description None leaves a switch as it is.
+         */
+        HttpChange: {
+            /** Luci On Network */
+            luci_on_network?: boolean | null;
+            /** Redirect Https */
+            redirect_https?: boolean | null;
+        };
+        /** HttpState */
+        HttpState: {
+            /** Listen Http */
+            listen_http: string[];
+            /** Listen Https */
+            listen_https: string[];
+            /** Loopback Kept */
+            loopback_kept: boolean;
+            /** Luci On Network */
+            luci_on_network: boolean | null;
+            /** Redirect Https */
+            redirect_https: boolean;
+        };
         /** ImeiOut */
         ImeiOut: {
             /** Imei */
@@ -4048,6 +4516,51 @@ export interface components {
             /** Width Mhz */
             width_mhz: number | null;
         };
+        /** KeptFiles */
+        KeptFiles: {
+            /** Listed */
+            listed: string[];
+            /** Text */
+            text: string;
+        };
+        /** KeyOwnerIn */
+        KeyOwnerIn: {
+            /** Fingerprint */
+            fingerprint: string;
+            /** Owner */
+            owner: string | null;
+        };
+        /** KeysApplyIn */
+        KeysApplyIn: {
+            /**
+             * Add
+             * @default []
+             */
+            add: string[];
+            /** Digest */
+            digest: string;
+            /**
+             * Remove
+             * @default []
+             */
+            remove: string[];
+        };
+        /**
+         * KeysChange
+         * @description Keys to add (public key lines) and to remove (by fingerprint).
+         */
+        KeysChange: {
+            /**
+             * Add
+             * @default []
+             */
+            add: string[];
+            /**
+             * Remove
+             * @default []
+             */
+            remove: string[];
+        };
         /**
          * KnownDevice
          * @description A device by name and its MACs (spec 7.12): the panel's Ethernet and Wi-Fi MACs are unrelated.
@@ -4057,6 +4570,16 @@ export interface components {
             macs: string[];
             /** Name */
             name: string;
+        };
+        /**
+         * KnownKey
+         * @description An SSH public key a harness logs in to the routers with (v0.6c D5, O10 for keys), by fingerprint.
+         */
+        KnownKey: {
+            /** Fingerprint */
+            fingerprint: string;
+            /** Owner */
+            owner: string;
         };
         /**
          * KnownTable
@@ -4085,6 +4608,122 @@ export interface components {
             ip: string;
             /** Mac */
             mac: string | null;
+        };
+        /** LedApplyIn */
+        LedApplyIn: {
+            /** Digest */
+            digest: string;
+            /** Rows */
+            rows: components["schemas"]["LedRow"][];
+        };
+        /**
+         * LedChange
+         * @description The LED actions as they should be: section None is new; a section left out is removed.
+         */
+        LedChange: {
+            /** Rows */
+            rows: components["schemas"]["LedRow"][];
+        };
+        /** LedInfo */
+        LedInfo: {
+            /** Active */
+            active: string | null;
+            /** Brightness */
+            brightness: number;
+            /** Max Brightness */
+            max_brightness: number;
+            /** Sysfs */
+            sysfs: string;
+            /** Triggers */
+            triggers: string[];
+        };
+        /** LedRow */
+        LedRow: {
+            /** Default */
+            default?: boolean | null;
+            /** Delayoff */
+            delayoff?: number | null;
+            /** Delayon */
+            delayon?: number | null;
+            /** Dev */
+            dev?: string | null;
+            /** Inverted */
+            inverted?: boolean | null;
+            /**
+             * Mode
+             * @default []
+             */
+            mode: string[];
+            /** Name */
+            name: string;
+            /** Port Mask */
+            port_mask?: string | null;
+            /** Section */
+            section: string | null;
+            /** Speed Mask */
+            speed_mask?: string | null;
+            /** Sysfs */
+            sysfs: string;
+            /** Trigger */
+            trigger: string;
+        };
+        /** LedState */
+        LedState: {
+            /** Devices */
+            devices: string[];
+            /** Leds */
+            leds: components["schemas"]["LedInfo"][];
+            /** Missing */
+            missing: string[];
+            /**
+             * Netdev Modes
+             * @default [
+             *       "link",
+             *       "link_10",
+             *       "link_100",
+             *       "link_1000",
+             *       "link_2500",
+             *       "link_5000",
+             *       "link_10000",
+             *       "half_duplex",
+             *       "full_duplex",
+             *       "tx",
+             *       "rx"
+             *     ]
+             */
+            netdev_modes: string[];
+            /** Rows */
+            rows: components["schemas"]["LedRow"][];
+            /**
+             * Trigger Options
+             * @default {
+             *       "heartbeat": [
+             *         "inverted"
+             *       ],
+             *       "netdev": [
+             *         "dev",
+             *         "mode"
+             *       ],
+             *       "none": [
+             *         "default"
+             *       ],
+             *       "switch0": [
+             *         "port_mask",
+             *         "speed_mask"
+             *       ],
+             *       "switch1": [
+             *         "port_mask",
+             *         "speed_mask"
+             *       ],
+             *       "timer": [
+             *         "delayon",
+             *         "delayoff"
+             *       ]
+             *     }
+             */
+            trigger_options: {
+                [key: string]: string[];
+            };
         };
         /** LiveRoute */
         LiveRoute: {
@@ -4408,6 +5047,26 @@ export interface components {
              * @default []
              */
             modes: ("b" | "g" | "n20" | "n40")[];
+        };
+        /** Mount */
+        Mount: {
+            /** Device */
+            device: string;
+            /** Fstype */
+            fstype: string;
+            /** Options */
+            options: string;
+            /** Target */
+            target: string;
+        };
+        /** MountState */
+        MountState: {
+            /** Block */
+            block: boolean;
+            /** Mounts */
+            mounts: components["schemas"]["Mount"][];
+            /** Usage */
+            usage: components["schemas"]["Usage"][];
         };
         /** NatConf */
         NatConf: {
@@ -4820,6 +5479,34 @@ export interface components {
             /** Password */
             password: string;
         };
+        /** PasswordPolicy */
+        PasswordPolicy: {
+            /**
+             * Digits
+             * @default false
+             */
+            digits: boolean;
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
+            /**
+             * Pw Length
+             * @default 0
+             */
+            pw_length: number;
+            /**
+             * Special Characters
+             * @default false
+             */
+            special_characters: boolean;
+            /**
+             * Uc Lc
+             * @default false
+             */
+            uc_lc: boolean;
+        };
         /** PinView */
         PinView: {
             /**
@@ -4852,6 +5539,64 @@ export interface components {
             router_id: string;
             /** Warnings */
             warnings: string[];
+        };
+        /** PolicyApplyIn */
+        PolicyApplyIn: {
+            /** Digest */
+            digest: string;
+            /**
+             * Digits
+             * @default false
+             */
+            digits: boolean;
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
+            /**
+             * Pw Length
+             * @default 0
+             */
+            pw_length: number;
+            /**
+             * Special Characters
+             * @default false
+             */
+            special_characters: boolean;
+            /**
+             * Uc Lc
+             * @default false
+             */
+            uc_lc: boolean;
+        };
+        /** PolicyIn */
+        PolicyIn: {
+            /**
+             * Digits
+             * @default false
+             */
+            digits: boolean;
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
+            /**
+             * Pw Length
+             * @default 0
+             */
+            pw_length: number;
+            /**
+             * Special Characters
+             * @default false
+             */
+            special_characters: boolean;
+            /**
+             * Uc Lc
+             * @default false
+             */
+            uc_lc: boolean;
         };
         /** PortEnableApplyIn */
         PortEnableApplyIn: {
@@ -5157,10 +5902,16 @@ export interface components {
             /** Error */
             error?: string | null;
             /**
+             * Kind
+             * @default reboot
+             * @enum {string}
+             */
+            kind: "reboot" | "restore" | "reset";
+            /**
              * Phase
              * @enum {string}
              */
-            phase: "armed" | "waiting" | "back" | "not back";
+            phase: "armed" | "waiting" | "back" | "not back" | "reset" | "not reset";
             /** Router Id */
             router_id: string;
             /**
@@ -5200,7 +5951,8 @@ export interface components {
         };
         /**
          * ReflashPending
-         * @description Flashed without keeping settings: the router comes back like firstboot and waits for Add again.
+         * @description Flashed without keeping settings, or reset to defaults (v0.6c): the router comes back like firstboot
+         *     and waits for Add again.
          */
         ReflashPending: {
             /**
@@ -5210,6 +5962,12 @@ export interface components {
             at: string;
             /** Board */
             board: string;
+            /**
+             * Reason
+             * @default flash
+             * @enum {string}
+             */
+            reason: "flash" | "reset";
             /** Revision */
             revision: string;
         };
@@ -5227,6 +5985,46 @@ export interface components {
             size: number;
             /** Version */
             version: string;
+        };
+        /** RepoKey */
+        RepoKey: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "apk" | "opkg";
+            /** Name */
+            name: string;
+        };
+        /** ResetStartIn */
+        ResetStartIn: {
+            /** Alone */
+            alone: boolean;
+            /** Confirm Name */
+            confirm_name: string;
+            /** Digest */
+            digest: string;
+        };
+        /** RestoreCheck */
+        RestoreCheck: {
+            /** Files */
+            files: string[];
+            /** Refusals */
+            refusals: string[];
+            /** Warnings */
+            warnings: string[];
+        };
+        /** RestoreIn */
+        RestoreIn: {
+            /** Name */
+            name: string;
+        };
+        /** RestoreStartIn */
+        RestoreStartIn: {
+            /** Digest */
+            digest: string;
+            /** Name */
+            name: string;
         };
         /** RouteConf */
         RouteConf: {
@@ -5307,6 +6105,16 @@ export interface components {
             record: components["schemas"]["RouterRecord"];
             status: components["schemas"]["RouterStatus"] | null;
             summary: components["schemas"]["DescriptionSummary"] | null;
+        };
+        /**
+         * RouterPasswordIn
+         * @description The new password: checked by the service (no field limits here, so a refusal never echoes it).
+         */
+        RouterPasswordIn: {
+            /** Digest */
+            digest: string;
+            /** Password */
+            password: string;
         };
         /** RouterRecord */
         RouterRecord: {
@@ -5623,6 +6431,8 @@ export interface components {
             guard?: components["schemas"]["GuardWatchList"];
             /** Known Devices */
             known_devices?: components["schemas"]["KnownDevice"][];
+            /** Known Keys */
+            known_keys?: components["schemas"]["KnownKey"][];
             /** Known Tables */
             known_tables?: components["schemas"]["KnownTable"][];
             /** Last Check */
@@ -5709,6 +6519,89 @@ export interface components {
             ntp_servers: string[];
             /** Zonename */
             zonename: string | null;
+        };
+        /** SshApplyIn */
+        SshApplyIn: {
+            /** Digest */
+            digest: string;
+            /** Instances */
+            instances: components["schemas"]["SshInstanceIn"][];
+            /**
+             * Remove
+             * @default []
+             */
+            remove: string[];
+        };
+        /** SshChange */
+        SshChange: {
+            /** Instances */
+            instances: components["schemas"]["SshInstanceIn"][];
+            /**
+             * Remove
+             * @default []
+             */
+            remove: string[];
+        };
+        /** SshInstance */
+        SshInstance: {
+            /** Direct Interface */
+            direct_interface: string;
+            /** Enable */
+            enable: boolean;
+            /** Gateway Ports */
+            gateway_ports: boolean;
+            /** Interface */
+            interface: string;
+            /** Password Auth */
+            password_auth: boolean;
+            /** Port */
+            port: number;
+            /** Root Password Auth */
+            root_password_auth: boolean;
+            /** Section */
+            section: string;
+        };
+        /**
+         * SshInstanceIn
+         * @description One dropbear instance as the screen sends it: section None is a new one.
+         */
+        SshInstanceIn: {
+            /** Enable */
+            enable: boolean;
+            /** Gateway Ports */
+            gateway_ports: boolean;
+            /** Interface */
+            interface: string;
+            /** Password Auth */
+            password_auth: boolean;
+            /** Port */
+            port: number;
+            /** Root Password Auth */
+            root_password_auth: boolean;
+            /** Section */
+            section: string | null;
+        };
+        /** SshKeyRow */
+        SshKeyRow: {
+            /** Comment */
+            comment: string;
+            /** Fingerprint */
+            fingerprint: string | null;
+            /** Index */
+            index: number;
+            /**
+             * Label
+             * @enum {string}
+             */
+            label: "app" | "harness" | "other";
+            /** Options */
+            options: string | null;
+            /** Owner */
+            owner: string | null;
+            /** Text */
+            text: string;
+            /** Type */
+            type: string | null;
         };
         /** SsidAccess */
         SsidAccess: {
@@ -5820,6 +6713,29 @@ export interface components {
          * @enum {string}
          */
         Step: "address" | "host_key" | "login" | "install_key" | "identify" | "ports" | "done";
+        /** SystemAccessState */
+        SystemAccessState: {
+            /** App Instance */
+            app_instance: string | null;
+            /** App Interface */
+            app_interface: string | null;
+            http: components["schemas"]["HttpState"];
+            /** Https Served */
+            https_served: boolean;
+            /** Interfaces */
+            interfaces: string[];
+            /** Keys */
+            keys: components["schemas"]["SshKeyRow"][];
+            /** Missing */
+            missing: string[];
+            /** Password */
+            password: ("set" | "none") | null;
+            policy: components["schemas"]["PasswordPolicy"] | null;
+            /** Repo Keys */
+            repo_keys: components["schemas"]["RepoKey"][];
+            /** Ssh */
+            ssh: components["schemas"]["SshInstance"][];
+        };
         /** SystemOverview */
         SystemOverview: {
             /** Board Name */
@@ -6221,6 +7137,21 @@ export interface components {
             /** Last Check */
             last_check: string | null;
             latest: components["schemas"]["ReleaseOut"] | null;
+        };
+        /** Usage */
+        Usage: {
+            /** Available Kib */
+            available_kib: number;
+            /** Filesystem */
+            filesystem: string;
+            /** Size Kib */
+            size_kib: number;
+            /** Target */
+            target: string;
+            /** Use Pct */
+            use_pct: number;
+            /** Used Kib */
+            used_kib: number;
         };
         /** ValidationError */
         ValidationError: {
@@ -9922,6 +10853,37 @@ export interface operations {
             };
         };
     };
+    access_api_routers__router_id__system_access_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemAccessState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     backup_api_routers__router_id__system_backup_post: {
         parameters: {
             query?: never;
@@ -9971,6 +10933,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BackupFile"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_backup_api_routers__router_id__system_backups_import_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-file-name"?: string;
+            };
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BackupFile"];
                 };
             };
             /** @description Validation Error */
@@ -10181,6 +11176,278 @@ export interface operations {
             };
         };
     };
+    http_apply_api_routers__router_id__system_http_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HttpApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    http_preview_api_routers__router_id__system_http_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HttpChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    kept_files_api_routers__router_id__system_kept_files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeptFiles"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    kept_files_apply_api_routers__router_id__system_kept_files_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TextApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    kept_files_preview_api_routers__router_id__system_kept_files_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TextIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    leds_api_routers__router_id__system_leds_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LedState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    leds_apply_api_routers__router_id__system_leds_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LedApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    leds_preview_api_routers__router_id__system_leds_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LedChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     logs_api_routers__router_id__system_logs_get: {
         parameters: {
             query?: {
@@ -10202,6 +11469,173 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LogEntry"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mounts_api_routers__router_id__system_mounts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MountState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    policy_apply_api_routers__router_id__system_password_policy_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    policy_preview_api_routers__router_id__system_password_policy_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    password_apply_api_routers__router_id__system_password_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RouterPasswordIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    password_preview_api_routers__router_id__system_password_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
                 };
             };
             /** @description Validation Error */
@@ -10444,6 +11878,177 @@ export interface operations {
             };
         };
     };
+    reset_preview_api_routers__router_id__system_reset_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_start_api_routers__router_id__system_reset_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResetStartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RebootJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_check_api_routers__router_id__system_restore_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestoreIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestoreCheck"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_preview_api_routers__router_id__system_restore_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestoreIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_start_api_routers__router_id__system_restore_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestoreStartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RebootJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     service_apply_api_routers__router_id__system_service_apply_post: {
         parameters: {
             query?: never;
@@ -10623,6 +12228,181 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    keys_apply_api_routers__router_id__system_ssh_keys_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeysApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    key_owner_api_routers__router_id__system_ssh_keys_owner_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeyOwnerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemAccessState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    keys_preview_api_routers__router_id__system_ssh_keys_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeysChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ssh_apply_api_routers__router_id__system_ssh_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SshApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ssh_preview_api_routers__router_id__system_ssh_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SshChange"];
             };
         };
         responses: {

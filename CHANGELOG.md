@@ -38,11 +38,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   fresh uptime (not back after 5 minutes is reported).
 - LuCI's logs, processes, realtime graphs, system, startup, scheduled tasks, reboot, backup and diagnostics
   pages now open the System screen.
+- System › Access: the root password (typed twice, sent on `passwd`'s input, never in a command line, log or
+  answer; proven by the changed hash) and LuCI's password policy; dropbear's instances with the app's own one
+  kept on, kept and kept on its interface, applied with the router's 60 s rollback and followed to a new port;
+  the authorized keys, each labelled App, Harness (with the owner you name) or Other, added and removed with
+  the app's own key protected and a new login proving the app still gets in; LuCI on or off the network and
+  the HTTPS redirect (refused while the router serves no HTTPS); the repository keys, read only.
+- System › LEDs: each LED action with its LED, trigger and that trigger's options, proven by the active
+  trigger read back. System › Mount points: what is mounted and how full, read only.
+- Backup: import a backup file from the PC (checked on the PC first); restore one from the list, refused when
+  it is another router's, would move the router off its address or lock the app out, and proven by a fresh
+  uptime and every restored file's sha256; the files kept in a backup (`/etc/sysupgrade.conf`) beside what a
+  backup holds now; reset to defaults, which needs the router's name typed and an "alone on this PC's
+  network" tick, after which the router is to be added again.
+- LuCI's administration pages (password, policy, SSH, SSH keys, HTTP(S), repository keys) and LED
+  configuration now open the System screen. Its Mount Points page still opens in LuCI, where fstab editing
+  lives.
 
 ### Fixed
 
 - A list replaced on a named uci section (for example the NTP servers) was reported as not saved although
   the router had it.
+- A crontab emptied of every task now removes the file, so the router goes back to having no crontab.
+- Two backups started in the same second no longer overwrite each other; two reboots started at once arm one.
+- The live System charts idle while the router reboots instead of reporting it unreachable.
+- A startup script the router refuses to read is named as such instead of shown empty.
 
 ### Fixed
 

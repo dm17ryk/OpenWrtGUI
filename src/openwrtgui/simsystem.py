@@ -120,6 +120,7 @@ class SimSystem:
         self._services: dict[str, list[bool]] = {
             name: [enabled, self._runs_at_boot(name, enabled)] for name, (_start, enabled) in _AP2.items()
         }
+        self.extra_files: Callable[[], dict[str, str]] | None = None  # the access side's files (v0.6c)
         self._start = clock()
         self._boot_at = clock() - 86400.0  # used only without an image (the image keeps the real one)
         self._boot_seen = self._booted()
@@ -177,15 +178,28 @@ class SimSystem:
             out[name] = {"start": 97, "enabled": enabled, "running": running}
         return dict(sorted(out.items()))
 
+    def set_file(self, path: str, text: str) -> None:
+        """A restored /etc/rc.local or crontab (v0.6c)."""
+        self._files[path] = text
+
+    def file(self, path: str) -> str | None:
+        return self._files.get(path)
+
     # ---------------------------------------------------------------- the archive
     def backup(self) -> bytes:
+        from openwrtgui.simaccess import render_uci_file
+
         uci = self._net.uci() if self._net is not None else {}
         files = {
-            "etc/config/system": "".join(f"{k}={v}\n" for k, v in uci.items() if k.startswith("system."))
+            f"etc/config/{config}": render_uci_file(uci, config)
+            for config in ("system", "network", "dropbear", "uhttpd")
+            if any(k.startswith(config + ".") for k in uci)
         }
         files["etc/rc.local"] = self._files["/etc/rc.local"]
         if "/etc/crontabs/root" in self._files:
             files["etc/crontabs/root"] = self._files["/etc/crontabs/root"]
+        if self.extra_files is not None:
+            files |= self.extra_files()
         raw = io.BytesIO()
         with tarfile.open(fileobj=raw, mode="w") as tar:
             for name, text in files.items():
@@ -229,6 +243,9 @@ class SimSystem:
             return _ok(c, self._files[path])
         if m := _WRITE.fullmatch(c):
             self._files[m.group(1)] = m.group(2) + "\n"
+            return _ok(c)
+        if c == s.REMOVE_CRONTAB:
+            self._files.pop("/etc/crontabs/root", None)
             return _ok(c)
         if c == s.LIVE:
             return _ok(c, self._live())

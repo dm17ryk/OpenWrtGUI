@@ -1,12 +1,15 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { ApiError, apiFetch, downloadFile, postJson } from '../../api/client'
+import { ApiError, apiFetch, downloadFile, postBytes, postJson } from '../../api/client'
 import type { BackupFile, NetPlan, RebootJob } from '../../api/types'
 import { PreviewApply } from '../../components/PreviewApply'
-import { Help } from '../../help/Help'
+import { Help, HelpTip } from '../../help/Help'
 import { HELP } from '../../help/topics'
-
-const POLL_MS = 2000
+import { JobStatus } from './JobStatus'
+import { KeptFilesCard } from './KeptFilesCard'
+import { ResetCard } from './ResetCard'
+import { RestoreCard } from './RestoreCard'
+import { isRunning, useJob, useJobEnd, useStartJob } from './useJob'
 
 function kib(bytes: number): string {
   return bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KiB` : `${(bytes / 1048576).toFixed(1)} MiB`
@@ -37,6 +40,13 @@ function BackupCard({ routerId, short }: { routerId: string; short: string }) {
       await postJson<BackupFile>(`/api/routers/${routerId}/system/backup`)
       await client.invalidateQueries({ queryKey: ['system-backups', routerId] })
     })
+  // a file from the PC: checked by the app (nothing goes to the router), then listed like a saved backup
+  const pick = (file: File | undefined): Promise<void> =>
+    act(async () => {
+      if (!file) return
+      await postBytes<BackupFile>(`/api/routers/${routerId}/system/backups/import`, await file.arrayBuffer(), file.name)
+      await client.invalidateQueries({ queryKey: ['system-backups', routerId] })
+    })
   return (
     <section className="card stack" aria-labelledby="system-backup-h">
       <div className="row">
@@ -45,6 +55,12 @@ function BackupCard({ routerId, short }: { routerId: string; short: string }) {
           <Help topic={HELP.systemBackup} />
         </div>
         <div className="spacer" />
+        <HelpTip topic={HELP.systemImport}>
+          <label className="btn">
+            Import backup…
+            <input type="file" accept=".tar.gz,.tgz" aria-label="Import backup…" hidden disabled={isBusy} onChange={(e) => void pick(e.target.files?.[0])} />
+          </label>
+        </HelpTip>
         <button type="button" className="btn pri" disabled={isBusy} onClick={() => void create()}>
           {isBusy ? 'Saving…' : 'Create backup'}
         </button>
@@ -70,7 +86,10 @@ function BackupCard({ routerId, short }: { routerId: string; short: string }) {
             <tbody>
               {list.data.map((b) => (
                 <tr key={b.name}>
-                  <td className="mono">{b.name}</td>
+                  <td>
+                    <span className="mono">{b.name}</span>
+                    {b.imported && <div className="muted">imported from this PC</div>}
+                  </td>
                   <td className="mono">{kib(b.size)}</td>
                   <td>{new Date(b.created_at).toLocaleString()}</td>
                   <td>
@@ -88,25 +107,14 @@ function BackupCard({ routerId, short }: { routerId: string; short: string }) {
   )
 }
 
-function phaseText(job: RebootJob, short: string): string {
-  if (job.phase === 'armed') return `Armed: ${short} reboots in 2 s`
-  if (job.phase === 'waiting') return `Waiting for ${short} to answer with a fresh uptime…`
-  if (job.phase === 'back') return job.detail ?? `${short} is back`
-  return job.error ?? `${short} is not back`
-}
-
 function RebootCard({ routerId, short }: { routerId: string; short: string }) {
-  const client = useQueryClient()
   const [plan, setPlan] = useState<NetPlan | null>(null)
   const [asking, setAsking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isBusy, setBusy] = useState(false)
-  const job = useQuery({
-    queryKey: ['system-reboot', routerId],
-    queryFn: () => apiFetch<RebootJob | null>(`/api/routers/${routerId}/system/reboot`),
-    refetchInterval: (q) => (q.state.data && (q.state.data.phase === 'armed' || q.state.data.phase === 'waiting') ? POLL_MS : false),
-  })
-  const running = job.data != null && (job.data.phase === 'armed' || job.data.phase === 'waiting')
+  const job = useJob(routerId)
+  const startJob = useStartJob(routerId)
+  const running = isRunning(job.data)
   const preview = async (): Promise<void> => {
     setError(null)
     try {
@@ -122,7 +130,7 @@ function RebootCard({ routerId, short }: { routerId: string; short: string }) {
     setError(null)
     try {
       const armed = await postJson<RebootJob>(`/api/routers/${routerId}/system/reboot/start`, { digest: plan.digest })
-      client.setQueryData(['system-reboot', routerId], armed) // polling starts from the armed job
+      startJob(armed)
       setPlan(null)
     } catch (err) {
       setError(errorText(err))
@@ -169,22 +177,23 @@ function RebootCard({ routerId, short }: { routerId: string; short: string }) {
           </button>
         </div>
       )}
-      {job.data && (
-        <div className={job.data.phase === 'not back' ? 'note x' : job.data.phase === 'back' ? 'note' : 'note w'} role="status" aria-label="Reboot">
-          {phaseText(job.data, short)}
-        </div>
-      )}
+      {job.data?.kind === 'reboot' && <JobStatus job={job.data} short={short} label="Reboot" />}
     </section>
   )
 }
 
-/** The configuration archive (D9) and a reboot proven by a fresh uptime (D8). */
+/** The configuration archive and its import, restore and kept files, a reboot proven by a fresh uptime, and
+ * the reset to defaults (v0.6b D8-D9, v0.6c D10-D12). One job (reboot, restore, reset) runs at a time. */
 export function BackupTab({ routerId, routerName }: Props) {
   const short = routerName.split(' · ')[0] || routerId
+  useJobEnd(routerId)
   return (
     <>
       <BackupCard routerId={routerId} short={short} />
+      <RestoreCard routerId={routerId} short={short} />
+      <KeptFilesCard routerId={routerId} short={short} />
       <RebootCard routerId={routerId} short={short} />
+      <ResetCard routerId={routerId} routerName={routerName} />
     </>
   )
 }

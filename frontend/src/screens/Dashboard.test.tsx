@@ -114,11 +114,19 @@ test('lists files added after flashing in Needs attention', () => {
 })
 
 test('a router reflashed without settings is to be added again', () => {
-  const reflashed = { ...AP2, record: { ...AP2.record, reflashed: { board: 'dlink,dwr-921-c3-uboot', revision: 'r35700-0c0ffee000', at: '2026-11-08T12:00:00' } } }
+  const reflashed = { ...AP2, record: { ...AP2.record, reflashed: { board: 'dlink,dwr-921-c3-uboot', revision: 'r35700-0c0ffee000', at: '2026-11-08T12:00:00', reason: 'flash' as const } } }
   renderWith([AP1, reflashed])
   const attention = screen.getByRole('region', { name: 'Needs attention' })
   expect(within(attention).getByText(/Reflashed without settings: add it again/)).toBeInTheDocument()
   expect(within(attention).getByRole('link', { name: 'Add again' })).toHaveAttribute('href', '/add?host=192.168.1.1')
+})
+
+test('a router reset to defaults is to be added again, in those words', () => {
+  const reset = { ...AP2, record: { ...AP2.record, reflashed: { board: 'dlink,dwr-921-c3-uboot', revision: 'r35692-b8bffeefdf', at: '2026-11-10T12:00:00', reason: 'reset' as const } } }
+  renderWith([AP1, reset])
+  const attention = screen.getByRole('region', { name: 'Needs attention' })
+  expect(within(attention).getByText(/Reset to defaults: add it again/)).toBeInTheDocument()
+  expect(within(attention).queryByText(/Reflashed/)).not.toBeInTheDocument()
 })
 
 test('shows owner tags on the router card', () => {

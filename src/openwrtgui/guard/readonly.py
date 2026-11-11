@@ -7,13 +7,14 @@ import shlex
 
 from openwrtgui.discovery.commands import OVERLAY_LS, ROM_LS
 from openwrtgui.lte.commands import TTY_LIST
-from openwrtgui.system.commands import BACKUP_SIZE
+from openwrtgui.system.commands import BACKUP_SIZE, HAS_BLOCK, PASSWORD_DIGEST
 
 # "&" also covers "&&" and "|&": a single & starts a second command in the background.
 _FORBIDDEN = (";", "&", "||", ">", "<", "`", "$(", "\n")
 # Discovery's own reads (v0.5), as exact texts: they need `-exec ls` and a stderr redirect. The System
-# screen's backup size (v0.6b): the archive goes to wc only, nothing is written on the router.
-_EXACT = frozenset({OVERLAY_LS, ROM_LS, TTY_LIST, BACKUP_SIZE})
+# screen's backup size (v0.6b): the archive goes to wc only, nothing is written on the router. Its
+# block-mount probe and password digest (v0.6c): `test` and `awk` are not open programs here.
+_EXACT = frozenset({OVERLAY_LS, ROM_LS, TTY_LIST, BACKUP_SIZE, HAS_BLOCK, PASSWORD_DIGEST})
 _FIRMWARE_HASH = re.compile(
     r"dd if=/dev/mtdblock\d{1,2} bs=65536 count=\d{1,6} 2>/dev/null \| head -c \d{1,10} \| sha256sum"
 )
@@ -42,6 +43,7 @@ _ALWAYS = frozenset(
         "sha256sum",
         "which",
         "hexdump",
+        "ls",  # lists names only (v0.6c: repository keys, network devices)
     ]
 )
 _UCI_READ = frozenset({"show", "get", "changes", "export"})
@@ -66,6 +68,7 @@ _UBUS_READ_METHODS = frozenset(
         "get_validate",
         "get_proto_handlers",
         "getTimezones",  # the System screen's time zone list (LuCI's own read)
+        "getLEDs",  # the LEDs tab (v0.6c, LuCI's own read)
     ]
 )
 _FIND_ACTIONS = frozenset({"-delete", "-exec", "-execdir", "-ok", "-okdir"})

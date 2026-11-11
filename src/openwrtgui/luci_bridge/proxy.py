@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Awaitable, Callable
+from typing import Literal
 
 import httpx
 from starlette.applications import Starlette
@@ -53,12 +54,18 @@ class BridgeProxy:
         sid: str,
         client_factory: Callable[[str], httpx.AsyncClient] | None = None,
         on_use: Callable[[], None] = lambda: None,
+        scheme: Literal["http", "https"] = "http",
     ) -> None:
         self._secret = secret
         self._sid = sid
         self._on_use = on_use
-        make = client_factory or (lambda base: httpx.AsyncClient(base_url=base, timeout=30.0))
-        self._client = make(f"http://127.0.0.1:{upstream_port}")
+        # With the router's HTTPS redirect on, the bridge talks TLS to the router's own port 443 through the
+        # SSH forward. The certificate is the router's self-signed one and is not checked: the SSH tunnel,
+        # with its pinned host key, is what proves this is the router.
+        self.verify = scheme == "http"
+        verify = self.verify
+        make = client_factory or (lambda base: httpx.AsyncClient(base_url=base, timeout=30.0, verify=verify))
+        self._client = make(f"{scheme}://127.0.0.1:{upstream_port}")
         self._stop: Callable[[], Awaitable[None]] | None = None
         self.app = Starlette(
             routes=[
@@ -95,7 +102,9 @@ class BridgeProxy:
             return PlainTextResponse(NOT_YOURS, status_code=403)
         self._on_use()
         headers = {k: v for k, v in request.headers.items() if k.lower() not in _DROP_REQUEST}
-        headers["cookie"] = f"sysauth_http={self._sid}; sysauth={self._sid}"
+        # LuCI reads sysauth_https over TLS, sysauth_http otherwise
+        name = "sysauth_http" if self.verify else "sysauth_https"
+        headers["cookie"] = f"{name}={self._sid}; sysauth={self._sid}"
         target = request.url.path + (f"?{request.url.query}" if request.url.query else "")
         try:
             upstream = await self._client.request(
