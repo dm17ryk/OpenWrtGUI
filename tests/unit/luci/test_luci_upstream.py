@@ -12,6 +12,8 @@ from openwrtgui.luci_bridge.upstream import router_web, ssh_upstream
 from openwrtgui.transport.base import CommandResult
 
 REDIRECT = "uci -q get uhttpd.main.redirect_https"
+LISTEN = "uci -q get uhttpd.main.listen_{}"
+ALL = {"http": "0.0.0.0:80 [::]:80", "https": "0.0.0.0:443 [::]:443"}
 
 
 @dataclass
@@ -25,13 +27,16 @@ class _Forward:
 @dataclass
 class FakeT:
     redirect: str | None
+    listen: dict[str, str] = field(default_factory=lambda: dict(ALL))
     forwarded: list[tuple[str, int]] = field(default_factory=list)
 
     async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
-        assert command == REDIRECT
-        if self.redirect is None:
+        answers = {REDIRECT: self.redirect, **{LISTEN.format(k): v for k, v in self.listen.items()}}
+        assert command in answers, command
+        answer = answers[command]
+        if answer is None:
             return CommandResult(command, "", "uci: Entry not found\n", 1)
-        return CommandResult(command, self.redirect + "\n", "", 0)
+        return CommandResult(command, answer + "\n", "", 0)
 
     async def forward_local(self, host: str, port: int) -> _Forward:
         self.forwarded.append((host, port))
@@ -51,6 +56,19 @@ async def test_router_web_follows_redirect_https() -> None:
     assert await router_web(FakeT("1")) == (443, "https")  # type: ignore[arg-type]
     assert await router_web(FakeT("0")) == (80, "http")  # type: ignore[arg-type]
     assert await router_web(FakeT(None)) == (80, "http")  # type: ignore[arg-type]
+
+
+async def test_the_bridge_uses_the_port_uhttpd_listens_on() -> None:
+    """A listen list with another port, as LuCI or a router's own config may set it: the tunnel goes to that
+    port on the router's loopback (PR #48 review: it always went to 443 or 80)."""
+    custom = {"http": "0.0.0.0:8080 [::]:8080", "https": "0.0.0.0:8443 [::]:8443"}
+    assert await router_web(FakeT("1", custom)) == (8443, "https")  # type: ignore[arg-type]
+    assert await router_web(FakeT("0", custom)) == (8080, "http")  # type: ignore[arg-type]
+    loop_only = {"http": "127.0.0.1:81", "https": "8444"}  # loopback only, and a bare port (every address)
+    assert await router_web(FakeT("0", loop_only)) == (81, "http")  # type: ignore[arg-type]
+    assert await router_web(FakeT("1", loop_only)) == (8444, "https")  # type: ignore[arg-type]
+    v6_only = {"http": "[::]:8080", "https": "[::1]:8443"}  # nothing the IPv4 loopback reaches: the default
+    assert await router_web(FakeT("1", v6_only)) == (443, "https")  # type: ignore[arg-type]
 
 
 async def test_the_bridge_follows_redirect_https() -> None:
