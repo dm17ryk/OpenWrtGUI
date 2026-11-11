@@ -64,8 +64,8 @@ only), and the HTTPS redirect with the LuCI pages behind it (the bench router se
 
 ### Changed
 
-- Bench Guard also watches for the C8000 memory soak (`mem04_bench.py`) by default. A settings file saved
-  with its own watch list keeps that list.
+- Bench Guard also watches for the C8000 memory soak (`mem04_bench.py`) by default. A watch list saved
+  unchanged from an earlier release's default gets it too; a list you edited is kept as saved.
 
 ### Fixed
 
