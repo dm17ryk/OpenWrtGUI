@@ -73,8 +73,12 @@ test('a restore of a fresh backup through to back, in the simulator', async ({ p
   test.skip(info.project.name !== 'desktop-light', 'one project changes the simulator')
   test.setTimeout(120_000)
   await open(page, '/routers/ap1/system?tab=backup')
+  const table = page.getByRole('table', { name: 'Backups' })
+  await expect(table.or(page.getByText('No backups of AP1 saved yet.'))).toBeVisible() // the list has loaded
+  const rows = table.getByRole('row')
+  const listed = await rows.count() // an earlier test may have saved one: wait for this test's own
   await page.getByRole('button', { name: 'Create backup' }).click()
-  await expect(page.getByRole('table', { name: 'Backups' })).toContainText(/ap1-\d{8}-\d{6}\.tar\.gz/)
+  await expect(rows).toHaveCount(listed === 0 ? 2 : listed + 1) // the header row and the new backup
   const restore = page.getByRole('region', { name: 'Restore' })
   await restore.getByRole('button', { name: 'Check' }).click()
   await expect(restore.getByRole('list', { name: 'Files in the backup' })).toContainText('/etc/config/network')

@@ -256,7 +256,12 @@ class JobsMixin:
         info = read_archive(data)
         pinned = self._host_keys.get(rec.host, rec.port) if self._host_keys is not None else None
         refusals = restore_refusals(
-            info, router_name=rec.name, address=rec.host, pinned=pinned, app=self._app_keys(rec)
+            info,
+            router_name=rec.name,
+            address=rec.host,
+            port=rec.port,
+            pinned=pinned,
+            app=self._app_keys(rec),
         )
         return data, info, refusals
 

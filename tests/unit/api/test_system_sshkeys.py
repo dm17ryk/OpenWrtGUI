@@ -3,6 +3,8 @@ app's key kept, harness keys named."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import asyncssh
 import httpx
 import pytest
@@ -113,3 +115,16 @@ async def test_keys_wait_for_the_run(ctx_guard_live: AppContext) -> None:
     plan = await ctx_guard_live.access.plan_keys("ap2", change)
     with pytest.raises(GuardLocked):
         await ctx_guard_live.access.apply_keys("ap2", change, plan.digest)
+
+
+async def test_no_key_is_removed_while_the_app_cannot_tell_its_own(ctx: AppContext, tmp_path: Path) -> None:
+    """The router's own key file does not read: the key the app logs in with cannot be labelled App, so a
+    removal could lock the app out. Removals wait; adding a key is still fine (review)."""
+    bench = await _fingerprint_of(ctx, "bench@lab")
+    rec = ctx.routers.get("ap2")
+    assert rec is not None
+    ctx.routers.upsert(rec.model_copy(update={"key_path": str(tmp_path / "gone" / "id_ed25519")}))
+    with pytest.raises(ValueError, match="cannot tell which key it logs in to AP2 . office with"):
+        await ctx.access.plan_keys("ap2", KeysChange(remove=(bench,)))
+    line, _ = _new_key()
+    assert line in (await ctx.access.plan_keys("ap2", KeysChange(add=(line,)))).lines

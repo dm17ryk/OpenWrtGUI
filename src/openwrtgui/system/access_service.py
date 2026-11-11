@@ -383,6 +383,13 @@ class AccessService:
             raise ValueError(f"{s.AUTHORIZED_KEYS} does not read: {result.stderr.strip()}")
         rows = self.key_rows(rec, result.stdout if result.ok else "")
         by_print = {r.fingerprint: r for r in rows if r.fingerprint}
+        unread = [p for p in router_key_paths(rec, self._app_key.private_path) if _key_fingerprint(p) is None]
+        if change.remove and unread:
+            # the key the app logs in with may be labelled "other": a removal could lock the app out
+            raise ValueError(
+                f"The app cannot tell which key it logs in to {rec.name} with ({unread[0].name} does not "
+                "read): no key is removed here"
+            )
         warnings: list[str] = []
         for fingerprint in change.remove:
             row = by_print.get(fingerprint)

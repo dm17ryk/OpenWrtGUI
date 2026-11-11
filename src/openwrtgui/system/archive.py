@@ -14,6 +14,7 @@ from collections.abc import Collection
 from pydantic import BaseModel, ConfigDict
 
 from openwrtgui.images.uci_file import parse_uci_file
+from openwrtgui.system.access import dropbear_instances
 from openwrtgui.system.sshkeys import parse_authorized_keys
 
 MAX_ARCHIVE = 4 * 1024 * 1024  # AP2's own backup is 7 KB; /tmp holds the upload (about 8 MB of RAM free)
@@ -40,6 +41,10 @@ class ArchiveInfo(BaseModel):
     files: tuple[ArchiveFile, ...]
     hostname: str | None
     addresses: tuple[str, ...]  # every interface's fixed IPv4 address in etc/config/network
+    interfaces: tuple[tuple[str, str], ...] = ()  # (interface, fixed IPv4 address) in etc/config/network
+    ssh: tuple[tuple[int, str], ...] | None = (
+        None  # enabled dropbear instances (port, interface); None: no config
+    )
     host_keys: tuple[str, ...]  # fingerprints of the archive's SSH host keys
     authorized_keys: str | None  # the file's text (public keys), None when the archive has none
     has_network: bool
@@ -79,15 +84,22 @@ def _members(data: bytes) -> list[tuple[str, bytes]]:
     return out
 
 
-def _addresses(network: str) -> tuple[str, ...]:
+def _interfaces(network: str) -> tuple[tuple[str, str], ...]:
     shown = parse_uci_file("network", network)
-    out: list[str] = []
+    out: list[tuple[str, str]] = []
     for path, value in shown.items():
         section, _, option = path.rpartition(".")
         if option != "ipaddr" or shown.get(section) != "interface":
             continue
-        out.extend(v.split("/", 1)[0] for v in value.split())
+        out.extend((section.split(".", 1)[1], v.split("/", 1)[0]) for v in value.split())
     return tuple(out)
+
+
+def _ssh(dropbear: str) -> tuple[tuple[int, str], ...]:
+    """Where dropbear listens after a restore: each enabled instance's port and interface ("" is all)."""
+    return tuple(
+        (i.port, i.interface) for i in dropbear_instances(parse_uci_file("dropbear", dropbear)) if i.enable
+    )
 
 
 def read_archive(data: bytes) -> ArchiveInfo:
@@ -104,6 +116,8 @@ def read_archive(data: bytes) -> ArchiveInfo:
     system = texts.get("/etc/config/system")
     network = texts.get("/etc/config/network")
     keys = texts.get("/etc/dropbear/authorized_keys")
+    dropbear = texts.get("/etc/config/dropbear")
+    interfaces = _interfaces(network.decode(errors="replace")) if network is not None else ()
     hostname = None
     if system is not None:
         hostname = parse_uci_file("system", system.decode(errors="replace")).get("system.@system[0].hostname")
@@ -113,7 +127,9 @@ def read_archive(data: bytes) -> ArchiveInfo:
             for path, raw in members
         ),
         hostname=hostname,
-        addresses=_addresses(network.decode(errors="replace")) if network is not None else (),
+        addresses=tuple(a for _, a in interfaces),
+        interfaces=interfaces,
+        ssh=_ssh(dropbear.decode(errors="replace")) if dropbear is not None else None,
         host_keys=tuple(host_keys),
         authorized_keys=keys.decode(errors="replace") if keys is not None else None,
         has_network=network is not None,
@@ -156,7 +172,13 @@ def dropbear_key_fingerprint(blob: bytes) -> str:
 
 
 def restore_refusals(
-    info: ArchiveInfo, *, router_name: str, address: str, pinned: str | None, app: Collection[str]
+    info: ArchiveInfo,
+    *,
+    router_name: str,
+    address: str,
+    port: int,
+    pinned: str | None,
+    app: Collection[str],
 ) -> list[str]:
     """Why this archive would leave the router unreachable for the app, or is another router's (D11)."""
     out: list[str] = []
@@ -169,4 +191,14 @@ def restore_refusals(
         present = {k.fingerprint for k in parse_authorized_keys(info.authorized_keys) if k.fingerprint}
         if not present & set(app):
             out.append(f"after the restore the app could not log in to {router_name}")
+    if info.ssh is not None:
+        # the interface holding the app's address; without a network config the router keeps its own
+        mine = {name for name, a in info.interfaces if a == address}
+        if not any(
+            p == port and (where == "" or not info.has_network or where in mine) for p, where in info.ssh
+        ):
+            out.append(
+                f"after the restore nothing on {router_name} listens for SSH on port {port}, "
+                "where the app connects"
+            )
     return out

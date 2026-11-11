@@ -38,6 +38,7 @@ export function RestoreCard({ routerId, short }: Props) {
   }
   const runCheck = async (): Promise<void> => {
     reset()
+    setPicked(name) // a backup listed meanwhile (it comes first) must not change what was checked
     setBusy(true)
     try {
       const found = await postJson<RestoreCheck>(`${base}/restore/check`, { name })

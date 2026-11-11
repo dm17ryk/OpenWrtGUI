@@ -132,7 +132,9 @@ def test_restore_refusals() -> None:
     app_fp = {app.get_fingerprint("sha256")}
 
     def refusals(info: object) -> list[str]:
-        return restore_refusals(info, router_name="AP2", address="192.168.1.2", pinned=pinned, app=app_fp)  # type: ignore[arg-type]
+        return restore_refusals(
+            info, router_name="AP2", address="192.168.1.2", port=22, pinned=pinned, app=app_fp
+        )  # type: ignore[arg-type]
 
     good = _info(
         etc__config__network=NETWORK.encode(),
@@ -152,3 +154,29 @@ def test_restore_refusals() -> None:
         "after the restore the app could not log in to AP2"
     ]
     assert refusals(_info(etc__config__system=SYSTEM.encode())) == []  # no keys, no network: nothing to lose
+
+
+DROPBEAR = "config dropbear 'main'\n\toption enable '1'\n\toption Port '22'\n"
+
+
+def test_restore_refuses_ssh_the_app_could_not_reach() -> None:
+    """A backup whose dropbear config leaves nothing on the app's port, on every interface or the one with
+    the router's address, would end "not back": it is refused before anything is sent (review, D11)."""
+
+    def refusals(dropbear: str | None) -> list[str]:
+        files = {"etc__config__network": NETWORK.encode()}
+        if dropbear is not None:
+            files["etc__config__dropbear"] = dropbear.encode()
+        info = _info(**files)
+        return restore_refusals(
+            info, router_name="AP2", address="192.168.1.2", port=22, pinned=None, app=set()
+        )  # type: ignore[arg-type]
+
+    unreachable = ["after the restore nothing on AP2 listens for SSH on port 22, where the app connects"]
+    assert refusals(DROPBEAR) == []
+    assert refusals(None) == []  # no dropbear config in the backup: the router keeps its own
+    assert refusals(DROPBEAR + "\toption Interface 'lan'\n") == []  # lan holds 192.168.1.2
+    assert refusals("config dropbear\n") == []  # dropbear's defaults: on, port 22, every interface
+    assert refusals(DROPBEAR.replace("'22'", "'2222'")) == unreachable
+    assert refusals(DROPBEAR.replace("enable '1'", "enable '0'")) == unreachable
+    assert refusals(DROPBEAR + "\toption Interface 'wan'\n") == unreachable
