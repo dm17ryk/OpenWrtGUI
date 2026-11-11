@@ -92,6 +92,8 @@ The proof is the saved config and dropbear listening on every enabled port.
 uses it. **App** is the key this app logs in with: it has no Remove. **Harness** is a key you named with
 **Owner…** (the name is kept in the app's settings, nothing is sent to the router); **Other** is any other
 key. **Add key** takes a pasted public key line; a private key, or a key the router has already, is refused.
+While the app cannot read the key file it logs in to the router with, it cannot tell which key is its own,
+so no key is removed until that file reads again.
 The preview is the whole new file. The proof is the file read back, every new key in it, and a new login with
 the app's key.
 
@@ -168,8 +170,9 @@ from this PC".
 
 Pick a backup from the list and **Check** it: the app reads the archive and lists its files, or says why it is
 refused. A restore is refused before anything is sent when the backup is another router's (its SSH host key is
-not this router's), when it would move the router off the address the app reaches it at, or when its
-authorized keys lack the app's key (the app could not log in afterwards). The preview follows: the upload to
+not this router's), when it would move the router off the address the app reaches it at, when its
+authorized keys lack the app's key (the app could not log in afterwards), or when its SSH settings leave
+nothing listening on the app's port where the app connects. The preview follows: the upload to
 `/tmp/owg/restore.tar.gz` (one audited line; the bytes are never logged), `tar -tzf`,
 `sysupgrade --restore-backup` and the reboot timer. **Restore and reboot** asks once more, then the screen
 follows the reboot as the Reboot card does. Done means a fresh uptime and every restored file matching the
