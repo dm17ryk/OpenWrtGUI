@@ -515,9 +515,12 @@ class SystemService(JobsMixin):
         read_archive(data)
         name = backup_name(rec.id, self._clock(), imported=True)
         path = backup_dir(self._data.root, rec.id) / name
-        if path.exists():
-            raise ValueError(f"A backup of {rec.name} was imported this second already")
-        await save_upload(path, data)
+        try:
+            if path.exists():
+                raise FileExistsError(path)
+            await save_upload(path, data)
+        except FileExistsError as exc:  # also another import of this second still writing its part file
+            raise ValueError(f"A backup of {rec.name} was imported this second already") from exc
         self._audit.record(
             router=rec.id,
             screen=SCREEN,

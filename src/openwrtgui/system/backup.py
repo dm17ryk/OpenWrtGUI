@@ -87,13 +87,16 @@ async def save_upload(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     await asyncio.to_thread(restrict_to_user, path.parent)
     part = path.with_name(path.name + ".part")
+    opened = False  # only this call's own part file is ever removed (another import may hold the name)
     try:
         with part.open("xb") as sink:
+            opened = True
             await asyncio.to_thread(restrict_to_user, part)
             sink.write(data)
     except BaseException:
-        with contextlib.suppress(OSError):
-            part.unlink()
+        if opened:
+            with contextlib.suppress(OSError):
+                part.unlink()
         raise
     part.replace(path)
 

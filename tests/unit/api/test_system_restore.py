@@ -155,3 +155,22 @@ async def test_restore_endpoints(authed: httpx.AsyncClient, ctx: AppContext) -> 
     assert (started.status_code, started.json()["kind"]) == (200, "restore")
     assert (await authed.post(f"{base}/check", json={"name": "nope.tar.gz"})).status_code == 404
     await wait_job(ctx)
+
+
+async def test_an_import_in_the_same_second_leaves_the_other_alone(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two imports in one second get one name: the second is refused and the first one's part file stays
+    (PR #48 review: it used to unlink the other import's file)."""
+    from openwrtgui.system.backup import backup_dir, backup_name
+
+    fixed = datetime(2026, 11, 11, 14, 0, 0)
+    monkeypatch.setattr(ctx.system, "_clock", lambda: fixed)
+    folder = backup_dir(ctx.data.root, "ap2")
+    folder.mkdir(parents=True, exist_ok=True)
+    other = folder / (backup_name("ap2", fixed, imported=True) + ".part")
+    other.write_bytes(b"\x1f\x8b")  # another import of this second is still being written
+    data = _archive({"etc/config/system": "config system\n"})
+    with pytest.raises(ValueError, match="imported this second already"):
+        await ctx.system.import_backup("ap2", data, "two.tar.gz")
+    assert other.exists()
