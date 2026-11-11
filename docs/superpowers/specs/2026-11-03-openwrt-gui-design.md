@@ -162,7 +162,7 @@ docs/            manual/ (user manual, synced to the wiki) · design/ · superpo
 
 | Mechanism | Behaviour |
 |---|---|
-| Bench Guard | Detects a live harness run: lock files (e.g. `iperf_txsweep/voip.lock.own`), processes (`dima_night.py`, `rh_soak.py`, `overnight_wifi`, `txlab_*.py`, `voip_chain.py`), router markers (run SSIDs `OpenWrtB` / `OpenWrtC`, armed radio dead-man jobs). While one is live, every router is read-only and a banner names the run. Reading, RF, capture and read-only terminal commands keep working. The watch list is editable in Settings |
+| Bench Guard | Detects a live harness run: lock files (e.g. `iperf_txsweep/voip.lock.own`), processes (`dima_night.py`, `rh_soak.py`, `overnight_wifi`, `txlab_*.py`, `voip_chain.py`, `mem04_bench.py`), router markers (run SSIDs `OpenWrtB` / `OpenWrtC`, armed radio dead-man jobs). While one is live, every router is read-only and a banner names the run. Reading, RF, capture and read-only terminal commands keep working. The watch list is editable in Settings |
 | Write lock | One write at a time per router. Reads run in parallel |
 | Preview | Every write shows the exact commands before Apply. Secrets are masked |
 | Verify by effect | A write is reported as done only when the effect is proven. Radio park: uci committed + netifd settled + no AP in `iw dev`. Link up: polled for up to 20 s. nft rule: present, ahead of `ct state established accept`, counter readable |

@@ -110,7 +110,7 @@ pwsh -File tools/build_windows.ps1        # PyInstaller build + self-check (vers
   restore timer), with its own OK. **A restore** reboots AP2 and needs its own OK, like a reboot. **Reset to
   defaults never runs on AP2**: it is tested in the simulator only (AP2 would come back as 192.168.1.1).
 - While Bench Guard reports a live run (`dima_night`, `rh_soak`, `overnight_wifi`, `txlab_*`,
-  `voip_chain`, lock files, run SSIDs), every router is read-only. Do not work around it.
+  `voip_chain`, `mem04_bench`, lock files, run SSIDs), every router is read-only. Do not work around it.
 - Agents **never type router passwords**. Where a password is needed, the owner types it.
 - **Nothing is pushed** to GitHub, and no issues, labels, milestones, releases or wiki pages are created,
   without the owner's explicit go in the conversation.

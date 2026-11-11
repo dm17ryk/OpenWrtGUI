@@ -14,7 +14,14 @@ from openwrtgui.store import write_atomic
 log = logging.getLogger(__name__)
 
 DEFAULT_LOCK_FILES = (r"D:\Essence_SC\wifi_ref\iperf_txsweep\voip.lock.own",)
-DEFAULT_PROCESSES = ("dima_night.py", "rh_soak.py", "overnight_wifi*", "txlab_*.py", "voip_chain.py")
+DEFAULT_PROCESSES = (
+    "dima_night.py",
+    "rh_soak.py",
+    "overnight_wifi*",
+    "txlab_*.py",
+    "voip_chain.py",
+    "mem04_bench.py",  # the C8000 memory soak: its calls go over AP1
+)
 
 
 class GuardWatchList(BaseModel):

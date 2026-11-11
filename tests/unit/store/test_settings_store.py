@@ -19,6 +19,7 @@ def test_settings_defaults(tmp_path: Path) -> None:
         "overnight_wifi*",
         "txlab_*.py",
         "voip_chain.py",
+        "mem04_bench.py",
     ]
     assert s.guard.router_ssids == ["OpenWrtB", "OpenWrtC"]
     assert s.guard.router_processes == []
