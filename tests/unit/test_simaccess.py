@@ -129,6 +129,18 @@ async def test_sim_passwd_changes_the_digest() -> None:
     assert after not in (before, s.EMPTY_DIGEST)
 
 
+async def test_sim_digest_comes_back_with_the_password() -> None:
+    """The D3 hardware test's put-back, simulated: the same password gives the same digest again."""
+    _, t = _sim(Clock())
+    assert t.state is not None and t.state.root_password
+    found = t.state.root_password
+    before = (await _out(t, s.PASSWORD_DIGEST)).split()[0]
+    assert (await t.run_stdin(s.PASSWD, "0ther-Pass\n0ther-Pass\n")).ok
+    assert (await _out(t, s.PASSWORD_DIGEST)).split()[0] != before
+    assert (await t.run_stdin(s.PASSWD, f"{found}\n{found}\n")).ok
+    assert (await _out(t, s.PASSWORD_DIGEST)).split()[0] == before
+
+
 def _archive(files: dict[str, str]) -> bytes:
     raw = io.BytesIO()
     with tarfile.open(fileobj=raw, mode="w:gz") as tar:

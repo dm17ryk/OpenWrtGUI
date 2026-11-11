@@ -99,6 +99,7 @@ BACKUP_LIST = "".join(
     )
 )
 APK_KEYS = "openwrt-snapshots.pem\npublic-key.pem\n"
+_SIM_SHADOW_SALT = b"owg-sim-shadow"  # fixed: the same password gives the same simulated shadow field
 _WRITE_KEYS = re.compile(
     r"mkdir -p /etc/dropbear && cat > /etc/dropbear/authorized_keys <<'OWG' && chmod 600 "
     r"/etc/dropbear/authorized_keys\n(.*)\nOWG",
@@ -256,8 +257,13 @@ class SimAccess:
         return v4 + v6
 
     def _password_digest(self) -> str:
+        """`sha256sum` of root's shadow field, as the router answers PASSWORD_DIGEST. The simulated field is a
+        password hash (scrypt, fixed salt, small cost: a stand-in, not a store), never the password itself."""
         password = self._state.root_password
-        field = "" if password is None else "sim$" + hashlib.sha256(password.encode()).hexdigest()
+        field = ""
+        if password is not None:
+            hashed = hashlib.scrypt(password.encode(), salt=_SIM_SHADOW_SALT, n=1024, r=8, p=1, dklen=32)
+            field = "sim$" + hashed.hex()
         return hashlib.sha256(f"{field}\n".encode()).hexdigest()
 
     def _led_restart(self) -> None:
