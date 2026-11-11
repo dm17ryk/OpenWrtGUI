@@ -180,3 +180,20 @@ def test_restore_refuses_ssh_the_app_could_not_reach() -> None:
     assert refusals(DROPBEAR.replace("'22'", "'2222'")) == unreachable
     assert refusals(DROPBEAR.replace("enable '1'", "enable '0'")) == unreachable
     assert refusals(DROPBEAR + "\toption Interface 'wan'\n") == unreachable
+
+
+def test_a_path_twice_in_the_archive_counts_once_as_its_last_copy() -> None:
+    """tar keeps the last member of a path, so the restore proof expects that one only (PR #48 review: each
+    copy used to be a file to prove, and the earlier one always "differed")."""
+    first = b"config system\n\toption hostname 'first'\n"
+    last = b"config system\n\toption hostname 'last'\n"
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        for text in (first, last):
+            member = tarfile.TarInfo("etc/config/system")
+            member.size = len(text)
+            tar.addfile(member, io.BytesIO(text))
+    info = read_archive(buf.getvalue())
+    assert [f.path for f in info.files] == ["/etc/config/system"]
+    assert info.files[0].sha256 == hashlib.sha256(last).hexdigest()
+    assert info.hostname == "last"

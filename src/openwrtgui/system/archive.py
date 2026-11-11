@@ -103,8 +103,11 @@ def _ssh(dropbear: str) -> tuple[tuple[int, str], ...]:
 
 
 def read_archive(data: bytes) -> ArchiveInfo:
-    members = _members(data)
-    texts = {path: raw for path, raw in members}
+    texts: dict[str, bytes] = {}
+    for path, raw in _members(data):  # tar keeps the last copy of a path: so does the proof
+        texts.pop(path, None)
+        texts[path] = raw
+    members = list(texts.items())
     host_keys: list[str] = []
     for path, raw in members:
         name = path.removeprefix(_HOST_KEY_DIR)
