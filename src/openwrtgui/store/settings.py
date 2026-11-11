@@ -22,6 +22,11 @@ DEFAULT_PROCESSES = (
     "voip_chain.py",
     "mem04_bench.py",  # the C8000 memory soak: its calls go over AP1
 )
+# The default process lists earlier releases shipped (v0.1.0-v0.5.0, from the tags). A saved list equal to one
+# of them, in any order, was never edited, so it follows the current default; any other list is kept as saved.
+SHIPPED_PROCESSES: tuple[tuple[str, ...], ...] = (
+    ("dima_night.py", "rh_soak.py", "overnight_wifi*", "txlab_*.py", "voip_chain.py"),
+)
 
 
 class GuardWatchList(BaseModel):
@@ -95,6 +100,16 @@ class Settings(BaseModel):
     known_keys: list[KnownKey] = Field(default_factory=list)
 
 
+def _upgrade_defaults(settings: Settings) -> Settings:
+    """A watch list saved as an earlier release shipped it gets today's default (the file is not rewritten
+    here; the next save writes it). An edited list stays exactly as saved."""
+    saved = sorted(settings.guard.processes)
+    if not any(saved == sorted(shipped) for shipped in SHIPPED_PROCESSES):
+        return settings
+    guard = settings.guard.model_copy(update={"processes": list(DEFAULT_PROCESSES)})
+    return settings.model_copy(update={"guard": guard})
+
+
 class SettingsStore:
     def __init__(self, path: Path) -> None:
         self.path = path
@@ -104,7 +119,7 @@ class SettingsStore:
             return Settings()
         text = self.path.read_text(encoding="utf-8")
         try:
-            return Settings.model_validate_json(text)
+            return _upgrade_defaults(Settings.model_validate_json(text))
         except ValidationError:
             bad = self.path.with_name(self.path.name + ".bad")
             bad.write_text(text, encoding="utf-8")
