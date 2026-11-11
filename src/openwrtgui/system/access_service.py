@@ -194,9 +194,13 @@ class AccessService:
         return rec, await self._pool.get(rec)
 
     def app_fingerprints(self, rec: RouterRecord) -> set[str]:
-        """The keys this app logs in to `rec` with (its own key, or the router's key file)."""
-        found = {self._app_key.fingerprint}
+        """The keys this app logs in to `rec` with: the router's own key file when it has one (the connection
+        offers only that key), else the app's key. Restore and key-removal checks trust nothing else."""
+        found: set[str] = set()
         for path in router_key_paths(rec, self._app_key.private_path):
+            if path == self._app_key.private_path:
+                found.add(self._app_key.fingerprint)
+                continue
             fingerprint = _key_fingerprint(path)
             if fingerprint is not None:
                 found.add(fingerprint)

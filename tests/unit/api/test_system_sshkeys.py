@@ -128,3 +128,17 @@ async def test_no_key_is_removed_while_the_app_cannot_tell_its_own(ctx: AppConte
         await ctx.access.plan_keys("ap2", KeysChange(remove=(bench,)))
     line, _ = _new_key()
     assert line in (await ctx.access.plan_keys("ap2", KeysChange(add=(line,)))).lines
+
+
+async def test_a_router_with_its_own_key_file_trusts_only_that_key(ctx: AppContext, tmp_path: Path) -> None:
+    """The app logs in to such a router with its key file only, so only that key is the app's: a restore or a
+    key removal must not count the generated app key as a way in (PR #48 review)."""
+    own = asyncssh.generate_private_key("ssh-ed25519", comment="bench@pc")
+    path = tmp_path / "bench_key"
+    own.write_private_key(str(path))
+    own.write_public_key(f"{path}.pub")
+    rec = ctx.routers.get("ap2")
+    assert rec is not None
+    with_file = rec.model_copy(update={"key_path": str(path)})
+    assert ctx.access.app_fingerprints(with_file) == {own.get_fingerprint("sha256")}
+    assert ctx.access.app_fingerprints(rec) == {ctx.app_key.fingerprint}  # no key file: the app's own key
