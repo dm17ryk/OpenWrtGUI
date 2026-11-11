@@ -25,6 +25,35 @@ async def test_kept_files_edit_read_back(ctx: AppContext) -> None:
     assert (await ctx.system.kept_files("ap2")).text == wanted
 
 
+async def test_a_kept_list_that_does_not_read_is_never_overwritten(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only "No such file" reads as an empty list. Any other failed read stops the preview, which would
+    otherwise replace the router's list with only what the screen sent (PR #48 review)."""
+    from openwrtgui.system import commands as s
+    from openwrtgui.transport.base import CommandResult
+    from openwrtgui.transport.fake import ReplayTransport
+
+    t = await ctx.pool.get(ctx.routers.get("ap2"))  # type: ignore[arg-type]
+    assert isinstance(t, ReplayTransport)
+    real = t.run
+    error = {"text": "cat: read error: I/O error\n"}
+
+    async def failing(command: str, *, timeout: float = 15.0) -> CommandResult:
+        if command == s.KEPT:
+            return CommandResult(command, "", error["text"], 1)
+        return await real(command, timeout=timeout)
+
+    monkeypatch.setattr(t, "run", failing)
+    with pytest.raises(ValueError, match="/etc/sysupgrade.conf does not read: cat: read error: I/O error"):
+        await ctx.system.plan_kept_files("ap2", "/etc/owg-test.conf\n")
+    with pytest.raises(ValueError, match="does not read"):
+        await ctx.system.kept_files("ap2")
+    error["text"] = "cat: can't open '/etc/sysupgrade.conf': No such file or directory\n"
+    assert (await ctx.system.kept_files("ap2")).text == ""  # no file yet: Apply creates it
+    assert "/etc/owg-test.conf" in (await ctx.system.plan_kept_files("ap2", "/etc/owg-test.conf\n")).lines
+
+
 @pytest.mark.parametrize(
     ("text", "reason"),
     [

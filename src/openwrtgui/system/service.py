@@ -461,15 +461,26 @@ class SystemService(JobsMixin):
         return folder / name
 
     # ---------------------------------------------------------------- files kept in a backup (D10)
+    async def _kept_text(self, t: Transport) -> str:
+        """/etc/sysupgrade.conf as it is: no file reads as an empty list, any other failed read is refused
+        (a write after it would replace the router's list with only what the screen sent)."""
+        result = await t.run(s.KEPT)
+        if result.ok:
+            return result.stdout
+        if "No such file" in result.stderr:
+            return ""
+        reason = (result.stderr or result.stdout).strip() or f"exit {result.exit_status}"
+        raise ValueError(f"/etc/sysupgrade.conf does not read: {reason}")
+
     async def kept_files(self, router_id: str) -> KeptFiles:
         _rec, t = await self._transport(router_id)
         listed = await self._stdout(t, s.BACKUP_LIST)
-        return KeptFiles(text=await self._stdout(t, s.KEPT), listed=tuple(listed.split()))
+        return KeptFiles(text=await self._kept_text(t), listed=tuple(listed.split()))
 
     async def _kept_plan(self, rec: RouterRecord, t: Transport, text: str) -> tuple[NetPlan, str]:
         wanted = check_kept(text)
         command = s.write_file("/etc/sysupgrade.conf", wanted)  # OWG and size refused before anything is sent
-        current = await self._stdout(t, s.KEPT)
+        current = await self._kept_text(t)
         if current == wanted:
             raise ValueError(NOTHING)
         warnings = []
