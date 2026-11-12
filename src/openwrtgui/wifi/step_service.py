@@ -207,11 +207,19 @@ class StepService:
         return self._steps_dir / f"{router_id}-{radio}.json"
 
     def pending(self) -> list[PendingRestore]:
+        """Restores left behind: the saved options of a run in progress (or starting) are not one."""
         out = []
         for path in sorted(self._steps_dir.glob("*.json")) if self._steps_dir.is_dir() else []:
             with contextlib.suppress(OSError, ValidationError):
-                out.append(PendingRestore.model_validate_json(path.read_text(encoding="utf-8")))
+                record = PendingRestore.model_validate_json(path.read_text(encoding="utf-8"))
+                if not self._in_progress(record.router_id, record.radio):
+                    out.append(record)
         return out
+
+    def _in_progress(self, router_id: str, radio: str) -> bool:
+        job = self._jobs.get(router_id)
+        running = job is not None and job.phase not in ENDED and job.radio == radio
+        return running or self._starting.get(router_id) == radio
 
     # ---------------------------------------------------------------- preview
     def _on_air_elsewhere(self, rec: RouterRecord, radio: RadioState) -> tuple[str, ...]:

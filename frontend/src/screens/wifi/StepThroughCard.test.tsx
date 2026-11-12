@@ -176,6 +176,28 @@ test('pending restore banner restores', async () => {
   expect(calls.find((c) => c.path.endsWith('/step-through/restore'))?.body).toEqual({ radio: 'radio0' })
 })
 
+test('a run left at a step offers Restore from the job itself', async () => {
+  // review I5: the pending list may have been read while the run went on
+  job = { ...BASE, phase: 'stopped', current: null, restore_pending: true, error: 'Stopped by Bench Guard' }
+  renderCard()
+  expect(await screen.findByRole('button', { name: 'Restore radio0' })).toBeInTheDocument()
+})
+
+test('a run that restored its radio offers no Restore, whatever the pending list said', async () => {
+  job = { ...BASE, phase: 'done', current: null, restore_pending: false }
+  pending = [{ router_id: 'ap2', radio: 'radio0', saved_at: '2026-11-12T09:00:00', options: {} }]
+  renderCard()
+  await screen.findByRole('status')
+  await waitFor(() => expect(calls.filter((c) => c.path === '/api/step-through/pending').length).toBeGreaterThan(0))
+  expect(screen.queryByRole('button', { name: 'Restore radio0' })).not.toBeInTheDocument()
+})
+
+test('a run that ends reads the pending restores again', async () => {
+  job = { ...BASE, phase: 'stopped', current: null, restore_pending: true }
+  renderCard()
+  await waitFor(() => expect(calls.filter((c) => c.path === '/api/step-through/pending').length).toBeGreaterThanOrEqual(2))
+})
+
 test('422 reason shown', async () => {
   previewError = 'Channel 14 is not allowed in country IL'
   const { card } = await tickG16()

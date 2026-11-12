@@ -103,12 +103,20 @@ export function StepThroughCard({ routerId, short, radio, onEnded }: Props) {
   const current = job.data ?? null
   const running = isRunning(current)
   const live = guard.data?.live ?? false
-  const leftBehind = (pending.data ?? []).find((p) => p.router_id === routerId && p.radio === radio.name)
   const endedPhase = current && !running ? current.phase : null
+  // the ended run of this radio knows whether it put the radio back; the pending list is for runs this app
+  // session did not see end (the app closed first)
+  const leftBehind =
+    endedPhase !== null && current?.radio === radio.name
+      ? current.restore_pending
+      : (pending.data ?? []).some((p) => p.router_id === routerId && p.radio === radio.name)
   useEffect(() => {
-    // a run that ended changed the radio (restored, or left at a step): the screen reads it again, once per
-    // phase change; onEnded is a new function on every render of the screen, so it is not a dependency
-    if (endedPhase !== null) onEnded()
+    // a run that ended changed the radio (restored, or left at a step): the screen reads it again, and the
+    // pending restores too, once per phase change; onEnded is a new function on every render of the screen,
+    // so it is not a dependency
+    if (endedPhase === null) return
+    onEnded()
+    void client.invalidateQueries({ queryKey: ['step-pending'] })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endedPhase])
 

@@ -186,6 +186,17 @@ async def test_a_starting_step_through_holds_the_router(env: WifiEnv, tmp_path: 
     assert steps.busy("ap2") is None
 
 
+async def test_a_running_step_through_is_not_a_pending_restore(env: WifiEnv, tmp_path: Path) -> None:
+    """Review I5: the saved options of a run in progress are its own, not a restore left behind."""
+    steps = _service(env, tmp_path, _Clock())
+    await _run(steps, "ap2", StepRequest("radio0", ("g",), (1, 6), advance="manual"))
+    await _until(lambda: _job(steps).phase == "waiting for Next")
+    assert (tmp_path / "steps" / "ap2-radio0.json").exists() and steps.pending() == []
+    await steps.stop("ap2")
+    await _until(lambda: _job(steps).phase in DONE)
+    assert steps.pending() == []
+
+
 async def test_rejoin_time_counts_from_the_reload(env: WifiEnv, tmp_path: Path) -> None:
     """Review I8: the reload drops the station; its re-join time counts from the step's start, not from the
     end of the Apply's checks (12 s of reload and proof here)."""
