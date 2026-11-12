@@ -44,6 +44,12 @@ FAILURES = 2
 REDONE = "monitor added again after a Wi-Fi reload"
 LIMIT = "Stopped after 30 minutes: frame analysis costs router CPU"
 CPU = "Costs router CPU: tcpdump runs 3 s of every 5 s for up to 30 minutes."
+WINDOW_OK = (0, 124)  # tcpdump took its frame count, or `timeout` ended the 3 s window
+
+
+def _last_line(result: CommandResult) -> str:
+    lines = [line.strip() for line in (result.stderr or result.stdout).splitlines() if line.strip()]
+    return lines[-1] if lines else f"exit {result.exit_status}"
 
 
 @dataclass(frozen=True)
@@ -102,6 +108,7 @@ class FrameAnalyzer:
         self._start_lock = asyncio.Lock()
         self._stopping = False  # one Stop cancels the loop; later ones wait for its cleanup
         self._flags_at = 0  # the monitor's generation the flags were set on
+        self._failure = ""  # why the last window failed
 
     def state(self) -> FrameState:
         return self._state
@@ -226,11 +233,14 @@ class FrameAnalyzer:
                     if up:
                         await self._keep_monitor(rec.id, phy, t, run)
                     result = await t.run(FRAME_WINDOW, timeout=10.0)
+                    if result.exit_status not in WINDOW_OK:  # not an empty window: tcpdump failed
+                        raise TransportError(f"tcpdump failed: {_last_line(result)}")
                     failures = 0
                 except GuardLocked:  # a run started between the check and the monitor's add: stop next round
                     continue
                 except TransportError as exc:
                     failures += 1
+                    self._failure = str(exc)
                     log.info("frame window on %s failed: %s", rec.id, exc)
                     await self._sleep(FRAME_EVERY_S - FRAME_WINDOW_S)
                     continue
@@ -263,8 +273,9 @@ class FrameAnalyzer:
             return LIMIT
         if parked >= PARKED_WINDOWS:
             return f"{self.radio} is parked: nothing of its own to analyse"
-        if failures >= FAILURES:
-            return "The router stopped answering"
+        if failures >= FAILURES:  # tcpdump's own words when it failed, else the connection is gone
+            tcpdump = self._failure.startswith("tcpdump failed")
+            return self._failure if tcpdump else "The router stopped answering"
         return None
 
     def _window(self, window: FrameWindow) -> None:

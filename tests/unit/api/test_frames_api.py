@@ -273,6 +273,49 @@ async def test_frames_that_cannot_remove_the_monitor_say_so(
     assert _audit(ctx).count(DEL) == 2
 
 
+async def test_a_failing_tcpdump_stops_the_analysis_and_says_why(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PR #59 review: tcpdump exiting other than 0 or 124 is a failure, not an empty window; two in a row stop
+    the analysis with tcpdump's own words."""
+    original = SimAir._one
+
+    def broken(self: SimAir, p: str) -> CommandResult | None:
+        if p == FRAME_WINDOW:
+            return CommandResult(p, "", "tcpdump: owgmon0: That device is not up\n", 1)
+        return original(self, p)
+
+    monkeypatch.setattr(SimAir, "_one", broken)
+    a = _analyzer(ctx, "ap1", [])
+    await _start(a)
+    await _until(lambda: not a.state().running)
+    state = a.state()
+    assert state.windows == 0, state
+    assert state.error == "tcpdump failed: tcpdump: owgmon0: That device is not up", state.error
+
+
+async def test_a_failed_window_between_good_ones_does_not_reset_the_count(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A good window resets the failure count; a failed one never does."""
+    original = SimAir._one
+    calls = [0]
+
+    def every_other(self: SimAir, p: str) -> CommandResult | None:
+        if p == FRAME_WINDOW:
+            calls[0] += 1
+            if calls[0] in (2, 4):
+                return CommandResult(p, "", "tcpdump: pcap_loop: The interface disappeared\n", 1)
+        return original(self, p)
+
+    monkeypatch.setattr(SimAir, "_one", every_other)
+    a = _analyzer(ctx, "ap1", [])
+    await _start(a)
+    await _until(lambda: a.state().windows >= 3)
+    state = await a.stop()
+    assert state.error is None and state.windows >= 3
+
+
 async def test_frames_routes(authed: httpx.AsyncClient) -> None:
     base = "/api/routers/ap1/rf/radio0/frames"
     assert (await authed.get(base)).json()["running"] is False
