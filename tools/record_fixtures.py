@@ -27,6 +27,7 @@ import json
 import re
 import sys
 import time
+from collections.abc import Collection
 from pathlib import Path
 from typing import Protocol
 
@@ -187,6 +188,55 @@ class Runner(Protocol):
 def sanitize(text: str) -> str:
     """The audit log's masking (uci `.key='…'` and JSON `"key": "…"`), plus IMEIs and public keys."""
     return _replace_keys(_IMEI.sub("<imei>", _ICCID.sub("<iccid>", mask(text, ()))))
+
+
+# Air recordings (v0.7 plan D14): a scan or a monitor window names the neighbours' networks and addresses, and
+# this repo is public. Each neighbour becomes a placeholder, the same one in every command of a file.
+# Not \b: tcpdump's labels "DA:" and "BSSID:" end in hex letters, and "DA:ff:ff:ff:ff:ff" must not match.
+_MAC = re.compile(r"(?<![0-9a-fA-F])[0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5}(?![:0-9a-fA-F])")
+_SSID_LINE = re.compile(r"^(\s*SSID: )(.*)$", re.M)
+_FRAME_SSID = re.compile(r"\b(Beacon|Probe Response|Probe Request|Assoc Request|ReAssoc Request) \((.*?)\)")
+_PLACEHOLDER_MAC = "02:00:00:00:"
+_PLACEHOLDER_SSID = re.compile(r"net-\d{2,}")
+_IW_ESCAPE = re.compile(r"\\x([0-9a-fA-F]{2})")
+
+
+def _iw_text(raw: str) -> str:
+    """An SSID as iw prints it (`\\xNN` for every byte that is not printable) back to text."""
+    data = _IW_ESCAPE.sub(lambda m: chr(int(m.group(1), 16)), raw).encode("latin-1", "replace")
+    return data.decode("utf-8", "replace")
+
+
+def _placeholder(kind: str, value: str, names: dict[str, str]) -> str:
+    key = f"{kind}:{value}"
+    if key not in names:
+        n = sum(1 for k in names if k.startswith(f"{kind}:")) + 1
+        names[key] = f"{_PLACEHOLDER_MAC}{n // 256:02x}:{n % 256:02x}" if kind == "mac" else f"net-{n:02d}"
+    return names[key]
+
+
+def sanitize_air(
+    text: str, own_macs: Collection[str], own_ssids: Collection[str], names: dict[str, str]
+) -> str:
+    """Every MAC that is not the router's own, a group address or a placeholder becomes `02:00:00:00:NN:NN`;
+    every SSID that is not the router's own becomes `net-NN`. `names` keeps the mapping across one file."""
+    own = {m.lower() for m in own_macs}
+
+    def mac(m: re.Match[str]) -> str:
+        value = m.group(0).lower()
+        if value in own or value.startswith(_PLACEHOLDER_MAC) or int(value[:2], 16) & 1:
+            return m.group(0)
+        return _placeholder("mac", value, names)
+
+    def ssid(raw: str) -> str:
+        kept = not raw.strip() or _PLACEHOLDER_SSID.fullmatch(raw) is not None
+        if kept or raw in own_ssids or _iw_text(raw) in own_ssids:
+            return raw
+        return _placeholder("ssid", raw, names)
+
+    text = _SSID_LINE.sub(lambda m: m.group(1) + ssid(m.group(2)), text)
+    text = _FRAME_SSID.sub(lambda m: f"{m.group(1)} ({ssid(m.group(2))})", text)
+    return _MAC.sub(mac, text)
 
 
 async def wifi_on_commands(t: Runner) -> tuple[str, ...]:
