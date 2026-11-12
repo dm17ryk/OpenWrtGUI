@@ -397,11 +397,16 @@ class WifiService:
         return radio, ops, [s.key for s in req.ssids if s.key]
 
     def _plan_request(
-        self, rec: RouterRecord, state: WifiState, uci: Mapping[str, str], req: RadioRequest
+        self,
+        rec: RouterRecord,
+        state: WifiState,
+        uci: Mapping[str, str],
+        req: RadioRequest,
+        allow_empty: bool = False,
     ) -> WifiPlan:
         radio, ops, secrets = self._request_ops(rec, state, uci, req)
         mask_args = _mask_after(uci, ops, radio, req.modes)
-        return self._plan(rec, radio, uci, ops, secrets, mask_args, full_verify=True)
+        return self._plan(rec, radio, uci, ops, secrets, mask_args, full_verify=True, allow_empty=allow_empty)
 
     async def plan_sequence(
         self, router_id: str, radio_name: str, requests: Sequence[RadioRequest], tail_ops: Sequence[UciOp]
@@ -432,11 +437,18 @@ class WifiService:
 
     # ---------------------------------------------------------------- applying
     async def apply(
-        self, router_id: str, req: RadioRequest, digest: str | None = None, *, holder: object | None = None
+        self,
+        router_id: str,
+        req: RadioRequest,
+        digest: str | None = None,
+        *,
+        holder: object | None = None,
+        allow_empty: bool = False,
     ) -> ApplyResult:
+        """`allow_empty`: a step-through step that changes nothing is still proven on air (v0.7 D3)."""
         self._check_hold(router_id, req.radio, holder)
         rec, t, state, uci = await self._read(router_id)
-        plan = self._plan_request(rec, state, uci, req)
+        plan = self._plan_request(rec, state, uci, req, allow_empty)
         return await self._execute(rec, t, _as_previewed(rec, plan, digest))
 
     async def apply_ops(
