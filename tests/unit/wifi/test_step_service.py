@@ -135,6 +135,23 @@ async def test_timer_run_proves_each_step_and_restores(env: WifiEnv, tmp_path: P
     assert screens == {"Wi-Fi"}
 
 
+async def test_list_options_end_as_found(env: WifiEnv, tmp_path: Path) -> None:
+    """Re-graded review minor (D6): a radio whose rates are uci lists reads exactly as found after a run."""
+    sim = await env.sim("ap2")
+    for rate in ("6000", "12000", "24000"):
+        assert (await sim.run(f"uci add_list wireless.radio0.basic_rate='{rate}'")).ok
+    for rate in ("6000", "9000", "12000", "18000", "24000", "36000", "48000", "54000"):
+        assert (await sim.run(f"uci add_list wireless.radio0.supported_rates='{rate}'")).ok
+    assert (await sim.run("uci commit wireless")).ok
+    found = (await sim.run("uci -q show wireless")).stdout
+    assert "wireless.radio0.basic_rate='6000' '12000' '24000'" in found
+    steps = _service(env, tmp_path, _Clock())
+    await _run(steps, "ap2", TWO_BY_TWO)
+    await _until(lambda: _job(steps).phase in DONE)
+    assert _job(steps).phase == "done", _job(steps).error
+    assert (await sim.run("uci -q show wireless")).stdout == found
+
+
 async def test_manual_waits_for_next(env: WifiEnv, tmp_path: Path) -> None:
     steps = _service(env, tmp_path, _Clock())
     await _run(steps, "ap2", StepRequest("radio0", ("g",), (1, 6), advance="manual"))

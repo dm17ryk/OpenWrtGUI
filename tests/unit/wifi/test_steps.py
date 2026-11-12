@@ -90,21 +90,51 @@ def test_step_request_with_power() -> None:
 
 
 def test_saved_ops_round_trip() -> None:
-    uci = {
-        "wireless.radio0": "wifi-device",
-        "wireless.radio0.htmode": "HT20",
-        "wireless.radio0.channel": "auto",
-        "wireless.radio0.disabled": "1",
-        "wireless.radio0.legacy_rates": "1",
-        "wireless.radio0.country": "IL",
+    section = {  # `ubus call uci get` of wireless.radio0: its values
+        ".type": "wifi-device",
+        ".name": "radio0",
+        "htmode": "HT20",
+        "channel": "auto",
+        "disabled": "1",
+        "legacy_rates": "1",
+        "country": "IL",
     }
-    saved = saved_options(uci, "radio0")
+    saved = saved_options(section)
     assert set(saved) == set(SAVED_OPTIONS) and saved["txpower"] is None and saved["disabled"] == "1"
     assert "country" not in saved  # never part of a step-through
     ops = saved_ops("radio0", saved)
     assert UciOp("set", "wireless.radio0.htmode", "HT20") in ops
     assert UciOp("delete", "wireless.radio0.noscan") in ops
     assert UciOp("set", "wireless.radio0.disabled", "1") in ops
+
+
+def test_a_list_is_written_back_as_the_same_list() -> None:
+    """Re-graded review minor: `list basic_rate` must come back a list, same values, same order (D6)."""
+    saved = saved_options({"basic_rate": ["6000", "12000", "24000"], "htmode": "HT20"})
+    assert saved["basic_rate"] == ["6000", "12000", "24000"]
+    p = "wireless.radio0.basic_rate"
+    ops = [o for o in saved_ops("radio0", saved) if o.path == p]
+    # libuci: `set` replaces an option where it stands, `add_list` on a string option makes it a list there,
+    # so the list comes back in its place in `uci show`, whatever the steps left
+    assert ops == [UciOp("set", p, "6000"), UciOp("add_list", p, "12000"), UciOp("add_list", p, "24000")]
+
+
+def test_a_one_item_list_is_rewritten_whole() -> None:
+    """A one-item list cannot be made in place (a set makes an option): delete, then add it back."""
+    p = "wireless.radio0.basic_rate"
+    ops = [o for o in saved_ops("radio0", saved_options({"basic_rate": ["6000"]})) if o.path == p]
+    assert ops == [UciOp("delete", p), UciOp("add_list", p, "6000")]
+
+
+def test_restore_skips_what_already_reads_as_saved() -> None:
+    saved = saved_options({"basic_rate": ["6000", "12000"], "htmode": "HT20"})
+    ops = saved_ops("radio0", saved, {"basic_rate": ["6000", "12000"], "htmode": "HT40"})
+    assert ops == [UciOp("set", "wireless.radio0.htmode", "HT20")]  # the list and every absent option match
+    as_option = saved_ops("radio0", saved, {"basic_rate": "6000 12000", "htmode": "HT20"})
+    assert as_option == [  # the same text as an option is not the list it was
+        UciOp("set", "wireless.radio0.basic_rate", "6000"),
+        UciOp("add_list", "wireless.radio0.basic_rate", "12000"),
+    ]
 
 
 def test_joined() -> None:

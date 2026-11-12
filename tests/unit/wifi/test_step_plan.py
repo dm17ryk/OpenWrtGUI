@@ -5,10 +5,10 @@ from __future__ import annotations
 import pytest
 
 from conftest import WifiEnv
+from openwrtgui.transport.base import ubus_call
 from openwrtgui.uci import UciOp
 from openwrtgui.wifi.model import ChannelSelection, ModeSelection, RadioRequest
 from openwrtgui.wifi.service import RadioBusy
-from openwrtgui.wifi.state import read_uci
 from openwrtgui.wifi.steps import StepRequest, expand_steps, saved_ops, saved_options, step_request
 
 DISABLED_0 = "uci set wireless.radio0.disabled='0'"
@@ -20,8 +20,8 @@ async def test_plan_sequence_chains(env: WifiEnv) -> None:
     [radio] = [r for r in state.radios if r.name == "radio0"]
     assert not radio.up
     steps = expand_steps(StepRequest("radio0", ("b",), (1, 6)), radio.limits)
-    uci = await read_uci(await env.sim("ap2"))
-    tail = saved_ops("radio0", saved_options(uci, "radio0"))
+    section = await ubus_call(await env.sim("ap2"), "uci", "get", {"config": "wireless", "section": "radio0"})
+    tail = saved_ops("radio0", saved_options((section or {})["values"]))
     plans, restore = await env.service.plan_sequence(
         "ap2", "radio0", [step_request(s, "radio0") for s in steps], tail
     )

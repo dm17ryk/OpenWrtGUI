@@ -108,20 +108,47 @@ def step_request(step: Step, radio: str) -> RadioRequest:
     )
 
 
-def saved_options(uci: Mapping[str, str], radio: str) -> dict[str, str | None]:
-    """The radio's options a step-through changes, as they are now; None for an absent one."""
-    return {name: uci.get(f"wireless.{radio}.{name}") for name in SAVED_OPTIONS}
+SavedValue = str | list[str] | None  # an option, a uci list (its items in order), or absent
 
 
-def saved_ops(radio: str, saved: Mapping[str, str | None]) -> list[UciOp]:
-    """Back to the saved options: set what was there, delete what was absent."""
+def _typed(value: object) -> SavedValue:
+    if isinstance(value, list):
+        return [str(v) for v in value]
+    return None if value is None else str(value)
+
+
+def saved_options(section: Mapping[str, object]) -> dict[str, SavedValue]:
+    """The radio's options a step-through changes, as they are now: the `values` of rpcd's `uci get` of the
+    radio's section, where a list is an array (as LuCI reads it); None for an absent one."""
+    return {name: _typed(section.get(name)) for name in SAVED_OPTIONS}
+
+
+def saved_ops(
+    radio: str, saved: Mapping[str, SavedValue], now: Mapping[str, object] | None = None
+) -> list[UciOp]:
+    """Back to the saved options, so the radio ends exactly as found (D6): an option set, an absent one
+    deleted, a list rewritten item by item in its order. libuci's `set` replaces an option where it stands and
+    `add_list` on a string option turns it into a list there, so `set` of the first item and `add_list` of
+    the rest bring a list back in its place in `uci show`. A one-item list cannot be made that way (a `set`
+    is an option): it is deleted and added again, at the end of its section. With `now` (the section as it
+    reads now), what already reads as saved, list or option alike, is left alone."""
     p = f"wireless.{radio}"
-    return [
-        UciOp("set", f"{p}.{name}", saved[name])
-        if saved.get(name) is not None
-        else UciOp("delete", f"{p}.{name}")
-        for name in SAVED_OPTIONS
-    ]
+    ops: list[UciOp] = []
+    for name in SAVED_OPTIONS:
+        path = f"{p}.{name}"
+        want = _typed(saved.get(name))
+        if now is not None and _typed(now.get(name)) == want:
+            continue
+        if want is None or want == []:
+            ops.append(UciOp("delete", path))
+        elif isinstance(want, list) and len(want) == 1:
+            ops += [UciOp("delete", path), UciOp("add_list", path, want[0])]
+        elif isinstance(want, list):
+            ops.append(UciOp("set", path, want[0]))
+            ops += [UciOp("add_list", path, item) for item in want[1:]]
+        else:
+            ops.append(UciOp("set", path, want))
+    return ops
 
 
 def joined(get_clients: Mapping[str, Any], mac: str) -> bool:

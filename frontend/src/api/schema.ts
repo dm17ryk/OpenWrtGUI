@@ -5851,7 +5851,7 @@ export interface components {
         PendingRestore: {
             /** Options */
             options: {
-                [key: string]: string | null;
+                [key: string]: string | string[] | null;
             };
             /** Radio */
             radio: string;

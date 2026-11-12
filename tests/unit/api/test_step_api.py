@@ -12,8 +12,8 @@ import httpx
 from openwrtgui.app import create_app
 from openwrtgui.context import AppContext
 from openwrtgui.system.reboot import RebootJob
+from openwrtgui.transport.base import ubus_call
 from openwrtgui.wifi.model import ChannelSelection, ModeSelection, RadioRequest
-from openwrtgui.wifi.state import read_uci
 from openwrtgui.wifi.steps import StepRequest, saved_options
 
 W = "/api/routers/ap2/wifi"
@@ -98,7 +98,10 @@ async def test_busy_matrix(authed: httpx.AsyncClient, ctx: AppContext) -> None:
 async def test_pending_restore_after_a_restart(authed: httpx.AsyncClient, ctx: AppContext) -> None:
     rec = ctx.routers.get("ap2")
     assert rec is not None
-    saved = saved_options(await read_uci(await ctx.pool.get(rec)), "radio0")
+    section = await ubus_call(
+        await ctx.pool.get(rec), "uci", "get", {"config": "wireless", "section": "radio0"}
+    )
+    saved = saved_options((section or {})["values"])
     on_air = RadioRequest(radio="radio0", modes=ModeSelection.of("g"), channels=ChannelSelection.of(6))
     assert (await ctx.wifi.apply("ap2", on_air)).applied and not await _parked(ctx)
     folder = ctx.data.steps_dir  # what an app that ended in the middle of a step-through leaves

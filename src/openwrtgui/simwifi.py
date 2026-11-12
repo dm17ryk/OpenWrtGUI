@@ -7,6 +7,7 @@ associated while the radio is up.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import math
 import re
@@ -35,6 +36,18 @@ _PHY_INFO = (
 )
 
 
+def _list_paths(uci_text: str) -> set[str]:
+    """Options `uci show` prints as several quoted items: uci lists (a one-item list reads as an option)."""
+    out = set()
+    for line in uci_text.splitlines():
+        path, sep, raw = line.partition("=")
+        if sep and path.count(".") == 2:
+            with contextlib.suppress(ValueError):
+                if len(shlex.split(raw)) > 1:
+                    out.add(path)
+    return out
+
+
 def _ok(stdout: str = "", command: str = "") -> CommandResult:
     return CommandResult(command, stdout, "", 0)
 
@@ -47,6 +60,8 @@ class SimWifi:
     def __init__(self, uci_text: str, *, phy: str = "phy0", bssid: str = "02:00:00:00:00:01") -> None:
         self._committed = parse_uci_show(uci_text)
         self._staged = dict(self._committed)
+        self._lists = _list_paths(uci_text)  # options that are uci lists (items space-joined in the dicts)
+        self._staged_lists = set(self._lists)
         self._phy = phy
         self._bssid = bssid
         self._up = {r: self._opt(r, "disabled") != "1" for r in self._radios()}
@@ -242,28 +257,48 @@ class SimWifi:
     def _show(self) -> str:
         lines = []
         for key, value in self._committed.items():
-            lines.append(f"{key}={value}" if key.count(".") == 1 else f"{key}={shell_quote(value)}")
+            if key.count(".") == 1:
+                lines.append(f"{key}={value}")
+            elif key in self._lists:  # uci prints a list's items each quoted
+                lines.append(f"{key}=" + " ".join(shell_quote(v) for v in value.split()))
+            else:
+                lines.append(f"{key}={shell_quote(value)}")
         return "\n".join(lines) + "\n"
 
     def _uci(self, p: str) -> CommandResult | None:
         tokens = [t for t in shlex.split(p) if t != "-q"]
         if tokens[1:] == ["commit", "wireless"]:
             self._committed = dict(self._staged)
+            self._lists = set(self._staged_lists)
             return _ok()
         if len(tokens) != 3 or not tokens[2].startswith("wireless."):
             return None
         verb, arg = tokens[1], tokens[2]
         if verb == "delete":
             self._staged.pop(arg, None)
+            self._staged_lists.discard(arg)
             return _ok()
         path, _, value = arg.partition("=")
         if verb == "set":
             self._staged[path] = value
+            self._staged_lists.discard(path)
         elif verb == "add_list":
             self._staged[path] = f"{self._staged.get(path, '')} {value}".strip()
+            self._staged_lists.add(path)
         else:
             return None
         return _ok()
+
+    def _uci_get(self, section: str) -> CommandResult:
+        """rpcd's `uci get` of one wireless section: lists as arrays, as LuCI reads them."""
+        name = f"wireless.{section}"
+        if name not in self._committed:
+            return _fail("Command failed: Not found\n", 4)
+        values: dict[str, Any] = {".type": self._committed[name], ".name": section}
+        for key, value in self._committed.items():
+            if key.startswith(name + ".") and key.count(".") == 2:
+                values[key.rsplit(".", 1)[1]] = value.split() if key in self._lists else value
+        return _ok(json.dumps({"values": values}, indent="\t") + "\n")
 
     def _wifi(self, action: str, radio: str) -> CommandResult:
         if radio not in self._up:
@@ -286,6 +321,8 @@ class SimWifi:
             return _ok(json.dumps(self._status(), indent="\t") + "\n")
         if (obj, method) == ("iwinfo", "phyname"):
             return _ok(json.dumps({"phyname": self._phy}))
+        if (obj, method) == ("uci", "get") and args.get("config") == "wireless" and args.get("section"):
+            return self._uci_get(str(args["section"]))
         if obj == "iwinfo":
             return self._iwinfo(method, str(args.get("device", "")))
         if (obj, method) == ("luci-rpc", "getHostHints"):

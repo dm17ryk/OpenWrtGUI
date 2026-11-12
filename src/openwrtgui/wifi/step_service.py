@@ -32,11 +32,12 @@ from openwrtgui.transport.base import TransportError, ubus_call
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.wifi.model import Mode
 from openwrtgui.wifi.service import NOTHING, ApplyResult, Check, PreviewChanged, WifiService
-from openwrtgui.wifi.state import RadioState, read_uci
+from openwrtgui.wifi.state import RadioState
 from openwrtgui.wifi.step_csv import StepCsv
 from openwrtgui.wifi.steps import (
     STEP_OVERHEAD_S,
     Advance,
+    SavedValue,
     Step,
     StepRequest,
     expand_steps,
@@ -122,7 +123,7 @@ class PendingRestore(BaseModel):
     router_id: str
     radio: str
     saved_at: datetime
-    options: dict[str, str | None]
+    options: dict[str, str | list[str] | None]  # a uci list keeps its items in order
 
 
 class StepBusy(RouterBusy):
@@ -132,7 +133,7 @@ class StepBusy(RouterBusy):
 @dataclass
 class _Control:
     token: object
-    saved: dict[str, str | None]
+    saved: dict[str, SavedValue]
     csv: StepCsv
     stop: asyncio.Event = field(default_factory=asyncio.Event)
     next: asyncio.Event = field(default_factory=asyncio.Event)
@@ -236,13 +237,13 @@ class StepService:
             ]
         return tuple(out)
 
-    async def _prepare(self, rec: RouterRecord, req: StepRequest) -> tuple[StepPlan, dict[str, str | None]]:
+    async def _prepare(self, rec: RouterRecord, req: StepRequest) -> tuple[StepPlan, dict[str, SavedValue]]:
         state = await self._wifi.state(rec.id)
         radio = next((r for r in state.radios if r.name == req.radio), None)
         if radio is None:
             raise ValueError(f"{req.radio} is not a radio of {rec.name}")
         steps = expand_steps(req, radio.limits)
-        saved = saved_options(await read_uci(await self._pool.get(rec)), req.radio)
+        saved = saved_options(await self._section(rec, req.radio))
         plans, restore = await self._wifi.plan_sequence(
             rec.id, req.radio, [step_request(s, req.radio) for s in steps], saved_ops(req.radio, saved)
         )
@@ -260,6 +261,17 @@ class StepService:
             restore_changes=restore.change_lines,
         )
         return plan, saved
+
+    async def _section(self, rec: RouterRecord, radio: str) -> dict[str, Any]:
+        """The radio's uci section as rpcd's `uci get` gives it: a list is an array, so a restore writes it
+        back as a list (`uci show` cannot tell a one-item list from an option)."""
+        answer = await ubus_call(
+            await self._pool.get(rec), "uci", "get", {"config": "wireless", "section": radio}
+        )
+        values = (answer or {}).get("values")
+        if not isinstance(values, dict) or not values:
+            raise ValueError(f"Could not read {radio}'s options on {rec.name}")
+        return values
 
     @staticmethod
     def _normal(req: StepRequest) -> StepRequest:
@@ -323,7 +335,7 @@ class StepService:
         ctl.task = asyncio.get_running_loop().create_task(self._runner(rec, req, plan, ctl))
         return self._jobs[rec.id]
 
-    def _open(self, rec: RouterRecord, req: StepRequest, saved: dict[str, str | None]) -> StepCsv:
+    def _open(self, rec: RouterRecord, req: StepRequest, saved: dict[str, SavedValue]) -> StepCsv:
         """The saved options first (written whole, then renamed), then the CSV."""
         self._steps_dir.mkdir(parents=True, exist_ok=True)
         path = self._saved_path(rec.id, req.radio)
@@ -511,11 +523,14 @@ class StepService:
 
     # ---------------------------------------------------------------- restore
     async def _apply_saved(
-        self, rec: RouterRecord, radio: str, saved: Mapping[str, str | None], token: object
+        self, rec: RouterRecord, radio: str, saved: Mapping[str, SavedValue], token: object
     ) -> tuple[ApplyResult | None, str | None]:
         """(result, why it is not proven); (None, None) when the radio already reads as saved."""
         try:
-            result = await self._wifi.apply_ops(rec.id, radio, saved_ops(radio, saved), holder=token)
+            ops = saved_ops(radio, saved, await self._section(rec, radio))
+            if not ops:
+                return None, None
+            result = await self._wifi.apply_ops(rec.id, radio, ops, holder=token)
         except ValueError as exc:
             return (None, None) if str(exc) == NOTHING else (None, str(exc))
         except GuardLocked:
