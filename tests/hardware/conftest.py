@@ -85,6 +85,9 @@ class FwWindow:
     connect: Callable[[], Awaitable[SshTransport]]
     pool: ConnectionPool
     wifi: WifiService
+    routers: RouterStore
+    guard: BenchGuard
+    audit: AuditLog
 
 
 def _by_content(text: str) -> list[tuple[str, tuple[tuple[str, str], ...]]]:
@@ -169,6 +172,9 @@ async def fw_window(
         connect=connect,
         pool=pool,
         wifi=wifi,
+        routers=routers,
+        guard=guard,
+        audit=audit,
     )
     try:
         yield w
