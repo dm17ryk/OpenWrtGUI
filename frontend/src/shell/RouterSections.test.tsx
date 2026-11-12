@@ -7,8 +7,8 @@ import type { LuciPageView } from '../api/types'
 import { RouterSections, type Section } from './RouterSections'
 
 const PAGES: LuciPageView[] = [
-  { path: 'admin/network/wireless', title: 'Wireless', package: 'luci-mod-network', native: 'wifi', section: 'Network', label: 'Network › Wireless' },
-  { path: 'admin/services/sqm', title: 'SQM QoS', package: 'luci-app-sqm', native: null, section: 'Services', label: 'Services › SQM QoS' },
+  { path: 'admin/network/wireless', title: 'Wireless', package: 'luci-mod-network', native: 'wifi', section: 'Network', label: 'Network › Wireless', available: true, checked: true },
+  { path: 'admin/services/sqm', title: 'SQM QoS', package: 'luci-app-sqm', native: null, section: 'Services', label: 'Services › SQM QoS', available: true, checked: true },
 ]
 
 function renderSections(current: Section, luciPath?: string) {
@@ -76,4 +76,21 @@ test('no LuCI list when every page has a screen here', () => {
     </QueryClientProvider>,
   )
   expect(screen.queryByText(/LuCI pages/)).not.toBeInTheDocument()
+})
+
+test('pages this router lacks are not in the LuCI list', () => {
+  const client = new QueryClient()
+  client.setQueryData(['luci-pages', 'ap2'], [
+    ...PAGES,
+    { path: 'admin/system/mounts', title: 'Mount Points', package: 'luci-mod-system', native: null, section: 'System', label: 'System › Mount Points', available: false, missing: 'needs /sbin/block', checked: true },
+  ])
+  render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <RouterSections routerId="ap2" name="AP2 · office" current="overview" />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  )
+  expect(screen.getByText('LuCI pages (1)')).toBeInTheDocument()
+  expect(screen.queryByRole('link', { name: 'System › Mount Points' })).not.toBeInTheDocument()
 })

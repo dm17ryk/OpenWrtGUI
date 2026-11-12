@@ -36,7 +36,7 @@ export function RouterSections({ routerId, name, current, luciPath }: Props) {
     ['system', 'System', `${base}/system`],
     ['terminal', 'Terminal', `/terminal/${routerId}`],
   ]
-  const fallback = (pages.data ?? []).filter((p) => p.native === null)
+  const fallback = (pages.data ?? []).filter((p) => p.native === null && p.available !== false)
   const open = current === 'luci' ? fallback.find((p) => p.path === luciPath) : undefined
   const short = name.split(' · ')[0] || routerId
   return (
