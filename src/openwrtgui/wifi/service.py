@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal
 
+from openwrtgui.busy import RouterBusy
 from openwrtgui.guard.audit import AuditLog, mask
 from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked
 from openwrtgui.guard.writes import run_audited
@@ -74,6 +75,20 @@ class WifiPlan:
     def digest(self) -> str:
         """Names the preview: Apply sends it back, so only the lines the user saw ever run."""
         return hashlib.sha256("\n".join(self.lines).encode()).hexdigest()[:16]
+
+    @property
+    def change_lines(self) -> tuple[str, ...]:
+        """The lines without the TX-mask line, whose interface is known once the radio is up (v0.7 D3)."""
+        return tuple(
+            line for line in self.lines if not (line.startswith("iw dev ") and " set bitrates" in line)
+        )
+
+
+class RadioBusy(RouterBusy):
+    """A step-through holds the radio (v0.7 plan D8): no other change to it until it ends (409)."""
+
+    def __init__(self, what: str, router_name: str, radio: str) -> None:
+        super().__init__(f"{what} runs on {router_name} {radio}: wait for it to end, or stop it")
 
 
 class PreviewChanged(Exception):
@@ -183,6 +198,33 @@ class WifiService:
         self._settle_timeout_s = settle_timeout_s
         self._poll_s = poll_s
         self._mask_marks: dict[tuple[str, str], int] = {}
+        self._held: dict[tuple[str, str], tuple[object, str]] = {}  # (router, radio) -> (token, what)
+
+    # ---------------------------------------------------------------- the radio hold (v0.7 plan D8)
+    def _name(self, router_id: str) -> str:
+        rec = self._routers.get(router_id)
+        return rec.name if rec else router_id
+
+    def hold_radio(self, router_id: str, radio: str, what: str) -> object:
+        """No other change to this radio until release_radio(token); RadioBusy when someone holds it."""
+        held = self._held.get((router_id, radio))
+        if held is not None:
+            raise RadioBusy(held[1], self._name(router_id), radio)
+        token = object()
+        self._held[(router_id, radio)] = (token, what)
+        return token
+
+    def release_radio(self, token: object) -> None:
+        self._held = {k: v for k, v in self._held.items() if v[0] is not token}
+
+    def radio_holder(self, router_id: str, radio: str) -> str | None:
+        held = self._held.get((router_id, radio))
+        return held[1] if held else None
+
+    def _check_hold(self, router_id: str, radio: str, holder: object | None) -> None:
+        held = self._held.get((router_id, radio))
+        if held is not None and held[0] is not holder:
+            raise RadioBusy(held[1], self._name(router_id), radio)
 
     @property
     def monitors(self) -> MonitorLeases:
@@ -230,6 +272,7 @@ class WifiService:
     async def apply_options(
         self, router_id: str, radio: str, edits: Sequence[OptionEdit], digest: str | None = None
     ) -> ApplyResult:
+        self._check_hold(router_id, radio, None)
         ops, secrets = compile_edits(edits, await self.options(router_id, radio))
         return await self.apply_ops(router_id, radio, ops, secrets, digest=digest)
 
@@ -300,13 +343,14 @@ class WifiService:
         secrets: Sequence[str],
         mask_args: str | None,
         full_verify: bool,
+        allow_empty: bool = False,
     ) -> WifiPlan:
         ops = drop_unchanged(ops, uci)
         after = after_ops(uci, ops)
         expect = _expectation(after, radio, _chosen_channels(after, radio.name))
         if not expect.radio_up:
             mask_args = None
-        if not ops and not (mask_args is not None and radio.mask == "missing"):
+        if not ops and not (mask_args is not None and radio.mask == "missing") and not allow_empty:
             raise ValueError(NOTHING)
         script = apply_script(radio.name, ops) if ops else ""
         reload = reload_command(radio.name) if ops else ""
@@ -333,9 +377,9 @@ class WifiService:
         rec, _t, state, uci = await self._read(router_id)
         return self._plan_request(rec, state, uci, req)
 
-    def _plan_request(
+    def _request_ops(
         self, rec: RouterRecord, state: WifiState, uci: Mapping[str, str], req: RadioRequest
-    ) -> WifiPlan:
+    ) -> tuple[RadioState, list[UciOp], list[str]]:
         radio = self._radio(state, rec, req.radio)
         limits = radio.limits
         ops: list[UciOp] = []
@@ -350,9 +394,34 @@ class WifiService:
             if s.section not in own:  # never a section name from outside into the shell
                 raise ValueError(f"{s.section} is not an SSID of {radio.name}")
             ops += compile_ssid(s, radio.band, limits.sae, uci)
-        secrets = [s.key for s in req.ssids if s.key]
+        return radio, ops, [s.key for s in req.ssids if s.key]
+
+    def _plan_request(
+        self, rec: RouterRecord, state: WifiState, uci: Mapping[str, str], req: RadioRequest
+    ) -> WifiPlan:
+        radio, ops, secrets = self._request_ops(rec, state, uci, req)
         mask_args = _mask_after(uci, ops, radio, req.modes)
         return self._plan(rec, radio, uci, ops, secrets, mask_args, full_verify=True)
+
+    async def plan_sequence(
+        self, router_id: str, radio_name: str, requests: Sequence[RadioRequest], tail_ops: Sequence[UciOp]
+    ) -> tuple[list[WifiPlan], WifiPlan]:
+        """A step-through's preview (v0.7 plan D3): one read, then each request planned on the config the
+        one before leaves, and the restore (`tail_ops`) last. A step that changes nothing keeps its place."""
+        rec, _t, state, uci = await self._read(router_id)
+        current: dict[str, str] = dict(uci)
+        plans: list[WifiPlan] = []
+        for req in requests:
+            if req.radio != radio_name:
+                raise ValueError(f"Every step is on {radio_name}")
+            radio, ops, secrets = self._request_ops(rec, state, current, req)
+            mask_args = _mask_after(current, ops, radio, req.modes)
+            plans.append(self._plan(rec, radio, current, ops, secrets, mask_args, True, allow_empty=True))
+            current = after_ops(current, drop_unchanged(ops, current))
+        radio = self._radio(state, rec, radio_name)
+        mask_args = _mask_after(current, tail_ops, radio)
+        restore = self._plan(rec, radio, current, tail_ops, (), mask_args, False, allow_empty=True)
+        return plans, restore
 
     async def plan_ops(
         self, router_id: str, radio_name: str, ops: Sequence[UciOp], secrets: Sequence[str] = ()
@@ -362,7 +431,10 @@ class WifiService:
         return self._plan(rec, radio, uci, ops, secrets, _mask_after(uci, ops, radio), full_verify=False)
 
     # ---------------------------------------------------------------- applying
-    async def apply(self, router_id: str, req: RadioRequest, digest: str | None = None) -> ApplyResult:
+    async def apply(
+        self, router_id: str, req: RadioRequest, digest: str | None = None, *, holder: object | None = None
+    ) -> ApplyResult:
+        self._check_hold(router_id, req.radio, holder)
         rec, t, state, uci = await self._read(router_id)
         plan = self._plan_request(rec, state, uci, req)
         return await self._execute(rec, t, _as_previewed(rec, plan, digest))
@@ -377,9 +449,12 @@ class WifiService:
         digest: str | None = None,
         screen: str = SCREEN,
         hold_lock: bool = True,
+        holder: object | None = None,
     ) -> ApplyResult:
         """`screen` names the screen in the audit log: Network & DHCP applies its saved MAC lists here.
-        `hold_lock=False`: the caller holds the router's write lock already."""
+        `hold_lock=False`: the caller holds the router's write lock already. `holder`: the step-through's
+        token while it holds the radio (v0.7 plan D8)."""
+        self._check_hold(router_id, radio_name, holder)
         token = _AUDIT_SCREEN.set(screen)
         try:
             rec, t, state, uci = await self._read(router_id)
