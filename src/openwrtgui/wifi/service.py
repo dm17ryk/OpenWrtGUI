@@ -32,7 +32,7 @@ from openwrtgui.wifi.compile import (
     tx_mask_args,
 )
 from openwrtgui.wifi.model import CCK_BASIC_KBPS, OFDM_BASIC_KBPS, ModeSelection, RadioRequest
-from openwrtgui.wifi.monitor import MONITOR
+from openwrtgui.wifi.monitor import MONITOR, MonitorLeases
 from openwrtgui.wifi.options import OptionEdit, OptionRow, compile_edits, option_rows
 from openwrtgui.wifi.parse import IwDevInfo, parse_beacon_rates, parse_iw_dev, parse_iw_dev_info
 from openwrtgui.wifi.state import RadioState, WifiState, modes_from_uci, read_uci, read_wifi, ssid_sections
@@ -169,7 +169,9 @@ class WifiService:
         sleep: Callable[[float], Awaitable[Any]] = asyncio.sleep,
         settle_timeout_s: float = 30.0,
         poll_s: float = 1.0,
+        monitors: MonitorLeases | None = None,
     ) -> None:
+        self._monitors = monitors or MonitorLeases()
         self._pool = pool
         self._routers = routers
         self._guard = guard
@@ -181,6 +183,11 @@ class WifiService:
         self._settle_timeout_s = settle_timeout_s
         self._poll_s = poll_s
         self._mask_marks: dict[tuple[str, str], int] = {}
+
+    @property
+    def monitors(self) -> MonitorLeases:
+        """The shared owgmon0 of every router (v0.7 plan D11): capture and frame analysis hold it too."""
+        return self._monitors
 
     # ---------------------------------------------------------------- reading
     async def _connect(self, router_id: str) -> tuple[RouterRecord, Transport]:
@@ -562,21 +569,23 @@ class WifiService:
             f"timeout 5 tcpdump -i {MONITOR} -e -n -c 5 -l "
             f"'type mgt subtype beacon and wlan addr2 {info.addr}'"
         )
-        try:  # the add is inside: a connection dropped after the router made it still cleans up
-            added = await self._run(  # a monitor left by a dropped connection would block the add
-                t,
-                rec,
-                f"iw dev {MONITOR} del 2>/dev/null; "
-                f"iw phy {phy} interface add {MONITOR} type monitor && ip link set {MONITOR} up",
-                source="app",
-            )
-            heard = (await self._run(t, rec, capture, source="app", timeout=15.0)).stdout if added.ok else ""
-        finally:  # cleaning up restores the radio, so it runs even when a run has started meanwhile
-            # `iw`, not `ip link del`: AP2's kernel refuses the latter for a wireless interface.
-            removed = await self._run(t, rec, f"iw dev {MONITOR} del", source="app", require_guard=False)
-        if not added.ok:
-            return Check("beacon rate", False, f"no monitor interface: {added.stderr.strip()}")
-        if not removed.ok:
+
+        async def run(command: str, require_guard: bool) -> CommandResult:
+            # cleaning up restores the radio, so the removal runs even when a run has started meanwhile;
+            # `iw`, not `ip link del`: AP2's kernel refuses the latter for a wireless interface
+            done: CommandResult = await self._run(t, rec, command, source="app", require_guard=require_guard)
+            return done
+
+        holder = f"beacon check {rec.id} {phy}"
+        try:  # a capture or frame analysis may hold owgmon0 already: it is shared, never removed under them
+            await self._monitors.acquire(rec.id, holder, phy, t, run)
+        except ValueError as exc:
+            return Check("beacon rate", False, f"no monitor interface: {exc}")
+        try:
+            heard = (await self._run(t, rec, capture, source="app", timeout=15.0)).stdout
+        finally:
+            removed = await self._monitors.release(rec.id, holder, run)
+        if removed is not None and not removed.ok:
             return Check("beacon rate", False, f"{MONITOR} is still on the radio: {removed.stderr.strip()}")
         rates = parse_beacon_rates(heard)
         if not rates:

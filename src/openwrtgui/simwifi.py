@@ -152,6 +152,10 @@ class SimWifi:
             return _ok(_PHY_INFO.format(phy=self._phy))
         if p == "iw dev":
             return _ok(self._iw_dev())
+        if p == "iw dev owgmon0 info":  # the shared monitor's check (v0.7 plan D11)
+            if not self._monitor:
+                return _fail("command failed: No such device (-19)\n", 237)
+            return _ok(f"Interface owgmon0\n\tifindex 9\n\ttype monitor\n\twiphy {self._phy[3:]}\n")
         if m := re.fullmatch(r"iw dev (\S+) (info|station dump|survey dump|set bitrates.*)", p):
             return self._iw(m.group(1), m.group(2))
         if p == f"iw phy {self._phy} interface add owgmon0 type monitor":

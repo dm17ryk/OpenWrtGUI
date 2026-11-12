@@ -51,6 +51,7 @@ from openwrtgui.transport.ssh import HostKeyStore, SshTransport
 from openwrtgui.update.service import Updater
 from openwrtgui.update.versions import parse_version
 from openwrtgui.version import APP_VERSION
+from openwrtgui.wifi.monitor import MonitorLeases
 from openwrtgui.wifi.service import WifiService
 
 
@@ -207,8 +208,15 @@ def build_context(
     poller = StatusPoller(
         routers=routers, pool=pool, guard=guard, hub=hub, statuses=statuses, descriptions=descriptions
     )
+    monitors = MonitorLeases()  # one owgmon0 per router, shared by the beacon check, capture and frames
     wifi = WifiService(
-        pool=pool, routers=routers, guard=guard, audit=audit, descriptions=descriptions, statuses=statuses
+        pool=pool,
+        routers=routers,
+        guard=guard,
+        audit=audit,
+        descriptions=descriptions,
+        statuses=statuses,
+        monitors=monitors,
     )
     luci = LuciBridgeService(
         pool=pool,
@@ -259,6 +267,7 @@ def build_context(
         net=net,
         documents=data.root / "documents" if simulator is not None else documents_dir(),
         wireshark=_no_wireshark if simulator is not None else find_wireshark,
+        monitors=monitors,
     )
     profiles = ProfileStore(data.profiles_dir)
     discovery = DiscoveryService(

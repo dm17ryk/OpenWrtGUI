@@ -22,10 +22,10 @@ from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.guard.writes import run_audited
 from openwrtgui.net.service import NetworkService
 from openwrtgui.store.routers import RouterRecord, RouterStore
-from openwrtgui.transport.base import ByteStream, Transport, TransportError, ubus_call
+from openwrtgui.transport.base import ByteStream, CommandResult, Transport, TransportError, ubus_call
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.uci import shell_quote
-from openwrtgui.wifi.monitor import MONITOR
+from openwrtgui.wifi.monitor import MONITOR, MonitorLeases, RunFn
 
 SCREEN = "Faults"
 MAX_BYTES = 500 * 1024 * 1024
@@ -94,7 +94,9 @@ class CaptureService:
         wireshark: Callable[[], Path | None] = find_wireshark,
         clock: Callable[[], datetime] = datetime.now,
         max_bytes: int = MAX_BYTES,
+        monitors: MonitorLeases | None = None,
     ) -> None:
+        self._monitors = monitors or MonitorLeases()
         self._pool = pool
         self._routers = routers
         self._guard = guard
@@ -136,7 +138,22 @@ class CaptureService:
     def list_all(self) -> builtins.list[CaptureView]:
         return list(self._views.values())
 
-    async def _monitor(self, rec: RouterRecord, t: Transport) -> None:
+    def _run_fn(self, rec: RouterRecord, t: Transport) -> RunFn:
+        async def run(command: str, require_guard: bool) -> CommandResult:
+            return await run_audited(
+                t,
+                command,
+                router_id=rec.id,
+                screen=SCREEN,
+                guard=self._guard,
+                audit=self._audit,
+                source="app",
+                require_guard=require_guard,
+            )
+
+        return run
+
+    async def _monitor(self, rec: RouterRecord, t: Transport, capture_id: str) -> None:
         state = self._guard.state()
         if state.live:
             run = state.reasons[0].text if state.reasons else "a harness run"
@@ -146,37 +163,18 @@ class CaptureService:
         if radio is None:
             raise ValueError(f"{rec.name} has no radio on air for mon0")
         phy = (await ubus_call(t, "iwinfo", "phyname", {"section": radio}) or {}).get("phyname", "phy0")
-        command = (
-            f"iw dev {MONITOR} del 2>/dev/null; "
-            f"iw phy {phy} interface add {MONITOR} type monitor && ip link set {MONITOR} up"
-        )
         async with self._pool.write_lock(rec.id):  # not in the middle of a Wi-Fi or firewall apply
-            done = await run_audited(
-                t,
-                command,
-                router_id=rec.id,
-                screen=SCREEN,
-                guard=self._guard,
-                audit=self._audit,
-                source="app",
-            )
-        if not done.ok:
-            raise ValueError(f"Could not create mon0 on {rec.name}: {(done.stderr or done.stdout).strip()}")
+            try:  # shared with the beacon check and frame analysis (v0.7 plan D11)
+                await self._monitors.acquire(rec.id, f"capture {capture_id}", phy, t, self._run_fn(rec, t))
+            except ValueError as exc:
+                raise ValueError(f"Could not create mon0 on {rec.name}: {exc}") from None
 
-    async def _monitor_gone(self, rec: RouterRecord, t: Transport) -> None:
-        """Remove the monitor interface; allowed during a run, as it only undoes what the capture made."""
+    async def _monitor_gone(self, rec: RouterRecord, t: Transport, capture_id: str) -> None:
+        """Let go of the monitor interface; the last holder removes it, allowed during a run, as it only
+        undoes what the app made."""
         with contextlib.suppress(TransportError):
             async with self._pool.write_lock(rec.id):
-                await run_audited(
-                    t,
-                    f"iw dev {MONITOR} del",
-                    router_id=rec.id,
-                    screen=SCREEN,
-                    guard=self._guard,
-                    audit=self._audit,
-                    source="app",
-                    require_guard=False,
-                )
+                await self._monitors.release(rec.id, f"capture {capture_id}", self._run_fn(rec, t))
 
     async def start(self, router_id: str, req: CaptureRequest) -> CaptureView:
         rec = self._record(router_id)
@@ -203,7 +201,7 @@ class CaptureService:
         capture_id = secrets.token_hex(4)
         t = await self._pool.get(rec)
         if mon0:
-            await self._monitor(rec, t)
+            await self._monitor(rec, t, capture_id)
         sink: Sink | None = None
         path: Path | None = None
         try:  # nothing is left behind when the capture cannot start: no monitor interface, no file
@@ -222,7 +220,7 @@ class CaptureService:
             if path is not None:
                 path.unlink(missing_ok=True)
             if mon0:
-                await self._monitor_gone(rec, t)
+                await self._monitor_gone(rec, t, capture_id)
             raise
         self._audit.record(
             router=rec.id,
@@ -281,7 +279,7 @@ class CaptureService:
                 source="app",
             )
             if mon0:
-                await self._monitor_gone(rec, t)
+                await self._monitor_gone(rec, t, capture_id)
             self._views[capture_id] = replace(
                 self._views[capture_id], bytes=total, running=False, error=error
             )

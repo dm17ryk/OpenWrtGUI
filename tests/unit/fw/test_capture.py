@@ -12,6 +12,7 @@ from openwrtgui.capture.service import CaptureRequest, CaptureService, capture_c
 from openwrtgui.capture.wireshark import find_wireshark
 from openwrtgui.transport.base import TransportError
 from openwrtgui.transport.fake import BytesStream, ReplayTransport
+from openwrtgui.wifi.model import ChannelSelection, RadioRequest
 
 PCAP_MAGIC = bytes.fromhex("d4c3b2a1")
 
@@ -167,6 +168,32 @@ async def test_mon0_writes_wait_for_the_router_write_lock(
         assert "iw dev owgmon0 del" not in env.audit_lines()
     await _done(service, view.id)
     assert "iw dev owgmon0 del" in env.audit_lines()
+
+
+async def test_beacon_check_keeps_a_capture_monitor(
+    env: FwEnv, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """v0.7 plan D11: an Apply's beacon check during a mon0 capture uses the same owgmon0 and leaves it."""
+    held = _HeldStream()
+
+    async def stream(self: ReplayTransport, command: str) -> _HeldStream:
+        return held
+
+    monkeypatch.setattr(ReplayTransport, "stream", stream)
+    service = _captures(env, tmp_path, monitors=env.wifi.monitors)
+    view = await service.start("ap1", CaptureRequest("mon0", "", 60))
+    state = await env.wifi.state("ap1")
+    radio = state.radios[0]
+    now = radio.actual.channel if radio.actual else None
+    channel = next(c for c in radio.limits.channels if c != now)
+    req = RadioRequest(radio=radio.name, channels=ChannelSelection.of(channel))
+    result = await env.wifi.apply("ap1", req)
+    beacon = next(c for c in result.checks if c.name == "beacon rate")
+    assert beacon.ok, beacon.detail
+    assert "iw dev owgmon0 del" not in env.audit_lines()  # the capture's monitor is still there
+    held.ended.set()
+    await _done(service, view.id)
+    assert env.audit_lines().count("iw dev owgmon0 del") == 1
 
 
 async def test_a_capture_that_cannot_start_leaves_nothing(
