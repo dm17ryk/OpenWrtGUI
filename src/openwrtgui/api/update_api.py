@@ -14,6 +14,7 @@ from openwrtgui.context import AppContext
 
 router = APIRouter(prefix="/api/update", dependencies=[Depends(require_token)], tags=["update"])
 Ctx = Annotated[AppContext, Depends(get_ctx)]
+STOP_LIMIT_S = 120.0
 
 
 class VersionIn(BaseModel):
@@ -53,14 +54,30 @@ async def skip(body: VersionIn, ctx: Ctx) -> UpdateOut:
     return _out(ctx)
 
 
+def _live(ctx: AppContext) -> list[str]:
+    """Work the update would stop (spec 9.3): step-throughs, captures and frame analysis."""
+    return [*ctx.steps.live(), *ctx.captures.live(), *ctx.rf.live_frames()]
+
+
+async def _stop_live(ctx: AppContext) -> None:
+    """Each step-through restores its radio first (v0.7 plan D15); a restore that fails keeps its file."""
+    await ctx.steps.stop_all(limit_s=STOP_LIMIT_S)
+    await ctx.captures.stop_all()
+    await ctx.rf.stop_frames()
+
+
 @router.post("/install", status_code=202)
 async def install(body: InstallIn, ctx: Ctx) -> JSONResponse:
-    if ctx.terminals and not body.force:
+    live = _live(ctx)
+    if (ctx.terminals or live) and not body.force:
+        detail = "Live work is running" if live else "Terminal sessions are open"
         return JSONResponse(
             status_code=409,
-            content={"detail": "Terminal sessions are open", "open_terminals": len(ctx.terminals)},
+            content={"detail": detail, "open_terminals": len(ctx.terminals), "live": live},
         )
+    # downloaded and verified first: nothing is stopped when that fails
     command = await ctx.updater.install(body.version)
+    await _stop_live(ctx)
     await _close_terminals_and_quit(ctx, command)
     return JSONResponse(status_code=202, content={"status": "installing", "version": body.version})
 

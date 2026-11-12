@@ -138,6 +138,20 @@ class CaptureService:
     def list_all(self) -> builtins.list[CaptureView]:
         return list(self._views.values())
 
+    def live(self) -> builtins.list[str]:
+        """The captures running now, for the update's question (spec 9.3)."""
+        out = []
+        for view in self._views.values():
+            if view.running:
+                rec = self._routers.get(view.router_id)
+                out.append(f"Capture on {rec.name if rec else view.router_id} {view.device}")
+        return out
+
+    async def stop_all(self) -> None:
+        for view in builtins.list(self._views.values()):
+            if view.running:
+                await self.stop(view.id)
+
     def _run_fn(self, rec: RouterRecord, t: Transport) -> RunFn:
         async def run(command: str, require_guard: bool) -> CommandResult:
             return await run_audited(
