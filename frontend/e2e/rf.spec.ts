@@ -18,3 +18,28 @@ test('recording writes a CSV and says where', async ({ page }, info) => {
   await page.getByRole('button', { name: 'Stop recording', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Record to CSV', exact: true })).toBeVisible()
 })
+
+test('channel analysis scans and draws the networks', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop-light', 'one project scans the simulated router')
+  await open(page, '/routers/ap1/rf')
+  const card = page.getByRole('region', { name: 'Channel analysis' })
+  await card.getByRole('button', { name: 'Scan…', exact: true }).click()
+  await expect(card.getByRole('region', { name: 'Command preview' })).toContainText('scan ap-force passive')
+  await card.getByRole('button', { name: 'Scan now', exact: true }).click()
+  await expect(card.getByRole('table', { name: 'Networks heard' })).toContainText('net-01')
+  await expect(card.getByRole('img', { name: /13 channels, 7 networks heard/ })).toBeVisible()
+  await noHorizontalScroll(page)
+})
+
+test('frame analysis starts, shows a window and stops', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop-light', 'one project adds a monitor on the simulated router')
+  await open(page, '/routers/ap1/rf')
+  const card = page.getByRole('region', { name: 'Frame analysis' })
+  await card.getByRole('button', { name: 'Frame analysis…', exact: true }).click()
+  await expect(card.getByText(/Costs router CPU/)).toBeVisible()
+  await card.getByRole('button', { name: 'Start frame analysis', exact: true }).click()
+  await expect(card.getByText(/window \d+ · 3 s of every 5 s/)).toBeVisible({ timeout: 8_000 })
+  await expect(card.getByRole('list', { name: 'Rate mix RX at AP, last window' })).toBeVisible({ timeout: 8_000 })
+  await card.getByRole('button', { name: 'Stop frame analysis', exact: true }).click()
+  await expect(card.getByRole('button', { name: 'Frame analysis…', exact: true })).toBeVisible()
+})

@@ -38,7 +38,7 @@ The top bar always shows the guard's state:
 
 ## What still works during a run
 
-- Everything that only reads: the dashboard, router overviews, the audit log.
+- Everything that only reads: the dashboard, router overviews, the audit log, RF live's samples.
 - The [terminal](Terminal-and-audit-log), in read-only mode: commands such as `cat`, `logread`,
   `iw dev`, `ubus call … status` run; anything that changes the router is refused with the reason.
 
@@ -46,3 +46,10 @@ The top bar always shows the guard's state:
 
 Every write to a router: installing the app key, setting a root password in the wizard, and terminal
 commands that change something. The refusal names the run, so you know what to wait for.
+
+## The test helpers when a run starts
+
+- A **step-through** stops at once and leaves the radio at its step: putting it back is a Wi-Fi reload, which
+  would disturb the run. The Wi-Fi screen offers **Restore** once the run is over.
+- **Frame analysis** stops and removes its monitor interface (that only undoes what the app added).
+- A **channel scan** and starting frame analysis or a step-through are refused while the run lasts.

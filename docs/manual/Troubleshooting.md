@@ -70,3 +70,10 @@ See [Bench Guard](Bench-Guard).
 
 `logs\app.log` in the data folder (Settings → **Open data folder**). Attach its end, with the audit-log
 export, to a [bug report](https://github.com/dm17ryk/OpenWrtGUI/issues/new/choose).
+
+## A radio was left at a step-through step
+
+The Wi-Fi screen and the dashboard's **Needs attention** say so when a step-through ended before it put the
+radio back: the app was closed or crashed, or a harness run started. The radio options it saved before step 1
+are in the data folder (`steps\`). **Restore** applies them back, proven on air like any Apply, and removes the
+saved copy; it waits while Bench Guard sees a run.

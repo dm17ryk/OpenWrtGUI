@@ -31,3 +31,28 @@ test('n20 on channel 6 goes on air, proven, then parks again', async ({ page }, 
   await apply.click()
   await expect(page.getByText('parked', { exact: true })).toBeVisible()
 })
+
+test('step-through manual run proves each step, then restores', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop-light', 'one project changes the simulated router')
+  // AP1: its SSID is the only one on air, so the one-radio-per-SSID rule lets it step (plan D9)
+  await open(page, '/routers/ap1/wifi')
+  const card = page.getByRole('region', { name: 'Step-through' })
+  await card.getByRole('button', { name: 'Step mode g', exact: true }).click()
+  await card.getByRole('button', { name: 'Step mode n20', exact: true }).click()
+  await card.getByRole('button', { name: 'Step channel 1', exact: true }).click()
+  await card.getByRole('button', { name: 'Step channel 6', exact: true }).click()
+  await card.getByRole('group', { name: 'Advance' }).getByRole('button', { name: 'Manual', exact: true }).click()
+  await expect(card.getByText(/Step-through preview: 4 steps/)).toBeVisible()
+  await expect(card.getByRole('region', { name: 'Command preview' })).toContainText('# Restore at the end')
+  await card.getByRole('button', { name: 'Start step-through', exact: true }).click()
+  for (const step of [1, 2, 3, 4]) {
+    await expect(card.getByRole('status')).toContainText(`Step ${step} of 4`)
+    await expect(card.getByRole('status')).toContainText('waiting for Next')
+    await card.getByRole('button', { name: 'Next step', exact: true }).click()
+  }
+  await expect(card.getByRole('status')).toContainText('Done: 4 steps, radio0 restored', { timeout: 30_000 })
+  const rows = card.getByRole('table', { name: 'Step-through results' }).getByRole('row')
+  await expect(rows).toHaveCount(5)
+  await expect(rows.filter({ hasText: 'proven' })).toHaveCount(4)
+  await noHorizontalScroll(page)
+})

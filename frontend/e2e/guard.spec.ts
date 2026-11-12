@@ -72,3 +72,21 @@ test('arming a fault is refused during a run', async ({ page }) => {
   await expect(run.getByRole('alert')).toContainText('dima_night.py started 21:04 (PID 18244)')
   await expect(page.getByText('nothing armed')).toBeVisible()
 })
+
+test('a step-through cannot start during a run', async ({ page }) => {
+  await open(page, '/routers/ap2/wifi')
+  const card = page.getByRole('region', { name: 'Step-through' })
+  await card.getByRole('button', { name: 'Step mode g', exact: true }).click()
+  await card.getByRole('button', { name: 'Step channel 1', exact: true }).click()
+  await expect(card.getByRole('region', { name: 'Command preview' })).toBeVisible()
+  await expect(card.getByText(/Bench Guard: dima_night\.py started 21:04/)).toBeVisible()
+  await expect(card.getByRole('button', { name: 'Start step-through', exact: true })).toBeDisabled()
+})
+
+test('a channel scan is refused during a run', async ({ page }) => {
+  await open(page, '/routers/ap1/rf')
+  const card = page.getByRole('region', { name: 'Channel analysis' })
+  await card.getByRole('button', { name: 'Scan…', exact: true }).click()
+  await card.getByRole('button', { name: 'Scan now', exact: true }).click()
+  await expect(card.getByRole('alert')).toContainText('dima_night.py started 21:04 (PID 18244)')
+})
