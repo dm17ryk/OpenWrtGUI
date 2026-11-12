@@ -37,6 +37,7 @@ from openwrtgui.ports.service import PortsService
 from openwrtgui.probe.describe import SelfDescription
 from openwrtgui.probe.status import RouterStatus
 from openwrtgui.rf.sampler import RfHub
+from openwrtgui.rf.scan_service import ScanService
 from openwrtgui.simulator import SimConnector, seed_routers, sim_http_client, sim_process_lister
 from openwrtgui.store.keys import AppKey, load_or_create_app_key
 from openwrtgui.store.routers import RouterRecord, RouterStore, router_key_paths
@@ -71,6 +72,7 @@ class AppContext:
     poller: StatusPoller
     wifi: WifiService
     rf: RfHub
+    scans: ScanService
     luci: LuciBridgeService
     net: NetworkService
     ports: PortsService
@@ -329,6 +331,7 @@ def build_context(
         rf=RfHub(
             pool=pool, routers=routers, recordings=data.root / "recordings" if simulator is not None else None
         ),
+        scans=ScanService(pool=pool, routers=routers, guard=guard, audit=audit, wifi=wifi),
         luci=luci,
         net=net,
         ports=ports,
