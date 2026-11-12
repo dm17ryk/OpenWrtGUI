@@ -195,7 +195,10 @@ def sanitize(text: str) -> str:
 # Not \b: tcpdump's labels "DA:" and "BSSID:" end in hex letters, and "DA:ff:ff:ff:ff:ff" must not match.
 _MAC = re.compile(r"(?<![0-9a-fA-F])[0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5}(?![:0-9a-fA-F])")
 _SSID_LINE = re.compile(r"^(\s*SSID: )(.*)$", re.M)
-_FRAME_SSID = re.compile(r"\b(Beacon|Probe Response|Probe Request|Assoc Request|ReAssoc Request) \((.*?)\)")
+# The SSID ends at the ")" before the rates (" [") or at the end of a trimmed line: it may itself hold ")".
+_FRAME_SSID = re.compile(
+    r"\b(Beacon|Probe Response|Probe Request|Assoc Request|ReAssoc Request) \((.*?)\)(?= \[|$)", re.M
+)
 _PLACEHOLDER_MAC = "02:00:00:00:"
 _PLACEHOLDER_SSID = re.compile(r"net-\d{2,}")
 _IW_ESCAPE = re.compile(r"\\x([0-9a-fA-F]{2})")
@@ -213,6 +216,81 @@ def _placeholder(kind: str, value: str, names: dict[str, str]) -> str:
         n = sum(1 for k in names if k.startswith(f"{kind}:")) + 1
         names[key] = f"{_PLACEHOLDER_MAC}{n // 256:02x}:{n % 256:02x}" if kind == "mac" else f"net-{n:02d}"
     return names[key]
+
+
+# What an air recording keeps (v0.7 review I7): a scan's lines the parser reads, and each frame line up to
+# its frame type and SSID. WPS names, serial numbers, mesh IDs and the payload tcpdump -v prints (IP
+# addresses, mDNS host names) never reach the file.
+_SCAN_TOP = (
+    "freq",
+    "signal",
+    "last seen",
+    "SSID",
+    "capability",
+    "RSN",
+    "WPA",
+    "HT operation",
+    "DS Parameter set",
+)
+_SCAN_NESTED = {
+    "RSN": ("Authentication suites",),
+    "WPA": ("Authentication suites",),
+    "HT operation": ("primary channel", "secondary channel offset"),
+}
+_FRAME_ADDR = re.compile(r"\b(?:SA|TA|DA|RA|BSSID):[0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5}")
+_FRAME_TYPE = re.compile(
+    r"\s+((?:QoS )?(?:Data|Null)|Beacon|Probe Request|Probe Response|(?:Re)?Assoc (?:Request|Response)"
+    r"|Authentication|DeAuthentication|Disassociation|Action|Acknowledgment|Clear-To-Send|Request-To-Send"
+    r"|Power Save-Poll|CF-End|BAR|BA)\b"
+)
+_WITH_SSID = ("Beacon", "Probe Request", "Probe Response", "Assoc Request", "ReAssoc Request")
+_TCPDUMP_STATUS = re.compile(r"tcpdump: |\d+ packets? (?:captured|received by filter|dropped by kernel)")
+
+
+def _trim_scan(text: str) -> str:
+    out: list[str] = []
+    section = ""
+    for line in text.splitlines():
+        if line.startswith("BSS "):
+            out.append(line)
+            continue
+        if line.startswith("\t") and not line.startswith("\t\t"):
+            section = line.strip().split(":", 1)[0]
+            if section in _SCAN_TOP:
+                out.append(line.split("\t*")[0].rstrip() if section in _SCAN_NESTED else line)
+            continue
+        if any(key in line for key in _SCAN_NESTED.get(section, ())):
+            out.append(line)
+    return "\n".join(out) + ("\n" if out else "")
+
+
+def _trim_frame(line: str) -> str | None:
+    """A frame line up to its type (and SSID); a tcpdump status line as it is; anything else (the payload
+    lines tcpdump -v prints under a frame) is dropped."""
+    addrs = list(_FRAME_ADDR.finditer(line))
+    if not addrs:
+        return line if _TCPDUMP_STATUS.match(line) else None
+    head, rest = line[: addrs[-1].end()], line[addrs[-1].end() :]
+    m = _FRAME_TYPE.match(rest)
+    if m is None:
+        return head
+    kind = m.group(1)
+    if kind in _WITH_SSID and rest[m.end() :].startswith(" ("):
+        body = rest[m.end() + 2 :]
+        end = body.rfind(") [")
+        ssid = body[: end if end >= 0 else body.rfind(")")]
+        return f"{head} {kind} ({ssid})"
+    return f"{head} {kind}"
+
+
+def trim_air(command: str, text: str) -> str:
+    """Only what the scan and frame parsers read, before sanitize_air replaces the neighbours' names."""
+    if "tcpdump" in command:
+        kept = (_trim_frame(line) for line in text.splitlines())
+        return "".join(line + "\n" for line in kept if line is not None)
+    if " scan" in command and "survey" not in command:
+        return _trim_scan(text)
+    return text
 
 
 def sanitize_air(
