@@ -15,8 +15,10 @@ from openwrtgui.rf.air import FRAME_WINDOW, MONITOR_FLAGS
 from openwrtgui.rf.frames_service import FrameAnalyzer, FrameState
 from openwrtgui.simair import SimAir
 from openwrtgui.simulator import SIM_GUARD_ENV
-from openwrtgui.transport.base import CommandResult
-from openwrtgui.wifi.monitor import DEL
+from openwrtgui.transport.base import CommandResult, TransportError
+from openwrtgui.transport.fake import ReplayTransport
+from openwrtgui.wifi.model import ChannelSelection, RadioRequest
+from openwrtgui.wifi.monitor import DEL, add_command
 
 Published = list[dict[str, Any]]
 
@@ -149,6 +151,105 @@ async def test_frames_survive_a_step_reload(ctx: AppContext) -> None:
     state = await a.stop()
     assert state.note == "monitor added again after a Wi-Fi reload"
     assert state.last is not None and state.last.rx.frames == 40
+
+
+ADD_AGAIN = add_command("phy0", clear_leftover=False)
+
+
+async def _rounds(n: int = 60) -> None:
+    for _ in range(n):
+        await asyncio.sleep(0)
+
+
+async def test_flags_set_again_after_an_apply_re_adds_the_monitor(ctx: AppContext) -> None:
+    """Review I2: an Apply's beacon check re-adds owgmon0 after the reload (frames still hold it); the frame
+    loop then finds it there, and must still set the flags again."""
+    a = _analyzer(ctx, "ap1", [])
+    await _start(a)
+    await _until(lambda: a.state().windows >= 1)
+    state = await ctx.wifi.state("ap1")
+    radio = state.radios[0]
+    now = radio.actual.channel if radio.actual else None
+    channel = next(c for c in radio.limits.channels if c != now)
+    await ctx.wifi.apply("ap1", RadioRequest(radio=radio.name, channels=ChannelSelection.of(channel)))
+    lines = _audit(ctx)
+    assert ADD_AGAIN in lines  # the beacon check put it back
+    seen = a.state().windows
+    await _until(lambda: a.state().windows > seen + 1)
+    await a.stop()
+    lines = _audit(ctx)
+    last_add = max(i for i, line in enumerate(lines) if line == ADD_AGAIN)
+    assert MONITOR_FLAGS in lines[last_add:], lines[last_add:]
+    assert a.state().note == "monitor added again after a Wi-Fi reload"
+
+
+async def test_the_loop_adds_the_monitor_again_only_under_the_write_lock(ctx: AppContext) -> None:
+    """Review I3: re-adding owgmon0 and its flags is a write; it waits for an Apply holding the lock."""
+    a = _analyzer(ctx, "ap1", [])
+    await _start(a)
+    await _until(lambda: a.state().windows >= 1)
+    rec = ctx.routers.get("ap1")
+    assert rec is not None
+    t = await ctx.pool.get(rec)
+    async with ctx.pool.write_lock("ap1"):
+        assert (await t.run("wifi down radio0; wifi up radio0", timeout=60)).ok  # the monitor is gone
+        await _rounds()
+        assert ADD_AGAIN not in _audit(ctx)
+    seen = a.state().windows
+    await _until(lambda: a.state().windows > seen)
+    await a.stop()
+    assert ADD_AGAIN in _audit(ctx)
+
+
+async def test_a_start_whose_flags_fail_lets_go_of_the_monitor(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review I4: the router drops between the monitor's add and its flags; the lease is not kept."""
+    original = SimAir._one
+
+    def drop(self: SimAir, p: str) -> CommandResult | None:
+        if p == MONITOR_FLAGS:
+            raise TransportError("connection lost")
+        return original(self, p)
+
+    monkeypatch.setattr(SimAir, "_one", drop)
+    a = _analyzer(ctx, "ap1", [])
+    with pytest.raises(TransportError):
+        await _start(a)
+    assert ctx.wifi.monitors.holders("ap1") == ()
+    assert _audit(ctx)[-1] == DEL and not a.state().running
+
+
+async def test_two_starts_at_once_run_one_analysis(ctx: AppContext, monkeypatch: pytest.MonkeyPatch) -> None:
+    original = ReplayTransport.run
+
+    async def yielding(self: ReplayTransport, *args: Any, **kwargs: Any) -> CommandResult:
+        await asyncio.sleep(0)  # an SSH round trip: the other Start runs meanwhile
+        return await original(self, *args, **kwargs)
+
+    monkeypatch.setattr(ReplayTransport, "run", yielding)
+    a = _analyzer(ctx, "ap1", [])
+    plan = await a.preview()
+    await asyncio.gather(a.start(plan.digest), a.start(plan.digest))
+    assert ctx.wifi.monitors.holders("ap1") == ("frames radio0",)
+    await a.stop()
+    assert ctx.wifi.monitors.holders("ap1") == ()
+    assert _audit(ctx).count(DEL) == 1
+
+
+async def test_a_second_stop_lets_the_first_finish(ctx: AppContext) -> None:
+    """Review I4: a second Stop (the last viewer leaving, shutdown) must not cancel the first's cleanup."""
+    a = _analyzer(ctx, "ap1", [])
+    await _start(a)
+    await _until(lambda: a.state().windows >= 1)
+    async with ctx.pool.write_lock("ap1"):  # the cleanup waits for the lock
+        first = asyncio.ensure_future(a.stop())
+        await _rounds()
+        second = asyncio.ensure_future(a.stop())
+        await _rounds()
+    await asyncio.gather(first, second)
+    assert ctx.wifi.monitors.holders("ap1") == ()
+    assert _audit(ctx)[-1] == DEL and not a.state().running
 
 
 async def test_frames_routes(authed: httpx.AsyncClient) -> None:

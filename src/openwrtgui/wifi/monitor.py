@@ -5,7 +5,8 @@ holder adds it, the last one removes it, and nobody removes it while another hol
 removes every interface on the phy, so a holder checks that it is still there and adds it again.
 
 The leases never take the router's write lock: the beacon check already holds it, and asyncio's locks are not
-reentrant. Callers that do not hold it (capture, frame analysis) take it around `acquire` and `release`.
+reentrant. Callers that do not hold it (capture, frame analysis) take it around `acquire`, `ensure` and
+`release`. `generation` moves on every add, so a holder sees that someone else put the monitor back.
 """
 
 from __future__ import annotations
@@ -37,6 +38,7 @@ class MonitorLeases:
     def __init__(self) -> None:
         self._holders: dict[str, list[str]] = {}
         self._locks: dict[str, asyncio.Lock] = {}
+        self._generations: dict[str, int] = {}
 
     def _lock(self, router_id: str) -> asyncio.Lock:
         return self._locks.setdefault(router_id, asyncio.Lock())
@@ -44,12 +46,20 @@ class MonitorLeases:
     def holders(self, router_id: str) -> tuple[str, ...]:
         return tuple(self._holders.get(router_id, ()))
 
+    def generation(self, router_id: str) -> int:
+        """Counts the adds: a holder that set something on the interface (frame analysis's flags) sets it
+        again when this moved, whoever added the monitor again after a reload."""
+        return self._generations.get(router_id, 0)
+
+    def _added(self, router_id: str) -> None:
+        self._generations[router_id] = self.generation(router_id) + 1
+
     async def acquire(self, router_id: str, holder: str, phy: str, t: Transport, run: RunFn) -> None:
         """Add the monitor for the first holder, or check it is there for a later one. ValueError when the
         router refuses it; then this holder is not registered."""
         async with self._lock(router_id):
             if self._holders.get(router_id):
-                await self._ensure(phy, t, run)
+                await self._ensure(router_id, phy, t, run)
             else:
                 try:
                     done = await run(add_command(phy, clear_leftover=True), True)
@@ -59,6 +69,7 @@ class MonitorLeases:
                     raise
                 if not done.ok:
                     raise ValueError(_reason(done))
+                self._added(router_id)
             self._holders.setdefault(router_id, []).append(holder)
 
     async def release(self, router_id: str, holder: str, run: RunFn) -> CommandResult | None:
@@ -76,14 +87,15 @@ class MonitorLeases:
     async def ensure(self, router_id: str, phy: str, t: Transport, run: RunFn) -> bool:
         """True when the monitor was gone (a Wi-Fi reload) and was added again."""
         async with self._lock(router_id):
-            return await self._ensure(phy, t, run)
+            return await self._ensure(router_id, phy, t, run)
 
-    async def _ensure(self, phy: str, t: Transport, run: RunFn) -> bool:
+    async def _ensure(self, router_id: str, phy: str, t: Transport, run: RunFn) -> bool:
         if (await t.run(INFO)).ok:
             return False
         done = await run(add_command(phy, clear_leftover=False), True)
         if not done.ok:
             raise ValueError(_reason(done))
+        self._added(router_id)
         return True
 
     @contextlib.asynccontextmanager

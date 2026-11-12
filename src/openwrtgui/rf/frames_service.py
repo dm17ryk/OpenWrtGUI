@@ -99,6 +99,9 @@ class FrameAnalyzer:
         self._state = FrameState()
         self._task: asyncio.Task[None] | None = None
         self._holder = f"frames {radio}"
+        self._start_lock = asyncio.Lock()
+        self._stopping = False  # one Stop cancels the loop; later ones wait for its cleanup
+        self._flags_at = 0  # the monitor's generation the flags were set on
 
     def state(self) -> FrameState:
         return self._state
@@ -157,8 +160,12 @@ class FrameAnalyzer:
 
     # ---------------------------------------------------------------- start and stop
     async def start(self, digest: str) -> FrameState:
-        if self.running:
-            return self._state
+        async with self._start_lock:  # two Starts at once run one analysis
+            if self.running:
+                return self._state
+            return await self._start(digest)
+
+    async def _start(self, digest: str) -> FrameState:
         self._guard.require_clear()
         rec, t, phy, own = await self._where()
         if self._plan(phy).digest != digest:
@@ -166,7 +173,14 @@ class FrameAnalyzer:
         run = self._run_fn(rec, t)
         async with self._pool.write_lock(rec.id):
             await self._monitors.acquire(rec.id, self._holder, phy, t, run)
-            fcs = (await run(MONITOR_FLAGS, True)).ok
+            try:
+                fcs = (await run(MONITOR_FLAGS, True)).ok
+            except BaseException:  # the router dropped or a run started: let go of the monitor again
+                with contextlib.suppress(TransportError):
+                    await self._monitors.release(rec.id, self._holder, run)
+                raise
+            self._flags_at = self._monitors.generation(rec.id)
+        self._stopping = False
         self._audit.record(
             router=rec.id,
             screen=SCREEN,
@@ -187,10 +201,11 @@ class FrameAnalyzer:
     async def stop(self, reason: str | None = None) -> FrameState:
         task = self._task
         if task is not None and not task.done():
-            self._state = replace(self._state, error=reason)
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
+            if not self._stopping:  # a second Stop must not cancel the first one's cleanup
+                self._stopping = True
+                self._state = replace(self._state, error=reason)
+                task.cancel()
+            await asyncio.wait({task})  # never cancels the loop, even when this caller is cancelled
         return self._state
 
     # ---------------------------------------------------------------- the windows
@@ -208,9 +223,8 @@ class FrameAnalyzer:
                         (await ubus_call(t, "network.wireless", "status") or {}).get(self.radio, {}).get("up")
                     )
                     parked = 0 if up else parked + 1
-                    if up and await self._monitors.ensure(rec.id, phy, t, run):
-                        await run(MONITOR_FLAGS, True)
-                        self._state = replace(self._state, note=REDONE)
+                    if up:
+                        await self._keep_monitor(rec.id, phy, t, run)
                     result = await t.run(FRAME_WINDOW, timeout=10.0)
                     failures = 0
                 except GuardLocked:  # a run started between the check and the monitor's add: stop next round
@@ -228,6 +242,18 @@ class FrameAnalyzer:
                 await self._sleep(FRAME_EVERY_S - FRAME_WINDOW_S)
         finally:
             await self._finish(rec, t, run)
+
+    async def _keep_monitor(
+        self, router_id: str, phy: str, t: Transport, run: Callable[[str, bool], Awaitable[CommandResult]]
+    ) -> None:
+        """After a Wi-Fi reload: the monitor back, and its flags set again whoever added it (an Apply's
+        beacon check may have). Both are writes, so they wait for an Apply that holds the router."""
+        async with self._pool.write_lock(router_id):
+            await self._monitors.ensure(router_id, phy, t, run)
+            if self._monitors.generation(router_id) != self._flags_at:
+                await run(MONITOR_FLAGS, True)
+                self._flags_at = self._monitors.generation(router_id)
+                self._state = replace(self._state, note=REDONE)
 
     def _why_stop(self, parked: int, failures: int) -> str | None:
         guard = self._guard.state()
