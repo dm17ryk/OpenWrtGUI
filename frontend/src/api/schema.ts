@@ -1778,6 +1778,109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/rf/{radio}/frames": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Frames State */
+        get: operations["frames_state_api_routers__router_id__rf__radio__frames_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/rf/{radio}/frames/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Frames Preview */
+        post: operations["frames_preview_api_routers__router_id__rf__radio__frames_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/rf/{radio}/frames/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Frames Start */
+        post: operations["frames_start_api_routers__router_id__rf__radio__frames_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/rf/{radio}/frames/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Frames Stop */
+        post: operations["frames_stop_api_routers__router_id__rf__radio__frames_stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/rf/{radio}/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Scan Last */
+        get: operations["scan_last_api_routers__router_id__rf__radio__scan_get"];
+        put?: never;
+        /** Scan Run */
+        post: operations["scan_run_api_routers__router_id__rf__radio__scan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/rf/{radio}/scan/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Scan Preview */
+        post: operations["scan_preview_api_routers__router_id__rf__radio__scan_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/system": {
         parameters: {
             query?: never;
@@ -2773,6 +2876,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/wifi/step-through": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Step Job */
+        get: operations["step_job_api_routers__router_id__wifi_step_through_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/wifi/step-through/next": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Step Next */
+        post: operations["step_next_api_routers__router_id__wifi_step_through_next_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/wifi/step-through/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Step Preview */
+        post: operations["step_preview_api_routers__router_id__wifi_step_through_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/wifi/step-through/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Step Restore */
+        post: operations["step_restore_api_routers__router_id__wifi_step_through_restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/wifi/step-through/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Step Start */
+        post: operations["step_start_api_routers__router_id__wifi_step_through_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/wifi/step-through/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Step Stop */
+        post: operations["step_stop_api_routers__router_id__wifi_step_through_stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings": {
         parameters: {
             query?: never;
@@ -2784,6 +2989,26 @@ export interface paths {
         get: operations["get_settings_api_settings_get"];
         /** Put Settings */
         put: operations["put_settings_api_settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/step-through/pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Step Pending
+         * @description Step-throughs the app ended before they restored their radio (plan D6): Needs attention.
+         */
+        get: operations["step_pending_api_step_through_pending_get"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -3150,6 +3375,32 @@ export interface components {
             /** Url */
             url: string;
         };
+        /** Bss */
+        Bss: {
+            /** Bssid */
+            bssid: string;
+            /** Channel */
+            channel: number | null;
+            /** Freq Mhz */
+            freq_mhz: number;
+            /** Last Seen Ms */
+            last_seen_ms: number | null;
+            /** Own */
+            own: boolean;
+            /** Secondary */
+            secondary: ("above" | "below") | null;
+            /**
+             * Security
+             * @enum {string}
+             */
+            security: "open" | "WEP" | "WPA" | "WPA2" | "WPA3" | "WPA2/WPA3";
+            /** Signal Dbm */
+            signal_dbm: number | null;
+            /** Ssid */
+            ssid: string | null;
+            /** Width Mhz */
+            width_mhz: number;
+        };
         /** CapabilityRow */
         CapabilityRow: {
             /** Name */
@@ -3227,6 +3478,19 @@ export interface components {
             declaration?: string | null;
             /** Name */
             name: string;
+        };
+        /** ChannelLoad */
+        ChannelLoad: {
+            /** Busy Pct */
+            busy_pct: number | null;
+            /** Channel */
+            channel: number;
+            /** Freq Mhz */
+            freq_mhz: number;
+            /** Networks */
+            networks: number;
+            /** Strongest Dbm */
+            strongest_dbm: number | null;
         };
         /** ChannelSelection */
         ChannelSelection: {
@@ -3579,6 +3843,32 @@ export interface components {
         Digest: {
             /** Digest */
             digest: string;
+        };
+        /** DigestIn */
+        DigestIn: {
+            /** Digest */
+            digest: string;
+        };
+        /** Direction */
+        Direction: {
+            /**
+             * Frames
+             * @default 0
+             */
+            frames: number;
+            /** Rates */
+            rates?: {
+                [key: string]: number;
+            };
+            /**
+             * Retries
+             * @default 0
+             */
+            retries: number;
+            /** Signal Hist */
+            signal_hist?: {
+                [key: string]: number;
+            };
         };
         /** DiscoveryState */
         DiscoveryState: {
@@ -4051,6 +4341,56 @@ export interface components {
              * @default []
              */
             upserts: components["schemas"]["ForwardIn"][];
+        };
+        /** FramePlanOut */
+        FramePlanOut: {
+            /** Digest */
+            digest: string;
+            /** Lines */
+            lines: string[];
+            /** Warnings */
+            warnings: string[];
+        };
+        /** FrameState */
+        FrameState: {
+            /** Ends At */
+            ends_at?: string | null;
+            /** Error */
+            error?: string | null;
+            /**
+             * Fcs Reported
+             * @default true
+             */
+            fcs_reported: boolean;
+            last?: components["schemas"]["FrameWindow"] | null;
+            /** Note */
+            note?: string | null;
+            /**
+             * Running
+             * @default false
+             */
+            running: boolean;
+            /** Started At */
+            started_at?: string | null;
+            totals?: components["schemas"]["FrameWindow"] | null;
+            /**
+             * Windows
+             * @default 0
+             */
+            windows: number;
+        };
+        /** FrameWindow */
+        FrameWindow: {
+            /** Bad Fcs */
+            bad_fcs: number;
+            /** Dropped */
+            dropped: number | null;
+            /** Frames */
+            frames: number;
+            rx: components["schemas"]["Direction"];
+            /** Seconds */
+            seconds: number;
+            tx: components["schemas"]["Direction"];
         };
         /** FwRuleConf */
         FwRuleConf: {
@@ -5507,6 +5847,22 @@ export interface components {
              */
             uc_lc: boolean;
         };
+        /** PendingRestore */
+        PendingRestore: {
+            /** Options */
+            options: {
+                [key: string]: string | null;
+            };
+            /** Radio */
+            radio: string;
+            /** Router Id */
+            router_id: string;
+            /**
+             * Saved At
+             * Format: date-time
+             */
+            saved_at: string;
+        };
         /** PinView */
         PinView: {
             /**
@@ -5791,6 +6147,11 @@ export interface components {
              */
             ssids: components["schemas"]["SsidIn"][];
             txpower?: components["schemas"]["TxPowerIn"] | null;
+        };
+        /** RadioIn */
+        RadioIn: {
+            /** Radio */
+            radio: string;
         };
         /**
          * RadioLimits
@@ -6340,6 +6701,43 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** ScanPlanOut */
+        ScanPlanOut: {
+            /** Digest */
+            digest: string;
+            /** Lines */
+            lines: string[];
+            /**
+             * Via
+             * @enum {string}
+             */
+            via: "ap" | "temporary";
+            /** Warnings */
+            warnings: string[];
+        };
+        /** ScanResult */
+        ScanResult: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /** Channels */
+            channels: components["schemas"]["ChannelLoad"][];
+            /** Networks */
+            networks: components["schemas"]["Bss"][];
+            /** Radio */
+            radio: string;
+            /** Router Id */
+            router_id: string;
+            /** Seconds */
+            seconds: number;
+            /**
+             * Via
+             * @enum {string}
+             */
+            via: "ap" | "temporary";
+        };
         /** ServiceApplyIn */
         ServiceApplyIn: {
             /**
@@ -6410,7 +6808,7 @@ export interface components {
             root_password: string;
             /** Sid */
             sid: string;
-            step: components["schemas"]["Step"];
+            step: components["schemas"]["openwrtgui__onboard__wizard__Step"];
             summary: components["schemas"]["DescriptionSummary"] | null;
             /** Username */
             username: string;
@@ -6708,11 +7106,163 @@ export interface components {
             /** Tx Mbps */
             tx_mbps: number;
         };
-        /**
-         * Step
-         * @enum {string}
-         */
-        Step: "address" | "host_key" | "login" | "install_key" | "identify" | "ports" | "done";
+        /** StepJob */
+        StepJob: {
+            /**
+             * Advance
+             * @enum {string}
+             */
+            advance: "timer" | "manual" | "rejoin";
+            /** Csv Path */
+            csv_path: string | null;
+            current: components["schemas"]["openwrtgui__wifi__steps__Step"] | null;
+            /** Detail */
+            detail: string | null;
+            /** Dwell S */
+            dwell_s: number;
+            /** Ended At */
+            ended_at: string | null;
+            /** Error */
+            error: string | null;
+            /** Index */
+            index: number;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "applying" | "dwell" | "waiting for station" | "waiting for Next" | "restoring" | "done" | "stopped" | "failed";
+            /** Phase Ends At */
+            phase_ends_at: string | null;
+            /** Radio */
+            radio: string;
+            /** Restore Pending */
+            restore_pending: boolean;
+            /** Results */
+            results: components["schemas"]["StepResult"][];
+            /** Router Id */
+            router_id: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Station */
+            station: string | null;
+            /** Total */
+            total: number;
+        };
+        /** StepPlanOut */
+        StepPlanOut: {
+            /** Digest */
+            digest: string;
+            /** Estimate S */
+            estimate_s: number;
+            /** Restore Lines */
+            restore_lines: string[];
+            /** Step Lines */
+            step_lines: string[][];
+            /** Steps */
+            steps: components["schemas"]["openwrtgui__wifi__steps__Step"][];
+            /** Warnings */
+            warnings: string[];
+        };
+        /** StepRequestIn */
+        StepRequestIn: {
+            /**
+             * Advance
+             * @default timer
+             * @enum {string}
+             */
+            advance: "timer" | "manual" | "rejoin";
+            /** Channels */
+            channels: number[];
+            /**
+             * Dwell S
+             * @default 60
+             */
+            dwell_s: number;
+            /** Modes */
+            modes: ("b" | "g" | "n20" | "n40")[];
+            /**
+             * Powers
+             * @default []
+             */
+            powers: number[];
+            /** Radio */
+            radio: string;
+            /**
+             * Rejoin Limit S
+             * @default 120
+             */
+            rejoin_limit_s: number;
+            /** Station */
+            station?: string | null;
+        };
+        /** StepResult */
+        StepResult: {
+            /** Beacon */
+            beacon: string | null;
+            /** Channel */
+            channel: number;
+            /** Checks */
+            checks: components["schemas"]["Check"][];
+            /** Ended At */
+            ended_at: string | null;
+            /** Index */
+            index: number;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "b" | "g" | "n20" | "n40";
+            /** Proven */
+            proven: boolean;
+            /** Rejoin S */
+            rejoin_s: number | null;
+            /** Rejoined */
+            rejoined: boolean | null;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Txpower Dbm */
+            txpower_dbm: number | null;
+        };
+        /** StepStartIn */
+        StepStartIn: {
+            /**
+             * Advance
+             * @default timer
+             * @enum {string}
+             */
+            advance: "timer" | "manual" | "rejoin";
+            /** Channels */
+            channels: number[];
+            /** Digest */
+            digest: string;
+            /**
+             * Dwell S
+             * @default 60
+             */
+            dwell_s: number;
+            /** Modes */
+            modes: ("b" | "g" | "n20" | "n40")[];
+            /**
+             * Powers
+             * @default []
+             */
+            powers: number[];
+            /** Radio */
+            radio: string;
+            /**
+             * Rejoin Limit S
+             * @default 120
+             */
+            rejoin_limit_s: number;
+            /** Station */
+            station?: string | null;
+        };
         /** SystemAccessState */
         SystemAccessState: {
             /** App Instance */
@@ -7362,6 +7912,25 @@ export interface components {
              * @default []
              */
             upserts: components["schemas"]["ZoneIn"][];
+        };
+        /**
+         * Step
+         * @enum {string}
+         */
+        openwrtgui__onboard__wizard__Step: "address" | "host_key" | "login" | "install_key" | "identify" | "ports" | "done";
+        /** Step */
+        openwrtgui__wifi__steps__Step: {
+            /** Channel */
+            channel: number;
+            /** Index */
+            index: number;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "b" | "g" | "n20" | "n40";
+            /** Txpower Dbm */
+            txpower_dbm: number | null;
         };
     };
     responses: never;
@@ -10822,6 +11391,238 @@ export interface operations {
             };
         };
     };
+    frames_state_api_routers__router_id__rf__radio__frames_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+                radio: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FrameState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    frames_preview_api_routers__router_id__rf__radio__frames_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+                radio: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FramePlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    frames_start_api_routers__router_id__rf__radio__frames_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+                radio: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DigestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FrameState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    frames_stop_api_routers__router_id__rf__radio__frames_stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+                radio: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FrameState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scan_last_api_routers__router_id__rf__radio__scan_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+                radio: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanResult"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scan_run_api_routers__router_id__rf__radio__scan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+                radio: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DigestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    scan_preview_api_routers__router_id__rf__radio__scan_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+                radio: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     overview_api_routers__router_id__system_get: {
         parameters: {
             query?: never;
@@ -12760,6 +13561,204 @@ export interface operations {
             };
         };
     };
+    step_job_api_routers__router_id__wifi_step_through_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StepJob"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    step_next_api_routers__router_id__wifi_step_through_next_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StepJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    step_preview_api_routers__router_id__wifi_step_through_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StepRequestIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StepPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    step_restore_api_routers__router_id__wifi_step_through_restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RadioIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    step_start_api_routers__router_id__wifi_step_through_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StepStartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StepJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    step_stop_api_routers__router_id__wifi_step_through_stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StepJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_settings_api_settings_get: {
         parameters: {
             query?: never;
@@ -12809,6 +13808,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    step_pending_api_step_through_pending_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingRestore"][];
                 };
             };
         };

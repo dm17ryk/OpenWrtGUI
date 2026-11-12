@@ -6,11 +6,13 @@ import { HELP } from '../help/topics'
 import { RouterRail } from '../shell/RouterRail'
 import { AirMap } from './AirMap'
 import { Attention } from './Attention'
+import { usePendingRestores } from './wifi/useStepJob'
 import { RouterCard } from './RouterCard'
 import { plural, stationCount } from './routerState'
 
 export function Dashboard() {
   const routers = useQuery({ queryKey: ['routers'], queryFn: () => apiFetch<RouterItem[]>('/api/routers') })
+  const pending = usePendingRestores()
   const items = routers.data ?? []
   const onAir = items.reduce((n, i) => n + (i.status?.radios.filter((r) => r.up).length ?? 0), 0)
   const stations = items.reduce((n, i) => n + stationCount(i.status), 0)
@@ -48,7 +50,7 @@ export function Dashboard() {
               <RouterCard key={item.record.id} item={item} />
             ))}
           </div>
-          <Attention items={items} />
+          <Attention items={items} pending={pending.data ?? []} />
         </main>
       </div>
     </div>

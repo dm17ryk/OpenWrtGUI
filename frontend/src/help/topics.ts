@@ -31,6 +31,8 @@ export const HELP = {
   wifiStations: 'Wi-Fi#stations',
   wifiWho: 'Wi-Fi#who-may-join',
   wifiOptions: 'Wi-Fi#all-options',
+  wifiStep: 'Wi-Fi#step-through',
+  wifiStepResults: 'Wi-Fi#step-through-results',
   // RF live
   rf: 'RF-live',
   rfRadio: 'RF-live#radio',

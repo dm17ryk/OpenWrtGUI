@@ -14,6 +14,7 @@ import { draftFrom, requestFrom, type Draft } from './draft'
 import { ModeCard } from './ModeCard'
 import { RadioFields } from './RadioFields'
 import { StationsTable } from './StationsTable'
+import { StepThroughCard } from './StepThroughCard'
 import { usePreview } from './usePreview'
 import { WhoMayJoin } from './WhoMayJoin'
 
@@ -171,6 +172,7 @@ export function WifiScreen() {
             onResult={setResult}
             onApplied={refresh}
           />
+          <StepThroughCard key={`steps-${radio.name}`} routerId={id} short={short} radio={radio} onEnded={refresh} />
           <WhoMayJoin routerId={id} />
           <StationsTable routerId={id} short={short} />
           <AllOptions key={radio.name} routerId={id} radio={radio} short={short} onApplied={refresh} />

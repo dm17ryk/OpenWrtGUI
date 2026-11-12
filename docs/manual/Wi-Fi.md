@@ -90,3 +90,34 @@ the bench routers 155 radio options and 289 SSID options. Search, show only the 
 or only those a harness sets (for example `cell_density` by dima_night). An empty value means "not in the
 config": the driver default applies. Options with their own control above say so. Edits go through the same
 preview, Apply and check.
+
+## Step-through
+
+Steps the radio through every ticked mode × ticked channel × ticked TX power, one pure mode per step, in the
+order mode (b, g, n20, n40), then channel, then power (no power ticked: the power stays as it is). At most
+200 steps. Each step is an Apply of exactly that mode, channel and power, proven on air like any Apply,
+beacon rate included; only then does the step wait.
+
+- **Timer** waits the dwell (10-3600 s) after the proof. **Manual** waits for **Next step**. **Station
+  re-joins** waits until the chosen station (by its MAC) is associated and authorized again, records how long
+  that took, then dwells; a station that is not back within the re-join limit (30-600 s) is recorded "not
+  re-joined" and the run goes on.
+- The preview shows every step's exact commands and the restore at the end, before **Start step-through**.
+  The run checks each step against the preview: if someone changed the radio meanwhile, it stops and
+  restores.
+- A step whose proof fails is recorded "not proven" and the run goes on, without its wait. A refused change
+  or a lost connection stops the run and restores the radio.
+- Before step 1 the radio's mode, channel and power options are saved in the data folder. At the end, on
+  **Stop and restore** and when the app closes, they are applied back, proven, and the saved copy goes. If the
+  app ended before that, **Restore** is offered here and on the dashboard.
+- When a harness run starts, the step-through stops at once and leaves the radio as it is, since a Wi-Fi
+  reload would disturb the run. **Restore** works again once Bench Guard is clear.
+- While a step-through runs, Apply, All options, the saved MAC lists, a channel scan, a reboot, a restore and
+  a flash of this router wait for it. It does not start while one of the radio's SSIDs is on air on another
+  router.
+
+## Step-through results
+
+One row per step: mode, channel, TX power, whether it was proven on air (or which checks failed), the beacon
+rate heard, and the station's re-join time. The same rows go to a CSV in `Documents\OpenWrtGUI\` as each step
+ends (`steps-<router>-<radio>-<time>.csv`), so a crash keeps what was done.

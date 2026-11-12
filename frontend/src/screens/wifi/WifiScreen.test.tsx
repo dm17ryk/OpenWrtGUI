@@ -25,6 +25,9 @@ vi.mock('../../api/client', async (orig) => {
     if (path === '/api/routers/ap2/luci/pages') return []
     if (path === '/api/routers/ap2/network/access') return ACCESS
     if (path === '/api/routers/ap2/wifi/preview') return N20_CH6_PLAN
+    if (path === '/api/routers/ap2/wifi/step-through') return null
+    if (path === '/api/step-through/pending') return []
+    if (path === '/api/guard') return { checked_at: '2026-11-05T09:00:00', live: false, reasons: [] }
     if (path === '/api/routers/ap2/wifi/options/preview') return OPTIONS_PLAN
     if (path === '/api/routers/ap2/wifi/options/apply') return PROVEN
     if (path === '/api/routers/ap2/wifi/apply') {

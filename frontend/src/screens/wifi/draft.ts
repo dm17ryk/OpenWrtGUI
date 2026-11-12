@@ -1,6 +1,7 @@
 import type { Mode, RadioState, Security } from '../../api/types'
 
 export const MODES: Mode[] = ['b', 'g', 'n20', 'n40']
+export const MODE_LABEL: Record<Mode, string> = { b: '802.11b', g: '802.11g', n20: '802.11n · 20 MHz', n40: '802.11n · 40 MHz' }
 
 /** The body of POST …/wifi/preview and …/wifi/apply; fields left out keep the router's value. */
 export type SsidIn = { section: string; ssid?: string; security?: Exclude<Security, 'other'>; key?: string }
