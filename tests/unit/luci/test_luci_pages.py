@@ -168,3 +168,18 @@ def test_session_commands() -> None:
         'ubus call session set \'{"ubus_rpc_session":"S1D","values":{"token":"T0K","username":"root"}}\''
     )
     assert destroy_command("S1D") == 'ubus call session destroy \'{"ubus_rpc_session":"S1D"}\''
+
+
+def test_pages_keep_their_and_their_ancestors_depends() -> None:
+    by_path = {p.path: p for p in parse_menu(MENUS)}
+    zones = by_path["admin/network/firewall/zones"]
+    # the alias above it (Network › Firewall) needs fw3 and the firewall config; zones itself has none
+    assert {"acl": ["luci-app-firewall"], "fs": {"/sbin/fw3": "executable"}, "uci": {"firewall": True}} in (
+        zones.requires
+    )
+    mounts = by_path["admin/system/mounts"]
+    assert mounts.requires[-1] == {"acl": ["luci-mod-system-mounts"], "fs": {"/sbin/block": "executable"}}
+    vlan = by_path["admin/network/switch-vlan"]
+    assert isinstance(vlan.requires[-1]["uci"], list) and len(vlan.requires[-1]["uci"]) == 4
+    plugins = by_path["admin/system/plugins"]
+    assert plugins.requires == ({"acl": ["luci-mod-system-plugins"]},)
