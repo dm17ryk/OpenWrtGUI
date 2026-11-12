@@ -70,4 +70,6 @@ Captures on a router interface: `br-lan` (wired and Wi-Fi), a Wi-Fi interface, `
 radio for the capture and removed afterwards; not during a run) or the LTE interface. **Filter** takes a tcpdump
 filter such as `host 192.168.1.30 and udp`; **Duration** is 1 to 3600 s. **Save .pcap** writes the file to
 `Documents\OpenWrtGUI\captures`; **Live in Wireshark** (shown when Wireshark is installed) opens it live. The app's
-own SSH connection is never captured. Captures keep working during a run.
+own SSH connection is never captured. Captures keep working during a run. A Wi-Fi reload (an Apply, a step of a
+step-through) removes `mon0` under a running capture: the capture ends early and says so, and the file keeps what
+it caught until then.

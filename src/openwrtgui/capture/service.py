@@ -29,6 +29,7 @@ from openwrtgui.wifi.monitor import MONITOR, MonitorLeases, RunFn
 
 SCREEN = "Faults"
 MAX_BYTES = 500 * 1024 * 1024
+MON0_GONE = "mon0 went away (a Wi-Fi reload removes the monitor interface): the capture ended early."
 _FILTER = re.compile(r"[A-Za-z0-9 .:/()!&|<>=\[\]-]{0,200}")
 FILTER_TEXT = "A filter uses letters, digits, spaces and . : / ( ) ! & | < > = [ ] -"
 
@@ -108,6 +109,7 @@ class CaptureService:
         self._max_bytes = max_bytes
         self._views: dict[str, CaptureView] = {}
         self._streams: dict[str, ByteStream] = {}
+        self._stop_asked: set[str] = set()
         self._running: dict[str, str] = {}  # router id -> capture id
         self._tasks: set[asyncio.Task[None]] = set()
 
@@ -283,8 +285,13 @@ class CaptureService:
             with contextlib.suppress(TransportError, OSError):
                 await stream.close()
             sink.close()
-            if error is None and stream.exit_status not in (0, 124, None) and not total:
+            failed = stream.exit_status not in (0, 124, None) and capture_id not in self._stop_asked
+            if error is None and failed and not total:
                 error = stream.stderr.strip() or f"tcpdump exited {stream.exit_status}"
+            elif error is None and failed and mon0:  # tcpdump lost owgmon0 under it
+                last = next((line for line in reversed(stream.stderr.splitlines()) if line.strip()), "")
+                error = f"{MON0_GONE} {last.strip()}".strip()
+            self._stop_asked.discard(capture_id)
             self._audit.record(
                 router=rec.id,
                 screen=SCREEN,
@@ -307,6 +314,7 @@ class CaptureService:
             raise ValueError(f"No capture {capture_id}")
         stream = self._streams.get(capture_id)
         if stream is not None:
+            self._stop_asked.add(capture_id)  # tcpdump's exit is ours, not a failure
             with contextlib.suppress(TransportError, OSError):
                 await stream.close()
         for _ in range(50):  # let the pump finish

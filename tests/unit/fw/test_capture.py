@@ -143,6 +143,42 @@ class _HeldStream:
         self.ended.set()
 
 
+class _DiedStream:
+    """tcpdump on owgmon0 when a Wi-Fi reload removes the interface: some frames, then exit 1."""
+
+    exit_status: int | None = 1
+    stderr = "tcpdump: listening on owgmon0\ntcpdump: pcap_loop: The interface disappeared\n"
+
+    def __init__(self) -> None:
+        self._chunks = [PCAP_MAGIC + bytes(20)]
+
+    async def read(self, n: int) -> bytes:
+        return self._chunks.pop() if self._chunks else b""
+
+    async def close(self) -> None:
+        return None
+
+
+async def test_mon0_capture_that_loses_its_monitor_says_so(
+    env: FwEnv, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review I9: a reload during a mon0 capture ends it early; the capture must not look complete."""
+
+    async def stream(self: ReplayTransport, command: str) -> _DiedStream:
+        return _DiedStream()
+
+    monkeypatch.setattr(ReplayTransport, "stream", stream)
+    service = _captures(env, tmp_path)
+    view = await service.start("ap1", CaptureRequest("mon0", "", 60))
+    await _done(service, view.id)
+    done = next(v for v in service.list("ap1") if v.id == view.id)
+    assert done.bytes > 0
+    assert done.error == (
+        "mon0 went away (a Wi-Fi reload removes the monitor interface): the capture ended early. "
+        "tcpdump: pcap_loop: The interface disappeared"
+    )
+
+
 async def test_mon0_writes_wait_for_the_router_write_lock(
     env: FwEnv, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
