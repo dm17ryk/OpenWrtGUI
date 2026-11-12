@@ -17,6 +17,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from openwrtgui.busy import RouterBusy
 from openwrtgui.discovery.service import DiscoveryService
 from openwrtgui.flash.plan import KEEP_LINE, FlashPlan, FlashRequest, flash_plan, fw_path, read_facts
 from openwrtgui.guard.audit import AuditLog
@@ -57,6 +58,10 @@ class ImageCheck(BaseModel):
 
     ok: bool
     detail: str
+
+
+class FlashBusy(RouterBusy):
+    """Another job holds the router: no flash until it ends (v0.7 D8, 409)."""
 
 
 class _Failed(Exception):
@@ -104,6 +109,7 @@ class FlashService:
         self.every_s = every_s
         self._jobs: dict[str, FlashJob] = {}
         self._tasks: set[asyncio.Task[None]] = set()
+        self.extra_busy: Callable[[str], str | None] | None = None  # a step-through (v0.7 D8)
 
     def job(self, router_id: str) -> FlashJob | None:
         return self._jobs.get(router_id)
@@ -130,6 +136,8 @@ class FlashService:
         return (await self._prepare(router_id, req))[2]
 
     async def start(self, router_id: str, req: FlashRequest, digest: str) -> FlashJob:
+        if self.extra_busy is not None and (why := self.extra_busy(router_id)) is not None:
+            raise FlashBusy(why)
         self._guard.require_clear()
         rec, image, plan, board = await self._prepare(router_id, req)
         if plan.digest != digest:

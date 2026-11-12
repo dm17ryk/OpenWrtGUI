@@ -23,6 +23,8 @@ from openwrtgui.wifi.options import OptionEdit, OptionRow
 from openwrtgui.wifi.service import ApplyResult, Expectation, WifiPlan
 from openwrtgui.wifi.state import WifiState
 from openwrtgui.wifi.stations import Station
+from openwrtgui.wifi.step_service import PendingRestore, StepJob, StepPlan
+from openwrtgui.wifi.steps import Advance, Step, StepRequest
 
 router = APIRouter(
     prefix="/api/routers/{router_id}/wifi", dependencies=[Depends(require_token)], tags=["wifi"]
@@ -184,3 +186,94 @@ async def wifi_block(router_id: str, mac: str, body: BlockIn, ctx: Ctx) -> Ok:
     if not result.ok:
         raise HTTPException(status_code=502, detail=f"The router refused: {result.stderr.strip()}")
     return Ok()
+
+
+# ---------------------------------------------------------------- step-through (v0.7 plan D2-D10)
+class StepRequestIn(BaseModel):
+    radio: str
+    modes: list[Mode]
+    channels: list[int]
+    powers: list[int] = []
+    advance: Advance = "timer"
+    dwell_s: int = 60
+    station: str | None = None
+    rejoin_limit_s: int = 120
+
+    def to_domain(self) -> StepRequest:
+        return StepRequest(
+            radio=self.radio,
+            modes=tuple(self.modes),
+            channels=tuple(self.channels),
+            powers=tuple(self.powers),
+            advance=self.advance,
+            dwell_s=self.dwell_s,
+            station=self.station,
+            rejoin_limit_s=self.rejoin_limit_s,
+        )
+
+
+class StepStartIn(StepRequestIn):
+    digest: str  # the preview's: the whole run is what was shown
+
+
+class StepPlanOut(BaseModel):
+    steps: list[Step]
+    step_lines: list[list[str]]
+    restore_lines: list[str]
+    warnings: list[str]
+    estimate_s: int
+    digest: str
+
+    @classmethod
+    def of(cls, plan: StepPlan) -> StepPlanOut:
+        return cls(
+            steps=list(plan.steps),
+            step_lines=[list(lines) for lines in plan.step_lines],
+            restore_lines=list(plan.restore_lines),
+            warnings=list(plan.warnings),
+            estimate_s=plan.estimate_s,
+            digest=plan.digest,
+        )
+
+
+class RadioIn(BaseModel):
+    radio: str
+
+
+@router.get("/step-through")
+async def step_job(router_id: str, ctx: Ctx) -> StepJob | None:
+    return ctx.steps.job(_known(ctx, router_id))
+
+
+@router.post("/step-through/preview")
+async def step_preview(router_id: str, body: StepRequestIn, ctx: Ctx) -> StepPlanOut:
+    return StepPlanOut.of(await ctx.steps.preview(_known(ctx, router_id), body.to_domain()))
+
+
+@router.post("/step-through/start", status_code=202)
+async def step_start(router_id: str, body: StepStartIn, ctx: Ctx) -> StepJob:
+    return await ctx.steps.start(_known(ctx, router_id), body.to_domain(), body.digest)
+
+
+@router.post("/step-through/next")
+async def step_next(router_id: str, ctx: Ctx) -> StepJob:
+    return ctx.steps.next(_known(ctx, router_id))
+
+
+@router.post("/step-through/stop")
+async def step_stop(router_id: str, ctx: Ctx) -> StepJob:
+    return await ctx.steps.stop(_known(ctx, router_id))
+
+
+@router.post("/step-through/restore")
+async def step_restore(router_id: str, body: RadioIn, ctx: Ctx) -> ApplyResult:
+    return await ctx.steps.restore(_known(ctx, router_id), body.radio)
+
+
+steps_router = APIRouter(prefix="/api/step-through", dependencies=[Depends(require_token)], tags=["wifi"])
+
+
+@steps_router.get("/pending")
+async def step_pending(ctx: Ctx) -> list[PendingRestore]:
+    """Step-throughs the app ended before they restored their radio (plan D6): Needs attention."""
+    return ctx.steps.pending()

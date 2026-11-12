@@ -54,6 +54,7 @@ from openwrtgui.update.versions import parse_version
 from openwrtgui.version import APP_VERSION
 from openwrtgui.wifi.monitor import MonitorLeases
 from openwrtgui.wifi.service import WifiService
+from openwrtgui.wifi.step_service import StepService
 
 
 @dataclass
@@ -73,6 +74,7 @@ class AppContext:
     wifi: WifiService
     rf: RfHub
     scans: ScanService
+    steps: StepService
     luci: LuciBridgeService
     net: NetworkService
     ports: PortsService
@@ -313,6 +315,24 @@ def build_context(
         host_keys=host_keys,
         app_keys=access.app_fingerprints,
     )
+
+    def flashing(router_id: str) -> str | None:
+        rec = routers.get(router_id)
+        return f"A flash runs on {rec.name if rec else router_id}" if flash.running(router_id) else None
+
+    # one radio action at a time per router (v0.7 plan D8): the step-through and the jobs check each other
+    steps = StepService(
+        wifi=wifi,
+        pool=pool,
+        routers=routers,
+        guard=guard,
+        statuses=statuses,
+        steps_dir=data.steps_dir,
+        documents=data.root / "documents" if simulator is not None else documents_dir(),
+        busy=(system.busy, flashing),
+    )
+    system.extra_busy = steps.busy
+    flash.extra_busy = steps.busy
     return AppContext(
         data=data,
         settings=settings,
@@ -336,7 +356,8 @@ def build_context(
             audit=audit,
             monitors=monitors,
         ),
-        scans=ScanService(pool=pool, routers=routers, guard=guard, audit=audit, wifi=wifi),
+        scans=ScanService(pool=pool, routers=routers, guard=guard, audit=audit, wifi=wifi, busy=steps.busy),
+        steps=steps,
         luci=luci,
         net=net,
         ports=ports,

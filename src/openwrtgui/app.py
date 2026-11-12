@@ -77,6 +77,8 @@ def create_app(ctx: AppContext) -> FastAPI:
             for task in tasks:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
+            with contextlib.suppress(Exception):  # a step-through restores its radio (v0.7 D6), 60 s at most
+                await ctx.steps.stop_all(limit_s=60)
             with contextlib.suppress(Exception):  # frame analysis removes its monitor before the pool closes
                 await ctx.rf.stop_frames()
             ctx.rf.close_all()
@@ -111,6 +113,7 @@ def create_app(ctx: AppContext) -> FastAPI:
     for module in modules:
         app.include_router(module.router)
     app.include_router(discovery_api.tools)
+    app.include_router(wifi_api.steps_router)
     app.include_router(misc_api.public)
     app.include_router(ws_api.router)
     if ctx.web_dir is not None and ctx.web_dir.is_dir():
