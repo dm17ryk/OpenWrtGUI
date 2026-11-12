@@ -32,6 +32,7 @@ from openwrtgui.wifi.compile import (
     tx_mask_args,
 )
 from openwrtgui.wifi.model import CCK_BASIC_KBPS, OFDM_BASIC_KBPS, ModeSelection, RadioRequest
+from openwrtgui.wifi.monitor import MONITOR
 from openwrtgui.wifi.options import OptionEdit, OptionRow, compile_edits, option_rows
 from openwrtgui.wifi.parse import IwDevInfo, parse_beacon_rates, parse_iw_dev, parse_iw_dev_info
 from openwrtgui.wifi.state import RadioState, WifiState, modes_from_uci, read_uci, read_wifi, ssid_sections
@@ -40,7 +41,6 @@ from openwrtgui.wifi.stations import Station, del_client_command, read_stations
 SCREEN = "Wi-Fi"
 _AUDIT_SCREEN: contextvars.ContextVar[str] = contextvars.ContextVar("wifi_audit_screen", default=SCREEN)
 NOTHING = "Nothing to apply: the router already has these settings."
-MONITOR = "owgmon0"
 SCRIPT_TIMEOUT_S = 60.0
 BLOCK_MIN_S, BLOCK_MAX_S = 10, 3600
 CheckName = Literal["radio", "channel", "width", "TX power", "TX mask", "beacon rate"]

@@ -25,9 +25,9 @@ from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import ByteStream, Transport, TransportError, ubus_call
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.uci import shell_quote
+from openwrtgui.wifi.monitor import MONITOR
 
 SCREEN = "Faults"
-MONITOR = "owgmon0"
 MAX_BYTES = 500 * 1024 * 1024
 _FILTER = re.compile(r"[A-Za-z0-9 .:/()!&|<>=\[\]-]{0,200}")
 FILTER_TEXT = "A filter uses letters, digits, spaces and . : / ( ) ! & | < > = [ ] -"
