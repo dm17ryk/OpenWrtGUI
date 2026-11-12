@@ -59,6 +59,34 @@ class SimWifi:
         self._acl: dict[tuple[str, str], list[str]] = {}
         self._disabled: set[str] = set()  # BSSes stopped with `hostapd_cli disable` (AP down)
 
+    # ---------------------------------------------------------------- what SimAir reads (v0.7)
+    @property
+    def phy(self) -> str:
+        return self._phy
+
+    @property
+    def bssid(self) -> str:
+        return self._bssid
+
+    @property
+    def monitor(self) -> bool:
+        return self._monitor
+
+    @property
+    def tick(self) -> int:
+        return self._tick
+
+    def on_air(self) -> tuple[str, int, str, str] | None:
+        """(radio, channel, AP interface, SSID) of the first radio on air; None while all are parked."""
+        for radio in self._radios():
+            ifaces = self._ifaces(radio)
+            if self._up[radio] and ifaces:
+                return radio, self._channel(radio), ifaces[0][0], self._opt(ifaces[0][1], "ssid", "") or ""
+        return None
+
+    def station_rates(self, radio: str) -> tuple[str, str]:
+        return self._station_rates(radio)
+
     # ---------------------------------------------------------------- uci state
     def _radios(self) -> list[str]:
         return [
@@ -245,6 +273,7 @@ class SimWifi:
             self._acl.pop((ifname, "accept_acl"), None)
         if action == "down":
             self._up[radio] = False
+            self._monitor = False  # a reload removes every interface on the phy (v0.7 plan D11)
         else:
             self._up[radio] = self._opt(radio, "disabled") != "1"
             if self._up[radio]:

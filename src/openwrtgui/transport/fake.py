@@ -13,6 +13,7 @@ from openwrtgui.transport.base import UPLOAD_CHUNK, CommandResult, ShellChannel,
 
 if TYPE_CHECKING:
     from openwrtgui.simaccess import SimAccess
+    from openwrtgui.simair import SimAir
     from openwrtgui.simfw import SimFirewall
     from openwrtgui.simimage import SimImage
     from openwrtgui.simmodem import SimModem
@@ -39,6 +40,13 @@ class SimState:
     system: SimSystem | None = None
     access: SimAccess | None = None  # v0.6c: dropbear, uhttpd, keys, LEDs, restore, reset
     generation_seen: int = 0  # the image's flash generation whose reset (keys, password) was applied
+    air: SimAir | None = None  # v0.7: scans, every channel's survey, frame windows (made with the Wi-Fi)
+
+    def __post_init__(self) -> None:
+        if self.wifi is not None and self.air is None:
+            from openwrtgui.simair import SimAir
+
+            self.air = SimAir(self.wifi)
 
 
 def load_commands(path: Path) -> dict[str, CommandResult]:
@@ -177,6 +185,9 @@ class ReplayTransport:
         if self.state.system is not None and (answered := self.state.system.answer(command)) is not None:
             return answered
         if self.state.net is not None and (answered := self.state.net.answer(command)) is not None:
+            return answered
+        # the air (v0.7) before the Wi-Fi: scans, every channel's survey, frame windows
+        if self.state.air is not None and (answered := self.state.air.answer(command)) is not None:
             return answered
         if self.state.wifi is not None and (answered := self.state.wifi.answer(command)) is not None:
             return answered
