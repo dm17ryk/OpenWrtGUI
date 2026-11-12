@@ -204,19 +204,21 @@ export function SettingsScreen() {
       setHidden(false)
     })
 
-  const install = (version: string): Promise<void> =>
-    act(async () => {
-      try {
-        await postJson('/api/update/install', { version })
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 409 && window.confirm(updateQuestion(err.body))) {
-          await postJson('/api/update/install', { version, force: true })
-        } else {
-          throw err
-        }
+  /** An update or going back: on a 409 the app asks what it would stop, then sends it again with force. */
+  const askingFirst = async (path: string, body: Record<string, unknown>): Promise<void> => {
+    try {
+      await postJson(path, Object.keys(body).length ? body : undefined)
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409 && window.confirm(updateQuestion(err.body))) {
+        await postJson(path, { ...body, force: true })
+      } else {
+        throw err
       }
-      setMessage('Installing: OpenWrtGUI closes now and starts again when the update is done.')
-    })
+    }
+    setMessage('Installing: OpenWrtGUI closes now and starts again when the update is done.')
+  }
+  const install = (version: string): Promise<void> => act(() => askingFirst('/api/update/install', { version }))
+  const reinstallPrevious = (): Promise<void> => act(() => askingFirst('/api/update/reinstall-previous', {}))
 
   const u = update.data
   const p = progress.data
@@ -298,7 +300,7 @@ export function SettingsScreen() {
             <>
               {' '}
               <HelpTip topic={HELP.reinstallPrevious}>
-                <button className="btn" type="button" onClick={() => void act(async () => { await postJson('/api/update/reinstall-previous') })}>
+                <button className="btn" type="button" onClick={() => void reinstallPrevious()}>
                   Reinstall previous version
                 </button>
               </HelpTip>

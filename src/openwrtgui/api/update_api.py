@@ -25,6 +25,10 @@ class InstallIn(VersionIn):
     force: bool = False
 
 
+class ReinstallIn(BaseModel):
+    force: bool = False
+
+
 def _out(ctx: AppContext) -> UpdateOut:
     return UpdateOut.of(ctx.updater.status(), ctx.updater.previous_installer() is not None)
 
@@ -66,15 +70,22 @@ async def _stop_live(ctx: AppContext) -> None:
     await ctx.rf.stop_frames()
 
 
-@router.post("/install", status_code=202)
-async def install(body: InstallIn, ctx: Ctx) -> JSONResponse:
+def _ask_first(ctx: AppContext, force: bool) -> JSONResponse | None:
+    """The 409 that asks before live work or terminals are stopped; None when there is nothing to ask."""
     live = _live(ctx)
-    if (ctx.terminals or live) and not body.force:
+    if (ctx.terminals or live) and not force:
         detail = "Live work is running" if live else "Terminal sessions are open"
         return JSONResponse(
             status_code=409,
             content={"detail": detail, "open_terminals": len(ctx.terminals), "live": live},
         )
+    return None
+
+
+@router.post("/install", status_code=202)
+async def install(body: InstallIn, ctx: Ctx) -> JSONResponse:
+    if (asked := _ask_first(ctx, body.force)) is not None:
+        return asked
     # downloaded and verified first: nothing is stopped when that fails
     command = await ctx.updater.install(body.version)
     await _stop_live(ctx)
@@ -83,9 +94,13 @@ async def install(body: InstallIn, ctx: Ctx) -> JSONResponse:
 
 
 @router.post("/reinstall-previous", status_code=202)
-async def reinstall_previous(ctx: Ctx) -> JSONResponse:
+async def reinstall_previous(ctx: Ctx, body: ReinstallIn | None = None) -> JSONResponse:
+    """The same question and the same stop as an update (PR #59 review)."""
     command = ctx.updater.reinstall_command()
     if command is None:
         raise HTTPException(status_code=404, detail="No previous installer is kept")
+    if (asked := _ask_first(ctx, body is not None and body.force)) is not None:
+        return asked
+    await _stop_live(ctx)
     await _close_terminals_and_quit(ctx, command)
     return JSONResponse(status_code=202, content={"status": "installing"})

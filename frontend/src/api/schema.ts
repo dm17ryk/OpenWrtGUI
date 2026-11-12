@@ -3112,7 +3112,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Reinstall Previous */
+        /**
+         * Reinstall Previous
+         * @description The same question and the same stop as an update (PR #59 review).
+         */
         post: operations["reinstall_previous_api_update_reinstall_previous_post"];
         delete?: never;
         options?: never;
@@ -6331,6 +6334,14 @@ export interface components {
             reason: "flash" | "reset";
             /** Revision */
             revision: string;
+        };
+        /** ReinstallIn */
+        ReinstallIn: {
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
         };
         /** ReleaseOut */
         ReleaseOut: {
@@ -14044,7 +14055,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ReinstallIn"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             202: {
@@ -14053,6 +14068,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -36,7 +36,8 @@ While an update is waiting, an **Update available** pill in the top bar links to
 ## Going back
 
 The previous installer is kept in the data folder. **Reinstall previous version** (in Settings, once
-there is one) installs it again.
+there is one) installs it again. Like an update, it first asks before it stops a step-through (its radio
+restored first), a capture or frame analysis.
 
 ## Running a development build
 

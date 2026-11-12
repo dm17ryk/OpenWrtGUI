@@ -90,6 +90,18 @@ test('asks before stopping live operations', async () => {
   asked.mockRestore()
 })
 
+test('reinstalling the previous version asks the same question', async () => {
+  const user = userEvent.setup()
+  const busy = { detail: 'Live work is running', open_terminals: 0, live: ['Capture on AP2 mon0'] }
+  vi.mocked(postJson).mockRejectedValueOnce(new ApiError(409, busy.detail, busy))
+  const asked = vi.spyOn(window, 'confirm').mockReturnValue(true)
+  renderSettings({ ...UPDATE, has_previous: true })
+  await user.click(within(screen.getByRole('region', { name: 'Updates' })).getByRole('button', { name: 'Reinstall previous version' }))
+  expect(asked).toHaveBeenCalledWith('Stop the capture on AP2 mon0, then update?')
+  expect(vi.mocked(postJson)).toHaveBeenLastCalledWith('/api/update/reinstall-previous', { force: true })
+  asked.mockRestore()
+})
+
 test('theme change PUTs settings', async () => {
   renderSettings()
   const group = screen.getByRole('group', { name: 'Theme' })
