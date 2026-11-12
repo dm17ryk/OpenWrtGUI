@@ -146,6 +146,27 @@ def test_trim_frames_drops_payload_lines_and_keeps_tcpdump_status() -> None:
     assert summarize(out, stderr, set(), 3.0) == summarize(stdout, stderr, set(), 3.0)
 
 
+def test_bad_fcs_addresses_are_replaced_even_with_the_group_bit() -> None:
+    """HW-1 by eye: a corrupted frame's addresses can carry the group bit and still be a bit away from a real
+    station's MAC. In a bad-FCS line only broadcast, the router's own and placeholders stay."""
+    bad = (
+        "07:24:36.264260 bad-fcs 1.0 Mb/s 2437 MHz 11b -58dBm signal antenna 1 0us BSSID:0b:ad:fc:5c:00:01 "
+        "DA:ff:ff:0b:ad:fc:02 SA:0b:ad:fc:5c:00:01 Beacon ()\n"
+    )
+    good = (
+        "07:24:36.300000 1.0 Mb/s 2437 MHz 11b -60dBm signal antenna 1 0us BSSID:3c:84:6a:11:22:33 "
+        "DA:01:00:5e:00:00:fb SA:3c:84:6a:11:22:33 Data\n"
+    )
+    names: dict[str, str] = {}
+    clean = rf.sanitize_air(bad + good, {OWN}, set(), names)
+    assert "0b:ad:fc:5c:00:01" not in clean and "ff:ff:0b:ad:fc:02" not in clean
+    assert "SA:02:00:00:00:00:01 Beacon" in clean
+    assert "DA:01:00:5e:00:00:fb" in clean  # a real multicast group in a good frame stays
+    assert rf.sanitize_air(f"x bad-fcs DA:ff:ff:ff:ff:ff:ff SA:{OWN} Beacon ()\n", {OWN}, set(), {}).endswith(
+        f"DA:ff:ff:ff:ff:ff:ff SA:{OWN} Beacon ()\n"
+    )
+
+
 def test_trim_air_is_idempotent() -> None:
     """The contract test checks a recording by trimming it again: a trimmed text must not change."""
     once = rf.trim_air("iw dev owgscan0 scan passive", SCAN_FULL)

@@ -85,10 +85,13 @@ def _air_leaks(recorded: dict[str, dict[str, object]]) -> list[tuple[str, str]]:
     for (cmd, field), text in outputs.items():
         if trim(cmd, text) != text:
             leaks.append((cmd, f"{field} not trimmed"))
-        for mac in _MAC.findall(text):
-            low = mac.lower()
-            if not (low in own_macs or low.startswith("02:00:00:00:") or int(low[:2], 16) & 1):
-                leaks.append((cmd, mac))
+        for line in text.splitlines():
+            corrupted = "bad-fcs" in line  # its addresses are not multicast groups, only broadcast is
+            for mac in _MAC.findall(line):
+                low = mac.lower()
+                group = low == "ff:ff:ff:ff:ff:ff" if corrupted else int(low[:2], 16) & 1
+                if not (low in own_macs or low.startswith("02:00:00:00:") or group):
+                    leaks.append((cmd, mac))
         for m in _NEIGHBOUR_SSID.finditer(text):
             ssid = (m.group(1) or m.group(2) or "").strip()
             if ssid and ssid not in own_ssids and not re.fullmatch(r"net-\d{2,}", ssid):
@@ -106,6 +109,8 @@ def test_air_leak_check_catches_what_the_sanitizer_must_cut() -> None:
                 "SA:02:00:00:00:00:01 BSSID:ff:ff:ff:ff:ff:ff Probe Request (Johns-Phone-Hotspot)\n"
                 "10:00:01.000200 1.0 Mb/s 2437 MHz 11b -70dBm signal BSSID:02:00:00:00:00:02 "
                 "SA:02:00:00:00:00:01 DA:02:00:00:00:00:02 Data IV:1 IP 192.168.7.50 > 224.0.0.251\n"
+                "10:00:01.000300 bad-fcs 1.0 Mb/s 2437 MHz 11b -88dBm signal BSSID:0b:ad:fc:5c:00:01 "
+                "DA:ff:ff:ff:ff:ff:ff SA:0b:ad:fc:5c:00:01 Beacon ()\n"
             ),
             "stderr": "",
         },
@@ -116,6 +121,7 @@ def test_air_leak_check_catches_what_the_sanitizer_must_cut() -> None:
     }
     found = {leak for _, leak in _air_leaks(leaky)}
     assert "Johns-Phone-Hotspot" in found
+    assert "0b:ad:fc:5c:00:01" in found  # a corrupted frame's group-bit address is not a multicast group
     assert "stdout not trimmed" in found
     assert len([c for c, leak in _air_leaks(leaky) if leak == "stdout not trimmed"]) == 2
 

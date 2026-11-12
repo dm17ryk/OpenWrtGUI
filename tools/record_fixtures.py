@@ -200,6 +200,7 @@ _FRAME_SSID = re.compile(
     r"\b(Beacon|Probe Response|Probe Request|Assoc Request|ReAssoc Request) \((.*?)\)(?= \[|$)", re.M
 )
 _PLACEHOLDER_MAC = "02:00:00:00:"
+_BROADCAST = "ff:ff:ff:ff:ff:ff"
 _PLACEHOLDER_SSID = re.compile(r"net-\d{2,}")
 _IW_ESCAPE = re.compile(r"\\x([0-9a-fA-F]{2})")
 
@@ -300,9 +301,12 @@ def sanitize_air(
     every SSID that is not the router's own becomes `net-NN`. `names` keeps the mapping across one file."""
     own = {m.lower() for m in own_macs}
 
-    def mac(m: re.Match[str]) -> str:
+    def mac(m: re.Match[str], *, corrupted: bool = False) -> str:
+        """A group address stays (broadcast, multicast), except in a bad-FCS frame: its addresses are
+        corrupted and may be a bit away from a real station's MAC, so only broadcast stays there."""
         value = m.group(0).lower()
-        if value in own or value.startswith(_PLACEHOLDER_MAC) or int(value[:2], 16) & 1:
+        group = value == _BROADCAST if corrupted else int(value[:2], 16) & 1
+        if value in own or value.startswith(_PLACEHOLDER_MAC) or group:
             return m.group(0)
         return _placeholder("mac", value, names)
 
@@ -314,7 +318,10 @@ def sanitize_air(
 
     text = _SSID_LINE.sub(lambda m: m.group(1) + ssid(m.group(2)), text)
     text = _FRAME_SSID.sub(lambda m: f"{m.group(1)} ({ssid(m.group(2))})", text)
-    return _MAC.sub(mac, text)
+    return "".join(
+        _MAC.sub(lambda m, bad="bad-fcs" in line: mac(m, corrupted=bad), line)
+        for line in text.splitlines(keepends=True)
+    )
 
 
 async def wifi_on_commands(t: Runner) -> tuple[str, ...]:
