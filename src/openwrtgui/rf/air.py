@@ -33,6 +33,7 @@ def scan_add(phy: str) -> str:
 
 
 SCAN_DEL = f"iw dev {SCAN_IF} del"
+SCAN_INFO = f"iw dev {SCAN_IF} info"  # whether the temporary interface is still there
 
 
 def scan_command(ifname: str, *, on_ap: bool) -> str:

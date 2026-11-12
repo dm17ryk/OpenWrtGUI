@@ -15,6 +15,7 @@ from openwrtgui.rf.air import FRAME_WINDOW, MONITOR_FLAGS
 from openwrtgui.rf.frames_service import FrameAnalyzer, FrameState
 from openwrtgui.simair import SimAir
 from openwrtgui.simulator import SIM_GUARD_ENV
+from openwrtgui.simwifi import SimWifi
 from openwrtgui.transport.base import CommandResult, TransportError
 from openwrtgui.transport.fake import ReplayTransport
 from openwrtgui.wifi.model import ChannelSelection, RadioRequest
@@ -250,6 +251,26 @@ async def test_a_second_stop_lets_the_first_finish(ctx: AppContext) -> None:
     await asyncio.gather(first, second)
     assert ctx.wifi.monitors.holders("ap1") == ()
     assert _audit(ctx)[-1] == DEL and not a.state().running
+
+
+async def test_frames_that_cannot_remove_the_monitor_say_so(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PR #59 review: a refused `iw dev owgmon0 del` is tried again, and a monitor left behind is reported."""
+    original = SimWifi._one
+
+    def refuse_del(self: SimWifi, p: str) -> CommandResult | None:
+        if p == DEL:
+            return CommandResult(p, "", "command failed: Device or resource busy (-16)\n", 240)
+        return original(self, p)
+
+    a = _analyzer(ctx, "ap1", [])
+    await _start(a)
+    await _until(lambda: a.state().windows >= 1)
+    monkeypatch.setattr(SimWifi, "_one", refuse_del)
+    state = await a.stop()
+    assert state.error is not None and "owgmon0 is still on AP1" in state.error, state.error
+    assert _audit(ctx).count(DEL) == 2
 
 
 async def test_frames_routes(authed: httpx.AsyncClient) -> None:

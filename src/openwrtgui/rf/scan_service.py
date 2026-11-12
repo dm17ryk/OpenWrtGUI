@@ -7,7 +7,6 @@ managed interface that is removed again, also when the scan fails.
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import time
 from collections.abc import Callable
@@ -23,6 +22,7 @@ from openwrtgui.rf.air import (
     RADIO,
     SCAN_DEL,
     SCAN_IF,
+    SCAN_INFO,
     SCAN_TIMEOUT_S,
     checked_ifname,
     scan_add,
@@ -203,6 +203,16 @@ class ScanService:
         return result
 
     async def _cleanup(self, t: Transport, rec: RouterRecord) -> None:
-        """Remove the temporary interface: allowed during a run, it only undoes what the scan made."""
-        with contextlib.suppress(TransportError):
-            await self._run(t, rec, SCAN_DEL, source="app", require_guard=False)
+        """Remove the temporary interface: allowed during a run, it only undoes what the scan made. A refused
+        removal is checked (already gone counts as removed) and tried once more; ValueError when the
+        interface is still there, so a scan never reports success with it left on the radio."""
+        why = ""
+        for _ in range(2):
+            try:
+                done = await self._run(t, rec, SCAN_DEL, source="app", require_guard=False)
+                if done.ok or not (await t.run(SCAN_INFO)).ok:
+                    return
+                why = _reason(done)
+            except TransportError as exc:
+                why = str(exc)
+        raise ValueError(f"{SCAN_IF} is still on {rec.name}: {why}. Remove it with `{SCAN_DEL}`.")

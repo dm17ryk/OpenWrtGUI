@@ -185,12 +185,20 @@ class CaptureService:
             except ValueError as exc:
                 raise ValueError(f"Could not create mon0 on {rec.name}: {exc}") from None
 
-    async def _monitor_gone(self, rec: RouterRecord, t: Transport, capture_id: str) -> None:
+    async def _monitor_gone(self, rec: RouterRecord, t: Transport, capture_id: str) -> str | None:
         """Let go of the monitor interface; the last holder removes it, allowed during a run, as it only
-        undoes what the app made."""
-        with contextlib.suppress(TransportError):
+        undoes what the app made. What to tell the user when it is still on the radio, else None."""
+        try:
             async with self._pool.write_lock(rec.id):
-                await self._monitors.release(rec.id, f"capture {capture_id}", self._run_fn(rec, t))
+                removed = await self._monitors.release(
+                    rec.id, f"capture {capture_id}", self._run_fn(rec, t), t
+                )
+        except TransportError as exc:
+            return f"{MONITOR} may still be on {rec.name}: {exc}"
+        if removed is not None and not removed.ok:
+            reason = (removed.stderr or removed.stdout).strip() or f"exit {removed.exit_status}"
+            return f"{MONITOR} is still on {rec.name}: {reason}"
+        return None
 
     async def start(self, router_id: str, req: CaptureRequest) -> CaptureView:
         rec = self._record(router_id)
@@ -299,8 +307,8 @@ class CaptureService:
                 exit_status=stream.exit_status,
                 source="app",
             )
-            if mon0:
-                await self._monitor_gone(rec, t, capture_id)
+            if mon0 and (left := await self._monitor_gone(rec, t, capture_id)) is not None:
+                error = f"{error}; {left}" if error else left
             self._views[capture_id] = replace(
                 self._views[capture_id], bytes=total, running=False, error=error
             )

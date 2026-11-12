@@ -120,6 +120,10 @@ class SimAir:
                 return _ok("", NO_DEVICE, 237)
             self._scan_if = False
             return _ok()
+        if p == f"iw dev {SCAN_IF} info":
+            if not self._scan_if:
+                return _ok("", NO_DEVICE, 237)
+            return _ok(f"Interface {SCAN_IF}\n\tifindex 10\n\ttype managed\n\twiphy {phy[3:]}\n")
         if m := re.fullmatch(r"iw dev (\S+) scan( ap-force)? passive", p):
             return self._scan(m.group(1), ap_force=m.group(2) is not None)
         if m := re.fullmatch(r"iw dev (\S+) survey dump", p):

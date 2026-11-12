@@ -33,7 +33,7 @@ from openwrtgui.rf.frames import FrameWindow, combine, summarize
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import CommandResult, Transport, TransportError, ubus_call
 from openwrtgui.transport.pool import ConnectionPool
-from openwrtgui.wifi.monitor import DEL, MonitorLeases, add_command
+from openwrtgui.wifi.monitor import DEL, MONITOR, MonitorLeases, add_command
 from openwrtgui.wifi.parse import parse_iw_dev
 from openwrtgui.wifi.service import PreviewChanged
 
@@ -177,7 +177,7 @@ class FrameAnalyzer:
                 fcs = (await run(MONITOR_FLAGS, True)).ok
             except BaseException:  # the router dropped or a run started: let go of the monitor again
                 with contextlib.suppress(TransportError):
-                    await self._monitors.release(rec.id, self._holder, run)
+                    await self._monitors.release(rec.id, self._holder, run, t)
                 raise
             self._flags_at = self._monitors.generation(rec.id)
         self._stopping = False
@@ -275,11 +275,20 @@ class FrameAnalyzer:
     async def _finish(
         self, rec: RouterRecord, t: Transport, run: Callable[[str, bool], Awaitable[Any]]
     ) -> None:
-        """Let go of the monitor (the last holder removes it, also during a run) and say it stopped."""
+        """Let go of the monitor (the last holder removes it, also during a run) and say it stopped, and say
+        so when the monitor is still on the radio."""
+        left: str | None = None
         try:
-            with contextlib.suppress(TransportError):
-                async with self._pool.write_lock(rec.id):
-                    await self._monitors.release(rec.id, self._holder, run)
+            async with self._pool.write_lock(rec.id):
+                removed = await self._monitors.release(rec.id, self._holder, run, t)
+            if removed is not None and not removed.ok:
+                reason = (removed.stderr or removed.stdout).strip() or f"exit {removed.exit_status}"
+                left = f"{MONITOR} is still on {rec.name}: {reason}"
+        except TransportError as exc:
+            left = f"{MONITOR} may still be on {rec.name}: {exc}"
         finally:
+            if left is not None:
+                error = self._state.error
+                self._state = replace(self._state, error=f"{error}; {left}" if error else left)
             self._state = replace(self._state, running=False)
             self._publish({"type": "frames", "state": self._state})

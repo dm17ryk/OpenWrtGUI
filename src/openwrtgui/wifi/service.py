@@ -671,7 +671,7 @@ class WifiService:
         try:
             heard = (await self._run(t, rec, capture, source="app", timeout=15.0)).stdout
         finally:
-            removed = await self._monitors.release(rec.id, holder, run)
+            removed = await self._monitors.release(rec.id, holder, run, t)
         if removed is not None and not removed.ok:
             return Check("beacon rate", False, f"{MONITOR} is still on the radio: {removed.stderr.strip()}")
         rates = parse_beacon_rates(heard)

@@ -10,7 +10,8 @@ from fwenv import FwEnv
 
 from openwrtgui.capture.service import CaptureRequest, CaptureService, capture_command
 from openwrtgui.capture.wireshark import find_wireshark
-from openwrtgui.transport.base import TransportError
+from openwrtgui.simwifi import SimWifi
+from openwrtgui.transport.base import CommandResult, TransportError
 from openwrtgui.transport.fake import BytesStream, ReplayTransport
 from openwrtgui.wifi.model import ChannelSelection, RadioRequest
 
@@ -177,6 +178,33 @@ async def test_mon0_capture_that_loses_its_monitor_says_so(
         "mon0 went away (a Wi-Fi reload removes the monitor interface): the capture ended early. "
         "tcpdump: pcap_loop: The interface disappeared"
     )
+
+
+async def test_a_mon0_capture_that_cannot_remove_its_monitor_says_so(
+    env: FwEnv, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PR #59 review: a refused `iw dev owgmon0 del` is tried again, and a monitor left behind is reported."""
+    held = _HeldStream()
+
+    async def stream(self: ReplayTransport, command: str) -> _HeldStream:
+        return held
+
+    original = SimWifi._one
+
+    def refuse_del(self: SimWifi, p: str) -> CommandResult | None:
+        if p == "iw dev owgmon0 del":
+            return CommandResult(p, "", "command failed: Device or resource busy (-16)\n", 240)
+        return original(self, p)
+
+    monkeypatch.setattr(ReplayTransport, "stream", stream)
+    monkeypatch.setattr(SimWifi, "_one", refuse_del)
+    service = _captures(env, tmp_path)
+    view = await service.start("ap1", CaptureRequest("mon0", "", 60))
+    held.ended.set()
+    await _done(service, view.id)
+    done = next(v for v in service.list("ap1") if v.id == view.id)
+    assert done.error is not None and "owgmon0 is still on AP1" in done.error, done.error
+    assert env.audit_lines().count("iw dev owgmon0 del") == 2
 
 
 async def test_mon0_writes_wait_for_the_router_write_lock(

@@ -79,6 +79,49 @@ async def test_refused_scan_cleans_up(
     assert _audit(ctx)[-1][0] == SCAN_DEL  # the temporary interface is gone again
 
 
+def _refuse_del(monkeypatch: pytest.MonkeyPatch, times: int) -> None:
+    """The router refuses `iw dev owgscan0 del` this many times, keeping the interface."""
+    original = SimAir._one
+    left = [times]
+
+    def one(self: SimAir, p: str) -> CommandResult | None:
+        if p == SCAN_DEL and left[0] > 0:
+            left[0] -= 1
+            return CommandResult(p, "", BUSY, 240)
+        return original(self, p)
+
+    monkeypatch.setattr(SimAir, "_one", one)
+
+
+async def test_a_refused_scan_cleanup_is_tried_again(
+    authed: httpx.AsyncClient, ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PR #59 review: a nonzero `iw dev owgscan0 del` is checked and tried once more."""
+    _refuse_del(monkeypatch, 1)
+    r = await _scan(authed, AP2)
+    assert r.status_code == 200, r.text
+    assert [c for c, _, _ in _audit(ctx)].count(SCAN_DEL) == 2
+    assert not any(i.startswith("Interface owgscan0") for i in [(await _iw_info(ctx))])
+
+
+async def test_a_scan_that_leaves_owgscan0_fails(
+    authed: httpx.AsyncClient, ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A scan never reports success with the temporary interface left on the parked radio."""
+    _refuse_del(monkeypatch, 2)
+    r = await _scan(authed, AP2)
+    assert r.status_code == 422
+    assert r.json()["detail"].startswith("owgscan0 is still on AP2"), r.json()["detail"]
+    assert "Device or resource busy" in r.json()["detail"]
+    assert [c for c, _, _ in _audit(ctx)].count(SCAN_DEL) == 2
+
+
+async def _iw_info(ctx: AppContext) -> str:
+    rec = ctx.routers.get("ap2")
+    assert rec is not None
+    return (await (await ctx.pool.get(rec)).run("iw dev owgscan0 info")).stdout
+
+
 async def test_preview_changed(authed: httpx.AsyncClient, ctx: AppContext) -> None:
     preview = (await authed.post(f"{AP2}/scan/preview")).json()
     on_air = RadioRequest(radio="radio0", modes=ModeSelection.of("n20"), channels=ChannelSelection.of(6))

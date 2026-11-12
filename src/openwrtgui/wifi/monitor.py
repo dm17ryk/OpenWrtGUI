@@ -72,9 +72,11 @@ class MonitorLeases:
                 self._added(router_id)
             self._holders.setdefault(router_id, []).append(holder)
 
-    async def release(self, router_id: str, holder: str, run: RunFn) -> CommandResult | None:
+    async def release(self, router_id: str, holder: str, run: RunFn, t: Transport) -> CommandResult | None:
         """Drop one holder; the last one removes the monitor (allowed during a run: it only undoes what the
-        app made). The removal's result, or None while other holders remain."""
+        app made). The removal's result, or None while other holders remain. A refused removal is checked
+        (gone already, say after a reload, counts as removed) and tried once more; a result that is still not
+        ok means the monitor is left on the radio, and the caller says so."""
         async with self._lock(router_id):
             held = self._holders.get(router_id, [])
             if holder in held:
@@ -82,6 +84,11 @@ class MonitorLeases:
             if held:
                 return None
             self._holders.pop(router_id, None)
+            done = await run(DEL, False)
+            if done.ok:
+                return done
+            if not (await t.run(INFO)).ok:
+                return CommandResult(DEL, "", "", 0)
             return await run(DEL, False)
 
     async def ensure(self, router_id: str, phy: str, t: Transport, run: RunFn) -> bool:
@@ -106,4 +113,4 @@ class MonitorLeases:
         try:
             yield
         finally:
-            await self.release(router_id, holder, run)
+            await self.release(router_id, holder, run, t)

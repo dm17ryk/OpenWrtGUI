@@ -225,7 +225,7 @@ async def test_owgmon0_after_a_reload(air: AirWindow) -> None:
         assert await monitors.ensure(AP2, "phy0", air.t, run) == (not survived)
         assert (await air.t.run(INFO)).ok
     finally:
-        await monitors.release(AP2, "HW-2", run)
+        await monitors.release(AP2, "HW-2", run, air.t)
     assert not (await air.t.run(INFO)).ok
 
 

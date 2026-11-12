@@ -13,10 +13,11 @@ PHY = "phy0"
 class _Router:
     """What the leases send, and whether owgmon0 exists on the 'router'."""
 
-    def __init__(self, *, add_fails: bool = False) -> None:
+    def __init__(self, *, add_fails: bool = False, del_fails: int = 0) -> None:
         self.sent: list[tuple[str, bool]] = []
         self.exists = False
         self.add_fails = add_fails
+        self.del_fails = del_fails  # how many removals the router refuses, keeping the interface
 
     async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
         assert command == INFO  # the only read the leases make on their own
@@ -31,6 +32,11 @@ class _Router:
                 return CommandResult(command, "", "command failed: Device or resource busy (-16)", 240)
             self.exists = True
         elif command == DEL:
+            if not self.exists:
+                return CommandResult(command, "", "command failed: No such device (-19)", 237)
+            if self.del_fails:
+                self.del_fails -= 1
+                return CommandResult(command, "", "command failed: Device or resource busy (-16)", 240)
             self.exists = False
         return CommandResult(command, "", "", 0)
 
@@ -72,6 +78,32 @@ async def test_failed_add_leaves_no_holder() -> None:
     router.add_fails = False
     async with leases.hold("ap2", "frames", PHY, router, router.audited):  # type: ignore[arg-type]
         assert router.exists
+
+
+async def test_a_refused_removal_is_tried_again() -> None:
+    """PR #59 review: a nonzero `iw dev owgmon0 del` is not success; it is checked and tried once more."""
+    router, leases = _Router(del_fails=1), MonitorLeases()
+    await leases.acquire("ap2", "frames", PHY, router, router.audited)  # type: ignore[arg-type]
+    removed = await leases.release("ap2", "frames", router.audited, router)  # type: ignore[arg-type]
+    assert removed is not None and removed.ok and not router.exists
+    assert [c for c, _ in router.sent].count(DEL) == 2
+
+
+async def test_a_monitor_that_stays_is_reported() -> None:
+    router, leases = _Router(del_fails=2), MonitorLeases()
+    await leases.acquire("ap2", "frames", PHY, router, router.audited)  # type: ignore[arg-type]
+    removed = await leases.release("ap2", "frames", router.audited, router)  # type: ignore[arg-type]
+    assert removed is not None and not removed.ok and "busy" in removed.stderr
+    assert router.exists and [c for c, _ in router.sent].count(DEL) == 2
+
+
+async def test_a_monitor_a_reload_removed_counts_as_removed() -> None:
+    router, leases = _Router(), MonitorLeases()
+    await leases.acquire("ap2", "frames", PHY, router, router.audited)  # type: ignore[arg-type]
+    router.exists = False  # a Wi-Fi reload took it first
+    removed = await leases.release("ap2", "frames", router.audited, router)  # type: ignore[arg-type]
+    assert removed is not None and removed.ok
+    assert [c for c, _ in router.sent].count(DEL) == 1
 
 
 def test_add_command_matches_todays() -> None:
