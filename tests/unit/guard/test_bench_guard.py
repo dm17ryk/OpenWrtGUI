@@ -6,6 +6,7 @@ import psutil
 import pytest
 
 from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked, ProcessInfo, scan_processes
+from openwrtgui.store import settings
 from openwrtgui.store.settings import GuardWatchList
 
 STARTED = datetime(2026, 11, 3, 21, 4)
@@ -119,8 +120,28 @@ def test_update_watch_takes_effect() -> None:
     assert g.check_local().live
 
 
+@pytest.fixture(params=["absent", "present"])
+def default_lock_file(
+    request: pytest.FixtureRequest, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Path:
+    """The default lock-file list, pointed at tmp_path instead of this PC's paths.
+
+    "present" is the bench PC on 2026-11-12 20:27: txctl's night run held voip.lock.own, and Bench Guard named
+    that lock first. A process test must give the same answer either way.
+    """
+    lock = tmp_path / "voip.lock"
+    if request.param == "present":
+        lock.write_text("18244", encoding="utf-8")
+    monkeypatch.setattr(settings, "DEFAULT_LOCK_FILES", (str(lock),))
+    assert GuardWatchList().lock_files == [str(lock)]  # the default list really is the test's now
+    return lock
+
+
+@pytest.mark.usefixtures("default_lock_file")
 def test_the_mem04_soak_is_a_run_by_default() -> None:
     """The C8000 memory soak (mem04_bench.py, calls over AP1) keeps every router read-only (2026-11-11)."""
-    soak = ProcessInfo(13664, ("python.exe", "-I", "D:\ab\mem04\mem04_bench.py", "soak"), STARTED)
-    state = BenchGuard(GuardWatchList(), lister=lambda: [soak]).check_local()
-    assert state.live and state.reasons[0].text == "mem04_bench.py started 21:04 (PID 13664)"
+    soak = ProcessInfo(13664, ("python.exe", "-I", r"D:\ab\mem04\mem04_bench.py", "soak"), STARTED)
+    defaults = GuardWatchList(lock_files=[])  # the default process list; lock files only from the test (none)
+    state = BenchGuard(defaults, lister=lambda: [soak]).check_local()
+    assert state.live
+    assert [r.text for r in state.reasons] == ["mem04_bench.py started 21:04 (PID 13664)"]
