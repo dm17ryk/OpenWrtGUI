@@ -235,6 +235,34 @@ async def test_rejoin_time_counts_from_the_reload(env: WifiEnv, tmp_path: Path) 
     assert result.rejoined is True and result.rejoin_s == 14.0
 
 
+async def test_rejoin_seen_on_any_ssid_of_the_radio(env: WifiEnv, tmp_path: Path) -> None:
+    """PR #59 review: on a radio with two SSIDs the station may re-join the second one; every AP interface
+    of the radio is read, not only the first."""
+    sim = await env.sim("ap2")
+    for line in (
+        "uci set wireless.owg2=wifi-iface",
+        "uci set wireless.owg2.device=radio0",
+        "uci set wireless.owg2.mode=ap",
+        "uci set wireless.owg2.network=lan",
+        "uci set wireless.owg2.ssid=OwgSecond",
+        "uci commit wireless",
+    ):
+        assert (await sim.run(line)).ok, line
+
+    def first_is_empty(command: str, n: int) -> CommandResult | None:
+        if "get_clients" in command and "hostapd.phy0-ap0 " in command:
+            return CommandResult(command, '{"freq": 2412, "clients": {}}', "", 0)
+        return None
+
+    env.wrap.append(lambda t: _Scripted(t, first_is_empty))  # type: ignore[arg-type,return-value]
+    steps = _service(env, tmp_path, _Clock())
+    req = StepRequest("radio0", ("g",), (1,), advance="rejoin", station="F4:12:FA:F3:57:68", dwell_s=10)
+    await _run(steps, "ap2", req)
+    await _until(lambda: _job(steps).phase in DONE)
+    [result] = _job(steps).results
+    assert result.rejoined is True, _job(steps)
+
+
 async def test_rejoin_limit_records_not_rejoined_and_goes_on(env: WifiEnv, tmp_path: Path) -> None:
     def never(command: str, n: int) -> CommandResult | None:
         if "get_clients" in command:

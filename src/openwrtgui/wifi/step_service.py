@@ -28,7 +28,7 @@ from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked
 from openwrtgui.probe.status import RouterStatus, ssids_on_air
 from openwrtgui.rf.air import checked_ifname, get_clients
 from openwrtgui.store.routers import RouterRecord, RouterStore
-from openwrtgui.transport.base import TransportError, ubus_call
+from openwrtgui.transport.base import Transport, TransportError, ubus_call
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.wifi.model import Mode
 from openwrtgui.wifi.service import NOTHING, ApplyResult, Check, PreviewChanged, WifiService
@@ -485,12 +485,19 @@ class StepService:
             await self._sleep(self._tick_s)
             waited += self._tick_s
 
-    async def _ap_ifname(self, rec: RouterRecord, radio: str) -> str | None:
+    async def _ap_ifnames(self, rec: RouterRecord, radio: str) -> list[str]:
+        """Every AP interface of the radio: the station may re-join any of its SSIDs."""
         status = (await ubus_call(await self._pool.get(rec), "network.wireless", "status") or {}).get(
             radio, {}
         )
-        name = next((str(i["ifname"]) for i in status.get("interfaces", []) if i.get("ifname")), None)
-        return checked_ifname(name) if name else None
+        return [checked_ifname(str(i["ifname"])) for i in status.get("interfaces", []) if i.get("ifname")]
+
+    async def _back(self, t: Transport, ifnames: Sequence[str], station: str) -> bool:
+        for ifname in ifnames:
+            with contextlib.suppress(TransportError, ValueError):
+                if joined(json.loads((await t.run(get_clients(ifname))).stdout or "{}"), station):
+                    return True
+        return False
 
     async def _rejoin(
         self, rec: RouterRecord, req: StepRequest, ctl: _Control, started: datetime
@@ -501,7 +508,7 @@ class StepService:
         self._update(
             rec.id, phase="waiting for station", phase_ends_at=self._clock() + timedelta(seconds=limit)
         )
-        ifname = await self._ap_ifname(rec, req.radio)
+        ifnames = await self._ap_ifnames(rec, req.radio)
         t = await self._pool.get(rec)
         waited = 0.0
         while waited < limit:
@@ -512,11 +519,8 @@ class StepService:
                 return "next", None
             if self._live():
                 return "guard", None
-            if ifname is not None and req.station:
-                with contextlib.suppress(TransportError, ValueError):
-                    clients = json.loads((await t.run(get_clients(ifname))).stdout or "{}")
-                    if joined(clients, req.station):
-                        return "next", (self._clock() - started).total_seconds()
+            if req.station and await self._back(t, ifnames, req.station):
+                return "next", (self._clock() - started).total_seconds()
             await self._sleep(self._tick_s)
             waited += self._tick_s
         return "next", None
