@@ -128,7 +128,7 @@ def test_system_pages_are_native() -> None:
     ):
         assert views[path].native == "system", path
     assert views["admin/system/mounts"].native is None
-    assert views["admin/status/realtime/wireless"].native is None  # RF live is its own screen, not this page
+    assert views["admin/status/realtime/wireless"].native == "rf"  # v1.0a1 D5: RF live replaces it
 
 
 def test_page_groups_fall_back_to_the_package() -> None:

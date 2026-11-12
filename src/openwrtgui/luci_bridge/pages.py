@@ -54,6 +54,8 @@ NATIVE: dict[str, str] = {
     "admin/network/diagnostics": "system",
     # v0.7 D13: Status › Channel analysis is RF live's channel analysis
     "admin/status/channel_analysis": "rf",
+    # v1.0a1 D5: Status › Realtime Graphs › Wireless is RF live (rates, signal and noise, live)
+    "admin/status/realtime/wireless": "rf",
 }
 
 

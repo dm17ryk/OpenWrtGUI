@@ -399,7 +399,7 @@ The wizard described in section 5.
 | Status › System log, Kernel log | System › Status |
 | Status › Processes | System › Status |
 | Status › Channel analysis | RF live › Channel analysis |
-| Status › Realtime graphs (load, bandwidth, wireless, connections) | System › Status (load, bandwidth, connections); RF live (wireless) |
+| Status › Realtime graphs (load, bandwidth, wireless, connections) | System › Status (load, bandwidth, connections); RF live (wireless) — native since v1.0a1 (D5) |
 | System › System | System › System |
 | System › Administration (router password, password policy, SSH access, SSH keys, HTTP(S) access, repo public keys) | System › Access (repo keys: read-only list) |
 | System › Plugins | not applicable (LuCI's internal plugin switches) |
