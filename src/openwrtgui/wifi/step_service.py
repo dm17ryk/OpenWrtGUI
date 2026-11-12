@@ -168,6 +168,7 @@ class StepService:
         self._tick_s = tick_s
         self._jobs: dict[str, StepJob] = {}
         self._controls: dict[str, _Control] = {}
+        self._starting: dict[str, str] = {}  # router -> radio: a Start past its checks, still reading
 
     # ---------------------------------------------------------------- reading
     def _record_of(self, router_id: str) -> RouterRecord:
@@ -185,11 +186,14 @@ class StepService:
 
     def busy(self, router_id: str) -> str | None:
         """Why another job may not start on this router now (plan D8); None when it may."""
+        rec = self._routers.get(router_id)
+        name = rec.name if rec else router_id
+        if (radio := self._starting.get(router_id)) is not None:
+            return f"A step-through is starting on {name} {radio}"
         job = self._jobs.get(router_id)
         if job is None or job.phase in ENDED:
             return None
-        rec = self._routers.get(router_id)
-        return f"A step-through runs on {rec.name if rec else router_id} {job.radio}"
+        return f"A step-through runs on {name} {job.radio}"
 
     def live(self) -> list[str]:
         out = []
@@ -268,6 +272,13 @@ class StepService:
                 raise StepBusy(why)
         if self._saved_path(rec.id, req.radio).exists():
             raise StepBusy(f"Restore {req.radio} on {rec.name} first: a step-through left it at a step")
+        self._starting[rec.id] = req.radio  # no await since the checks: nothing else got in between
+        try:
+            return await self._start(rec, req, digest)
+        finally:
+            self._starting.pop(rec.id, None)
+
+    async def _start(self, rec: RouterRecord, req: StepRequest, digest: str) -> StepJob:
         plan, saved = await self._prepare(rec, req)
         if plan.digest != digest:
             raise PreviewChanged(rec.name)

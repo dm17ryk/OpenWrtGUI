@@ -55,6 +55,20 @@ class _Scripted:
         return getattr(self._inner, name)
 
 
+class _Yielding:
+    """Every command is an SSH round trip: other tasks run meanwhile."""
+
+    def __init__(self, inner: Transport) -> None:
+        self._inner = inner
+
+    async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
+        await asyncio.sleep(0)
+        return await self._inner.run(command, timeout=timeout)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._inner, name)
+
+
 def _service(
     env: WifiEnv, tmp_path: Path, clock: _Clock, statuses: dict[str, Any] | None = None, **kw: Any
 ) -> StepService:
@@ -148,6 +162,28 @@ async def test_rejoin_records_the_time(env: WifiEnv, tmp_path: Path) -> None:
     await _until(lambda: _job(steps).phase in DONE)
     [result] = _job(steps).results
     assert result.rejoined is True and result.rejoin_s == 2.0
+
+
+async def test_a_starting_step_through_holds_the_router(env: WifiEnv, tmp_path: Path) -> None:
+    """Review I6: from the moment Start passes its checks, a System job, a flash or a second Start on the
+    router is refused, also while Start still reads the router."""
+    env.wrap.append(lambda t: _Yielding(t))  # type: ignore[arg-type,return-value]
+    steps = _service(env, tmp_path, _Clock())
+    req = StepRequest("radio0", ("g",), (1,), advance="manual")
+    plan = await steps.preview("ap2", req)
+    starting = asyncio.ensure_future(steps.start("ap2", req, plan.digest))
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+    assert not starting.done()
+    assert steps.busy("ap2") is not None
+    with pytest.raises(StepBusy):
+        await steps.start("ap2", req, plan.digest)
+    await starting
+    await steps.stop("ap2")
+    await _until(lambda: _job(steps).phase in DONE)
+    with pytest.raises(PreviewChanged):  # a Start that fails lets go of the router
+        await steps.start("ap2", req, "0" * 16)
+    assert steps.busy("ap2") is None
 
 
 async def test_rejoin_time_counts_from_the_reload(env: WifiEnv, tmp_path: Path) -> None:
