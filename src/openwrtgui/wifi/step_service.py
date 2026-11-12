@@ -425,7 +425,7 @@ class StepService:
             return ("stop", None) if ctl.stop.is_set() else ("next", None)
         waited: Outcome = "next"
         if req.advance == "rejoin":
-            waited, rejoin_s = await self._rejoin(rec, req, ctl)
+            waited, rejoin_s = await self._rejoin(rec, req, ctl, started)
             base = base.model_copy(update={"rejoin_s": rejoin_s, "rejoined": rejoin_s is not None})
             if waited == "next" and rejoin_s is not None:
                 waited = await self._wait(rec.id, ctl, req.dwell_s, "dwell")
@@ -462,9 +462,10 @@ class StepService:
         return checked_ifname(name) if name else None
 
     async def _rejoin(
-        self, rec: RouterRecord, req: StepRequest, ctl: _Control
+        self, rec: RouterRecord, req: StepRequest, ctl: _Control, started: datetime
     ) -> tuple[Outcome, float | None]:
-        """Read hostapd's clients every tick until the station is back; None when it is not by the limit."""
+        """Read hostapd's clients every tick until the station is back; None when it is not by the limit.
+        The time counts from the step's start (the reload drops the station), the limit from its proof."""
         limit = req.rejoin_limit_s
         self._update(
             rec.id, phase="waiting for station", phase_ends_at=self._clock() + timedelta(seconds=limit)
@@ -484,7 +485,7 @@ class StepService:
                 with contextlib.suppress(TransportError, ValueError):
                     clients = json.loads((await t.run(get_clients(ifname))).stdout or "{}")
                     if joined(clients, req.station):
-                        return "next", waited
+                        return "next", (self._clock() - started).total_seconds()
             await self._sleep(self._tick_s)
             waited += self._tick_s
         return "next", None

@@ -100,8 +100,8 @@ beacon rate included; only then does the step wait.
 
 - **Timer** waits the dwell (10-3600 s) after the proof. **Manual** waits for **Next step**. **Station
   re-joins** waits until the chosen station (by its MAC) is associated and authorized again, records how long
-  that took, then dwells; a station that is not back within the re-join limit (30-600 s) is recorded "not
-  re-joined" and the run goes on.
+  that took (from the step's start: the reload drops it), then dwells; a station that is not back within the
+  re-join limit (30-600 s after the proof) is recorded "not re-joined" and the run goes on.
 - The preview shows every step's exact commands and the restore at the end, before **Start step-through**.
   The run checks each step against the preview: if someone changed the radio meanwhile, it stops and
   restores.

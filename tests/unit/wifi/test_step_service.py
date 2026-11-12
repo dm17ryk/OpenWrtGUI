@@ -150,6 +150,27 @@ async def test_rejoin_records_the_time(env: WifiEnv, tmp_path: Path) -> None:
     assert result.rejoined is True and result.rejoin_s == 2.0
 
 
+async def test_rejoin_time_counts_from_the_reload(env: WifiEnv, tmp_path: Path) -> None:
+    """Review I8: the reload drops the station; its re-join time counts from the step's start, not from the
+    end of the Apply's checks (12 s of reload and proof here)."""
+    clock = _Clock()
+
+    def slow_reload(command: str, n: int) -> CommandResult | None:
+        if command.startswith("set -e") and n == 1:
+            clock.t += 12  # the step's Apply: reload, then the checks
+        if "get_clients" in command and n <= 2:
+            return CommandResult(command, '{"freq": 2412, "clients": {}}', "", 0)
+        return None
+
+    env.wrap.append(lambda t: _Scripted(t, slow_reload))  # type: ignore[arg-type,return-value]
+    steps = _service(env, tmp_path, clock)
+    req = StepRequest("radio0", ("g",), (1,), advance="rejoin", station="F4:12:FA:F3:57:68", dwell_s=10)
+    await _run(steps, "ap2", req)
+    await _until(lambda: _job(steps).phase in DONE)
+    [result] = _job(steps).results
+    assert result.rejoined is True and result.rejoin_s == 14.0
+
+
 async def test_rejoin_limit_records_not_rejoined_and_goes_on(env: WifiEnv, tmp_path: Path) -> None:
     def never(command: str, n: int) -> CommandResult | None:
         if "get_clients" in command:
