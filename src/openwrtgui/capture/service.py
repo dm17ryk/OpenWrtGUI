@@ -22,13 +22,14 @@ from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.guard.writes import run_audited
 from openwrtgui.net.service import NetworkService
 from openwrtgui.store.routers import RouterRecord, RouterStore
-from openwrtgui.transport.base import ByteStream, Transport, TransportError, ubus_call
+from openwrtgui.transport.base import ByteStream, CommandResult, Transport, TransportError, ubus_call
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.uci import shell_quote
+from openwrtgui.wifi.monitor import MONITOR, MonitorLeases, RunFn
 
 SCREEN = "Faults"
-MONITOR = "owgmon0"
 MAX_BYTES = 500 * 1024 * 1024
+MON0_GONE = "mon0 went away (a Wi-Fi reload removes the monitor interface): the capture ended early."
 _FILTER = re.compile(r"[A-Za-z0-9 .:/()!&|<>=\[\]-]{0,200}")
 FILTER_TEXT = "A filter uses letters, digits, spaces and . : / ( ) ! & | < > = [ ] -"
 
@@ -94,7 +95,9 @@ class CaptureService:
         wireshark: Callable[[], Path | None] = find_wireshark,
         clock: Callable[[], datetime] = datetime.now,
         max_bytes: int = MAX_BYTES,
+        monitors: MonitorLeases | None = None,
     ) -> None:
+        self._monitors = monitors or MonitorLeases()
         self._pool = pool
         self._routers = routers
         self._guard = guard
@@ -106,6 +109,7 @@ class CaptureService:
         self._max_bytes = max_bytes
         self._views: dict[str, CaptureView] = {}
         self._streams: dict[str, ByteStream] = {}
+        self._stop_asked: set[str] = set()
         self._running: dict[str, str] = {}  # router id -> capture id
         self._tasks: set[asyncio.Task[None]] = set()
 
@@ -136,7 +140,36 @@ class CaptureService:
     def list_all(self) -> builtins.list[CaptureView]:
         return list(self._views.values())
 
-    async def _monitor(self, rec: RouterRecord, t: Transport) -> None:
+    def live(self) -> builtins.list[str]:
+        """The captures running now, for the update's question (spec 9.3)."""
+        out = []
+        for view in self._views.values():
+            if view.running:
+                rec = self._routers.get(view.router_id)
+                out.append(f"Capture on {rec.name if rec else view.router_id} {view.device}")
+        return out
+
+    async def stop_all(self) -> None:
+        for view in builtins.list(self._views.values()):
+            if view.running:
+                await self.stop(view.id)
+
+    def _run_fn(self, rec: RouterRecord, t: Transport) -> RunFn:
+        async def run(command: str, require_guard: bool) -> CommandResult:
+            return await run_audited(
+                t,
+                command,
+                router_id=rec.id,
+                screen=SCREEN,
+                guard=self._guard,
+                audit=self._audit,
+                source="app",
+                require_guard=require_guard,
+            )
+
+        return run
+
+    async def _monitor(self, rec: RouterRecord, t: Transport, capture_id: str) -> None:
         state = self._guard.state()
         if state.live:
             run = state.reasons[0].text if state.reasons else "a harness run"
@@ -146,37 +179,26 @@ class CaptureService:
         if radio is None:
             raise ValueError(f"{rec.name} has no radio on air for mon0")
         phy = (await ubus_call(t, "iwinfo", "phyname", {"section": radio}) or {}).get("phyname", "phy0")
-        command = (
-            f"iw dev {MONITOR} del 2>/dev/null; "
-            f"iw phy {phy} interface add {MONITOR} type monitor && ip link set {MONITOR} up"
-        )
         async with self._pool.write_lock(rec.id):  # not in the middle of a Wi-Fi or firewall apply
-            done = await run_audited(
-                t,
-                command,
-                router_id=rec.id,
-                screen=SCREEN,
-                guard=self._guard,
-                audit=self._audit,
-                source="app",
-            )
-        if not done.ok:
-            raise ValueError(f"Could not create mon0 on {rec.name}: {(done.stderr or done.stdout).strip()}")
+            try:  # shared with the beacon check and frame analysis (v0.7 plan D11)
+                await self._monitors.acquire(rec.id, f"capture {capture_id}", phy, t, self._run_fn(rec, t))
+            except ValueError as exc:
+                raise ValueError(f"Could not create mon0 on {rec.name}: {exc}") from None
 
-    async def _monitor_gone(self, rec: RouterRecord, t: Transport) -> None:
-        """Remove the monitor interface; allowed during a run, as it only undoes what the capture made."""
-        with contextlib.suppress(TransportError):
+    async def _monitor_gone(self, rec: RouterRecord, t: Transport, capture_id: str) -> str | None:
+        """Let go of the monitor interface; the last holder removes it, allowed during a run, as it only
+        undoes what the app made. What to tell the user when it is still on the radio, else None."""
+        try:
             async with self._pool.write_lock(rec.id):
-                await run_audited(
-                    t,
-                    f"iw dev {MONITOR} del",
-                    router_id=rec.id,
-                    screen=SCREEN,
-                    guard=self._guard,
-                    audit=self._audit,
-                    source="app",
-                    require_guard=False,
+                removed = await self._monitors.release(
+                    rec.id, f"capture {capture_id}", self._run_fn(rec, t), t
                 )
+        except TransportError as exc:
+            return f"{MONITOR} may still be on {rec.name}: {exc}"
+        if removed is not None and not removed.ok:
+            reason = (removed.stderr or removed.stdout).strip() or f"exit {removed.exit_status}"
+            return f"{MONITOR} is still on {rec.name}: {reason}"
+        return None
 
     async def start(self, router_id: str, req: CaptureRequest) -> CaptureView:
         rec = self._record(router_id)
@@ -203,7 +225,7 @@ class CaptureService:
         capture_id = secrets.token_hex(4)
         t = await self._pool.get(rec)
         if mon0:
-            await self._monitor(rec, t)
+            await self._monitor(rec, t, capture_id)
         sink: Sink | None = None
         path: Path | None = None
         try:  # nothing is left behind when the capture cannot start: no monitor interface, no file
@@ -222,7 +244,7 @@ class CaptureService:
             if path is not None:
                 path.unlink(missing_ok=True)
             if mon0:
-                await self._monitor_gone(rec, t)
+                await self._monitor_gone(rec, t, capture_id)
             raise
         self._audit.record(
             router=rec.id,
@@ -271,8 +293,13 @@ class CaptureService:
             with contextlib.suppress(TransportError, OSError):
                 await stream.close()
             sink.close()
-            if error is None and stream.exit_status not in (0, 124, None) and not total:
+            failed = stream.exit_status not in (0, 124, None) and capture_id not in self._stop_asked
+            if error is None and failed and not total:
                 error = stream.stderr.strip() or f"tcpdump exited {stream.exit_status}"
+            elif error is None and failed and mon0:  # tcpdump lost owgmon0 under it
+                last = next((line for line in reversed(stream.stderr.splitlines()) if line.strip()), "")
+                error = f"{MON0_GONE} {last.strip()}".strip()
+            self._stop_asked.discard(capture_id)
             self._audit.record(
                 router=rec.id,
                 screen=SCREEN,
@@ -280,8 +307,8 @@ class CaptureService:
                 exit_status=stream.exit_status,
                 source="app",
             )
-            if mon0:
-                await self._monitor_gone(rec, t)
+            if mon0 and (left := await self._monitor_gone(rec, t, capture_id)) is not None:
+                error = f"{error}; {left}" if error else left
             self._views[capture_id] = replace(
                 self._views[capture_id], bytes=total, running=False, error=error
             )
@@ -295,6 +322,7 @@ class CaptureService:
             raise ValueError(f"No capture {capture_id}")
         stream = self._streams.get(capture_id)
         if stream is not None:
+            self._stop_asked.add(capture_id)  # tcpdump's exit is ours, not a failure
             with contextlib.suppress(TransportError, OSError):
                 await stream.close()
         for _ in range(50):  # let the pump finish

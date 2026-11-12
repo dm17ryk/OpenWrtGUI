@@ -1,14 +1,29 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
-import type { RouterItem } from '../api/types'
+import type { PendingRestore, RouterItem } from '../api/types'
 import { Help } from '../help/Help'
 import { HELP } from '../help/topics'
 import { hhmm, plural, routerState } from './routerState'
 
 type Row = { key: string; tag: string; tagClass: string; text: ReactNode; action?: ReactNode }
 
-function rows(items: RouterItem[]): Row[] {
+function rows(items: RouterItem[], pending: PendingRestore[]): Row[] {
   const out: Row[] = []
+  for (const p of pending) {
+    // a step-through the app ended before it restored the radio (v0.7 plan D6)
+    const name = items.find((i) => i.record.id === p.router_id)?.record.name ?? p.router_id
+    out.push({
+      key: `${p.router_id}-${p.radio}-steps`,
+      tag: name,
+      tagClass: 'b bad',
+      text: `${p.radio} was left at a step by a step-through that did not restore it. Restore it on the Wi-Fi screen.`,
+      action: (
+        <Link className="btn" to={`/routers/${p.router_id}/wifi`}>
+          Open Wi-Fi
+        </Link>
+      ),
+    })
+  }
   for (const item of items) {
     const { record, health } = item
     const state = routerState(item)
@@ -78,8 +93,8 @@ function rows(items: RouterItem[]): Row[] {
   return out
 }
 
-export function Attention({ items }: { items: RouterItem[] }) {
-  const list = rows(items)
+export function Attention({ items, pending = [] }: { items: RouterItem[]; pending?: PendingRestore[] }) {
+  const list = rows(items, pending)
   if (list.length === 0) return null
   return (
     <section className="card" aria-labelledby="attention-h">

@@ -2,11 +2,13 @@ import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useParams, useSearchParams } from 'react-router'
 import { apiFetch, openSocket } from '../../api/client'
-import type { Bitrate, RateRow, RfMessage, RfSample, RouterDetail, StationSample, WifiState } from '../../api/types'
+import type { Bitrate, FrameState, RateRow, RfMessage, RfSample, RouterDetail, StationSample, WifiState } from '../../api/types'
 import { Help, HelpTip } from '../../help/Help'
 import { HELP } from '../../help/topics'
 import { RouterSections } from '../../shell/RouterSections'
 import { dbm } from '../routerState'
+import { ChannelAnalysis } from './ChannelAnalysis'
+import { FrameAnalysis } from './FrameAnalysis'
 import { RatesTable } from './RatesTable'
 import { RfChart } from './RfChart'
 import { pushSample, windowed, type Buffers, type WindowS } from './series'
@@ -69,6 +71,7 @@ export function RfLive() {
   const [chosen, setChosen] = useState<string | null>(params.get('station'))
   const [recording, setRecording] = useState<string | null>(null)
   const [rates, setRates] = useState<{ mac: string; rows?: RateRow[]; error?: string } | null>(null)
+  const [frames, setFrames] = useState<FrameState | null>(null)
   const socket = useRef<WebSocket | null>(null)
   const pausedRef = useRef(paused)
   useEffect(() => {
@@ -92,6 +95,8 @@ export function RfLive() {
         setRecording(msg.path)
       } else if (msg.type === 'rates') {
         setRates(msg)
+      } else if (msg.type === 'frames') {
+        setFrames(msg.state)
       }
     }
     ws.onclose = () => setIdle('Lost the connection to OpenWrtGUI. Open RF live again.')
@@ -259,6 +264,8 @@ export function RfLive() {
         <span className="muted">AP → station, from the router's rate control (minstrel). Success = frames the station acknowledged.</span>
         <RatesTable rows={rates?.mac === station ? rates.rows : undefined} error={rates?.mac === station ? rates.error : undefined} />
       </section>
+      <FrameAnalysis routerId={id} radio={radio} live={frames} retryPct={s?.retry_pct ?? null} />
+      <ChannelAnalysis routerId={id} radio={radio} />
       <span className="sr-only">{short}</span>
     </main>
   )

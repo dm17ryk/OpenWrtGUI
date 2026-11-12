@@ -37,6 +37,25 @@ export type BridgeClosed = S['BridgeClosed']
 export type UciChange = S['UciChange']
 export type Mode = ModesIn['modes'][number]
 
+// Wi-Fi step-through (v0.7)
+export type StepJob = S['StepJob']
+export type StepPlanOut = S['StepPlanOut']
+export type StepResult = S['StepResult']
+export type StepRequestIn = S['StepRequestIn']
+export type PendingRestore = S['PendingRestore']
+export type Step = StepPlanOut['steps'][number]
+export type Advance = StepRequestIn['advance']
+
+// RF live: channel analysis and frame analysis (v0.7)
+export type ScanResult = S['ScanResult']
+export type ScanPlanOut = S['ScanPlanOut']
+export type Bss = S['Bss']
+export type ChannelLoad = S['ChannelLoad']
+export type FrameState = S['FrameState']
+export type FramePlanOut = S['FramePlanOut']
+export type FrameWindow = S['FrameWindow']
+export type Direction = S['Direction']
+
 // Network & DHCP, Ports (v0.3)
 export type NetworkState = S['NetworkState']
 export type InterfaceView = S['InterfaceView']
@@ -175,6 +194,7 @@ export type RfMessage =
   | { type: 'rf-idle'; reason: string }
   | { type: 'recording'; path: string | null }
   | { type: 'rates'; mac: string; rows?: RateRow[]; error?: string }
+  | { type: 'frames'; state: FrameState }
 export type LteState = S['LteState']
 export type LteMeasure = S['Measure']
 export type ModemInfo = S['ModemInfo']

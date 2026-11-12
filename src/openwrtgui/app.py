@@ -25,6 +25,7 @@ from openwrtgui.api import (
     net_api,
     onboard_api,
     ports_api,
+    rf_api,
     routers_api,
     system_access_api,
     system_api,
@@ -76,6 +77,12 @@ def create_app(ctx: AppContext) -> FastAPI:
             for task in tasks:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
+            with contextlib.suppress(Exception):  # a step-through restores its radio (v0.7 D6), 60 s at most
+                await ctx.steps.stop_all(limit_s=60)
+            with contextlib.suppress(Exception):  # frame analysis removes its monitor before the pool closes
+                await ctx.rf.stop_frames()
+            with contextlib.suppress(Exception):  # a capture closes its file; on mon0 it removes owgmon0
+                await ctx.captures.stop_all()
             ctx.rf.close_all()
             ctx.lte_live.close_all()
             ctx.system_live.close_all()
@@ -92,6 +99,7 @@ def create_app(ctx: AppContext) -> FastAPI:
         onboard_api,
         update_api,
         wifi_api,
+        rf_api,
         luci_api,
         net_api,
         ports_api,
@@ -107,6 +115,7 @@ def create_app(ctx: AppContext) -> FastAPI:
     for module in modules:
         app.include_router(module.router)
     app.include_router(discovery_api.tools)
+    app.include_router(wifi_api.steps_router)
     app.include_router(misc_api.public)
     app.include_router(ws_api.router)
     if ctx.web_dir is not None and ctx.web_dir.is_dir():

@@ -8,6 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from openwrtgui.api.models import GuardOut
+from openwrtgui.busy import RouterBusy
 from openwrtgui.guard.bench_guard import GuardLocked
 from openwrtgui.transport.base import AuthFailed, HostKeyChanged, HostKeyUnknown, TransportError, Unreachable
 from openwrtgui.update.service import UpdateFailed, UpdateInProgress
@@ -60,6 +61,11 @@ def install(app: FastAPI) -> None:
 
     @app.exception_handler(PreviewChanged)
     async def preview_changed(request: Request, exc: PreviewChanged) -> JSONResponse:
+        return JSONResponse(status_code=409, content={"detail": str(exc)})
+
+    @app.exception_handler(RouterBusy)
+    async def router_busy(request: Request, exc: RouterBusy) -> JSONResponse:
+        """Another job holds the router or the radio (v0.7 plan D8): a step-through, a reboot, a flash."""
         return JSONResponse(status_code=409, content={"detail": str(exc)})
 
     @app.exception_handler(ValueError)

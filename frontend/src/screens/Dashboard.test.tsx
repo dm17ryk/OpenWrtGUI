@@ -3,13 +3,14 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, expect, test, vi } from 'vitest'
-import type { RouterItem } from '../api/types'
+import type { PendingRestore, RouterItem } from '../api/types'
 import { AP1, AP2, ROUTERS } from '../testing/fixtures'
 import { Dashboard } from './Dashboard'
 
-function renderWith(items: RouterItem[]) {
+function renderWith(items: RouterItem[], pending: PendingRestore[] = []) {
   const client = new QueryClient()
   client.setQueryData(['routers'], items)
+  client.setQueryData(['step-pending'], pending)
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
@@ -88,6 +89,13 @@ test('router without key is in Needs attention', () => {
   const attention = screen.getByRole('region', { name: 'Needs attention' })
   expect(within(attention).getByText('AP3 · QA stands')).toBeInTheDocument()
   expect(within(attention).getByText(/no app key yet/)).toBeInTheDocument()
+})
+
+test('a step-through left behind needs attention', () => {
+  renderWith([AP1, AP2], [{ router_id: 'ap2', radio: 'radio0', saved_at: '2026-11-12T09:00:00', options: {} }])
+  const attention = screen.getByRole('region', { name: 'Needs attention' })
+  expect(within(attention).getByText(/radio0 was left at a step by a step-through/)).toBeInTheDocument()
+  expect(within(attention).getByRole('link', { name: 'Open Wi-Fi' })).toHaveAttribute('href', '/routers/ap2/wifi')
 })
 
 test('unreachable router is reported with the time', () => {

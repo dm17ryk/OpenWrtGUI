@@ -31,6 +31,8 @@ export const HELP = {
   wifiStations: 'Wi-Fi#stations',
   wifiWho: 'Wi-Fi#who-may-join',
   wifiOptions: 'Wi-Fi#all-options',
+  wifiStep: 'Wi-Fi#step-through',
+  wifiStepResults: 'Wi-Fi#step-through-results',
   // RF live
   rf: 'RF-live',
   rfRadio: 'RF-live#radio',
@@ -39,6 +41,8 @@ export const HELP = {
   rfCharts: 'RF-live#charts',
   rfRates: 'RF-live#which-rates-reach-the-station',
   rfRecord: 'RF-live#record-to-csv',
+  rfFrames: 'RF-live#frame-analysis',
+  rfChannels: 'RF-live#channel-analysis',
   // Network and DHCP
   network: 'Network-and-DHCP',
   netAddresses: 'Network-and-DHCP#router-addresses',

@@ -7,8 +7,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Wi-Fi › Step-through: steps a radio through every ticked mode, channel and TX power, one pure mode per step,
+  each step proven on air before it waits. Advance on a timer, by hand, or when a chosen station re-joins (its
+  re-join time is recorded). The whole run is previewed first; results go to a table and a CSV in Documents.
+  The radio is put back at the end, on Stop and when the app closes; a step-through left behind (the app
+  ended, or a harness run started) offers Restore on the Wi-Fi screen and the dashboard.
+- RF live › Frame analysis: short windows on a monitor interface show the rate mix per direction, the RX
+  signal histogram, the retry flag and the bad-FCS share. Off by default; it stops by itself after 30 minutes.
+- RF live › Channel analysis (LuCI's Status › Channel analysis opens it): a passive scan of nearby networks
+  with each channel's busy share, as a chart and a table.
+- An update asks before it stops a step-through, a capture or frame analysis, and puts the radio back first.
+
 ### Fixed
 
+- An Apply during a Capture on mon0 no longer removes the capture's monitor interface: the beacon check,
+  the capture and frame analysis now share it.
 - The GitHub release notes keep characters such as "›": since 0.4.0 they showed a replacement character
   instead (the 0.4.0, 0.5.0 and 0.6.0 notes are corrected).
 

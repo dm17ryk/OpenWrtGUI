@@ -73,6 +73,7 @@ class JobsMixin:
     _tasks: set[asyncio.Task[None]]
     every_s: float
     reboot_limit_s: float
+    extra_busy: Callable[[str], str | None] | None  # a step-through holds the router (v0.7 D8)
 
     def _record(self, router_id: str) -> RouterRecord:
         raise NotImplementedError
@@ -107,6 +108,12 @@ class JobsMixin:
             return None
         doing = {"reboot": "is rebooting", "restore": "is restoring a backup", "reset": "is resetting"}
         return f"{rec.name} {doing[job.kind]}"
+
+    def _not_busy(self, rec: RouterRecord) -> None:
+        """No reboot, restore or reset while another job holds the router (a step-through, v0.7 D8)."""
+        why = self.extra_busy(rec.id) if self.extra_busy is not None else None
+        if why is not None:
+            raise RebootBusy(why)
 
     def rebooting(self, router_id: str) -> bool:
         job = self._reboots.get(router_id)
@@ -154,6 +161,7 @@ class JobsMixin:
     async def start_reboot(self, router_id: str, digest: str) -> RebootJob:
         """Arm the timer (audited, under the write lock), then wait for the router in the background."""
         rec = self._record(router_id)
+        self._not_busy(rec)
         plan = await self.plan_reboot(rec.id)
 
         async def arm(t: Transport) -> None:
@@ -218,6 +226,7 @@ class JobsMixin:
         """Only with the router's name typed and the "alone on this PC" tick; done when it stops answering,
         and its entry then waits for Add again (the flash-without-settings marker, reason reset)."""
         rec = self._record(router_id)
+        self._not_busy(rec)
         if confirm_name != rec.name or not alone:
             raise ValueError(
                 f"Type the router's name ({rec.name}) and tick that it is alone on this PC's network"
@@ -305,6 +314,7 @@ class JobsMixin:
         """Upload, list, restore, arm the reboot; then the come-back with the files proven. A step that
         fails removes the uploaded archive (it holds the router's secrets) and starts no job."""
         rec = self._record(router_id)
+        self._not_busy(rec)
         plan, data, info = self._restore_plan(rec, name, await router_ipv4(rec.host))
         files = provable(info)
 

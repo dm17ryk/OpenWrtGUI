@@ -10,13 +10,17 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from openwrtgui.guard.audit import AuditLog
+from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.paths import documents_dir
+from openwrtgui.rf.frames_service import FrameAnalyzer
 from openwrtgui.rf.parse import current_survey, parse_station_dump, parse_survey, split_sections
 from openwrtgui.rf.recorder import CsvRecorder
 from openwrtgui.rf.sample import RawTick, derive, rf_command
 from openwrtgui.store.routers import RouterStore
 from openwrtgui.transport.base import TransportError, ubus_call
 from openwrtgui.transport.pool import ConnectionPool
+from openwrtgui.wifi.monitor import MonitorLeases
 from openwrtgui.wifi.parse import parse_iw_dev_info
 
 log = logging.getLogger(__name__)
@@ -58,6 +62,7 @@ class RfSampler:
         self._names: dict[str, str] = {}
         self._names_at: datetime | None = None
         self._recorder: CsvRecorder | None = None
+        self.on_idle: Callable[[], None] | None = None  # the last viewer left (frame analysis stops)
 
     @property
     def running(self) -> bool:
@@ -74,6 +79,12 @@ class RfSampler:
         self._subs.discard(queue)
         if not self._subs:
             self.stop()
+            if self.on_idle is not None:
+                self.on_idle()
+
+    def publish(self, msg: Message) -> None:
+        """Another source's message to every viewer of this radio (frame analysis, v0.7)."""
+        self._publish(msg)
 
     def stop(self) -> None:
         if self._task is not None:
@@ -181,21 +192,74 @@ class RfSampler:
 
 
 class RfHub:
-    """One sampler per router radio, shared by every client watching it."""
+    """One sampler per router radio, shared by every client watching it, and its frame analysis (v0.7)."""
 
-    def __init__(self, *, pool: ConnectionPool, routers: RouterStore, recordings: Path | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        pool: ConnectionPool,
+        routers: RouterStore,
+        recordings: Path | None = None,
+        guard: BenchGuard | None = None,
+        audit: AuditLog | None = None,
+        monitors: MonitorLeases | None = None,
+    ) -> None:
         self._pool = pool
         self._routers = routers
         self._recordings = recordings  # None: Documents\OpenWrtGUI
+        self._guard = guard
+        self._audit = audit
+        self._monitors = monitors or MonitorLeases()
         self._samplers: dict[tuple[str, str], RfSampler] = {}
+        self._frames: dict[tuple[str, str], FrameAnalyzer] = {}
+        self._tasks: set[asyncio.Task[Any]] = set()
 
     def sampler(self, router_id: str, radio: str) -> RfSampler:
         key = (router_id, radio)
         if key not in self._samplers:
-            self._samplers[key] = RfSampler(
+            sampler = RfSampler(
                 router_id, radio, pool=self._pool, routers=self._routers, recordings=self._recordings
             )
+            sampler.on_idle = lambda: self._idle(key)
+            self._samplers[key] = sampler
         return self._samplers[key]
+
+    def frames(self, router_id: str, radio: str) -> FrameAnalyzer:
+        key = (router_id, radio)
+        if key not in self._frames:
+            if self._guard is None or self._audit is None:
+                raise ValueError("Frame analysis needs Bench Guard and the audit log")
+            self._frames[key] = FrameAnalyzer(
+                router_id,
+                radio,
+                pool=self._pool,
+                routers=self._routers,
+                guard=self._guard,
+                audit=self._audit,
+                monitors=self._monitors,
+                publish=self.sampler(router_id, radio).publish,
+            )
+        return self._frames[key]
+
+    def _idle(self, key: tuple[str, str]) -> None:
+        analyzer = self._frames.get(key)
+        if analyzer is not None and analyzer.running:
+            task = asyncio.get_running_loop().create_task(analyzer.stop("no RF viewer left"))
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)
+
+    def live_frames(self) -> list[str]:
+        out = []
+        for (router_id, radio), analyzer in self._frames.items():
+            if analyzer.running:
+                rec = self._routers.get(router_id)
+                out.append(f"Frame analysis on {rec.name if rec else router_id} {radio}")
+        return out
+
+    async def stop_frames(self) -> None:
+        for analyzer in list(self._frames.values()):
+            if analyzer.running:
+                await analyzer.stop()
 
     def close_all(self) -> None:
         for sampler in self._samplers.values():

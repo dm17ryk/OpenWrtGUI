@@ -3,6 +3,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, expect, test, vi } from 'vitest'
+import { ApiError, postJson } from '../api/client'
 import type { AppInfo, Settings, UpdateOut } from '../api/types'
 import { SettingsScreen } from './Settings'
 
@@ -69,6 +70,37 @@ function renderSettings(update: UpdateOut = UPDATE) {
     </QueryClientProvider>,
   )
 }
+
+test('asks before stopping live operations', async () => {
+  const user = userEvent.setup()
+  const busy = {
+    detail: 'Live work is running',
+    open_terminals: 1,
+    live: ['Step-through on AP2 radio0', 'Capture on AP2 br-lan'],
+  }
+  vi.mocked(postJson).mockRejectedValueOnce(new ApiError(409, busy.detail, busy))
+  const asked = vi.spyOn(window, 'confirm').mockReturnValue(true)
+  renderSettings({ ...UPDATE, can_install: true })
+  await user.click(within(screen.getByRole('region', { name: 'Updates' })).getByRole('button', { name: 'Update now' }))
+  expect(asked).toHaveBeenCalledWith(
+    'Stop the step-through on AP2 radio0 (its radio is restored first) and the capture on AP2 br-lan, ' +
+      'close 1 terminal, then update?',
+  )
+  expect(vi.mocked(postJson)).toHaveBeenLastCalledWith('/api/update/install', { version: '0.1.0', force: true })
+  asked.mockRestore()
+})
+
+test('reinstalling the previous version asks the same question', async () => {
+  const user = userEvent.setup()
+  const busy = { detail: 'Live work is running', open_terminals: 0, live: ['Capture on AP2 mon0'] }
+  vi.mocked(postJson).mockRejectedValueOnce(new ApiError(409, busy.detail, busy))
+  const asked = vi.spyOn(window, 'confirm').mockReturnValue(true)
+  renderSettings({ ...UPDATE, has_previous: true })
+  await user.click(within(screen.getByRole('region', { name: 'Updates' })).getByRole('button', { name: 'Reinstall previous version' }))
+  expect(asked).toHaveBeenCalledWith('Stop the capture on AP2 mon0, then update?')
+  expect(vi.mocked(postJson)).toHaveBeenLastCalledWith('/api/update/reinstall-previous', { force: true })
+  asked.mockRestore()
+})
 
 test('theme change PUTs settings', async () => {
   renderSettings()

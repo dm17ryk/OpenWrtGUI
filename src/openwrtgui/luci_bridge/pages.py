@@ -51,6 +51,8 @@ NATIVE: dict[str, str] = {
     "admin/system/reboot": "system",
     "admin/system/flash": "system",
     "admin/network/diagnostics": "system",
+    # v0.7 D13: Status › Channel analysis is RF live's channel analysis
+    "admin/status/channel_analysis": "rf",
 }
 
 

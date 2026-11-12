@@ -23,7 +23,11 @@ or "Not checked yet."
 When a newer version exists, Settings shows its name, size and release notes, with three buttons:
 
 - **Update now** downloads the installer and `SHA256SUMS.txt`, checks the SHA-256, then closes the app,
-  installs into the same folder, and starts the new version. If a terminal is open, you are asked first.
+  installs into the same folder, and starts the new version. If a terminal is open, or a step-through, a
+  capture or frame analysis runs, you are asked first, naming each. On **OK** the app stops them before the
+  installer starts: a step-through puts its radio back first (up to two minutes), a capture closes its file,
+  and frame analysis removes its monitor interface. If the radio could not be put back, the Wi-Fi screen
+  offers **Restore** after the update.
 - **Skip this version** stops offering that version; a newer one is offered again.
 - **Later** hides the offer until the next check.
 
@@ -32,7 +36,8 @@ While an update is waiting, an **Update available** pill in the top bar links to
 ## Going back
 
 The previous installer is kept in the data folder. **Reinstall previous version** (in Settings, once
-there is one) installs it again.
+there is one) installs it again. Like an update, it first asks before it stops a step-through (its radio
+restored first), a capture or frame analysis.
 
 ## Running a development build
 

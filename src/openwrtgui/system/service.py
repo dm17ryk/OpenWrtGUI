@@ -132,6 +132,7 @@ class SystemService(JobsMixin):
         self.every_s = EVERY_S  # how often the come-back wait asks
         self.reboot_limit_s = LIMIT_S
         self._reboots: dict[str, RebootJob] = {}
+        self.extra_busy: Callable[[str], str | None] | None = None  # a step-through (v0.7 D8)
         self._tasks: set[asyncio.Task[None]] = set()
 
     def _record(self, router_id: str) -> RouterRecord:

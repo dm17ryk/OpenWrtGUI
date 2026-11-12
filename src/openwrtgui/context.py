@@ -37,6 +37,7 @@ from openwrtgui.ports.service import PortsService
 from openwrtgui.probe.describe import SelfDescription
 from openwrtgui.probe.status import RouterStatus
 from openwrtgui.rf.sampler import RfHub
+from openwrtgui.rf.scan_service import ScanService
 from openwrtgui.simulator import SimConnector, seed_routers, sim_http_client, sim_process_lister
 from openwrtgui.store.keys import AppKey, load_or_create_app_key
 from openwrtgui.store.routers import RouterRecord, RouterStore, router_key_paths
@@ -51,7 +52,9 @@ from openwrtgui.transport.ssh import HostKeyStore, SshTransport
 from openwrtgui.update.service import Updater
 from openwrtgui.update.versions import parse_version
 from openwrtgui.version import APP_VERSION
+from openwrtgui.wifi.monitor import MonitorLeases
 from openwrtgui.wifi.service import WifiService
+from openwrtgui.wifi.step_service import StepService
 
 
 @dataclass
@@ -70,6 +73,8 @@ class AppContext:
     poller: StatusPoller
     wifi: WifiService
     rf: RfHub
+    scans: ScanService
+    steps: StepService
     luci: LuciBridgeService
     net: NetworkService
     ports: PortsService
@@ -207,8 +212,15 @@ def build_context(
     poller = StatusPoller(
         routers=routers, pool=pool, guard=guard, hub=hub, statuses=statuses, descriptions=descriptions
     )
+    monitors = MonitorLeases()  # one owgmon0 per router, shared by the beacon check, capture and frames
     wifi = WifiService(
-        pool=pool, routers=routers, guard=guard, audit=audit, descriptions=descriptions, statuses=statuses
+        pool=pool,
+        routers=routers,
+        guard=guard,
+        audit=audit,
+        descriptions=descriptions,
+        statuses=statuses,
+        monitors=monitors,
     )
     luci = LuciBridgeService(
         pool=pool,
@@ -259,6 +271,7 @@ def build_context(
         net=net,
         documents=data.root / "documents" if simulator is not None else documents_dir(),
         wireshark=_no_wireshark if simulator is not None else find_wireshark,
+        monitors=monitors,
     )
     profiles = ProfileStore(data.profiles_dir)
     discovery = DiscoveryService(
@@ -302,6 +315,24 @@ def build_context(
         host_keys=host_keys,
         app_keys=access.app_fingerprints,
     )
+
+    def flashing(router_id: str) -> str | None:
+        rec = routers.get(router_id)
+        return f"A flash runs on {rec.name if rec else router_id}" if flash.running(router_id) else None
+
+    # one radio action at a time per router (v0.7 plan D8): the step-through and the jobs check each other
+    steps = StepService(
+        wifi=wifi,
+        pool=pool,
+        routers=routers,
+        guard=guard,
+        statuses=statuses,
+        steps_dir=data.steps_dir,
+        documents=data.root / "documents" if simulator is not None else documents_dir(),
+        busy=(system.busy, flashing),
+    )
+    system.extra_busy = steps.busy
+    flash.extra_busy = steps.busy
     return AppContext(
         data=data,
         settings=settings,
@@ -318,8 +349,15 @@ def build_context(
         wifi=wifi,
         # the simulator never writes into the user's Documents
         rf=RfHub(
-            pool=pool, routers=routers, recordings=data.root / "recordings" if simulator is not None else None
+            pool=pool,
+            routers=routers,
+            recordings=data.root / "recordings" if simulator is not None else None,
+            guard=guard,
+            audit=audit,
+            monitors=monitors,
         ),
+        scans=ScanService(pool=pool, routers=routers, guard=guard, audit=audit, wifi=wifi, busy=steps.busy),
+        steps=steps,
         luci=luci,
         net=net,
         ports=ports,
