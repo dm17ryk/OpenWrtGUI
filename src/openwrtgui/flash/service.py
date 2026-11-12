@@ -109,14 +109,16 @@ class FlashService:
         self.every_s = every_s
         self._jobs: dict[str, FlashJob] = {}
         self._tasks: set[asyncio.Task[None]] = set()
+        self._starting: set[str] = set()  # past its checks, still reading the router before its job exists
         self.extra_busy: Callable[[str], str | None] | None = None  # a step-through (v0.7 D8)
 
     def job(self, router_id: str) -> FlashJob | None:
         return self._jobs.get(router_id)
 
     def running(self, router_id: str) -> bool:
+        """A flash runs, or one is starting: other jobs on the router wait for it either way."""
         job = self._jobs.get(router_id)
-        return job is not None and job.phase not in ("done", "failed")
+        return router_id in self._starting or (job is not None and job.phase not in ("done", "failed"))
 
     def _update(self, router_id: str, **fields: object) -> None:
         self._jobs[router_id] = self._jobs[router_id].model_copy(update=fields)
@@ -138,7 +140,16 @@ class FlashService:
     async def start(self, router_id: str, req: FlashRequest, digest: str) -> FlashJob:
         if self.extra_busy is not None and (why := self.extra_busy(router_id)) is not None:
             raise FlashBusy(why)
+        if self.running(router_id):
+            raise FlashBusy("A flash runs on this router already")
         self._guard.require_clear()
+        self._starting.add(router_id)  # no await since the checks: a step-through cannot get in between
+        try:
+            return await self._start(router_id, req, digest)
+        finally:
+            self._starting.discard(router_id)
+
+    async def _start(self, router_id: str, req: FlashRequest, digest: str) -> FlashJob:
         rec, image, plan, board = await self._prepare(router_id, req)
         if plan.digest != digest:
             raise PreviewChanged(rec.name)

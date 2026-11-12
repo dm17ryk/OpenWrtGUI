@@ -8,9 +8,11 @@ from datetime import datetime
 from typing import Any
 
 import httpx
+import pytest
 
 from openwrtgui.app import create_app
 from openwrtgui.context import AppContext
+from openwrtgui.flash.plan import FlashRequest
 from openwrtgui.system.reboot import RebootJob
 from openwrtgui.transport.base import ubus_call
 from openwrtgui.wifi.model import ChannelSelection, ModeSelection, RadioRequest
@@ -93,6 +95,31 @@ async def test_busy_matrix(authed: httpx.AsyncClient, ctx: AppContext) -> None:
     ctx.system._reboots["ap2"] = RebootJob(router_id="ap2", phase="waiting", started_at=datetime.now())
     r = await _start(authed)
     assert r.status_code == 409 and "is rebooting" in r.json()["detail"]
+
+
+async def test_a_flash_being_prepared_holds_the_router(
+    authed: httpx.AsyncClient, ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PR #59 review: from the moment a flash passes its checks, while it still reads the router, a
+    step-through is refused; a flash that fails its preparation lets go again."""
+    reading = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow_prepare(router_id: str, req: object) -> object:
+        reading.set()
+        await release.wait()
+        raise ValueError("No imported image b r")
+
+    monkeypatch.setattr(ctx.flash, "_prepare", slow_prepare)
+    req = FlashRequest(board="b", revision="r", sha256="s", keep_settings=True)
+    flashing = asyncio.ensure_future(ctx.flash.start("ap2", req, "x"))
+    await reading.wait()
+    r = await _start(authed)
+    assert r.status_code == 409 and "flash" in r.json()["detail"].lower(), r.text
+    release.set()
+    with pytest.raises(ValueError):
+        await flashing
+    assert not ctx.flash.running("ap2")
 
 
 async def test_pending_restore_after_a_restart(authed: httpx.AsyncClient, ctx: AppContext) -> None:
