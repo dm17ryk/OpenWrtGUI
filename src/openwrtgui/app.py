@@ -77,6 +77,8 @@ def create_app(ctx: AppContext) -> FastAPI:
             for task in tasks:
                 task.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
+            with contextlib.suppress(Exception):  # frame analysis removes its monitor before the pool closes
+                await ctx.rf.stop_frames()
             ctx.rf.close_all()
             ctx.lte_live.close_all()
             ctx.system_live.close_all()

@@ -9,6 +9,8 @@ from pydantic import BaseModel
 
 from openwrtgui.api.deps import get_ctx, require_token
 from openwrtgui.context import AppContext
+from openwrtgui.rf.air import RADIO
+from openwrtgui.rf.frames_service import FrameAnalyzer, FramePlan, FrameState
 from openwrtgui.rf.scan_service import ScanPlan, ScanResult, Via
 
 router = APIRouter(
@@ -51,3 +53,39 @@ async def scan_preview(router_id: str, radio: str, ctx: Ctx) -> ScanPlanOut:
 @router.post("/scan")
 async def scan_run(router_id: str, radio: str, body: DigestIn, ctx: Ctx) -> ScanResult:
     return await ctx.scans.scan(_known(ctx, router_id), radio, body.digest)
+
+
+class FramePlanOut(BaseModel):
+    lines: list[str]
+    warnings: list[str]
+    digest: str
+
+    @classmethod
+    def of(cls, plan: FramePlan) -> FramePlanOut:
+        return cls(lines=list(plan.lines), warnings=list(plan.warnings), digest=plan.digest)
+
+
+def _frames(ctx: AppContext, router_id: str, radio: str) -> FrameAnalyzer:
+    if not RADIO.fullmatch(radio):
+        raise HTTPException(status_code=422, detail=f"{radio!r} is not a radio name")
+    return ctx.rf.frames(_known(ctx, router_id), radio)
+
+
+@router.get("/frames")
+async def frames_state(router_id: str, radio: str, ctx: Ctx) -> FrameState:
+    return _frames(ctx, router_id, radio).state()
+
+
+@router.post("/frames/preview")
+async def frames_preview(router_id: str, radio: str, ctx: Ctx) -> FramePlanOut:
+    return FramePlanOut.of(await _frames(ctx, router_id, radio).preview())
+
+
+@router.post("/frames/start")
+async def frames_start(router_id: str, radio: str, body: DigestIn, ctx: Ctx) -> FrameState:
+    return await _frames(ctx, router_id, radio).start(body.digest)
+
+
+@router.post("/frames/stop")
+async def frames_stop(router_id: str, radio: str, ctx: Ctx) -> FrameState:
+    return await _frames(ctx, router_id, radio).stop()

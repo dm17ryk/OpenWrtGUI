@@ -329,7 +329,12 @@ def build_context(
         wifi=wifi,
         # the simulator never writes into the user's Documents
         rf=RfHub(
-            pool=pool, routers=routers, recordings=data.root / "recordings" if simulator is not None else None
+            pool=pool,
+            routers=routers,
+            recordings=data.root / "recordings" if simulator is not None else None,
+            guard=guard,
+            audit=audit,
+            monitors=monitors,
         ),
         scans=ScanService(pool=pool, routers=routers, guard=guard, audit=audit, wifi=wifi),
         luci=luci,
