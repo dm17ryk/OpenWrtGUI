@@ -41,6 +41,8 @@ export const HELP = {
   rfCharts: 'RF-live#charts',
   rfRates: 'RF-live#which-rates-reach-the-station',
   rfRecord: 'RF-live#record-to-csv',
+  rfFrames: 'RF-live#frame-analysis',
+  rfChannels: 'RF-live#channel-analysis',
   // Network and DHCP
   network: 'Network-and-DHCP',
   netAddresses: 'Network-and-DHCP#router-addresses',

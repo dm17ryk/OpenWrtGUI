@@ -194,6 +194,7 @@ export type RfMessage =
   | { type: 'rf-idle'; reason: string }
   | { type: 'recording'; path: string | null }
   | { type: 'rates'; mac: string; rows?: RateRow[]; error?: string }
+  | { type: 'frames'; state: FrameState }
 export type LteState = S['LteState']
 export type LteMeasure = S['Measure']
 export type ModemInfo = S['ModemInfo']
