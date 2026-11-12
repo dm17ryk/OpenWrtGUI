@@ -24,8 +24,7 @@ is connected, and how each router describes itself. It never disturbs a test run
 > and faults from a pulled cable to netem, plus capture to Wireshark. v0.3 added the network (addresses with
 > a router-side rollback, DHCP, DNS, routes, ports and VLANs); v0.2 Wi-Fi with proof on air, RF live and the
 > LuCI fallback; v0.1 the foundation: install, update, add routers, the dashboard, Bench Guard, the terminal
-> and the audit log. Access, SSH keys, LEDs, mounts, restore and reset to defaults follow; see the
-> [roadmap](ROADMAP.md).
+> and the audit log. What comes next is in the [roadmap](ROADMAP.md).
 
 ## What v0.6 adds
 
@@ -180,7 +179,7 @@ The app was built for a bench where test harnesses run for hours. It must never 
 
 Any standard OpenWrt router that you can reach over SSH. On first connect the app reads the router's
 self-description (the same files and ubus methods LuCI uses), so a new model needs no code change.
-Firmware image profiles, which add a bench image's custom tools, arrive in v0.5.
+Firmware image profiles add a bench image's custom tools (see Discovery in the manual).
 
 Developed and tested on the D-Link DWR-921 C3 with OpenWrt SNAPSHOT r35692.
 
@@ -196,7 +195,7 @@ Developed and tested on the D-Link DWR-921 C3 with OpenWrt SNAPSHOT r35692.
 
 ## Contributing, roadmap, license
 
-- [ROADMAP.md](ROADMAP.md): what comes after v0.1.
+- [ROADMAP.md](ROADMAP.md): what comes next.
 - [CONTRIBUTING.md](CONTRIBUTING.md): development setup, tests, and the rules for hardware tests.
 - [SECURITY.md](SECURITY.md): how to report a vulnerability and what the app stores.
 - [CHANGELOG.md](CHANGELOG.md): what changed in each release.

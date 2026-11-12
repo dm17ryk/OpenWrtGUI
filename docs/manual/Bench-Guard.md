@@ -38,14 +38,23 @@ The top bar always shows the guard's state:
 
 ## What still works during a run
 
-- Everything that only reads: the dashboard, router overviews, the audit log, RF live's samples.
+- Everything that only reads: the dashboard, router overviews, every screen's state, RF live's samples, the
+  audit log.
+- LTE: AT queries and the LTE screen's readings.
+- Faults: **Clear everything** for the faults this app armed (a fault left in place disturbs a run more).
+- A capture on a wired or Wi-Fi interface (not `mon0`, which adds a monitor interface).
+- System: reads, logs, the live charts and a backup (it changes nothing on the router).
+- LuCI pages open read-only.
 - The [terminal](Terminal-and-audit-log), in read-only mode: commands such as `cat`, `logread`,
   `iw dev`, `ubus call … status` run; anything that changes the router is refused with the reason.
 
 ## What is refused
 
-Every write to a router: installing the app key, setting a root password in the wizard, and terminal
-commands that change something. The refusal names the run, so you know what to wait for.
+Every write to a router: each screen's **Apply**, LTE actions (connect, disconnect, modem reboot, settings) and
+AT commands that are not queries, arming a fault, a flash or a firmware check, a restore, a reboot, a capture on
+`mon0`, RF live's channel scan and frame analysis (each adds an interface on the radio), System's diagnostics
+(ping and traceroute send traffic from a router under test), installing the app key, setting a root password in
+the wizard, and terminal commands that change something. The refusal names the run, so you know what to wait for.
 
 ## The test helpers when a run starts
 

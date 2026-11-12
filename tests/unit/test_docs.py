@@ -112,3 +112,15 @@ def test_agents_file_carries_the_bench_rules() -> None:
 def test_repo_files_exist() -> None:
     for name in ("SECURITY.md", "CODE_OF_CONDUCT.md", ".github/PULL_REQUEST_TEMPLATE.md"):
         assert (ROOT / name).is_file(), name
+
+
+def test_home_lists_every_sidebar_page() -> None:
+    """v1.0a1 D8: the manual's home page links every page the sidebar has."""
+    sidebar = {t for t in _LINK.findall(_read(MANUAL / "_Sidebar.md")) if not t.startswith("http")}
+    home = set(_LINK.findall(_read(MANUAL / "Home.md")))
+    assert sidebar - {"Home"} <= home, sorted(sidebar - home)
+    assert "covers v0.4" not in _read(MANUAL / "Home.md")
+
+
+def test_no_manual_page_answers_for_v0_1() -> None:
+    assert "Not in v0.1" not in _read(MANUAL / "FAQ.md")

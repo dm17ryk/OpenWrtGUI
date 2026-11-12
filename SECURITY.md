@@ -26,6 +26,13 @@ Everything lives in the data folder you picked at install time (default `%LOCALA
 | `settings.json` | Theme, update channel, Bench Guard watch list, audit-log retention |
 | `updates\` | Downloaded installers (the current and the previous one) |
 | `logs\` | The app's own log |
+| `backups\` | Routers' configuration backups. They hold password hashes, host keys and Wi-Fi keys; the folder is readable by your Windows user only |
+| `profiles\` | Imported router images and what the app read from them |
+| `reflash\` | Reflash checklists |
+| `tools\` | Promoted tool cards |
+| `steps\` | The saved radio options of a step-through that has not been restored yet |
+
+RF recordings, step-through results and captures go to `Documents\OpenWrtGUI`.
 
 The app **never stores router passwords**. The root password you type in the Add-router wizard is used
 for that one login, to install the app key, and is then discarded.
