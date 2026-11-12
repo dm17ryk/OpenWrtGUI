@@ -1,9 +1,9 @@
 """Frame analysis (v0.7 plan D12): `tcpdump -e -v` lines from the monitor interface, summed per window.
 
-The router only prints; the PC parses. A frame's direction comes from its source address: TX from the AP
-when one of the radio's BSSIDs sent it, RX at the AP when another station sent it to the BSS. A frame with a
-bad FCS counts only in the totals, since its addresses cannot be trusted. The radio's own TX path carries no
-signal (spec O4), so the signal histogram is the RX direction's.
+The router only prints; the PC parses. A frame's direction comes from its transmitter (address 2): TX from
+the AP when one of the radio's BSSIDs sent it, RX at the AP when another station sent it to the BSS. A frame
+with a bad FCS counts only in the totals, since its addresses cannot be trusted. The radio's own TX path
+carries no signal (spec O4), so the signal histogram is the RX direction's.
 """
 
 from __future__ import annotations
@@ -28,9 +28,9 @@ class Frame:
     signal_dbm: int | None  # RX only: the radio's own TX path prints none (O4)
     bad_fcs: bool
     retry: bool
-    src: str | None  # SA or TA
+    src: str | None  # the transmitter (address 2)
     bssid: str | None
-    dst: str | None  # DA or RA
+    dst: str | None  # RA, else DA
 
 
 @dataclass(frozen=True)
@@ -57,8 +57,11 @@ def parse_frame(line: str) -> Frame | None:
     rate = _RATE.search(line)
     signal = _SIGNAL.search(line)
     addrs: dict[str, str] = {}
+    order: list[str] = []
     for label, mac in _ADDR.findall(line):
-        addrs.setdefault(label, mac.lower())
+        if label not in addrs:
+            addrs[label] = mac.lower()
+            order.append(label)
     if mcs is None and rate is None and signal is None and not addrs:
         return None
     return Frame(
@@ -66,10 +69,19 @@ def parse_frame(line: str) -> Frame | None:
         signal_dbm=int(signal.group(1)) if signal else None,
         bad_fcs="bad-fcs" in line,
         retry=re.search(r"\bRetry\b", line) is not None,
-        src=addrs.get("SA") or addrs.get("TA"),
+        src=_transmitter(addrs, order),
         bssid=addrs.get("BSSID"),
-        dst=addrs.get("DA") or addrs.get("RA"),
+        dst=addrs.get("RA") or addrs.get("DA"),
     )
+
+
+def _transmitter(addrs: Mapping[str, str], order: list[str]) -> str | None:
+    """Address 2, by the order tcpdump prints the labels in: FromDS data is `DA BSSID SA` (the AP sent it, SA
+    is where it came from on the LAN), 4-address data `RA TA DA SA` and control frames carry TA; every other
+    frame's SA is its sender."""
+    if order[:3] == ["DA", "BSSID", "SA"]:
+        return addrs["BSSID"]
+    return addrs.get("TA") or addrs.get("SA")
 
 
 def _signal_bin(dbm: int) -> int:

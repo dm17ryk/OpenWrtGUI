@@ -42,6 +42,30 @@ def test_tx_mcs_frame() -> None:
     assert (window.tx.frames, window.tx.rates, window.rx.frames) == (1, {"MCS 7": 1}, 0)
 
 
+def test_from_ds_data_relayed_from_the_lan_is_tx() -> None:
+    """tcpdump prints FromDS data as DA BSSID SA: the AP (BSSID, address 2) sent it, SA is the LAN host."""
+    lan_host = "3c:84:6a:11:22:33"
+    line = (
+        "23:54:52.950000 65.0 Mb/s MCS 7 20 MHz short GI antenna 0 "
+        f"44us DA:{STA} BSSID:{OWN} SA:{lan_host} QoS Data IV:  2 Pad 0 KeyID 0"
+    )
+    assert parse_frame(line) is not None and parse_frame(line).src == OWN  # type: ignore[union-attr]
+    window = summarize(line, "", {OWN}, 3.0)
+    assert (window.tx.frames, window.rx.frames) == (1, 0)
+
+
+def test_four_address_frames_go_by_the_transmitter() -> None:
+    """WDS data is printed RA TA DA SA: the transmitter is TA, the receiver RA."""
+    far = "3c:84:6a:11:22:33"
+    sent = f"23:54:52.950000 54.0 Mb/s 2437 MHz 11g antenna 0 RA:{STA} TA:{OWN} DA:{far} SA:{far} Data IV"
+    heard = (
+        f"23:54:52.960000 54.0 Mb/s 2437 MHz 11g -60dBm signal RA:{OWN} TA:{STA} DA:{OWN} SA:{far} Data IV"
+    )
+    assert parse_frame(sent) is not None and parse_frame(sent).src == OWN  # type: ignore[union-attr]
+    window = summarize(sent + "\n" + heard, "", {OWN}, 3.0)
+    assert (window.tx.frames, window.rx.frames) == (1, 1)
+
+
 def test_bad_fcs_counts_only_in_totals() -> None:
     window = summarize(BAD_LINE + "\n" + OTHER_LINE, "", {OWN}, 3.0)
     assert (window.frames, window.bad_fcs, window.rx.frames, window.tx.frames) == (2, 1, 0, 0)
