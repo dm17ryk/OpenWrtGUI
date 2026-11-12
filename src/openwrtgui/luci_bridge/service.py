@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import secrets
-from collections.abc import Awaitable, Callable, MutableMapping
+from collections.abc import Awaitable, Callable, MutableMapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Any
@@ -13,6 +13,19 @@ from typing import Any
 from openwrtgui.guard.audit import HIDDEN, SECRET_OPTIONS, AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.guard.writes import run_audited
+from openwrtgui.luci_bridge.depends import (
+    UNCHECKED,
+    Facts,
+    dir_paths,
+    files_command,
+    fs_paths,
+    listing_command,
+    missing_paths,
+    parse_ls,
+    uci_command,
+    uci_configs,
+    usable_groups,
+)
 from openwrtgui.luci_bridge.pages import PageView, page_views
 from openwrtgui.luci_bridge.proxy import BridgeProxy
 from openwrtgui.luci_bridge.session import (
@@ -35,6 +48,7 @@ log = logging.getLogger(__name__)
 
 SCREEN = "LuCI"
 UCI_SHOW = "uci show"
+FACTS_TTL = timedelta(seconds=60)  # how long the answers to a router's menu `depends` are kept (v1.0a1 D3)
 UpstreamFactory = Callable[[RouterRecord, Transport], Awaitable[Upstream]]
 
 
@@ -109,6 +123,7 @@ class LuciBridgeService:
         self._clock = clock
         self._idle = timedelta(seconds=idle_s)
         self._bridges: dict[str, _Bridge] = {}
+        self._facts: dict[str, tuple[datetime, Facts]] = {}
 
     async def _connect(self, router_id: str) -> tuple[RouterRecord, Transport]:
         rec = self._routers.get(router_id)
@@ -127,9 +142,42 @@ class LuciBridgeService:
         desc = self._descriptions.get(router_id)
         return desc.luci.acl if desc and desc.luci else {}
 
+    async def _read_facts(self, rec: RouterRecord, t: Transport, pages: Sequence[LuciPage]) -> Facts:
+        """What the router's menu asks about (D3); facts the router cannot give hide nothing."""
+        paths = fs_paths(pages)
+        try:
+            files: dict[str, str] = {}
+            if paths:
+                listed = await t.run(files_command(paths))
+                files = parse_ls(listed.stdout)
+                if set(files) | missing_paths(listed.stderr, paths) != set(paths):
+                    return UNCHECKED  # an ls that cannot say (no -L, not found, refused)
+            for path in dir_paths(pages):
+                if files.get(path) == "directory":
+                    shown = await t.run(listing_command(path))
+                    files[path] = "directory" if shown.ok and shown.stdout.strip() else "empty directory"
+            uci: dict[str, dict[str, str]] = {}
+            for config in uci_configs(pages):
+                done = await t.run(uci_command(config))
+                if done.ok:  # `uci -q show` of a config that does not exist fails: it is absent
+                    uci[config] = parse_uci_show(done.stdout)
+        except TransportError:
+            return UNCHECKED
+        return Facts(files, uci, usable_groups(self._acl(rec.id)))
+
+    async def _page_facts(self, rec: RouterRecord, t: Transport, pages: Sequence[LuciPage]) -> Facts:
+        cached = self._facts.get(rec.id)
+        if cached is not None and self._clock() - cached[0] < FACTS_TTL:
+            return cached[1]
+        facts = await self._read_facts(rec, t, pages)
+        if facts.checked:
+            self._facts[rec.id] = (self._clock(), facts)
+        return facts
+
     async def pages(self, router_id: str) -> list[PageView]:
         rec, t = await self._connect(router_id)
-        return page_views(await self._luci_pages(rec, t))
+        pages = await self._luci_pages(rec, t)
+        return page_views(pages, await self._page_facts(rec, t, pages))
 
     def view(self, bridge_id: str) -> BridgeView:
         return self._bridges[bridge_id].view
@@ -193,7 +241,9 @@ class LuciBridgeService:
         page = next((p for p in pages if p.path == path), None)
         if page is None:
             raise ValueError(f"No LuCI page {path} on {rec.name}")
-        shown = next(v for v in page_views(pages) if v.path == path)
+        shown = next(v for v in page_views(pages, await self._page_facts(rec, t, pages)) if v.path == path)
+        if not shown.available:
+            raise ValueError(f"LuCI does not show {shown.label} on {rec.name}: {shown.missing}")
         access: Access = "read" if self._guard.state().live else "write"
         before = parse_uci_show((await t.run(UCI_SHOW)).stdout)
         sid = await self._new_session(rec, t, page, access)
