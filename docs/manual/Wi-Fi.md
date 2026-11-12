@@ -102,9 +102,10 @@ beacon rate included; only then does the step wait.
   re-joins** waits until the chosen station (by its MAC) is associated and authorized again, records how long
   that took (from the step's start: the reload drops it), then dwells; a station that is not back within the
   re-join limit (30-600 s after the proof) is recorded "not re-joined" and the run goes on.
-- The preview shows every step's exact commands and the restore at the end, before **Start step-through**.
-  The run checks each step against the preview: if someone changed the radio meanwhile, it stops and
-  restores.
+- The preview shows every step's exact commands and the restore at the end, before **Start step-through**,
+  with how long the run takes: about that long on a timer, at most that long when a station re-joins (each
+  step counted with its whole re-join limit). The run checks each step against the preview: if someone
+  changed the radio meanwhile, it stops and restores.
 - A step whose proof fails is recorded "not proven" and the run goes on, without its wait. A refused change
   or a lost connection stops the run and restores the radio.
 - Before step 1 the radio's mode, channel and power options are saved in the data folder. At the end, on

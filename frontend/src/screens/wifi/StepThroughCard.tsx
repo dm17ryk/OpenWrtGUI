@@ -239,7 +239,11 @@ export function StepThroughCard({ routerId, short, radio, onEnded }: Props) {
             </button>
           )}
           <PreviewApply
-            heading={plan ? `Step-through preview: ${plan.steps.length} steps, about ${minutes(plan.estimate_s)}` : `Step-through on ${short}`}
+            heading={
+              plan
+                ? `Step-through preview: ${plan.steps.length} steps, ${advance === 'rejoin' ? 'at most' : 'about'} ${minutes(plan.estimate_s)}`
+                : `Step-through on ${short}`
+            }
             lines={plan ? previewLines(plan, all) : []}
             warnings={plan?.warnings ?? []}
             error={error ?? preview?.error ?? null}

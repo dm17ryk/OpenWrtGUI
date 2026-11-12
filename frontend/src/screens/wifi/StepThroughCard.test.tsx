@@ -124,6 +124,13 @@ test('previews numbered steps and the restore', async () => {
   expect(asked?.body).toMatchObject({ radio: 'radio0', modes: ['g'], channels: [1, 6], advance: 'timer' })
 })
 
+test('a re-join run shows its worst case', async () => {
+  // PR #59 review: each step may wait the whole re-join limit, so the time shown is an upper bound
+  const { user, card } = await tickG16()
+  await user.click(within(card).getByRole('button', { name: 'Station re-joins' }))
+  expect(await within(card).findByText('Step-through preview: 2 steps, at most 1 min')).toBeInTheDocument()
+})
+
 test('start sends the preview digest', async () => {
   const { user, card } = await tickG16()
   await within(card).findByRole('region', { name: 'Command preview' })

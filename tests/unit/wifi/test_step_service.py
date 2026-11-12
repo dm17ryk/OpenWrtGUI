@@ -152,6 +152,22 @@ async def test_list_options_end_as_found(env: WifiEnv, tmp_path: Path) -> None:
     assert (await sim.run("uci -q show wireless")).stdout == found
 
 
+async def test_a_rejoin_estimate_is_the_worst_case(env: WifiEnv, tmp_path: Path) -> None:
+    """PR #59 review: a re-join step can wait its whole limit and then dwell; the estimate counts both."""
+    steps = _service(env, tmp_path, _Clock())
+    req = StepRequest(
+        "radio0",
+        ("g",),
+        (1, 6),
+        advance="rejoin",
+        station="f4:12:fa:f3:57:68",
+        dwell_s=60,
+        rejoin_limit_s=120,
+    )
+    plan = await steps.preview("ap2", req)
+    assert plan.estimate_s == 2 * (20 + 120 + 60)
+
+
 async def test_manual_waits_for_next(env: WifiEnv, tmp_path: Path) -> None:
     steps = _service(env, tmp_path, _Clock())
     await _run(steps, "ap2", StepRequest("radio0", ("g",), (1, 6), advance="manual"))

@@ -247,7 +247,9 @@ class StepService:
         plans, restore = await self._wifi.plan_sequence(
             rec.id, req.radio, [step_request(s, req.radio) for s in steps], saved_ops(req.radio, saved)
         )
-        per_step = STEP_OVERHEAD_S + (0 if req.advance == "manual" else req.dwell_s)
+        # a re-join step may wait its whole limit and then dwell: the estimate is that worst case
+        waits = {"manual": 0, "timer": req.dwell_s, "rejoin": req.rejoin_limit_s + req.dwell_s}
+        per_step = STEP_OVERHEAD_S + waits[req.advance]
         plan = StepPlan(
             router_id=rec.id,
             radio=req.radio,
