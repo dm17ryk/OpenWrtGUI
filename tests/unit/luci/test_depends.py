@@ -154,3 +154,28 @@ def test_a_symlink_counts_as_what_it_points_to() -> None:
     listing = "-rwxr-xr-x    1 root     root        303472 Aug 13  2024 /usr/sbin/iptables\n"
     facts = Facts(parse_ls(listing), {}, frozenset({"luci-mod-status-firewall"}))
     assert why_hidden(_page({"fs": {"/usr/sbin/iptables": "executable"}}), facts) is None
+
+
+def test_the_reason_names_what_fails() -> None:
+    network = {"network.lan": "interface", "network.lan.proto": "static"}
+    facts = Facts({}, {"network": network}, ACL)
+    assert (
+        why_hidden(_page({"uci": {"network": True, "dhcp": True}}), facts) == "needs the dhcp configuration"
+    )
+    # a menu's empty section spec matches anything: the reason comes from the part that fails, never a crash
+    assert why_hidden(_page({"uci": {"network": {}, "dhcp": True}}), facts) == "needs the dhcp configuration"
+    assert (
+        why_hidden(_page({"uci": {"network": {"lan": "interface", "wan": True}}}), facts)
+        == "needs network.wan"
+    )
+    either = _page({"fs": [{"/usr/sbin/odhcpd": "executable"}, {"/usr/sbin/dnsmasq": "executable"}]})
+    assert why_hidden(either, Facts({}, {}, ACL)) == "needs one of /usr/sbin/odhcpd, /usr/sbin/dnsmasq"
+    # two alternatives failing the same way give one reason
+    iptables = PAGES["admin/status/iptables"]
+    nft_only = Facts({"/usr/sbin/nft": "executable"}, {}, frozenset({"luci-mod-status-firewall"}))
+    assert why_hidden(iptables, nft_only) == "is for routers without /usr/sbin/nft"
+
+
+def test_unread_access_groups_hide_nothing() -> None:
+    facts = Facts({"/sbin/block": "executable"}, {}, None)
+    assert why_hidden(PAGES["admin/system/mounts"], facts) is None

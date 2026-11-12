@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import re
 import shlex
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -20,8 +20,9 @@ class Facts:
     files: Mapping[str, str]
     # config -> parse_uci_show of `uci -q show <config>`; a config missing here is absent
     uci: Mapping[str, Mapping[str, str]]
-    # the router's LuCI access groups that grant read or write
-    acl: frozenset[str]
+    # the router's LuCI access groups that grant read or write; None: they were not read, so a page's acl
+    # depends are not checked (D3: facts the router cannot give hide nothing)
+    acl: frozenset[str] | None
     # False: the facts could not be read, so nothing is hidden (D3)
     checked: bool = True
 
@@ -105,9 +106,15 @@ def _fs_ok(path: str, kind: str, files: Mapping[str, str]) -> bool:
     return False
 
 
-def _fs_reason(alt: Mapping[str, str], files: Mapping[str, str]) -> str:
-    path, kind = next((p, k) for p, k in alt.items() if not _fs_ok(p, k, files))
-    return f"is for routers without {path}" if kind == "absent" else f"needs {path}"
+def _fs_reason(alts: Sequence[Mapping[str, str]], files: Mapping[str, str]) -> str:
+    """Why every fs alternative fails: the first failing path of each, once each."""
+    failures = list(
+        dict.fromkeys(next((p, k) for p, k in alt.items() if not _fs_ok(p, k, files)) for alt in alts)
+    )
+    if len(failures) == 1:
+        path, kind = failures[0]
+        return f"is for routers without {path}" if kind == "absent" else f"needs {path}"
+    return "needs one of " + ", ".join(p if k != "absent" else f"no {p}" for p, k in failures)
 
 
 def _sections(config: str, values: Mapping[str, str]) -> dict[str, tuple[str, dict[str, str]]]:
@@ -142,47 +149,43 @@ def _section_ok(kind: str, options: Mapping[str, str], spec: Any) -> bool:
     return False
 
 
-def _uci_alt_ok(alt: Mapping[str, Any], uci: Mapping[str, Mapping[str, str]]) -> bool:
+def _section_reason(config: str, kind: str, spec: Any) -> str:
+    if isinstance(spec, dict) and spec:
+        wanted = ", ".join(f"{k}={'set' if v is True else v}" for k, v in spec.items())
+        return f"needs a {kind} section in {config} with {wanted}"
+    return f"needs a {kind} section in {config}"
+
+
+def _uci_failure(alt: Mapping[str, Any], uci: Mapping[str, Mapping[str, str]]) -> str | None:
+    """Why this uci alternative fails (its first failing config or section), or None when it holds."""
     for config, spec in alt.items():
         sections = _sections(config, uci.get(config, {}))
         if spec is True:
             if not sections:
-                return False
+                return f"needs the {config} configuration"
             continue
         if not isinstance(spec, dict):
-            return False
+            return f"needs the {config} configuration"
         for name, section_spec in spec.items():
             if name.startswith("@"):
                 if not any(k == name[1:] and _section_ok(k, o, section_spec) for k, o in sections.values()):
-                    return False
+                    return _section_reason(config, name[1:], section_spec)
             elif name not in sections or not _section_ok(*sections[name], section_spec):
-                return False
-    return True
-
-
-def _uci_reason(alt: Mapping[str, Any]) -> str:
-    config, spec = next(iter(alt.items()))
-    if spec is True or not isinstance(spec, dict):
-        return f"needs the {config} configuration"
-    name, section_spec = next(iter(spec.items()))
-    if not name.startswith("@"):
-        return f"needs {config}.{name}"
-    if isinstance(section_spec, dict):
-        wanted = ", ".join(f"{k}={'set' if v is True else v}" for k, v in section_spec.items())
-        return f"needs a {name[1:]} section in {config} with {wanted}"
-    return f"needs a {name[1:]} section in {config}"
+                return f"needs {config}.{name}"
+    return None
 
 
 def _reason(depends: Mapping[str, Any], facts: Facts) -> str | None:
     for group in depends.get("acl") or ():
-        if group not in facts.acl:
+        if facts.acl is not None and group not in facts.acl:
             return f"needs LuCI's {group} access group"
     fs = _alternatives(depends.get("fs"))
     if fs and not any(all(_fs_ok(p, k, facts.files) for p, k in alt.items()) for alt in fs):
-        return _fs_reason(fs[0], facts.files)
+        return _fs_reason(fs, facts.files)
     uci = _alternatives(depends.get("uci"))
-    if uci and not any(_uci_alt_ok(alt, facts.uci) for alt in uci):
-        return _uci_reason(uci[0])
+    failures = [_uci_failure(alt, facts.uci) for alt in uci]
+    if failures and all(f is not None for f in failures):
+        return failures[0]
     return None
 
 

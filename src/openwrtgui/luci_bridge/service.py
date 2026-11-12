@@ -123,7 +123,8 @@ class LuciBridgeService:
         self._clock = clock
         self._idle = timedelta(seconds=idle_s)
         self._bridges: dict[str, _Bridge] = {}
-        self._facts: dict[str, tuple[datetime, Facts]] = {}
+        # router id -> (read at, the description read for, facts); a new description reads them again
+        self._facts: dict[str, tuple[datetime, SelfDescription | None, Facts]] = {}
 
     async def _connect(self, router_id: str) -> tuple[RouterRecord, Transport]:
         rec = self._routers.get(router_id)
@@ -163,15 +164,17 @@ class LuciBridgeService:
                     uci[config] = parse_uci_show(done.stdout)
         except TransportError:
             return UNCHECKED
-        return Facts(files, uci, usable_groups(self._acl(rec.id)))
+        acl = self._acl(rec.id)  # empty: the router's acl.d could not be read, so access is not checked
+        return Facts(files, uci, usable_groups(acl) if acl else None)
 
     async def _page_facts(self, rec: RouterRecord, t: Transport, pages: Sequence[LuciPage]) -> Facts:
+        desc = self._descriptions.get(rec.id)
         cached = self._facts.get(rec.id)
-        if cached is not None and self._clock() - cached[0] < FACTS_TTL:
-            return cached[1]
+        if cached is not None and cached[1] is desc and self._clock() - cached[0] < FACTS_TTL:
+            return cached[2]
         facts = await self._read_facts(rec, t, pages)
         if facts.checked:
-            self._facts[rec.id] = (self._clock(), facts)
+            self._facts[rec.id] = (self._clock(), desc, facts)
         return facts
 
     async def pages(self, router_id: str) -> list[PageView]:

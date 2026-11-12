@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from dataclasses import replace
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked, ProcessInfo
 from openwrtgui.luci_bridge.service import LuciBridgeService
 from openwrtgui.luci_bridge.upstream import Upstream, sim_upstream
 from openwrtgui.probe.describe import SelfDescription
+from openwrtgui.probe.luci_menu import LuciPage
 from openwrtgui.simulator import SimConnector, seed_routers
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.store.settings import GuardWatchList
@@ -286,3 +288,76 @@ async def test_opening_a_page_luci_hides_is_refused(env: Env) -> None:
     hidden = r"^LuCI does not show System › Mount Points on AP1 · bench: needs /sbin/block$"
     with pytest.raises(ValueError, match=hidden):
         await env.service.open("ap1", "admin/system/mounts")
+
+
+def _reads(env: Env) -> list[str]:
+    return [c for c in env.calls() if c.startswith(("ls -ldL ", "ls -A ", "uci -q show "))]
+
+
+async def _described(env: Env, router_id: str) -> SelfDescription:
+    await env.service.pages(router_id)  # describes the router and reads its facts
+    return env.descriptions[router_id]
+
+
+async def test_facts_are_kept_for_a_minute(env: Env) -> None:
+    await env.service.pages("ap1")
+    first = len(_reads(env))
+    assert first > 0
+    await env.service.pages("ap1")
+    assert len(_reads(env)) == first  # within the minute: nothing read again
+    env.clock.now += timedelta(seconds=61)
+    await env.service.pages("ap1")
+    assert len(_reads(env)) == 2 * first
+
+
+async def test_a_dropped_connection_hides_nothing_and_is_asked_again(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    rec = env.routers.get("ap1")
+    assert rec is not None
+    t = await env.pool.get(rec)
+    original = t.run
+    dropped = True
+
+    async def flaky(command: str, *, timeout: float = 15.0) -> CommandResult:
+        if dropped and command.startswith("uci -q show "):
+            raise TransportError("connection lost")
+        return await original(command, timeout=timeout)
+
+    monkeypatch.setattr(t, "run", flaky)
+    pages = await env.service.pages("ap1")
+    assert all(p.available for p in pages) and not any(p.checked for p in pages)
+    dropped = False  # unread facts are not kept: the next list asks again
+    pages = {p.path: p for p in await env.service.pages("ap1")}
+    assert (
+        pages["admin/system/mounts"].missing == "needs /sbin/block" and pages["admin/system/mounts"].checked
+    )
+
+
+async def test_facts_follow_a_new_description(env: Env) -> None:
+    desc = await _described(env, "ap1")
+    assert desc.luci is not None
+    sqm = LuciPage(
+        "admin/services/sqm",
+        "SQM QoS",
+        "luci-app-sqm",
+        ("luci-app-sqm",),
+        ("sqm",),
+        (),
+        "Services",
+        ({"acl": ["luci-app-sqm"]},),
+    )
+    acl = {**desc.luci.acl, "luci-app-sqm": {"read": {"uci": ["sqm"]}}}
+    env.descriptions["ap1"] = replace(desc, luci=replace(desc.luci, pages=(*desc.luci.pages, sqm), acl=acl))
+    pages = {p.path: p for p in await env.service.pages("ap1")}  # within the minute, but a new description
+    assert pages["admin/services/sqm"].available is True
+
+
+async def test_an_unread_acl_hides_nothing(env: Env) -> None:
+    desc = await _described(env, "ap1")
+    assert desc.luci is not None
+    env.descriptions["ap1"] = replace(desc, luci=replace(desc.luci, acl={}))  # the acl.d read failed
+    env.clock.now += timedelta(seconds=61)
+    pages = {p.path: p for p in await env.service.pages("ap1")}
+    assert pages["admin/system/plugins"].available is True
+    assert pages["admin/system/mounts"].missing == "needs /sbin/block"
