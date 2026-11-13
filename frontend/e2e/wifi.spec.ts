@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { noHorizontalScroll, open } from './helpers'
+import { noHorizontalScroll, open, stepThroughClear } from './helpers'
 
 test('the Wi-Fi screen fits the window', async ({ page }) => {
   await open(page, '/routers/ap2/wifi')
@@ -32,9 +32,11 @@ test('n20 on channel 6 goes on air, proven, then parks again', async ({ page }, 
   await expect(page.getByText('parked', { exact: true })).toBeVisible()
 })
 
-test('step-through manual run proves each step, then restores', async ({ page }, info) => {
+test('step-through manual run proves each step, then restores', async ({ page, request }, info) => {
   test.skip(info.project.name !== 'desktop-light', 'one project changes the simulated router')
-  // AP1: its SSID is the only one on air, so the one-radio-per-SSID rule lets it step (plan D9)
+  // AP1: its SSID is the only one on air, so the one-radio-per-SSID rule lets it step (plan D9). The n20 test
+  // above just parked AP2 (same SSID): wait until the app's statuses say so, or the card's one preview warns
+  await stepThroughClear(request, 'ap1', { radio: 'radio0', modes: ['g', 'n20'], channels: [1, 6], advance: 'manual' })
   await open(page, '/routers/ap1/wifi')
   const card = page.getByRole('region', { name: 'Step-through' })
   await card.getByRole('button', { name: 'Step mode g', exact: true }).click()

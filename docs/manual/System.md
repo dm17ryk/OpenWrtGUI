@@ -175,8 +175,17 @@ authorized keys lack the app's key (the app could not log in afterwards), or whe
 nothing listening on the app's port where the app connects. The preview follows: the upload to
 `/tmp/owg/restore.tar.gz` (one audited line; the bytes are never logged), `tar -tzf`,
 `sysupgrade --restore-backup` and the reboot timer. **Restore and reboot** asks once more, then the screen
-follows the reboot as the Reboot card does. Done means a fresh uptime and every restored file matching the
-backup by its sha256. If a step fails before the reboot, the uploaded archive is removed from the router.
+follows the reboot as the Reboot card does. Done means a fresh uptime and everything restored matching the
+backup:
+- each config (`/etc/config/...`) by its settings in the router's `uci show`: every option has the backup's
+  value, and every list holds every item of the backup's, in any order. The first boot may add list items:
+  OpenWrt commits what the boot stages, such as the LTE interface in a firewall zone.
+- every other file by its sha256.
+- a backup's `/etc/uci-defaults` script that is gone counts as restored: OpenWrt runs each at the first boot
+  and deletes the ones that succeed. `sysupgrade -b` adds one itself, `10_disable_services`, so services you
+  disabled stay so. A script still there must match the backup, like any other file.
+
+If a step fails before the reboot, the uploaded archive is removed from the router.
 
 ## Files kept in a backup
 

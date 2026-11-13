@@ -17,8 +17,10 @@ firewall, nft tables, qdiscs, /tmp/owg and the switch ports are as found.
 from __future__ import annotations
 
 import asyncio
+import json
 import secrets
 import subprocess
+from collections.abc import Awaitable, Callable
 
 import pytest
 
@@ -161,15 +163,46 @@ async def _uci_wireless(t: Transport) -> str:
     return shown.stdout
 
 
-async def _restore(t: SshTransport, snapshot: str) -> None:
+async def _netifd_radio(t: Transport) -> str:
+    """netifd's view of radio0 for the log: its state and interface names only, never the config (the key)."""
+    status = await t.run("ubus call network.wireless status")
+    try:
+        radio = json.loads(status.stdout or "{}").get("radio0", {})
+    except ValueError:
+        return f"unreadable (exit {status.exit_status})"
+    state = {k: radio.get(k) for k in ("up", "pending", "autostart", "disabled", "retry_setup_failed")}
+    names = [i.get("ifname") for i in radio.get("interfaces", []) if isinstance(i, dict)]
+    return f"{state} interfaces={names}"
+
+
+async def _park(
+    t: Transport, *, waits: int = PARK_WAIT_S, sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
+) -> int:
+    """Reload radio0 with the parked config and wait for netifd to take the AP interface down: the passes
+    it took, 0 when it is still on air. HW-2 (2026-11-13): after the owgmon0 test the interface was still up
+    20 s after `wifi down radio0; wifi up radio0`; then netifd's view is printed and radio0 goes down and up
+    once more, apart."""
+    for attempt in (1, 2):
+        if attempt == 1:
+            await t.run("wifi down radio0; wifi up radio0", timeout=60.0)
+        else:
+            print(f"\nradio0 still on air after the restore; netifd: {await _netifd_radio(t)}")
+            await t.run("wifi down radio0", timeout=60.0)
+            await sleep(2)
+            await t.run("wifi up radio0", timeout=60.0)
+        for _ in range(waits):  # netifd takes the AP interface down about a second after `wifi` returns
+            if not await _on_air(t):
+                return attempt
+            await sleep(1)
+    return 0
+
+
+async def _restore(t: SshTransport, snapshot: str) -> int:
+    """Write AP2's wireless config back as found and park radio0: the passes `_park` took (0: on air)."""
     await t.run("uci revert wireless")
     wrote = await t.run_stdin(f"cat > {CONFIG}", snapshot)
     assert wrote.ok, wrote.stderr
-    await t.run("wifi down radio0; wifi up radio0", timeout=60.0)
-    for _ in range(PARK_WAIT_S):  # netifd takes the AP interface down about a second after `wifi` returns
-        if not await _on_air(t):
-            return
-        await asyncio.sleep(1)
+    return await _park(t)
 
 
 async def test_wifi_faults_on_air(fw_window: FwWindow, request: pytest.FixtureRequest) -> None:

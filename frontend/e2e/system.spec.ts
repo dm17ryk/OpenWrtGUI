@@ -84,5 +84,5 @@ test('a restore of a fresh backup through to back, in the simulator', async ({ p
   await expect(restore.getByRole('list', { name: 'Files in the backup' })).toContainText('/etc/config/network')
   await restore.getByRole('button', { name: 'Restore and reboot' }).click()
   await restore.getByRole('group', { name: 'Confirm restore' }).getByRole('button', { name: 'Restore now' }).click()
-  await expect(restore.getByRole('status', { name: 'Restore' })).toContainText('every restored file matches the backup', { timeout: 90_000 })
+  await expect(restore.getByRole('status', { name: 'Restore' })).toContainText('everything restored matches the backup', { timeout: 90_000 })
 })

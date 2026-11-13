@@ -75,7 +75,7 @@ async def test_restore_proven_by_the_files(ctx: AppContext) -> None:
     assert (job.kind, job.phase) == ("restore", "armed")
     done = await wait_job(ctx)
     assert (done.phase, done.error) == ("back", None), done
-    assert done.detail is not None and "every restored file matches" in done.detail
+    assert done.detail is not None and "everything restored matches" in done.detail
     assert (await ctx.system.overview("ap2")).hostname == "OpenWrt"  # the backup's
     for line in (e.command for e in ctx.audit.query()):
         assert "option hostname" not in line  # the archive's bytes are never logged
