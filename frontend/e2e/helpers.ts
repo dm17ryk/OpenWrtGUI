@@ -31,6 +31,20 @@ export async function open(page: Page, hashPath = '/'): Promise<void> {
   if (hashPath !== '/') await page.goto(`/#${hashPath}`)
 }
 
+/**
+ * Wait until the app's own step-through preview for a radio carries no warning. The one-radio-per-SSID rule (plan
+ * D9) reads the routers' statuses the poller refreshes every 5 s: right after another router with the same SSID
+ * parks (wifi.spec's n20 test parks AP2), the preview still says the SSID is on air there, the card asks for it
+ * only once, and Start stays disabled (the 2026-11-13 gate flake, a 60 s click timeout under load).
+ */
+export async function stepThroughClear(request: APIRequestContext, routerId: string, body: object): Promise<void> {
+  const warnings = async (): Promise<string[]> => {
+    const res = await request.post(`/api/routers/${routerId}/wifi/step-through/preview`, { headers: AUTH, data: body })
+    return ((await res.json()) as { warnings: string[] }).warnings
+  }
+  await expect.poll(warnings, { timeout: 30_000, intervals: [500, 1000] }).toEqual([])
+}
+
 export async function noHorizontalScroll(page: Page): Promise<void> {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   expect(overflow).toBeLessThanOrEqual(0)
