@@ -39,6 +39,7 @@ from openwrtgui.system.restore import (
     listed_ok,
     not_reset,
     provable,
+    proven_configs,
     reset_done,
     reset_warnings,
     restore_lines,
@@ -203,7 +204,7 @@ class JobsMixin:
             if back.proof:
                 error = "These files differ from the backup: " + ", ".join(back.proof)
             else:
-                detail += "; every restored file matches the backup"
+                detail += "; everything restored matches the backup"
         self._update_reboot(rec.id, phase="back", uptime_s=back.uptime_s, detail=detail, error=error)
 
     # ---------------------------------------------------------------- reset to defaults (D12, simulator only)
@@ -317,6 +318,7 @@ class JobsMixin:
         self._not_busy(rec)
         plan, data, info = self._restore_plan(rec, name, await router_ipv4(rec.host))
         files = provable(info)
+        configs = proven_configs(info)
 
         async def steps(t: Transport) -> None:
             sent = await run_audited_upload(
@@ -351,7 +353,7 @@ class JobsMixin:
                 raise
 
         async def prove(t: Transport, uptime: float) -> list[str]:
-            return await differing(t, files)
+            return await differing(t, files, configs)
 
         async def wait(r: RouterRecord, armed_at: float) -> None:
             await self._come_back(r, armed_at, prove)

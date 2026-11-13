@@ -21,6 +21,7 @@ MAX_ARCHIVE = 4 * 1024 * 1024  # AP2's own backup is 7 KB; /tmp holds the upload
 MAX_UNPACKED = 16 * 1024 * 1024
 GZIP = b"\x1f\x8b"
 _HOST_KEY_DIR = "/etc/dropbear/"
+_CONFIG_DIR = "/etc/config/"
 
 
 class ArchiveRefused(ValueError):
@@ -48,6 +49,8 @@ class ArchiveInfo(BaseModel):
     host_keys: tuple[str, ...]  # fingerprints of the archive's SSH host keys
     authorized_keys: str | None  # the file's text (public keys), None when the archive has none
     has_network: bool
+    # (name, text) of each etc/config/<name>: a restore proves a config by its settings, not its bytes
+    configs: tuple[tuple[str, str], ...] = ()
 
 
 def _path(name: str) -> str:
@@ -136,6 +139,11 @@ def read_archive(data: bytes) -> ArchiveInfo:
         host_keys=tuple(host_keys),
         authorized_keys=keys.decode(errors="replace") if keys is not None else None,
         has_network=network is not None,
+        configs=tuple(
+            (path.removeprefix(_CONFIG_DIR), raw.decode(errors="replace"))
+            for path, raw in members
+            if path.startswith(_CONFIG_DIR) and "/" not in path.removeprefix(_CONFIG_DIR)
+        ),
     )
 
 

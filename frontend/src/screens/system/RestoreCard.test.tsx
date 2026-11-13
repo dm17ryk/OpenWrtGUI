@@ -32,7 +32,7 @@ vi.mock('../../api/client', async (orig) => {
       if (path === `${base}/restore/start`) {
         jobs = [
           { ...JOB, phase: 'waiting' },
-          { ...JOB, phase: 'back', uptime_s: 38, detail: 'AP2 · office is back after 61 s (uptime 38 s); every restored file matches the backup' },
+          { ...JOB, phase: 'back', uptime_s: 38, detail: 'AP2 · office is back after 61 s (uptime 38 s); everything restored matches the backup' },
         ]
         return { ...JOB, phase: 'armed' }
       }
@@ -88,7 +88,7 @@ test('a checked backup lists its files, previews, asks once more, then follows t
   await vi.advanceTimersByTimeAsync(2100)
   expect(await screen.findByText(/Waiting for AP2 to answer/)).toBeInTheDocument()
   await vi.advanceTimersByTimeAsync(2100)
-  expect(await screen.findByText(/every restored file matches the backup/)).toBeInTheDocument()
+  expect(await screen.findByText(/everything restored matches the backup/)).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Check' })).toBeEnabled() // the job is over
 })
 
