@@ -7,10 +7,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-13
+
+Test helpers.
+
 Proven on the bench router (2026-11-13): the System reboot and a restore of the router's own backup, which
 0.6.0 listed as not yet proven; the step-through on air with a phone re-joining; frame analysis on the router's
-own network. Still not proven on a real router: the HTTPS redirect with the LuCI pages behind it (the bench
-router serves no HTTPS).
+own network. Channel analysis on air lists the networks around the router but not its own: a radio does not
+hear its own beacons.
+
+Not yet proven on a real router: the HTTPS redirect with the LuCI pages behind it (the bench router serves no
+HTTPS).
 
 ### Added
 
@@ -273,7 +280,8 @@ The foundation: install, update, add routers, see them, and stay out of a runnin
 - Router simulator built from recorded router output, used for e2e tests, screenshots and demos.
 - CI, pre-release and release workflows, wiki sync, CodeQL and Dependabot.
 
-[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.7.0
 [0.6.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.6.0
 [0.5.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.5.0
 [0.4.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.4.0
