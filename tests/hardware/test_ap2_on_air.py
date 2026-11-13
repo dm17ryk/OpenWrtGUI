@@ -93,7 +93,9 @@ async def air(fw_window: FwWindow, tmp_path: Path) -> AsyncIterator[AirWindow]:
         try:
             await steps.stop_all(120)  # a run still going restores first
         finally:
-            await _restore(t, snapshot)
+            passes = await _restore(t, snapshot)
+            if passes != 1:
+                print(f"\nAP2's park took {passes or 'more than 2'} passes (O21)")
             after = await _uci_wireless(t)
             names = [i.ifname for i in parse_iw_dev((await t.run("iw dev")).stdout)]
             parked = not await _on_air(t)
@@ -230,7 +232,9 @@ async def test_owgmon0_after_a_reload(air: AirWindow) -> None:
 
 
 async def test_ap_scan(air: AirWindow) -> None:
-    """A scan with `ap-force` while on air: AP2's own BSS listed and marked, channel loads read."""
+    """A scan with `ap-force` while on air: networks and channel loads read, and whatever AP2 hears of its own
+    BSSes is marked `own`. HW-2 (2026-11-13): 58 BSSes and none of them AP2's own, since a radio does not
+    receive its own beacons; `own` marks what another radio of the same router hears (spec O21)."""
     await _owgtest_on_air(air)
     scans = ScanService(
         pool=air.w.pool, routers=air.w.routers, guard=air.w.guard, audit=air.w.audit, wifi=air.w.wifi
@@ -238,8 +242,16 @@ async def test_ap_scan(air: AirWindow) -> None:
     plan = await scans.preview(AP2, "radio0")
     assert plan.via == "ap", plan
     result = await scans.scan(AP2, "radio0", plan.digest)
-    print(f"\nscan via {result.via}: {len(result.networks)} BSSes in {result.seconds:.1f} s")
-    assert any(n.own for n in result.networks)
+    mine = {
+        i.addr.lower() for i in parse_iw_dev((await air.t.run("iw dev")).stdout) if i.type == "AP" and i.addr
+    }
+    heard = [n for n in result.networks if n.bssid in mine]
+    print(
+        f"\nscan via {result.via}: {len(result.networks)} BSSes in {result.seconds:.1f} s; "
+        f"own heard: {len(heard)}"
+    )
+    assert result.networks, "the scan heard no network"
+    assert all(n.own for n in heard) and not any(n.own for n in result.networks if n.bssid not in mine)
     assert any(c.busy_pct is not None for c in result.channels)
 
 

@@ -20,7 +20,7 @@ import asyncio
 import secrets
 import shutil
 import time
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Collection
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -83,6 +83,27 @@ def by_content(text: str) -> list[tuple[str, tuple[tuple[str, str], ...]]]:
     )
 
 
+_ANY_OR_LOOPBACK = {"0.0.0.0", "::", "127.0.0.1", "::1"}
+
+
+def fixed_addresses(network_show: str) -> set[str]:
+    """The addresses the network config fixes (`ipaddr`, `ip6addr`, prefix lengths dropped)."""
+    out: set[str] = set()
+    for key, value in parse_uci_show(network_show).items():
+        if key.rsplit(".", 1)[-1] in ("ipaddr", "ip6addr"):
+            out |= {v.split("/", 1)[0] for v in value.split()}
+    return out
+
+
+def stable_listeners(
+    listeners: Collection[tuple[str, int]], fixed: Collection[str]
+) -> tuple[tuple[str, int], ...]:
+    """The listeners on addresses a reboot keeps: any, loopback and the config's fixed ones. The carrier gives
+    the LTE interface a new address at every boot (HW-3, 2026-11-13), so a listener there is left out, as are
+    other addresses the router gets at run time (link-local, ULA)."""
+    return tuple(sorted((a, p) for a, p in listeners if a in _ANY_OR_LOOPBACK or a in fixed))
+
+
 @dataclass(frozen=True)
 class Found:
     dropbear: list[tuple[str, tuple[tuple[str, str], ...]]]
@@ -111,7 +132,9 @@ async def found(t: Transport) -> Found:
         system=by_content(await out(s.UCI_SYSTEM)),
         keys=await out(s.KEYS_READ),
         kept=await out(s.KEPT),
-        listeners=tuple(sorted(parse_listeners(await out(s.LISTENERS)))),
+        listeners=stable_listeners(
+            parse_listeners(await out(s.LISTENERS)), fixed_addresses(await out("uci -q show network"))
+        ),
         leds=tuple((i.sysfs, i.active) for i in parse_leds(await out(s.LEDS) or "{}")),
         owg=await out("ls -A /tmp/owg 2>/dev/null"),
         radio=(await out("uci -q get wireless.radio0.disabled")).strip(),
