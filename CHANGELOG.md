@@ -7,6 +7,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Proven on the bench router (2026-11-13): the System reboot and a restore of the router's own backup, which
+0.6.0 listed as not yet proven; the step-through on air with a phone re-joining; frame analysis on the router's
+own network. Still not proven on a real router: the HTTPS redirect with the LuCI pages behind it (the bench
+router serves no HTTPS).
+
 ### Added
 
 - Wi-Fi › Step-through: steps a radio through every ticked mode, channel and TX power, one pure mode per step,
@@ -22,6 +27,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- A restore no longer reports files that "differ" when OpenWrt's first boot changed them by design (found on the
+  bench router): the script `sysupgrade -b` adds to keep disabled services disabled runs once and is deleted,
+  and the boot may add to a config. Each config is now checked by its settings, other files by their sha256.
 - An Apply during a Capture on mon0 no longer removes the capture's monitor interface: the beacon check,
   the capture and frame analysis now share it.
 - The GitHub release notes keep characters such as "›": since 0.4.0 they showed a replacement character
