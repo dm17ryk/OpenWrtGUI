@@ -34,6 +34,7 @@ HEX_MASK = re.compile(r"0[xX][0-9a-fA-F]{1,8}")
 KEPT_PATH = re.compile(r"/[^\s'\"\\]{0,255}")
 OWNER = re.compile(r"[A-Za-z0-9 ._-]{1,40}")
 _DIGEST_PATH = re.compile(r"/[A-Za-z0-9._/@+-]{1,255}")
+CONFIG_NAME = re.compile(r"[A-Za-z0-9_-]{1,64}")  # a file in /etc/config `uci show` can be asked about
 MAX_FILE = 8 * 1024
 DIAG_LIMIT_S = 25  # D4: a diagnostic never runs longer, whatever the network does
 
@@ -142,6 +143,12 @@ def write_file(path: FilePath, text: str) -> str:
         first, _, rest = command.partition("\n")
         command = f"{first} && chmod 600 {AUTHORIZED_KEYS}\n{rest}"
     return command
+
+
+def uci_show_config(config: str) -> str:
+    """A config as the router has it now, staged changes included, unnamed sections as libuci's cfgXXXXXX
+    (a restore's proof reads each restored config's settings, D11; a missing config exits non-zero)."""
+    return f"uci -X show {_checked(CONFIG_NAME, config, 'a uci config name')}"
 
 
 def file_digests(paths: Sequence[str]) -> str:

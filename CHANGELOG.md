@@ -29,7 +29,8 @@ router serves no HTTPS).
 
 - A restore no longer reports files that "differ" when OpenWrt's first boot changed them by design (found on the
   bench router): the script `sysupgrade -b` adds to keep disabled services disabled runs once and is deleted,
-  and the boot may add to a config. Each config is now checked by its settings, other files by their sha256.
+  and the boot may add to a config. Each config is now checked by its settings (options exactly, lists by
+  every item of the backup), other files by their sha256; a uci-defaults script still there must match.
 - An Apply during a Capture on mon0 no longer removes the capture's monitor interface: the beacon check,
   the capture and frame analysis now share it.
 - The GitHub release notes keep characters such as "›": since 0.4.0 they showed a replacement character
