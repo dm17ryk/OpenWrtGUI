@@ -80,7 +80,7 @@ export function SystemScreen() {
       {tab === 'services' && <ServicesTab routerId={id} routerName={name} />}
       {tab === 'cron' && <CronTab routerId={id} routerName={name} />}
       {tab === 'leds' && <LedsTab routerId={id} routerName={name} />}
-      {tab === 'mounts' && <MountsTab routerId={id} />}
+      {tab === 'mounts' && <MountsTab routerId={id} routerName={name} />}
       {tab === 'backup' && <BackupTab routerId={id} routerName={name} />}
     </main>
   )

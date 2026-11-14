@@ -127,7 +127,7 @@ def test_system_pages_are_native() -> None:
         "admin/system/admin/uhttpd",
     ):
         assert views[path].native == "system", path
-    assert views["admin/system/mounts"].native is None
+    assert views["admin/system/mounts"].native == "system"  # v1.0a2 D5: edited natively with block-mount
     assert views["admin/status/realtime/wireless"].native == "rf"  # v1.0a1 D5: RF live replaces it
 
 

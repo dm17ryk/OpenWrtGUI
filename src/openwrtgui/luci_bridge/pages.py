@@ -28,8 +28,8 @@ NATIVE: dict[str, str] = {
     "admin/network/firewall/ipsets": "firewall",
     "admin/network/firewall/custom": "firewall",
     "admin/status/nftables": "firewall",
-    # v0.6b D11: the System screen; v0.6c D1: Administration and LEDs too (Mount points stays LuCI's: its page
-    # needs block-mount, D8)
+    # v0.6b D11: the System screen; v0.6c D1: Administration and LEDs too; Mount points too (v1.0a2 D5: edited
+    # natively on routers with block-mount)
     "admin/system/admin": "system",
     "admin/system/admin/password": "system",
     "admin/system/admin/pwpolicy": "system",
@@ -39,6 +39,7 @@ NATIVE: dict[str, str] = {
     "admin/system/admin/repokeys": "system",
     "admin/system/leds": "system",
     "admin/system/plugins": "system",  # v1.0a2 D4: System › Plugins
+    "admin/system/mounts": "system",
     "admin/status/logs": "system",
     "admin/status/logs/syslog": "system",
     "admin/status/logs/dmesg": "system",
@@ -76,6 +77,7 @@ NATIVE_TAB: dict[str, str] = {
     "admin/system/admin/repokeys": "access",
     "admin/system/leds": "leds",
     "admin/system/plugins": "plugins",
+    "admin/system/mounts": "mounts",
     "admin/status/logs": "logs",
     "admin/status/logs/syslog": "logs",
     "admin/status/logs/dmesg": "logs",

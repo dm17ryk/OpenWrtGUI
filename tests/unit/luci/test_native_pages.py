@@ -53,6 +53,14 @@ def test_plugins_is_system_plugins() -> None:
     assert (view.native, view.tab) == ("system", "plugins")
 
 
+def test_mount_points_is_system_mount_points() -> None:
+    mounts = LuciPage(
+        "admin/system/mounts", "Mount Points", "luci-mod-system", ("luci-mod-system-mounts",), (), ()
+    )
+    (view,) = page_views([mounts])
+    assert (view.native, view.tab) == ("system", "mounts")
+
+
 def test_every_tab_is_one_its_screen_has() -> None:
     for path, tab in NATIVE_TAB.items():
         assert path in NATIVE, path

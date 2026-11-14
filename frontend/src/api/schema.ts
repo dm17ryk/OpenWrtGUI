@@ -2071,6 +2071,159 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/system/fstab": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Fstab */
+        get: operations["fstab_api_routers__router_id__system_fstab_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/fstab/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply */
+        post: operations["apply_api_routers__router_id__system_fstab_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/fstab/generate/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate Apply */
+        post: operations["generate_apply_api_routers__router_id__system_fstab_generate_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/fstab/generate/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate Preview */
+        post: operations["generate_preview_api_routers__router_id__system_fstab_generate_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/fstab/mount/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mount Apply */
+        post: operations["mount_apply_api_routers__router_id__system_fstab_mount_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/fstab/mount/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mount Preview */
+        post: operations["mount_preview_api_routers__router_id__system_fstab_mount_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/fstab/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview */
+        post: operations["preview_api_routers__router_id__system_fstab_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/fstab/unmount/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unmount Apply */
+        post: operations["unmount_apply_api_routers__router_id__system_fstab_unmount_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/fstab/unmount/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unmount Preview */
+        post: operations["unmount_preview_api_routers__router_id__system_fstab_unmount_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/system/http/apply": {
         parameters: {
             query?: never;
@@ -3397,6 +3550,21 @@ export interface components {
             /** Size */
             size: number;
         };
+        /** BlockDevice */
+        BlockDevice: {
+            /** Dev */
+            dev: string;
+            /** Label */
+            label?: string | null;
+            /** Mount */
+            mount?: string | null;
+            /** Size */
+            size?: number | null;
+            /** Type */
+            type?: string | null;
+            /** Uuid */
+            uuid?: string | null;
+        };
         /** BlockIn */
         BlockIn: {
             /** Seconds */
@@ -4445,6 +4613,109 @@ export interface components {
             /** Seconds */
             seconds: number;
             tx: components["schemas"]["Direction"];
+        };
+        /** FstabApplyIn */
+        FstabApplyIn: {
+            /** Digest */
+            digest: string;
+            /** Entries */
+            entries?: components["schemas"]["FstabEntry"][] | null;
+            settings?: components["schemas"]["FstabGlobal"] | null;
+        };
+        /** FstabChange */
+        FstabChange: {
+            /** Entries */
+            entries?: components["schemas"]["FstabEntry"][] | null;
+            settings?: components["schemas"]["FstabGlobal"] | null;
+        };
+        /** FstabEntry */
+        FstabEntry: {
+            /** Device */
+            device?: string | null;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Fstype */
+            fstype?: string | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "mount" | "swap";
+            /** Label */
+            label?: string | null;
+            /** Options */
+            options?: string | null;
+            /** Section */
+            section?: string | null;
+            /** Target */
+            target?: string | null;
+            /** Uuid */
+            uuid?: string | null;
+        };
+        /** FstabGlobal */
+        FstabGlobal: {
+            /**
+             * Anon Mount
+             * @default false
+             */
+            anon_mount: boolean;
+            /**
+             * Anon Swap
+             * @default false
+             */
+            anon_swap: boolean;
+            /**
+             * Auto Mount
+             * @default true
+             */
+            auto_mount: boolean;
+            /**
+             * Auto Swap
+             * @default true
+             */
+            auto_swap: boolean;
+            /**
+             * Check Fs
+             * @default false
+             */
+            check_fs: boolean;
+            /** Delay Root */
+            delay_root?: number | null;
+        };
+        /** FstabState */
+        FstabState: {
+            /** Block */
+            block: boolean;
+            /**
+             * Devices
+             * @default []
+             */
+            devices: components["schemas"]["BlockDevice"][];
+            /**
+             * Entries
+             * @default []
+             */
+            entries: components["schemas"]["FstabEntry"][];
+            /** Global Section */
+            global_section?: string | null;
+            /**
+             * Missing
+             * @default []
+             */
+            missing: string[];
+            /**
+             * @default {
+             *       "anon_mount": false,
+             *       "anon_swap": false,
+             *       "auto_mount": true,
+             *       "auto_swap": true,
+             *       "check_fs": false
+             *     }
+             */
+            settings: components["schemas"]["FstabGlobal"];
         };
         /** FwRuleConf */
         FwRuleConf: {
@@ -7841,6 +8112,18 @@ export interface components {
             before: string | null;
             /** Option */
             option: string;
+        };
+        /** UnmountApplyIn */
+        UnmountApplyIn: {
+            /** Digest */
+            digest: string;
+            /** Target */
+            target: string;
+        };
+        /** UnmountIn */
+        UnmountIn: {
+            /** Target */
+            target: string;
         };
         /** UpdateOut */
         UpdateOut: {
@@ -12136,6 +12419,309 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DiagResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fstab_api_routers__router_id__system_fstab_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FstabState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_api_routers__router_id__system_fstab_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FstabApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_apply_api_routers__router_id__system_fstab_generate_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Digest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_preview_api_routers__router_id__system_fstab_generate_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mount_apply_api_routers__router_id__system_fstab_mount_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Digest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mount_preview_api_routers__router_id__system_fstab_mount_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_api_routers__router_id__system_fstab_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FstabChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unmount_apply_api_routers__router_id__system_fstab_unmount_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnmountApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unmount_preview_api_routers__router_id__system_fstab_unmount_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UnmountIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
                 };
             };
             /** @description Validation Error */

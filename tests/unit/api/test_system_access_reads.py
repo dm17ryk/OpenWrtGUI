@@ -102,4 +102,5 @@ def test_luci_pages_for_access_and_leds() -> None:
         "admin/system/leds",
     ):
         assert NATIVE[page] == "system", page
-    assert "admin/system/mounts" not in NATIVE  # LuCI's page needs block-mount: the fallback keeps it (D8)
+    # v0.6c D8 left Mount Points to LuCI; v1.0a2 D5 edits fstab natively on routers with block-mount
+    assert NATIVE["admin/system/mounts"] == "system"
