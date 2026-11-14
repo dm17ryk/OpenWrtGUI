@@ -406,7 +406,7 @@ The wizard described in section 5.
 | System › Plugins | System › Plugins (the switches; a plugin's own options in LuCI) — native since v1.0a2 (D4) |
 | System › Startup | System › Services |
 | System › Scheduled tasks | System › Scheduled tasks |
-| System › Mount points | System › Mount points (fstab editing with block-mount since v1.0a2, D5) |
+| System › Mount points | System › Mount points (fstab editing with block-mount since v1.0a2, D5; mount points on the router's own file systems refused: /, /overlay, /rom, /tmp, /dev, /proc, /sys, /etc, /usr, /var, /www) |
 | System › LED configuration | System › LEDs |
 | System › Backup / Flash firmware | System › Backup and firmware |
 | System › Reboot | System › Reboot |

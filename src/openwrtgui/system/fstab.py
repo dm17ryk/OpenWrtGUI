@@ -22,8 +22,9 @@ DEVICE = re.compile(r"/dev/[A-Za-z0-9._/-]{1,64}")
 FSTYPE = re.compile(r"[a-z0-9]{1,16}")
 OPTIONS = re.compile(r"[A-Za-z0-9,=._:/+-]{1,255}")
 PROTECTED = re.compile(r"/(?:overlay|rom|tmp(?:/.+)?|dev(?:/.+)?|)")  # LuCI offers no Unmount for these
-# D5: extroot (/, /overlay) and the router's own file systems are no mount targets here
-REFUSED_TARGET = re.compile(r"/(?:|overlay|rom|(?:tmp|dev|proc|sys)(?:/.*)?)")
+# D5: extroot (/, /overlay) and the router's own file systems are no mount targets here; /etc, /usr, /var and
+# /www too (widened 2026-11-14 after the final review: a mount there hides the router's config or programs)
+REFUSED_TARGET = re.compile(r"/(?:|overlay|rom|(?:tmp|dev|proc|sys|etc|usr|var|www)(?:/.*)?)")
 FLAGS = ("anon_swap", "anon_mount", "auto_swap", "auto_mount", "check_fs")
 _CONFIG = re.compile(r"config\s+'?(\w+)'?")
 _OPTION = re.compile(r"option\s+'?(\w+)'?\s+'([^']*)'")

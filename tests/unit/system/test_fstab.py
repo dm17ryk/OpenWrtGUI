@@ -88,11 +88,28 @@ def test_sections_keep_label_device_and_absent_devices() -> None:
         (FstabEntry(kind="mount", uuid=USB, target="//overlay"), "plain mount point"),
         (FstabEntry(kind="mount", uuid=USB, target="/overlay/."), "plain mount point"),
         (FstabEntry(kind="mount", uuid=USB, target="/mnt/.."), "plain mount point"),
+        # widened 2026-11-14 after the final review: /etc, /usr, /var and /www and below are refused too
+        (FstabEntry(kind="mount", uuid=USB, target="/etc"), "own file system"),
+        (FstabEntry(kind="mount", uuid=USB, target="/etc/"), "own file system"),
+        (FstabEntry(kind="mount", uuid=USB, target="/etc/config"), "own file system"),
+        (FstabEntry(kind="mount", uuid=USB, target="/usr"), "own file system"),
+        (FstabEntry(kind="mount", uuid=USB, target="/usr/lib/lua"), "own file system"),
+        (FstabEntry(kind="mount", uuid=USB, target="/var"), "own file system"),
+        (FstabEntry(kind="mount", uuid=USB, target="/var/log/"), "own file system"),
+        (FstabEntry(kind="mount", uuid=USB, target="/www"), "own file system"),
+        (FstabEntry(kind="mount", uuid=USB, target="/www/luci-static"), "own file system"),
+        (FstabEntry(kind="mount", uuid=USB, target="/mnt/../etc"), "plain mount point"),
+        (FstabEntry(kind="mount", uuid=USB, target="//www"), "plain mount point"),
     ],
 )
 def test_values_outside_the_rules_are_refused(entry: FstabEntry, message: str) -> None:
     with pytest.raises(ValueError, match=message):
         check_entry(entry)
+
+
+@pytest.mark.parametrize("target", ["/mnt/usb", "/mnt/etc", "/srv/www", "/etcetera", "/usrdata", "/variable"])
+def test_mount_points_beside_the_refused_ones_are_accepted(target: str) -> None:
+    check_entry(FstabEntry(kind="mount", uuid=USB, target=target))  # no ValueError
 
 
 def test_a_new_mount_and_a_removed_swap() -> None:

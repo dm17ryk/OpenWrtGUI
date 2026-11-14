@@ -173,8 +173,10 @@ On a router with block-mount the screen also edits `/etc/config/fstab`, as LuCI'
   is picked from the router's block devices by UUID (else label, else device); one that is not attached now
   shows "not present" and is kept. **Add mount**, **Add swap** and **Remove** change the list at Apply. The
   preview shows the exact `uci` lines and `/sbin/block mount`, which mounts what the new fstab says.
-- A mount point of `/` or `/overlay` (extroot), or one under `/rom`, `/tmp`, `/dev`, `/proc` or `/sys`, is
-  refused: extroot moves the router's root at the next boot, so set it up in LuCI or the terminal.
+- A mount point of `/` or `/overlay` (extroot), or one at or under `/rom`, `/tmp`, `/dev`, `/proc`, `/sys`,
+  `/etc`, `/usr`, `/var` or `/www`, is refused: extroot moves the router's root at the next boot, and a mount
+  over the others hides the router's own files. Set those up in LuCI or the terminal. A mount point with `..`,
+  `.` or `//` in it is refused too.
 - **Unmount** on a row unmounts that file system (not offered for `/`, `/overlay`, `/rom`, `/tmp` and `/dev`).
 - **Mount attached devices** runs `block mount`.
 - **Generate config** replaces every fstab entry with what `block detect` finds now; the mounts it finds start
