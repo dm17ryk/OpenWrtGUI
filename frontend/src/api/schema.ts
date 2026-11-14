@@ -5826,6 +5826,8 @@ export interface components {
              * @default
              */
             section: string;
+            /** Tab */
+            tab?: string | null;
             /** Title */
             title: string;
         };
