@@ -193,7 +193,9 @@ def _checked(rule: re.Pattern[str], value: str, what: str) -> str:
     return value
 
 
-def check_entry(e: FstabEntry) -> None:
+def check_entry(e: FstabEntry, *, detected: bool = False) -> None:
+    """`detected`: an entry block detect printed (Generate). A disabled one may name the router's own file
+    system, as block detect writes /rom and /overlay disabled on a real router (final review)."""
     if e.uuid:
         _checked(UUID, e.uuid, "a UUID")
     elif e.label:
@@ -207,7 +209,10 @@ def check_entry(e: FstabEntry) -> None:
     if not e.target:
         raise ValueError("A mount needs a mount point")
     _checked(MOUNT_PATH, e.target, "a mount point (an absolute path of letters, digits, . _ - /)")
-    if REFUSED_TARGET.fullmatch(e.target.rstrip("/") or "/"):
+    # final review: `..`, `.` or `//` would walk around the refused set (/mnt/../overlay is /overlay)
+    if e.target != "/" and any(part in ("", ".", "..") for part in e.target.rstrip("/").split("/")[1:]):
+        raise ValueError(f"{e.target} is not a plain mount point (no '.', '..' or '//' in it)")
+    if _refused(e.target) and not (detected and not e.enabled):
         raise ValueError(
             f"{e.target} is the router's own file system: set up extroot or system mounts in LuCI or the "
             "terminal"
@@ -248,19 +253,47 @@ def fstab_ops(global_section: str | None, current: Sequence[FstabEntry], change:
         if change.settings.delay_root is not None:
             ops.append(UciOp("set", f"{path}.delay_root", str(change.settings.delay_root)))
     if change.entries is not None:
-        kinds = {e.section: e.kind for e in current if e.section}
-        kept: set[str] = set()
-        for i, e in enumerate(change.entries, 1):
-            check_entry(e)
-            if e.section is None:
-                path = f"fstab.$m{i}"
-                ops += [UciOp("add", path, e.kind), *_entry_ops(path, e, new=True)]
-                continue
-            if kinds.get(e.section) != e.kind:
-                raise ValueError(f"No {e.kind} section {e.section} on this router")
+        ops += _entries_ops(current, change.entries)
+    return ops
+
+
+def _guarded(e: FstabEntry) -> bool:
+    """An enabled mount on the router's own file system (extroot): never changed or removed here (D5)."""
+    return e.kind == "mount" and e.enabled and bool(e.target) and _refused(e.target or "")
+
+
+def _refused(target: str) -> bool:
+    return REFUSED_TARGET.fullmatch(target.rstrip("/") or "/") is not None
+
+
+def _entries_ops(
+    current: Sequence[FstabEntry], entries: Sequence[FstabEntry], *, detected: bool = False
+) -> list[UciOp]:
+    """Only new and changed entries are checked and written: an untouched one (even outside the rules, as a
+    router may hold it) is left as it is (final review)."""
+    now = {e.section: e for e in current if e.section}
+    ops: list[UciOp] = []
+    kept: set[str] = set()
+    for i, e in enumerate(entries, 1):
+        if e.section is not None and now.get(e.section) == e:
             kept.add(e.section)
-            ops += _entry_ops(f"fstab.{e.section}", e, new=False)
-        ops += [UciOp("delete", f"fstab.{s}") for s in sorted(set(kinds) - kept)]
+            continue
+        check_entry(e, detected=detected)
+        if e.section is None:
+            path = f"fstab.$m{i}"
+            ops += [UciOp("add", path, e.kind), *_entry_ops(path, e, new=True)]
+            continue
+        if e.section not in now or now[e.section].kind != e.kind:
+            raise ValueError(f"No {e.kind} section {e.section} on this router")
+        kept.add(e.section)
+        ops += _entry_ops(f"fstab.{e.section}", e, new=False)
+    for section in sorted(set(now) - kept):
+        if _guarded(now[section]):
+            raise ValueError(
+                f"{now[section].target} is the router's own file system (extroot): remove it in LuCI or the "
+                "terminal"
+            )
+        ops.append(UciOp("delete", f"fstab.{section}"))
     return ops
 
 
@@ -270,6 +303,8 @@ def generate_ops(global_section: str | None, current: Sequence[FstabEntry], dete
         raise ValueError("block detect printed nothing")
     settings, entries = parse_detect(detected)
     old = [s for s in [global_section, *(e.section for e in current)] if s]
-    return [UciOp("delete", f"fstab.{s}") for s in old] + fstab_ops(
-        None, [], FstabChange(settings=settings, entries=entries)
-    )
+    return [
+        *(UciOp("delete", f"fstab.{s}") for s in old),
+        *fstab_ops(None, [], FstabChange(settings=settings)),
+        *_entries_ops([], entries, detected=True),
+    ]
