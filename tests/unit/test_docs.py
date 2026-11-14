@@ -54,6 +54,24 @@ def test_readme_links_the_project_files() -> None:
     assert SCREENSHOT_URL + "dashboard.png" in readme
 
 
+def released_minors(changelog: str) -> list[str]:
+    """The `x.y` of every released `## [x.y.z] - date` section, newest first, each once."""
+    found = re.findall(r"^## \[(\d+\.\d+)\.\d+\] - \d{4}-\d{2}-\d{2}$", changelog, re.MULTILINE)
+    return list(dict.fromkeys(found))
+
+
+def test_readme_describes_every_released_minor() -> None:
+    """0.7.0 shipped with a README that stopped at v0.6: the opening note names the newest release and every
+    release has its "What vX.Y adds" section."""
+    readme = _read(ROOT / "README.md")
+    minors = released_minors(_read(ROOT / "CHANGELOG.md"))
+    assert {"0.1", "0.6", "0.7"} <= set(minors)
+    assert f"> v{minors[0]} adds " in readme, minors[0]
+    assert "## What v0.1 does" in readme
+    missing = [m for m in minors if m != "0.1" and f"## What v{m} adds" not in readme]
+    assert missing == []
+
+
 def test_readme_screenshots_are_ones_e2e_writes() -> None:
     shown = {
         t.removeprefix(SCREENSHOT_URL).removesuffix(".png")

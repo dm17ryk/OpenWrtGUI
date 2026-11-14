@@ -15,9 +15,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
-- The manual's home page, FAQ and Bench Guard page describe the current release. SECURITY.md lists every data
-  folder. Flashing a router with too little free memory, such as the bench's AP2, is documented: use LuCI or the
-  terminal.
+- The README (with what 0.7 added), the manual's home page, FAQ and Bench Guard page describe the current
+  release. SECURITY.md lists every data folder. Flashing a router with too little free memory, such as the
+  bench's AP2, is documented: use LuCI or the terminal.
 
 ## [0.7.0] - 2026-11-13
 
