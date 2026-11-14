@@ -1,6 +1,6 @@
 [project]
 name = "openwrtgui"
-version = "0.7.0"
+version = "1.0.0"
 description = "Windows desktop app for operating the OpenWrt routers of a Wi-Fi test bench"
 readme = "README.md"
 license = "GPL-3.0-only"
