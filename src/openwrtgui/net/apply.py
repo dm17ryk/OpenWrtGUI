@@ -387,6 +387,8 @@ class ApplyRunner:
         self._restore_s = restore_s
         self._fetch_key = fetch_key
         self._holds: dict[str, object] = {}  # router id -> the pool hold a rollback apply has
+        # called with the router id after each applied change (v1.0a2 D10a: the LuCI menu facts go stale)
+        self.on_applied: list[Callable[[str], None]] = []
 
     async def _run(
         self, t: Transport, rec: RouterRecord, plan: NetPlan, command: str, source: Source = "user", **kw: Any
@@ -437,7 +439,11 @@ class ApplyRunner:
             planned = await make(t)
             if digest is not None and digest != planned.plan.digest:
                 raise PreviewChanged(rec.name)
-            return await self.run_locked(rec, t, planned, guarded=guarded)
+            result = await self.run_locked(rec, t, planned, guarded=guarded)
+        if result.applied:
+            for listener in self.on_applied:
+                listener(rec.id)
+        return result
 
     async def run_locked(
         self, rec: RouterRecord, t: Transport, planned: Planned, *, guarded: bool = True

@@ -177,6 +177,10 @@ class LuciBridgeService:
             self._facts[rec.id] = (self._clock(), desc, facts)
         return facts
 
+    def forget_facts(self, router_id: str) -> None:
+        """The app changed the router's config (v1.0a2 D10a): the next page list asks it again."""
+        self._facts.pop(router_id, None)
+
     async def pages(self, router_id: str) -> list[PageView]:
         rec, t = await self._connect(router_id)
         pages = await self._luci_pages(rec, t)
