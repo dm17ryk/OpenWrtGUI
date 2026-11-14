@@ -48,15 +48,17 @@ class PluginsService:
         shown = await t.run(s.UCI_PLUGINS)
         uci = parse_uci_show(shown.stdout) if shown.ok else {}
         headers: list[PluginHeader] = []
+        files: set[str] = set()
         listed = await t.run(s.LIST_PLUGINS)  # no such folder: no plugins installed
         if listed.ok:
             for name in listed.stdout.split():
                 if m := PLUGIN_FILE.fullmatch(name):
+                    files.add(m.group(1))
                     text = await t.run(read_plugin_command(m.group(1)))
                     header = parse_header(m.group(1), text.stdout) if text.ok else None
                     if header is not None:
                         headers.append(header)
-        state = plugin_state(uci, headers)
+        state = plugin_state(uci, headers, files)
         if not shown.ok:
             state = state.model_copy(update={"missing": ("luci_plugins config",)})
         return state, uci

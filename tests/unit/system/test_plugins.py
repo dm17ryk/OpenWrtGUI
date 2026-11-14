@@ -104,6 +104,38 @@ def test_the_global_section_is_made_when_missing() -> None:
     ]
 
 
+def test_a_present_file_whose_header_cannot_be_read_is_not_gone() -> None:
+    """final review Important 4: installed means the plugin's file is there; its header may be unreadable."""
+    state = plugin_state(UCI, [], files={CSP_ID})  # CSP's file is listed, its header did not parse
+    by = {p.id: p for p in state.plugins}
+    assert (by[CSP_ID].installed, by[CSP_ID].readable, by[CSP_ID].group) == (True, False, "http_headers")
+    assert (by[GONE_ID].installed, by[GONE_ID].readable) == (False, False)
+    with pytest.raises(ValueError, match="file is gone"):
+        plugin_ops(state, PluginChange(remove=[CSP_ID]))
+    assert plugin_ops(state, PluginChange(plugins={CSP_ID: False})) == [
+        UciOp("delete", f"luci_plugins.{CSP_ID}.enabled")
+    ]
+    lone = "a" * 32  # a file with an unreadable header and no section: listed, but no group to switch
+    bare = plugin_state({"luci_plugins.global": "global"}, [], files={lone})
+    assert [(p.id, p.installed, p.group) for p in bare.plugins] == [(lone, True, "")]
+    with pytest.raises(ValueError, match="configure it in LuCI"):
+        plugin_ops(bare, PluginChange(plugins={lone: True}))
+
+
+def test_secret_options_are_hidden() -> None:
+    """final review (re-graded): LuCI's 2FA plugin keeps root's TOTP key in key_root; it is never shown."""
+    totp = "bb4ea47fcffb44ec9bb3d3673c9b4ed2"
+    uci = {
+        f"luci_plugins.{totp}": "auth_login",
+        f"luci_plugins.{totp}.name": "TOTP/HOTP 2FA",
+        f"luci_plugins.{totp}.key_root": "JBSWY3DPEHPK3PXP",
+        f"luci_plugins.{totp}.type_root": "totp",
+        f"luci_plugins.{totp}.priority": "10",
+    }
+    (row,) = plugin_state(uci, []).plugins
+    assert row.options == {"key_root": "<hidden>", "type_root": "totp", "priority": "10"}
+
+
 def test_refusals() -> None:
     assert CSP is not None
     state = plugin_state(UCI, [CSP])

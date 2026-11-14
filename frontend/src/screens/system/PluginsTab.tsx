@@ -78,7 +78,7 @@ export function PluginsTab({ routerId, routerName }: Props) {
                         <input
                           type="checkbox"
                           aria-label={`${p.name} on`}
-                          disabled={!p.installed}
+                          disabled={!p.installed || !p.group}
                           checked={change.plugins[p.id] ?? p.enabled}
                           onChange={(e) => setChange({ ...change, plugins: { ...change.plugins, [p.id]: e.target.checked } })}
                         />
@@ -87,6 +87,7 @@ export function PluginsTab({ routerId, routerName }: Props) {
                         <strong>{p.title || p.name}</strong>
                         {p.description && <div className="muted">{p.description}</div>}
                         {!p.installed && <div className="note w">Missing plugin: its file is gone</div>}
+                        {p.installed && !p.readable && <div className="note">Its header could not be read: configure it in LuCI.</div>}
                       </td>
                       <td className="mono">{p.group}</td>
                       <td className="mono">{Object.entries(p.options).map(([k, v]) => `${k}=${v}`).join(' ') || '—'}</td>

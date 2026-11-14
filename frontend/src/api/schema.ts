@@ -6486,6 +6486,8 @@ export interface components {
             options: {
                 [key: string]: string;
             };
+            /** Readable */
+            readable: boolean;
             /** Title */
             title: string;
         };

@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, expect, test, vi } from 'vitest'
+import { apiFetch } from '../../api/client'
 import { AP4_PLUGIN_OFF_PLAN, AP4_PLUGINS } from '../../testing/later'
 import { PluginsTab } from './PluginsTab'
 
@@ -48,6 +49,15 @@ test('the switches, the plugins and their options', async () => {
   expect(screen.getByRole('button', { name: 'Remove' })).toBeEnabled()
   expect(screen.getByRole('link', { name: 'Configure in LuCI' })).toHaveAttribute('href', '/routers/ap4/luci?page=admin%2Fsystem%2Fplugins')
   expect(screen.getByRole('button', { name: 'Help: Plugins' })).toBeInTheDocument()
+})
+
+test('an installed plugin whose header cannot be read is not called gone (final review)', async () => {
+  const csp = AP4_PLUGINS.plugins[1]
+  vi.mocked(apiFetch).mockResolvedValueOnce({ ...AP4_PLUGINS, plugins: [{ ...csp, readable: false, title: '', description: '' }] })
+  renderTab()
+  expect(await screen.findByText(/header could not be read/)).toBeInTheDocument()
+  expect(screen.queryByText(/Missing plugin/)).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull()
 })
 
 test('a plugin switched off is previewed', async () => {

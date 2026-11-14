@@ -9,10 +9,11 @@ options are shown, and edited in LuCI.
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, Sequence, Set
 
 from pydantic import BaseModel, ConfigDict
 
+from openwrtgui.guard.audit import HIDDEN
 from openwrtgui.system.commands import PLUGIN_DIR
 from openwrtgui.uci import UciOp
 
@@ -23,6 +24,8 @@ _WORD = re.compile(r"[a-z][a-z0-9]{0,31}")  # a plugin class or type
 _FIELD = re.compile(
     r"""\b(class|type|name|id|title|description)\s*:\s*(?:_\(\s*)?(['"])((?:(?!\2).){0,300})\2"""
 )
+# a plugin's option that may hold a secret (LuCI's 2FA plugin keeps root's TOTP key in key_root): never shown
+_SECRET_OPTION = re.compile(r"key|secret|pass|token|pin", re.IGNORECASE)
 LOGIN_WARNING = (
     "A login plugin adds a step to LuCI's web login on this router. The LuCI pages in this app log in over "
     "SSH and are not affected."
@@ -49,9 +52,10 @@ class PluginRow(BaseModel):
     title: str
     description: str
     installed: bool  # its JS file is there
+    readable: bool  # its header could be read (title, class and type); else it is configured in LuCI
     configured: bool  # it has a section
     enabled: bool  # LuCI runs it (header plugins: any `enabled` value; login plugins: '1')
-    options: dict[str, str]  # its own options, shown; edited in LuCI
+    options: dict[str, str]  # its own options, shown (secret ones hidden); edited in LuCI
 
 
 class PluginGroup(BaseModel):
@@ -109,13 +113,18 @@ def _runs(group: str, value: str | None) -> bool:
     return value == "1" if group.startswith("auth_") else bool(value)
 
 
-def plugin_state(uci: Mapping[str, str], headers: Sequence[PluginHeader]) -> PluginState:
+def plugin_state(
+    uci: Mapping[str, str], headers: Sequence[PluginHeader], files: Set[str] | None = None
+) -> PluginState:
+    """`files`: the plugin ids whose JS file the router lists (default: the ones whose header was read). A
+    file whose header cannot be read is still installed (final review): shown, and configured in LuCI."""
     by_id = {h.id: h for h in headers}
+    present = set(files) if files is not None else set(by_id)
     sections = {k.split(".", 1)[1]: v for k, v in uci.items() if k.count(".") == 1}
     rows: list[PluginRow] = []
-    for pid in sorted(set(by_id) | {n for n in sections if PLUGIN_ID.fullmatch(n)}):
+    for pid in sorted(present | set(by_id) | {n for n in sections if PLUGIN_ID.fullmatch(n)}):
         h = by_id.get(pid)
-        group = f"{h.class_name}_{h.type_name}" if h else sections[pid]
+        group = f"{h.class_name}_{h.type_name}" if h else sections.get(pid, "")
         prefix = f"luci_plugins.{pid}."
         opts = {k.removeprefix(prefix): v for k, v in uci.items() if k.startswith(prefix)}
         rows.append(
@@ -125,13 +134,18 @@ def plugin_state(uci: Mapping[str, str], headers: Sequence[PluginHeader]) -> Plu
                 name=opts.get("name") or (h.name if h else pid),
                 title=h.title if h else "",
                 description=h.description if h else "",
-                installed=h is not None,
+                installed=pid in present,
+                readable=h is not None,
                 configured=pid in sections,
                 enabled=_runs(group, opts.get("enabled")),
-                options={k: v for k, v in opts.items() if k not in ("name", "enabled")},
+                options={
+                    k: HIDDEN if _SECRET_OPTION.search(k) else v
+                    for k, v in opts.items()
+                    if k not in ("name", "enabled")
+                },
             )
         )
-    groups = sorted({r.group for r in rows})
+    groups = sorted({r.group for r in rows if r.group})
     return PluginState(
         enabled=uci.get("luci_plugins.global.enabled") == "1",
         global_section="luci_plugins.global" in uci,
@@ -165,6 +179,8 @@ def plugin_ops(state: PluginState, change: PluginChange) -> list[UciOp]:
         row = rows.get(pid)
         if row is None or not row.installed:
             raise ValueError(f"No installed plugin {pid} on this router")
+        if not row.group:
+            raise ValueError(f"The header of plugin {pid} could not be read: configure it in LuCI")
         if on and not row.configured:
             ops += [
                 UciOp("set", f"luci_plugins.{pid}", row.group),
