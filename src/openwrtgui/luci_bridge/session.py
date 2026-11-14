@@ -23,8 +23,10 @@ def create_command() -> str:
 
 
 def page_groups(page: LuciPage, acl: Mapping[str, Any]) -> list[str]:
-    """The page's access groups (or its package's, when the menu entry names none), then LuCI's base."""
-    own = list(page.acl) or ([page.package] if page.package in acl else [])
+    """The access groups the page's and its ancestors' menu entries name (dispatcher.uc checks each node on the
+    way down, v1.0a2 D10b), or its package's when none names any; then LuCI's base. Only groups the router has."""
+    named = [g for d in page.requires for g in (d.get("acl") or []) if isinstance(g, str)]
+    own = list(dict.fromkeys([*named, *page.acl])) or ([page.package] if page.package in acl else [])
     return [g for g in dict.fromkeys([*own, *BASE_GROUPS]) if g in acl]
 
 

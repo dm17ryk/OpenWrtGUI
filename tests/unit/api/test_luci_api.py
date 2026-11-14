@@ -17,6 +17,7 @@ async def test_luci_api_open_list_close(authed: httpx.AsyncClient, ctx: AppConte
         "available": True,
         "missing": None,
         "checked": True,
+        "tab": None,  # Network & DHCP has no tabs (v1.0a2 D3)
     }
     assert dhcp in pages
     view = (await authed.post("/api/routers/ap1/luci/open", json={"path": "admin/network/dhcp"})).json()
