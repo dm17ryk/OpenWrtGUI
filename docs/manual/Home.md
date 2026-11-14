@@ -1,11 +1,12 @@
 # OpenWrtGUI user manual
 
 OpenWrtGUI lets you see and operate the OpenWrt routers of a Wi-Fi test bench from one Windows window,
-instead of SSH sessions. This manual covers **v0.4 (Firewall and faults)**: install, update, add routers, the
-dashboard, the [Wi-Fi](Wi-Fi) screen, [RF live](RF-live), [Network and DHCP](Network-and-DHCP),
-[Ports, VLANs, mirroring](Ports-and-VLANs), [Firewall](Firewall), [Faults and capture](Faults-and-capture),
-[LuCI pages](LuCI-pages), Bench Guard, the terminal and the audit log. Later versions add LTE and image import
-(see the [roadmap](https://github.com/dm17ryk/OpenWrtGUI/blob/master/ROADMAP.md)).
+instead of SSH sessions. This manual covers the current release: install, update, add routers, the dashboard,
+[Discovery](Discovery), the [Wi-Fi](Wi-Fi) screen and its step-through, [RF live](RF-live),
+[Network and DHCP](Network-and-DHCP), the [LTE modem](LTE-modem), [Ports, VLANs, mirroring](Ports-and-VLANs),
+[Firewall](Firewall), [Faults and capture](Faults-and-capture), [System](System), [LuCI pages](LuCI-pages), Bench
+Guard, the terminal and the audit log. What comes next is on the
+[roadmap](https://github.com/dm17ryk/OpenWrtGUI/blob/master/ROADMAP.md).
 
 ![The dashboard with three routers](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/dashboard.png)
 
@@ -19,10 +20,11 @@ dashboard, the [Wi-Fi](Wi-Fi) screen, [RF live](RF-live), [Network and DHCP](Net
 ## All pages
 
 - [Install](Install) · [Updating](Updating)
-- [First router](First-router) · [Dashboard](Dashboard)
+- [First router](First-router) · [Dashboard](Dashboard) · [Discovery](Discovery) ·
+  [Adding a router family](Adding-a-router-family)
 - [Wi-Fi](Wi-Fi) · [RF live](RF-live) · [LuCI pages](LuCI-pages)
-- [Network and DHCP](Network-and-DHCP) · [Ports, VLANs, mirroring](Ports-and-VLANs)
-- [Firewall](Firewall) · [Faults and capture](Faults-and-capture)
+- [Network and DHCP](Network-and-DHCP) · [LTE modem](LTE-modem) · [Ports, VLANs, mirroring](Ports-and-VLANs)
+- [Firewall](Firewall) · [Faults and capture](Faults-and-capture) · [System](System)
 - [Bench Guard](Bench-Guard) · [Terminal and audit log](Terminal-and-audit-log) · [Settings](Settings)
 - [Troubleshooting](Troubleshooting) · [FAQ](FAQ)
 
