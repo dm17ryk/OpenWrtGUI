@@ -20,6 +20,7 @@ from openwrtgui.api import (
     fstab_api,
     fw_api,
     images_api,
+    iptables_api,
     lte_api,
     luci_api,
     misc_api,
@@ -115,6 +116,7 @@ def create_app(ctx: AppContext) -> FastAPI:
         system_access_api,
         plugins_api,
         fstab_api,
+        iptables_api,
     )
     for module in modules:
         app.include_router(module.router)

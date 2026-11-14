@@ -18,6 +18,7 @@ from openwrtgui.discovery.service import DiscoveryService
 from openwrtgui.discovery.tools import ToolStore
 from openwrtgui.faults.service import FaultsService
 from openwrtgui.flash.service import FlashService
+from openwrtgui.fw.iptables_service import IptablesService
 from openwrtgui.fw.service import FirewallService
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard, psutil_lister
@@ -93,6 +94,7 @@ class AppContext:
     access: AccessService
     plugins: PluginsService  # v1.0a2 D4
     fstab: FstabService  # v1.0a2 D5
+    iptables: IptablesService  # v1.0a2 D6
     token: str
     port: int
     mode: Literal["real", "simulator"]
@@ -379,6 +381,7 @@ def build_context(
         access=access,
         plugins=PluginsService(pool=pool, routers=routers, runner=runner),
         fstab=FstabService(pool=pool, routers=routers, runner=runner),
+        iptables=IptablesService(pool=pool, routers=routers, runner=runner),
         token=token,
         port=port,
         mode="simulator" if simulator is not None else "real",
