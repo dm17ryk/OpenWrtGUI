@@ -30,10 +30,17 @@ does. If something looks wrong, open a
 [New router support](https://github.com/dm17ryk/OpenWrtGUI/issues/new/choose) issue with the outputs
 it asks for.
 
-**Can I change Wi-Fi channels or the firewall with it?**
-Not in v0.1, which only reads (plus installing the key). Wi-Fi comes in v0.2, network in v0.3, and the
-firewall in v0.4; see the [roadmap](https://github.com/dm17ryk/OpenWrtGUI/blob/master/ROADMAP.md).
-Until then, the [terminal](Terminal-and-audit-log) gives you a shell.
+**What can it change?**
+Wi-Fi (modes, channels, power, security, step-throughs), the network (addresses with a 60 s rollback, DHCP,
+DNS, routes), ports and VLANs, the firewall and faults, the LTE modem, and the System screen (host name, time,
+services, scheduled tasks, access, LEDs, backups, restore). Every change shows its exact commands first and
+is checked on the router afterwards. A LuCI page the app has no screen for yet opens inside the app.
+
+**What does the app leave on a router?**
+The line in `/etc/dropbear/authorized_keys` that lets it log in. If you make the zone that carries the app's SSH
+block traffic to the router, the change adds the [pinned rules](Firewall#pinned-rules) `owg_pin_ssh` and
+`owg_pin_dhcpdns`, which stay until you remove them on the Firewall screen. An armed fault keeps its record under
+`/tmp/owg` until it ends. **Clear everything** on the Faults screen removes faults left from a closed session.
 
 **Will it interfere with a harness run?**
 No. While [Bench Guard](Bench-Guard) sees a run, every router is read-only in the app. The dashboard's

@@ -193,6 +193,10 @@ class SimConnector:
             modem=modem,
             system=self._system(entry, net, image),
         )
+        if entry.get("files"):
+            from openwrtgui.simfiles import SimFiles
+
+            state.files = SimFiles(json.loads((self._sim_dir / "files" / entry["files"]).read_text("utf-8")))
         if net is not None:  # the Access side (v0.6c), as the System side: routers with a network
             state.access = SimAccess(
                 net=net,

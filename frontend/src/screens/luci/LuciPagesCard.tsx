@@ -6,7 +6,7 @@ import { HELP } from '../../help/topics'
 import { luciPageLink, nativeScreen, useLuciPages } from './pages'
 
 function InThisApp({ page, routerId }: { page: LuciPageView; routerId: string }) {
-  const screen = page.native ? nativeScreen(page.native, routerId) : null
+  const screen = page.native ? nativeScreen(page.native, routerId, page.path) : null
   if (!screen) return <span className="b har">no screen here yet</span>
   return (
     <>
@@ -19,6 +19,8 @@ function InThisApp({ page, routerId }: { page: LuciPageView; routerId: string })
 export function LuciPagesCard({ routerId, short }: { routerId: string; short: string }) {
   const pages = useLuciPages(routerId)
   const error = pages.error instanceof ApiError ? pages.error.detail : pages.error ? String(pages.error) : null
+  const shown = (pages.data ?? []).filter((p) => p.available !== false)
+  const lacking = (pages.data ?? []).filter((p) => p.available === false)
   return (
     <section className="card stack" aria-labelledby="luci-h">
       <div className="row" style={{ alignItems: 'baseline' }}>
@@ -27,8 +29,8 @@ export function LuciPagesCard({ routerId, short }: { routerId: string; short: st
           <Help topic={HELP.luciWhich} />
         </div>
         <span className="muted">
-          every page LuCI would show here, and where it lives in this app. A page with no screen here yet opens in LuCI,
-          inside the app.
+          every page LuCI shows on this router, and where it lives in this app. A page with no screen here yet opens in
+          LuCI, inside the app.
         </span>
       </div>
       {error && <div className="note x">{error}</div>}
@@ -47,7 +49,7 @@ export function LuciPagesCard({ routerId, short }: { routerId: string; short: st
               </tr>
             </thead>
             <tbody>
-              {pages.data.map((p) => (
+              {shown.map((p) => (
                 <tr key={p.path}>
                   <td className="mono">{p.package}</td>
                   <td>{p.label}</td>
@@ -66,6 +68,18 @@ export function LuciPagesCard({ routerId, short }: { routerId: string; short: st
             </tbody>
           </table>
         </div>
+      )}
+      {lacking.length > 0 && (
+        <details>
+          <summary>Not on this router ({lacking.length})</summary>
+          <ul aria-label={`LuCI pages not on ${short}`}>
+            {lacking.map((p) => (
+              <li key={p.path}>
+                {p.label}: {p.missing}
+              </li>
+            ))}
+          </ul>
+        </details>
       )}
     </section>
   )

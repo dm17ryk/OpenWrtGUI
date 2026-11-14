@@ -5799,10 +5799,22 @@ export interface components {
         /** PageView */
         PageView: {
             /**
+             * Available
+             * @default true
+             */
+            available: boolean;
+            /**
+             * Checked
+             * @default true
+             */
+            checked: boolean;
+            /**
              * Label
              * @default
              */
             label: string;
+            /** Missing */
+            missing?: string | null;
             /** Native */
             native: string | null;
             /** Package */

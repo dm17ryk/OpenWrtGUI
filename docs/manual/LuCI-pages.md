@@ -15,6 +15,14 @@ here yet** has an **Open in LuCI** button. The same pages are in the **LuCI page
 section links on every router screen. Two pages with the same name in the same menu (Status › Firewall for
 iptables and for nftables) carry their LuCI path name in brackets; LuCI shows only the one the router supports.
 
+## Pages this router does not have
+
+LuCI shows a page only when the router has what the page needs: a program (Mount Points needs `/sbin/block`), a
+configuration (Switch/VLAN config needs a bridge with VLAN filtering), or an access group. The app asks the router
+the same questions when it lists the pages. A page LuCI would not show is left out of the **LuCI pages** list.
+On the **LuCI pages** card it is under **Not on this router**, with what it needs. If the router cannot be asked,
+nothing is left out.
+
 ## Opening a page
 
 Opening a page makes a LuCI session on the router over SSH, allowed to touch only what that page needs (from the

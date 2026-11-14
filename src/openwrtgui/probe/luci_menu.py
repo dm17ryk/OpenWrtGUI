@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 PAGE_ACTIONS = frozenset({"view", "template", "cbi", "form"})
@@ -19,6 +19,9 @@ class LuciPage:
     uci: tuple[str, ...]
     fs: tuple[str, ...]
     section: str = ""  # the menu entries above the page, below "admin": "Network › Firewall"
+    # LuCI's raw `depends` of each menu entry above the page and of the page itself, ancestors first
+    # (dispatcher.uc stops at an unsatisfied node); read by luci_bridge/depends.py
+    requires: tuple[dict[str, Any], ...] = field(default=(), compare=False)
 
 
 def _names(value: Any) -> tuple[str, ...]:
@@ -35,6 +38,12 @@ def _section(path: str, titles: Mapping[str, str]) -> str:
     return SECTION_SEP.join(titles.get(p, p.rsplit("/", 1)[-1]) for p in above)
 
 
+def _requires(path: str, depends_of: Mapping[str, dict[str, Any]]) -> tuple[dict[str, Any], ...]:
+    parts = path.split("/")
+    chain = ("/".join(parts[:n]) for n in range(1, len(parts) + 1))
+    return tuple(depends_of[p] for p in chain if p in depends_of)
+
+
 def parse_menu(menus: Mapping[str, Mapping[str, Any]]) -> list[LuciPage]:
     """Every menu entry that shows a page, from {menu.d file stem: its JSON}."""
     titles = {
@@ -42,6 +51,12 @@ def parse_menu(menus: Mapping[str, Mapping[str, Any]]) -> list[LuciPage]:
         for entries in menus.values()
         for path, entry in entries.items()
         if isinstance(entry, dict) and entry.get("title")
+    }
+    depends_of = {
+        path: entry["depends"]
+        for entries in menus.values()
+        for path, entry in entries.items()
+        if isinstance(entry, dict) and isinstance(entry.get("depends"), dict) and entry["depends"]
     }
     pages = []
     for package, entries in menus.items():
@@ -58,6 +73,7 @@ def parse_menu(menus: Mapping[str, Mapping[str, Any]]) -> list[LuciPage]:
                     uci=_names(depends.get("uci")),
                     fs=_names(depends.get("fs")),
                     section=_section(path, titles),
+                    requires=_requires(path, depends_of),
                 )
             )
     return sorted(pages, key=lambda p: p.path)

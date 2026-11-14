@@ -1,7 +1,15 @@
 import type { BridgeView, LuciPageView, UciChange } from '../api/types'
 
-function page(path: string, title: string, pkg: string, native: string | null, section: string, label?: string): LuciPageView {
-  return { path, title, package: pkg, native, section, label: label ?? `${section} › ${title}` }
+function page(
+  path: string,
+  title: string,
+  pkg: string,
+  native: string | null,
+  section: string,
+  label?: string,
+  available = true,
+): LuciPageView {
+  return { path, title, package: pkg, native, section, label: label ?? `${section} › ${title}`, available, checked: true }
 }
 
 export const LUCI_PAGES: LuciPageView[] = [

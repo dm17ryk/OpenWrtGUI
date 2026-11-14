@@ -14,6 +14,9 @@ async def test_luci_api_open_list_close(authed: httpx.AsyncClient, ctx: AppConte
         "native": "network",  # it has a screen now, and still opens in LuCI on request
         "section": "Network",
         "label": "Network › DHCP",
+        "available": True,
+        "missing": None,
+        "checked": True,
     }
     assert dhcp in pages
     view = (await authed.post("/api/routers/ap1/luci/open", json={"path": "admin/network/dhcp"})).json()
@@ -30,3 +33,10 @@ async def test_luci_api_open_list_close(authed: httpx.AsyncClient, ctx: AppConte
 async def test_luci_api_unknown_page_is_422(authed: httpx.AsyncClient) -> None:
     r = await authed.post("/api/routers/ap1/luci/open", json={"path": "admin/nope"})
     assert r.status_code == 422 and r.json()["detail"] == "No LuCI page admin/nope on AP1 · bench"
+
+
+async def test_hidden_page_opens_with_422(authed: httpx.AsyncClient) -> None:
+    r = await authed.post("/api/routers/ap1/luci/open", json={"path": "admin/system/mounts"})
+    assert r.status_code == 422 and r.json()["detail"].endswith("needs /sbin/block")
+    pages = (await authed.get("/api/routers/ap1/luci/pages")).json()
+    assert next(p for p in pages if p["path"] == "admin/system/mounts")["available"] is False

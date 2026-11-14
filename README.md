@@ -14,7 +14,11 @@ is connected, and how each router describes itself. It never disturbs a test run
 
 ![Dashboard: three routers, the 2.4 GHz air map and one station](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/dashboard.png)
 
-> v0.6 adds the LTE modem: registration, operator and signal with quality labels and live charts, the LTE
+> v0.7 adds the test helpers: a step-through that walks a radio through modes, channels and TX powers, each
+> step proven on air, and waits on a timer, by hand or until a station re-joins; frame analysis (rate mix, RX
+> signal, retries and broken frames) from a monitor interface; and a passive channel analysis of the networks
+> around the router.
+> v0.6 added the LTE modem: registration, operator and signal with quality labels and live charts, the LTE
 > settings with rollback, connect, disconnect, a safe modem reboot, and an AT console. It also adds the
 > System screen: overview, live load and traffic, logs, processes, diagnostics, host name and time,
 > services and rc.local, scheduled tasks, a backup and a reboot proven by a fresh uptime.
@@ -24,8 +28,19 @@ is connected, and how each router describes itself. It never disturbs a test run
 > and faults from a pulled cable to netem, plus capture to Wireshark. v0.3 added the network (addresses with
 > a router-side rollback, DHCP, DNS, routes, ports and VLANs); v0.2 Wi-Fi with proof on air, RF live and the
 > LuCI fallback; v0.1 the foundation: install, update, add routers, the dashboard, Bench Guard, the terminal
-> and the audit log. Access, SSH keys, LEDs, mounts, restore and reset to defaults follow; see the
-> [roadmap](ROADMAP.md).
+> and the audit log. What comes next is in the [roadmap](ROADMAP.md).
+
+## What v0.7 adds
+
+| Screen | What you get |
+|---|---|
+| **Wi-Fi › Step-through** | Steps a radio through every ticked mode, channel and TX power, one pure mode per step. Each step is proven on air, beacon rate included, before it waits: on a timer, for **Next step**, or until a chosen station re-joins, with its re-join time recorded. The whole run is previewed first, with how long it takes. Results go to a table and, step by step, to a CSV in Documents. The radio is put back at the end, on Stop and when the app closes; one left behind offers **Restore** on the Wi-Fi screen and the dashboard. A harness run stops it at once. |
+| **RF live › Frame analysis** | For a radio on air, a monitor interface and short `tcpdump` windows: the rate mix per direction, the RX signal in 5 dB steps, the retry flag and the share of broken frames (bad FCS), for the last window and since the start. Off by default; it stops by itself after 30 minutes, when you leave RF live, and when a harness run starts. |
+| **RF live › Channel analysis** | A passive scan of every channel (nothing is sent): each network heard as a span over its channels, as high as its signal, the router's own in orange, with each channel's busy share; a table of SSID, BSSID, channel, width, signal and security. LuCI's Status › Channel analysis opens it. |
+
+Proven on the bench router: the step-through on air with a phone re-joining, and frame analysis on the
+router's own network. Channel analysis there lists the networks around the router; a radio does not hear its
+own beacons.
 
 ## What v0.6 adds
 
@@ -180,7 +195,7 @@ The app was built for a bench where test harnesses run for hours. It must never 
 
 Any standard OpenWrt router that you can reach over SSH. On first connect the app reads the router's
 self-description (the same files and ubus methods LuCI uses), so a new model needs no code change.
-Firmware image profiles, which add a bench image's custom tools, arrive in v0.5.
+Firmware image profiles add a bench image's custom tools (see Discovery in the manual).
 
 Developed and tested on the D-Link DWR-921 C3 with OpenWrt SNAPSHOT r35692.
 
@@ -196,7 +211,7 @@ Developed and tested on the D-Link DWR-921 C3 with OpenWrt SNAPSHOT r35692.
 
 ## Contributing, roadmap, license
 
-- [ROADMAP.md](ROADMAP.md): what comes after v0.1.
+- [ROADMAP.md](ROADMAP.md): what comes next.
 - [CONTRIBUTING.md](CONTRIBUTING.md): development setup, tests, and the rules for hardware tests.
 - [SECURITY.md](SECURITY.md): how to report a vulnerability and what the app stores.
 - [CHANGELOG.md](CHANGELOG.md): what changed in each release.

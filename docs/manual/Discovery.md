@@ -49,6 +49,10 @@ the board and revision it reads match the image you flashed.
 The image must name this router's board, there must be room for it in the router's RAM, and nothing is flashed
 while Bench Guard shows a run.
 
+The app needs the image plus 4 MiB free in the router's memory. A router with less free memory (the bench's AP2
+has about 8 MB) cannot be flashed from the app: flash it with LuCI's **System › Backup / Flash Firmware** or
+from the terminal.
+
 ## Added after flashing
 
 Files in the router's overlay that the image does not have (**added**), files it changed (**changed from the

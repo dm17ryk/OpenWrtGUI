@@ -6,6 +6,7 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from openwrtgui.luci_bridge.depends import Facts, why_hidden
 from openwrtgui.probe.luci_menu import SECTION_SEP, LuciPage
 
 # LuCI page → the app screen that replaces it. Grows as native screens arrive (the roadmap's parity).
@@ -53,6 +54,8 @@ NATIVE: dict[str, str] = {
     "admin/network/diagnostics": "system",
     # v0.7 D13: Status › Channel analysis is RF live's channel analysis
     "admin/status/channel_analysis": "rf",
+    # v1.0a1 D5: Status › Realtime Graphs › Wireless is RF live (rates, signal and noise, live)
+    "admin/status/realtime/wireless": "rf",
 }
 
 
@@ -64,26 +67,35 @@ class PageView:
     native: str | None
     section: str = ""
     label: str = ""  # unique on the router: "Status › Firewall (nftables)"
+    available: bool = True  # LuCI shows it on this router (v1.0a1 D4)
+    missing: str | None = None  # why LuCI does not: "needs /sbin/block"
+    checked: bool = True  # False: the router's facts could not be read, so nothing is hidden (D3)
 
 
 def _label(p: LuciPage) -> str:
     return f"{p.section}{SECTION_SEP}{p.title}" if p.section else p.title
 
 
-def page_views(pages: Sequence[LuciPage]) -> list[PageView]:
-    # LuCI hides one of two same-titled pages by its dependencies; the app lists both, so tell them apart.
+def page_views(pages: Sequence[LuciPage], facts: Facts | None = None) -> list[PageView]:
+    # LuCI hides one of two same-titled pages by its dependencies; the label tells them apart either way.
     counts = Counter(_label(p) for p in pages)
-    return [
-        PageView(
-            p.path,
-            p.title,
-            p.package,
-            NATIVE.get(p.path),
-            p.section,
-            _label(p) if counts[_label(p)] == 1 else f"{_label(p)} ({p.path.rsplit('/', 1)[-1]})",
+    views = []
+    for p in pages:
+        missing = why_hidden(p, facts) if facts is not None else None
+        views.append(
+            PageView(
+                p.path,
+                p.title,
+                p.package,
+                NATIVE.get(p.path),
+                p.section,
+                _label(p) if counts[_label(p)] == 1 else f"{_label(p)} ({p.path.rsplit('/', 1)[-1]})",
+                available=missing is None,
+                missing=missing,
+                checked=facts.checked if facts is not None else True,
+            )
         )
-        for p in pages
-    ]
+    return views
 
 
 def fallback_pages(pages: Sequence[LuciPage]) -> list[LuciPage]:

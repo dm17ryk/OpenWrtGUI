@@ -14,6 +14,7 @@ from openwrtgui.transport.base import UPLOAD_CHUNK, CommandResult, ShellChannel,
 if TYPE_CHECKING:
     from openwrtgui.simaccess import SimAccess
     from openwrtgui.simair import SimAir
+    from openwrtgui.simfiles import SimFiles
     from openwrtgui.simfw import SimFirewall
     from openwrtgui.simimage import SimImage
     from openwrtgui.simmodem import SimModem
@@ -41,6 +42,7 @@ class SimState:
     access: SimAccess | None = None  # v0.6c: dropbear, uhttpd, keys, LEDs, restore, reset
     generation_seen: int = 0  # the image's flash generation whose reset (keys, password) was applied
     air: SimAir | None = None  # v0.7: scans, every channel's survey, frame windows (made with the Wi-Fi)
+    files: SimFiles | None = None  # v1.0a1: what LuCI's menu asks about (ls -ldL, ls -A)
 
     def __post_init__(self) -> None:
         if self.wifi is not None and self.air is None:
@@ -175,6 +177,8 @@ class ReplayTransport:
         # The image side first: it answers only exact commands it owns. Then the network: it answers only
         # commands it knows whole (the Wi-Fi one echoes any `echo`); the firewall last, since it splits
         # compound commands and hands their parts back here.
+        if self.state.files is not None and (answered := self.state.files.answer(command)) is not None:
+            return answered
         if self.state.image is not None and (answered := self.state.image.answer(command)) is not None:
             return answered
         if self.state.modem is not None and (answered := self.state.modem.answer(command)) is not None:

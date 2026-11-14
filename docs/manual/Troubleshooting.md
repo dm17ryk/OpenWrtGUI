@@ -77,3 +77,9 @@ The Wi-Fi screen and the dashboard's **Needs attention** say so when a step-thro
 radio back: the app was closed or crashed, or a harness run started. The radio options it saved before step 1
 are in the data folder (`steps\`). **Restore** applies them back, proven on air like any Apply, and removes the
 saved copy; it waits while Bench Guard sees a run.
+
+## Flash refused: not enough free memory
+
+The app uploads the image into the router's memory first and needs the image plus 4 MiB free. On a router with
+less (the bench's AP2 has about 8 MB), flash with LuCI's **System › Backup / Flash Firmware** or from the terminal
+(`sysupgrade`).

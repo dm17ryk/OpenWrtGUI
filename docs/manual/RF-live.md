@@ -4,6 +4,9 @@ RF live shows, once a second, what a router's radio and each connected station s
 RX at the AP (station → AP); orange is always TX from the AP (AP → station). It reads the router only while
 the screen is open, and nothing it does changes the router, so it keeps working during a harness run.
 
+LuCI's **Status › Realtime Graphs › Wireless** page opens here: RF live shows the same live rate, signal and noise,
+per station and per radio.
+
 ![RF live](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/rf-live.png)
 
 ## Radio
