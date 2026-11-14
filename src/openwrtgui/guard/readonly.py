@@ -7,14 +7,15 @@ import shlex
 
 from openwrtgui.discovery.commands import OVERLAY_LS, ROM_LS
 from openwrtgui.lte.commands import TTY_LIST
-from openwrtgui.system.commands import BACKUP_SIZE, HAS_BLOCK, PASSWORD_DIGEST
+from openwrtgui.system.commands import BACKUP_SIZE, BLOCK_DETECT, HAS_BLOCK, PASSWORD_DIGEST
 
 # "&" also covers "&&" and "|&": a single & starts a second command in the background.
 _FORBIDDEN = (";", "&", "||", ">", "<", "`", "$(", "\n")
 # Discovery's own reads (v0.5), as exact texts: they need `-exec ls` and a stderr redirect. The System
 # screen's backup size (v0.6b): the archive goes to wc only, nothing is written on the router. Its
-# block-mount probe and password digest (v0.6c): `test` and `awk` are not open programs here.
-_EXACT = frozenset({OVERLAY_LS, ROM_LS, TTY_LIST, BACKUP_SIZE, HAS_BLOCK, PASSWORD_DIGEST})
+# block-mount probe and password digest (v0.6c): `test` and `awk` are not open programs here. `block detect`
+# (v1.0a2): it only prints the fstab block-mount would write.
+_EXACT = frozenset({OVERLAY_LS, ROM_LS, TTY_LIST, BACKUP_SIZE, HAS_BLOCK, PASSWORD_DIGEST, BLOCK_DETECT})
 _FIRMWARE_HASH = re.compile(
     r"dd if=/dev/mtdblock\d{1,2} bs=65536 count=\d{1,6} 2>/dev/null \| head -c \d{1,10} \| sha256sum"
 )
@@ -69,6 +70,7 @@ _UBUS_READ_METHODS = frozenset(
         "get_proto_handlers",
         "getTimezones",  # the System screen's time zone list (LuCI's own read)
         "getLEDs",  # the LEDs tab (v0.6c, LuCI's own read)
+        "getBlockDevices",  # Mount points with block-mount (v1.0a2, LuCI's own read)
     ]
 )
 _FIND_ACTIONS = frozenset({"-delete", "-exec", "-execdir", "-ok", "-okdir"})
@@ -135,6 +137,25 @@ def _uniq_ok(args: list[str]) -> bool:
     return len(operands) <= 1
 
 
+# LuCI's iptables view (v1.0a2 D12): list options only, and the four tables it shows
+_IPTABLES_FLAGS = frozenset({"--line-numbers", "-w", "-n", "-v", "-x", "-L", "-nvxL"})
+_IPTABLES_TABLES = frozenset({"filter", "nat", "mangle", "raw"})
+
+
+def _iptables_ok(args: list[str]) -> bool:
+    listed = False
+    i = 0
+    while i < len(args):
+        if args[i] == "-t" and i + 1 < len(args) and args[i + 1] in _IPTABLES_TABLES:
+            i += 2
+            continue
+        if args[i] not in _IPTABLES_FLAGS:
+            return False
+        listed = listed or args[i] in ("-L", "-nvxL")
+        i += 1
+    return listed
+
+
 def _iw_ok(args: list[str]) -> bool:
     words = [a for a in args if not (a.startswith("-") and a != "--version")]
     if not words or words[0] in _IW_TOP:
@@ -199,6 +220,8 @@ def _segment_ok(words: list[str]) -> bool:
         return args[:1] in (["list"], ["info"])
     if prog == "sysupgrade":
         return args == ["-l"]
+    if prog in ("iptables", "ip6tables"):
+        return _iptables_ok(args)
     return False
 
 
