@@ -23,12 +23,22 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       env: { OPENWRTGUI_SIM_GUARD: 'live' },
     },
+    {
+      // v1.0a2 D9: a simulator that also seeds ap4, the later image (block-mount, iptables, a plugin, sqm)
+      command: app(8767, 'e2e-later'),
+      url: 'http://127.0.0.1:8767/api/health',
+      timeout: 120_000,
+      reuseExistingServer: !process.env.CI,
+      env: { OPENWRTGUI_SIM_SEED: 'ap4' },
+    },
   ],
   projects: [
-    { name: 'desktop-light', testIgnore: /guard\.spec/, use: { ...desktop, colorScheme: 'light' } },
-    { name: 'desktop-dark', testIgnore: /guard\.spec/, use: { ...desktop, colorScheme: 'dark' } },
-    { name: 'mobile-light', testIgnore: /guard\.spec/, use: { ...mobile, colorScheme: 'light' } },
-    { name: 'mobile-dark', testIgnore: /guard\.spec/, use: { ...mobile, colorScheme: 'dark' } },
+    { name: 'desktop-light', testIgnore: /(guard|later|luci)\.spec/, use: { ...desktop, colorScheme: 'light' } },
+    { name: 'desktop-dark', testIgnore: /(guard|later|luci)\.spec/, use: { ...desktop, colorScheme: 'dark' } },
+    { name: 'mobile-light', testIgnore: /(guard|later|luci)\.spec/, use: { ...mobile, colorScheme: 'light' } },
+    { name: 'mobile-dark', testIgnore: /(guard|later|luci)\.spec/, use: { ...mobile, colorScheme: 'dark' } },
     { name: 'guard', testMatch: /guard\.spec/, use: { ...desktop, colorScheme: 'light', baseURL: 'http://127.0.0.1:8766' } },
+    { name: 'later-desktop-light', testMatch: /(later|luci)\.spec/, use: { ...desktop, colorScheme: 'light', baseURL: 'http://127.0.0.1:8767' } },
+    { name: 'later-mobile-dark', testMatch: /(later|luci)\.spec/, use: { ...mobile, colorScheme: 'dark', baseURL: 'http://127.0.0.1:8767' } },
   ],
 })
