@@ -5,7 +5,7 @@ from __future__ import annotations
 from openwrtgui.luci_bridge.pages import NATIVE, NATIVE_TAB, page_views
 from openwrtgui.probe.luci_menu import LuciPage
 
-# the tab ids of frontend/src/screens/system/SystemScreen.tsx and fw/FirewallScreen.tsx, with the tabs v1.0a2 adds
+# the tab ids of frontend/src/screens/system/SystemScreen.tsx and fw/FirewallScreen.tsx, with v1.0a2's
 SCREEN_TABS = {
     "system": {
         "status",

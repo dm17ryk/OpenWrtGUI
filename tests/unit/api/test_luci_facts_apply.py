@@ -1,5 +1,5 @@
-"""v1.0a2 D10a: the app's own apply drops the router's cached menu facts, so a page its change made LuCI show is
-listed at once (v1.0a1 review: the facts cache was not dropped by the app's own uci writes)."""
+"""v1.0a2 D10a: the app's own apply drops the router's cached menu facts, so a page its change made LuCI
+show is listed at once (v1.0a1 review: the facts cache was not dropped by the app's own uci writes)."""
 
 from __future__ import annotations
 

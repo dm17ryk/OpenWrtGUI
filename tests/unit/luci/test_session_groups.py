@@ -1,5 +1,5 @@
-"""v1.0a2 D10b: LuCI checks each menu node's acl on the way down (dispatcher.uc), so a page's bridge session gets
-its ancestors' groups too. Before, a page whose own entry names none got only its package's."""
+"""v1.0a2 D10b: LuCI checks each menu node's acl on the way down (dispatcher.uc), so a page's bridge session
+gets its ancestors' groups too. Before, a page whose own entry names none got only its package's."""
 
 from __future__ import annotations
 
