@@ -14,6 +14,10 @@ that has a screen here (Network › Wireless is the Wi-Fi screen) links to that 
 here yet** has an **Open in LuCI** button. The same pages are in the **LuCI pages** list next to the router's
 section links on every router screen. Two pages with the same name in the same menu (Status › Firewall for
 iptables and for nftables) carry their LuCI path name in brackets; LuCI shows only the one the router supports.
+A page that is one tab of a screen opens that tab (LED Configuration opens System › LEDs).
+
+Every page of the bench image has a screen here. The pages that open in LuCI are the ones a later image or an
+installed LuCI app brings, such as SQM QoS.
 
 ## Pages this router does not have
 

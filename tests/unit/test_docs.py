@@ -140,5 +140,15 @@ def test_home_lists_every_sidebar_page() -> None:
     assert "covers v0.4" not in _read(MANUAL / "Home.md")
 
 
+def test_v1_0a2_pages_are_documented() -> None:
+    system = _read(MANUAL / "System.md")
+    wanted = ("## Plugins", "Configure in LuCI", "## Mount points", "block-mount", "Generate", "extroot")
+    for text in wanted:
+        assert text in system, text
+    firewall = _read(MANUAL / "Firewall.md")
+    assert "## Legacy iptables" in firewall and "filter table" in firewall
+    assert "AP4" not in _read(MANUAL / "LuCI-pages.md")  # the simulator's router is not the user's
+
+
 def test_no_manual_page_answers_for_v0_1() -> None:
     assert "Not in v0.1" not in _read(MANUAL / "FAQ.md")

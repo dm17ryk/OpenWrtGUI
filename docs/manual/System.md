@@ -113,7 +113,18 @@ They are shown, never changed here.
 
 ## Plugins
 
-LuCI's plugin switches: the global one, one per group of plugins and one per plugin.
+LuCI's plugin switches (`/etc/config/luci_plugins`): the global one, one per group of plugins (such as the
+HTTP header plugins and the login plugins) and one per plugin. Each installed plugin shows its title, its
+description and the options it has; a plugin's own options are set with **Configure in LuCI**, which opens
+LuCI's Plugins page in the app, because each plugin draws its own form there.
+
+- Turning a switch off removes it rather than writing `0`: LuCI runs a header plugin whatever its switch holds.
+- A login plugin adds a step to LuCI's web login on this router. The LuCI pages in this app log in over SSH and
+  are not affected; the preview says so.
+- A plugin whose file is gone (left behind in the config) shows **Missing plugin** and can be removed.
+
+The preview shows the exact `uci` lines; the proof is the saved config. The bench image has the switches and no
+plugins.
 
 ## Services
 
@@ -152,8 +163,22 @@ says so.
 ## Mount points
 
 What is mounted where (device, type and mount options) and how full each file system is (size, used, free).
-The view is read only. Editing `/etc/config/fstab` needs the block-mount package, which the bench images do
-not have; the screen says so when it is missing.
+Without the block-mount package, as on the bench image, that is all the screen shows, and it says why.
+
+On a router with block-mount the screen also edits `/etc/config/fstab`, as LuCI's Mount Points page does:
+
+- **Settings**: mount and swap automatically, mount or swap on devices fstab does not list, and check file
+  systems before mounting.
+- **Entries**: each mount (its device, mount point, type and options) and each swap, enabled or not. A device
+  is picked from the router's block devices by UUID (else label, else device); one that is not attached now
+  shows "not present" and is kept. **Add mount**, **Add swap** and **Remove** change the list at Apply. The
+  preview shows the exact `uci` lines and `/sbin/block mount`, which mounts what the new fstab says.
+- A mount point of `/` or `/overlay` (extroot), or one under `/rom`, `/tmp`, `/dev`, `/proc` or `/sys`, is
+  refused: extroot moves the router's root at the next boot, so set it up in LuCI or the terminal.
+- **Unmount** on a row unmounts that file system (not offered for `/`, `/overlay`, `/rom`, `/tmp` and `/dev`).
+- **Mount attached devices** runs `block mount`.
+- **Generate config** replaces every fstab entry with what `block detect` finds now; the mounts it finds start
+  disabled.
 
 ## Backup
 
