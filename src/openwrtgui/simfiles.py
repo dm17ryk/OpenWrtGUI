@@ -20,6 +20,9 @@ class SimFiles:
     def __init__(self, files: Mapping[str, str]) -> None:
         self._files = dict(files)
 
+    def kind(self, path: str) -> str | None:
+        return self._files.get(path)
+
     def answer(self, command: str) -> CommandResult | None:
         if command.startswith("ls -ldL "):
             paths = shlex.split(command)[2:]

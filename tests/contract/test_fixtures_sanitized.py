@@ -139,7 +139,7 @@ def test_air_recording_names_no_neighbour() -> None:
 
 def test_sim_routers_reference_existing_files() -> None:
     routers = json.loads((FIXTURES / "sim" / "routers.json").read_text(encoding="utf-8"))
-    assert [r["id"] for r in routers] == ["ap1", "ap2", "ap3", "new", "factory"]
+    assert [r["id"] for r in routers] == ["ap1", "ap2", "ap3", "ap4", "new", "factory"]
     for r in routers:
         assert (FIXTURES / r["base"] / "commands.json").exists()
         if r["overlay"]:

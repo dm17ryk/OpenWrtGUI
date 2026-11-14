@@ -373,8 +373,9 @@ class SimAccess:
             return _ok(c)
         if c == s.OPKG_KEYS:
             return _fail(c, "ls: /etc/opkg/keys: No such file or directory\n")
-        if c == s.HAS_BLOCK:
-            return _fail(c, "")
+        if c == s.HAS_BLOCK:  # from the router's files map: a later image (ap4) has block-mount
+            files = self._state.files
+            return _ok(c) if files is not None and files.kind("/sbin/block") == "executable" else _fail(c, "")
         if c == s.LEDS:
             leds = {
                 name: {"triggers": list(_TRIGGERS), "active_trigger": a, "brightness": b, "max_brightness": m}

@@ -1,0 +1,43 @@
+{
+  "menu": {
+    "/usr/share/luci/menu.d/luci-app-sqm.json": {
+      "admin/network/sqm": {
+        "title": "SQM QoS",
+        "order": 59,
+        "action": {"type": "view", "path": "network/sqm"},
+        "depends": {"acl": ["luci-app-sqm"]}
+      }
+    }
+  },
+  "acl": {
+    "/usr/share/rpcd/acl.d/luci-app-sqm.json": {
+      "luci-app-sqm": {
+        "description": "Grant UCI access for luci-app-sqm",
+        "read": {"uci": ["sqm"]},
+        "write": {"uci": ["sqm"]}
+      }
+    }
+  },
+  "plugins": {
+    "c0ffee2cf63e160c091224d95d69cdff.js": "'use strict';\n'require baseclass';\n'require form';\n\nreturn baseclass.extend({\n\tclass: 'http',\n\tclass_i18n: _('HTTP'),\n\ttype: 'headers',\n\ttype_i18n: _('Headers'),\n\tname: 'Content-Security-Policy',\n\tid: 'c0ffee2cf63e160c091224d95d69cdff',\n\ttitle: _('Content Security Policy'),\n\tdescription: _('Sets the Content-Security-Policy header on every LuCI response.'),\n\n\taddFormOptions(s) {\n\t\tlet o = s.option(form.ListValue, 'mode', _('Mode'));\n\t}\n});\n"
+  },
+  "block_devices": {
+    "/dev/sda1": {"dev": "/dev/sda1", "uuid": "5e1f6c2a-9b0d-4c3e-8f7a-1d2c3b4a5e6f", "label": "usb", "type": "ext4", "size": 15728640000, "mount": "/mnt/usb"},
+    "/dev/sda2": {"dev": "/dev/sda2", "uuid": "8a3b1c4d-2e5f-4a6b-9c7d-0e1f2a3b4c5d", "type": "swap", "size": 1073741824}
+  },
+  "mounts": "/dev/root /rom squashfs ro,relatime 0 0\nproc /proc proc rw,nosuid,nodev,noexec,noatime 0 0\nsysfs /sys sysfs rw,nosuid,nodev,noexec,noatime 0 0\ntmpfs /tmp tmpfs rw,nosuid,nodev,noatime 0 0\n/dev/mtdblock6 /overlay jffs2 rw,noatime 0 0\noverlayfs:/overlay / overlay rw,noatime,lowerdir=/,upperdir=/overlay/upper,workdir=/overlay/work 0 0\n/dev/sda1 /mnt/usb ext4 rw,relatime 0 0\n",
+  "df": "Filesystem           1K-blocks      Used Available Use% Mounted on\n/dev/root                 3072      3072         0 100% /rom\ntmpfs                    13760       116     13644   1% /tmp\n/dev/mtdblock6             896       308       588  34% /overlay\noverlayfs:/overlay         896       308       588  34% /\n/dev/sda1             15360000    524288  14835712   3% /mnt/usb\n",
+  "detect": "config 'global'\n\toption\tanon_swap\t'0'\n\toption\tanon_mount\t'0'\n\toption\tauto_swap\t'1'\n\toption\tauto_mount\t'1'\n\toption\tdelay_root\t'5'\n\toption\tcheck_fs\t'0'\n\nconfig 'mount'\n\toption\ttarget\t'/mnt/usb'\n\toption\tuuid\t'5e1f6c2a-9b0d-4c3e-8f7a-1d2c3b4a5e6f'\n\toption\tenabled\t'0'\n\nconfig 'swap'\n\toption\tuuid\t'8a3b1c4d-2e5f-4a6b-9c7d-0e1f2a3b4c5d'\n\toption\tenabled\t'0'\n\n",
+  "iptables": {
+    "filter": "Chain INPUT (policy ACCEPT 1200 packets, 96000 bytes)\nnum      pkts      bytes target     prot opt in     out     source               destination         \n1         640    51200 ACCEPT     all  --  lo     *       0.0.0.0/0            0.0.0.0/0           \n2          12      720 DROP       tcp  --  *      *       10.9.8.0/24          0.0.0.0/0            tcp dpt:22 /* !fw3: Drop SSH from the lab net */\n\nChain FORWARD (policy DROP 0 packets, 0 bytes)\nnum      pkts      bytes target     prot opt in     out     source               destination         \n\nChain OUTPUT (policy ACCEPT 900 packets, 72000 bytes)\nnum      pkts      bytes target     prot opt in     out     source               destination         \n\nChain lab_user (0 references)\nnum      pkts      bytes target     prot opt in     out     source               destination         \n",
+    "nat": "Chain PREROUTING (policy ACCEPT 30 packets, 2400 bytes)\nnum      pkts      bytes target     prot opt in     out     source               destination         \n1           4      240 DNAT       tcp  --  eth0.2 *       0.0.0.0/0            0.0.0.0/0            tcp dpt:8080 to:192.168.1.30:80\n\nChain POSTROUTING (policy ACCEPT 18 packets, 1300 bytes)\nnum      pkts      bytes target     prot opt in     out     source               destination         \n",
+    "mangle": "Chain PREROUTING (policy ACCEPT 1300 packets, 99000 bytes)\nnum      pkts      bytes target     prot opt in     out     source               destination         \n",
+    "raw": "Chain PREROUTING (policy ACCEPT 1300 packets, 99000 bytes)\nnum      pkts      bytes target     prot opt in     out     source               destination         \n"
+  },
+  "ip6tables": {
+    "filter": "Chain INPUT (policy ACCEPT 40 packets, 3200 bytes)\nnum      pkts      bytes target     prot opt in     out     source               destination         \n1           3      240 ACCEPT     icmpv6    *      *       fe80::/10            ::/0                \n",
+    "nat": "Chain PREROUTING (policy ACCEPT 0 packets, 0 bytes)\nnum      pkts      bytes target     prot opt in     out     source               destination         \n",
+    "mangle": "Chain PREROUTING (policy ACCEPT 0 packets, 0 bytes)\nnum      pkts      bytes target     prot opt in     out     source               destination         \n",
+    "raw": "Chain PREROUTING (policy ACCEPT 0 packets, 0 bytes)\nnum      pkts      bytes target     prot opt in     out     source               destination         \n"
+  }
+}

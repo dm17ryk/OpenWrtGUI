@@ -53,6 +53,23 @@
     "modem": true
   },
   {
+    "id": "ap4",
+    "name": "AP4 · later image",
+    "host": "192.168.1.6",
+    "base": "ap2",
+    "files": "ap4.json",
+    "overlay": null,
+    "later": "ap4.json",
+    "wifi": "ap2.uci",
+    "net": "ap4.uci",
+    "fw": "ap2.json",
+    "auth": "key",
+    "image": "mini-r35692.bin",
+    "upper": "overlay/ap2.json",
+    "https": false,
+    "seed": false
+  },
+  {
     "id": "new",
     "name": "",
     "host": "192.168.1.4",

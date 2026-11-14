@@ -56,6 +56,8 @@ def sim_commands(sim_dir: Path, router_id: str) -> dict[str, CommandResult]:
 
 
 SIM_GUARD_ENV = "OPENWRTGUI_SIM_GUARD"
+# routers.json entries with "seed": false (v1.0a2 D7: ap4) are seeded only when this names them (ids, commas)
+SIM_SEED_ENV = "OPENWRTGUI_SIM_SEED"
 SIM_RUN = ProcessInfo(
     18244, ("python.exe", r"D:\Essence_SC\wifi_ref\dima_night.py"), datetime(2026, 11, 3, 21, 4)
 )
@@ -67,8 +69,11 @@ def sim_process_lister() -> list[ProcessInfo]:
 
 
 def seed_routers(sim_dir: Path, store: RouterStore) -> None:
+    named = os.environ.get(SIM_SEED_ENV, "").split(",")
     for entry in sim_routers(sim_dir):
         if entry.get("wizard_only") or store.get(entry["id"]) is not None:
+            continue
+        if entry.get("seed") is False and entry["id"] not in named:
             continue
         store.upsert(
             RouterRecord(
@@ -125,6 +130,10 @@ class SimConnector:
         self._entries = sim_routers(sim_dir)
         self._states: dict[str, SimState] = {}
         self._host_keys: dict[tuple[str, int], HostKeyInfo] = {}
+
+    def base_commands(self, router_id: str) -> dict[str, CommandResult]:
+        """The recordings a simulated router answers from (its base, then its overlay)."""
+        return sim_commands(self._sim_dir, router_id)
 
     def _address(self, entry: dict[str, Any]) -> str:
         state = self._states.get(entry["id"])
@@ -197,6 +206,11 @@ class SimConnector:
             from openwrtgui.simfiles import SimFiles
 
             state.files = SimFiles(json.loads((self._sim_dir / "files" / entry["files"]).read_text("utf-8")))
+        if entry.get("later"):
+            from openwrtgui.simlater import SimLater
+
+            spec = json.loads((self._sim_dir / "later" / entry["later"]).read_text("utf-8"))
+            state.later = SimLater(spec, sim_commands(self._sim_dir, entry["id"]))
         if net is not None:  # the Access side (v0.6c), as the System side: routers with a network
             state.access = SimAccess(
                 net=net,
