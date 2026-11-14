@@ -11,6 +11,7 @@ import { FirewallScreen } from './FirewallScreen'
 
 const calls: Array<{ path: string; body: unknown }> = []
 let fw: FirewallState = AP1_FW
+let present = { iptables: false, ip6tables: false } // v1.0a2 D6: ap1 has no iptables
 let guardLive = false
 let modelApplies = 0
 const CONFIRMED: NetApplyResult = { router_id: 'ap1', applied: true, verified: true, error: null, host: null, checks: [{ name: 'confirmed', ok: true, detail: 'the router keeps the change' }] }
@@ -24,6 +25,8 @@ vi.mock('../../api/client', async (orig) => {
     if (path === '/api/routers/ap1/firewall') return fw
     if (path === '/api/routers/ap1/network') return AP2_NET
     if (path === '/api/routers/ap1/luci/pages') return []
+    if (path === '/api/routers/ap1/firewall/iptables/present') return present
+    if (path === '/api/routers/ap1/firewall/iptables') return { ...present, tables: [] }
     if (path === '/api/routers/ap1/firewall/model/preview') {
       const cells = (body as { cells: Record<string, string> }).cells
       return 'lan.input' in cells ? LAN_BLOCK_PLAN : WAN_ALLOW_PLAN
@@ -47,6 +50,7 @@ vi.mock('../../api/client', async (orig) => {
 beforeEach(() => {
   calls.length = 0
   fw = AP1_FW
+  present = { iptables: false, ip6tables: false }
   guardLive = false
   modelApplies = 0
 })
@@ -66,12 +70,27 @@ function renderFirewall(at = '/routers/ap1/firewall') {
 }
 
 const cell = (name: string) => screen.findByRole('group', { name })
+
+test('a router the screen does not manage shows Legacy iptables when it has iptables (v1.0a2 D6)', async () => {
+  fw = NOT_FW4
+  present = { iptables: true, ip6tables: false }
+  renderFirewall()
+  expect(await screen.findByRole('tab', { name: 'Legacy iptables' })).toHaveAttribute('aria-selected', 'true')
+  expect(screen.queryByRole('tab', { name: 'Zones and model' })).toBeNull()
+  expect(screen.queryByText('nftables · fw4')).toBeNull()
+})
+
+test('a fw4 router without iptables has no Legacy iptables tab', async () => {
+  renderFirewall()
+  expect(await screen.findByRole('tab', { name: 'Zones and model' })).toBeInTheDocument()
+  expect(screen.queryByRole('tab', { name: 'Legacy iptables' })).toBeNull()
+})
 const lastModel = (): unknown => calls.filter((c) => c.path.endsWith('/model/preview')).at(-1)?.body
 
 test('the grid shows each zone and direction, and the own zone carries the badge', async () => {
   renderFirewall()
   expect(await screen.findByRole('heading', { name: 'Firewall', level: 1 })).toBeInTheDocument()
-  expect(screen.getByText('nftables · fw4')).toBeInTheDocument()
+  expect(await screen.findByText('nftables · fw4')).toBeInTheDocument() // once the router says it runs fw4
   const grid = await screen.findByRole('table', { name: 'Filtering model' })
   const lan = within(grid).getByRole('row', { name: /^lan/ })
   expect(within(lan).getByText("carries this app's SSH")).toBeInTheDocument()

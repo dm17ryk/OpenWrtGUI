@@ -1,6 +1,57 @@
 // ap4, the simulated later image (v1.0a2 D7): what its endpoints answer, written from the simulator's fixtures
 // (tests/fixtures/sim/later/ap4.json, net/ap4.uci). testing/system.ts is generated from ap2; ap4 is not there.
-import type { FstabState, NetPlan, PluginState } from '../api/types'
+import type { FstabState, IptablesState, NetPlan, PluginState } from '../api/types'
+
+const rule = (num: number, packets: number, bytes: number, target: string, prot: string, inp: string, source: string, options: string, comment: string | null) => ({
+  num,
+  packets,
+  bytes,
+  target,
+  prot,
+  opt: '--',
+  inp,
+  out: '*',
+  source,
+  destination: '0.0.0.0/0',
+  options,
+  comment,
+})
+
+export const AP4_IPTABLES: IptablesState = {
+  iptables: true,
+  ip6tables: true,
+  tables: [
+    {
+      program: 'iptables',
+      table: 'filter',
+      error: null,
+      chains: [
+        {
+          name: 'INPUT',
+          policy: 'ACCEPT',
+          packets: 1200,
+          bytes: 96000,
+          references: null,
+          rules: [rule(1, 640, 51200, 'ACCEPT', 'all', 'lo', '0.0.0.0/0', '', null), rule(2, 12, 720, 'DROP', 'tcp', '*', '10.9.8.0/24', 'tcp dpt:22', 'Drop SSH from the lab net')],
+        },
+        { name: 'FORWARD', policy: 'DROP', packets: 0, bytes: 0, references: null, rules: [] },
+        { name: 'OUTPUT', policy: 'ACCEPT', packets: 900, bytes: 72000, references: null, rules: [] },
+        { name: 'lab_user', policy: null, packets: null, bytes: null, references: 0, rules: [] },
+      ],
+    },
+    { program: 'iptables', table: 'nat', error: null, chains: [] },
+  ],
+}
+
+export const AP4_RESET_PLAN: NetPlan = {
+  router_id: 'ap4',
+  screen: 'Firewall',
+  lines: ['iptables -Z', 'ip6tables -Z'],
+  warnings: ["Resets the filter table's counters only, as LuCI does: nat, mangle and raw keep theirs."],
+  rollback: false,
+  target_host: null,
+  digest: '2b3c4d5e6f7a8b9c',
+}
 
 export const AP4_FSTAB: FstabState = {
   block: true,

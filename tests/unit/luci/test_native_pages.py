@@ -61,6 +61,15 @@ def test_mount_points_is_system_mount_points() -> None:
     assert (view.native, view.tab) == ("system", "mounts")
 
 
+def test_both_iptables_pages_are_firewall_legacy_iptables() -> None:
+    fw3 = LuciPage(
+        "admin/status/iptables", "Firewall", "luci-mod-status", ("luci-mod-status-firewall",), (), ()
+    )
+    fw4 = LuciPage("admin/status/nftables/iptables", "", "luci-mod-status", (), (), ())
+    views = page_views([fw3, fw4])
+    assert [(v.native, v.tab) for v in views] == [("firewall", "iptables"), ("firewall", "iptables")]
+
+
 def test_every_tab_is_one_its_screen_has() -> None:
     for path, tab in NATIVE_TAB.items():
         assert path in NATIVE, path

@@ -108,6 +108,7 @@ export const HELP = {
   fwCustom: 'Firewall#custom-rules',
   fwTables: 'Firewall#other-nftables-tables',
   fwRaw: 'Firewall#raw-ruleset',
+  firewallIptables: 'Firewall#legacy-iptables',
   // Faults and capture
   faults: 'Faults-and-capture',
   faultTarget: 'Faults-and-capture#target',

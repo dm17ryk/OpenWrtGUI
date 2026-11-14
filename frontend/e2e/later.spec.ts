@@ -20,3 +20,12 @@ test('mount points are edited on a router with block-mount', async ({ page }) =>
   await expect(preview).toContainText('/sbin/block mount')
   await noHorizontalScroll(page)
 })
+
+test('the legacy iptables rules on a router that has iptables', async ({ page }) => {
+  await open(page, '/routers/ap4/firewall?tab=iptables')
+  await expect(page.getByText('Chain INPUT')).toBeVisible()
+  await expect(page.getByText('Drop SSH from the lab net')).toBeVisible()
+  await page.getByRole('button', { name: 'Reset counters' }).click()
+  await expect(page.getByRole('region', { name: 'Command preview' })).toContainText('iptables -Z')
+  await noHorizontalScroll(page)
+})

@@ -81,3 +81,7 @@ there stay true.
 ## Raw ruleset
 
 The router's whole nftables ruleset (`nft -a list ruleset`), read-only, with each table's owner.
+
+## Legacy iptables
+
+LuCI's iptables view, on routers that have `/usr/sbin/iptables`.

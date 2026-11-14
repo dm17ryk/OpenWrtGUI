@@ -891,6 +891,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/firewall/iptables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Iptables */
+        get: operations["iptables_api_routers__router_id__firewall_iptables_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/iptables/present": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Present */
+        get: operations["present_api_routers__router_id__firewall_iptables_present_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/iptables/reset/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reset Apply */
+        post: operations["reset_apply_api_routers__router_id__firewall_iptables_reset_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/iptables/reset/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reset Preview */
+        post: operations["reset_preview_api_routers__router_id__firewall_iptables_reset_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/iptables/restart/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restart Apply */
+        post: operations["restart_apply_api_routers__router_id__firewall_iptables_restart_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/iptables/restart/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restart Preview */
+        post: operations["restart_preview_api_routers__router_id__firewall_iptables_restart_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/firewall/model/apply": {
         parameters: {
             query?: never;
@@ -5155,6 +5257,78 @@ export interface components {
              * @default []
              */
             upserts: components["schemas"]["IpsetIn"][];
+        };
+        /** IptChain */
+        IptChain: {
+            /** Bytes */
+            bytes: number | null;
+            /** Name */
+            name: string;
+            /** Packets */
+            packets: number | null;
+            /** Policy */
+            policy: string | null;
+            /** References */
+            references: number | null;
+            /** Rules */
+            rules: components["schemas"]["IptRule"][];
+        };
+        /** IptRule */
+        IptRule: {
+            /** Bytes */
+            bytes: number;
+            /** Comment */
+            comment: string | null;
+            /** Destination */
+            destination: string;
+            /** Inp */
+            inp: string;
+            /** Num */
+            num: number;
+            /** Opt */
+            opt: string;
+            /** Options */
+            options: string;
+            /** Out */
+            out: string;
+            /** Packets */
+            packets: number;
+            /** Prot */
+            prot: string;
+            /** Source */
+            source: string;
+            /** Target */
+            target: string;
+        };
+        /** IptTable */
+        IptTable: {
+            /** Chains */
+            chains: components["schemas"]["IptChain"][];
+            /** Error */
+            error?: string | null;
+            /**
+             * Program
+             * @enum {string}
+             */
+            program: "iptables" | "ip6tables";
+            /** Table */
+            table: string;
+        };
+        /** IptablesPresence */
+        IptablesPresence: {
+            /** Ip6Tables */
+            ip6tables: boolean;
+            /** Iptables */
+            iptables: boolean;
+        };
+        /** IptablesState */
+        IptablesState: {
+            /** Ip6Tables */
+            ip6tables: boolean;
+            /** Iptables */
+            iptables: boolean;
+            /** Tables */
+            tables: components["schemas"]["IptTable"][];
         };
         /** IwDevInfo */
         IwDevInfo: {
@@ -10065,6 +10239,200 @@ export interface operations {
                 "application/json": components["schemas"]["IpsetsIn"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    iptables_api_routers__router_id__firewall_iptables_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IptablesState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    present_api_routers__router_id__firewall_iptables_present_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IptablesPresence"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_apply_api_routers__router_id__firewall_iptables_reset_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Digest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_preview_api_routers__router_id__firewall_iptables_reset_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restart_apply_api_routers__router_id__firewall_iptables_restart_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Digest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restart_preview_api_routers__router_id__firewall_iptables_restart_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

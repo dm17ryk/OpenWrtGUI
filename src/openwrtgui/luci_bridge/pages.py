@@ -28,6 +28,9 @@ NATIVE: dict[str, str] = {
     "admin/network/firewall/ipsets": "firewall",
     "admin/network/firewall/custom": "firewall",
     "admin/status/nftables": "firewall",
+    # v1.0a2 D6: LuCI's iptables view, on fw3 routers and as fw4's sub-route: Firewall › Legacy iptables
+    "admin/status/iptables": "firewall",
+    "admin/status/nftables/iptables": "firewall",
     # v0.6b D11: the System screen; v0.6c D1: Administration and LEDs too; Mount points too (v1.0a2 D5: edited
     # natively on routers with block-mount)
     "admin/system/admin": "system",
@@ -68,6 +71,8 @@ NATIVE_TAB: dict[str, str] = {
     "admin/network/firewall/ipsets": "ipsets",
     "admin/network/firewall/custom": "custom",
     "admin/status/nftables": "raw",
+    "admin/status/iptables": "iptables",
+    "admin/status/nftables/iptables": "iptables",
     "admin/system/admin": "access",
     "admin/system/admin/password": "access",
     "admin/system/admin/pwpolicy": "access",
