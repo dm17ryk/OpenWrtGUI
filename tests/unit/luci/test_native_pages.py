@@ -46,7 +46,9 @@ def test_a_native_page_names_its_screens_tab() -> None:
 
 
 def test_plugins_is_system_plugins() -> None:
-    plugins = LuciPage("admin/system/plugins", "Plugins", "luci-mod-system", ("luci-mod-system-plugins",), (), ())
+    plugins = LuciPage(
+        "admin/system/plugins", "Plugins", "luci-mod-system", ("luci-mod-system-plugins",), (), ()
+    )
     (view,) = page_views([plugins])
     assert (view.native, view.tab) == ("system", "plugins")
 
