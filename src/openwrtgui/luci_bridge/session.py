@@ -27,8 +27,9 @@ def page_groups(page: LuciPage, acl: Mapping[str, Any]) -> list[str]:
     the way down, v1.0a2 D10b), or its package's when none names any; then LuCI's base. Only groups the router
     has."""
     named = [g for d in page.requires for g in (d.get("acl") or []) if isinstance(g, str)]
-    own = list(dict.fromkeys([*named, *page.acl])) or ([page.package] if page.package in acl else [])
-    return [g for g in dict.fromkeys([*own, *BASE_GROUPS]) if g in acl]
+    # the page's own groups, or its package's when its entry names none (as before v1.0a2: final review)
+    own = list(page.acl) or ([page.package] if page.package in acl else [])
+    return [g for g in dict.fromkeys([*named, *own, *BASE_GROUPS]) if g in acl]
 
 
 def _objects(scope: str, block: Mapping[str, Any], level: Access) -> list[list[str]]:

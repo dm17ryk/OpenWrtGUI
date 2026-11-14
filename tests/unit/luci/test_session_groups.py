@@ -23,6 +23,22 @@ def test_a_pages_session_gets_its_ancestors_groups() -> None:
     assert "luci-mod-status-firewall" in page_groups(sub, ACL)
 
 
+def test_a_page_without_its_own_groups_keeps_its_package_group() -> None:
+    """final review (re-graded): D10b must not drop the package fallback a page had before v1.0a2."""
+    acl = {**ACL, "luci-app-sqm": {}}
+    page = LuciPage(
+        "admin/network/sqm/extra",
+        "Extra",
+        "luci-app-sqm",
+        (),
+        (),
+        (),
+        requires=({"acl": ["luci-mod-status-firewall"]},),
+    )
+    groups = page_groups(page, acl)
+    assert "luci-app-sqm" in groups and "luci-mod-status-firewall" in groups
+
+
 def test_groups_the_router_lacks_are_left_out() -> None:
     page = LuciPage(
         "admin/x/y",
