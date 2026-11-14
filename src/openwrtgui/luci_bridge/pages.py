@@ -38,6 +38,7 @@ NATIVE: dict[str, str] = {
     "admin/system/admin/uhttpd": "system",
     "admin/system/admin/repokeys": "system",
     "admin/system/leds": "system",
+    "admin/system/plugins": "system",  # v1.0a2 D4: System › Plugins
     "admin/status/logs": "system",
     "admin/status/logs/syslog": "system",
     "admin/status/logs/dmesg": "system",
@@ -74,6 +75,7 @@ NATIVE_TAB: dict[str, str] = {
     "admin/system/admin/uhttpd": "access",
     "admin/system/admin/repokeys": "access",
     "admin/system/leds": "leds",
+    "admin/system/plugins": "plugins",
     "admin/status/logs": "logs",
     "admin/status/logs/syslog": "logs",
     "admin/status/logs/dmesg": "logs",

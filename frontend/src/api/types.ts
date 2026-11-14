@@ -240,6 +240,7 @@ export type LedState = S['LedState']
 export type LedRow = S['LedRow']
 export type LedInfo = S['LedInfo']
 export type MountState = S['MountState']
+export type PluginState = S['PluginState']
 export type KeptFiles = S['KeptFiles']
 export type RestoreCheck = S['RestoreCheck']
 export type SystemSample = {

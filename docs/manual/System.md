@@ -111,6 +111,10 @@ the saved config and uhttpd listening where the switch says.
 The names of the keys the package manager trusts (`/etc/apk/keys`, or `/etc/opkg/keys` on older firmware).
 They are shown, never changed here.
 
+## Plugins
+
+LuCI's plugin switches: the global one, one per group of plugins and one per plugin.
+
 ## Services
 
 Every init script the router has, with whether it starts at boot (enabled) and whether it is running.

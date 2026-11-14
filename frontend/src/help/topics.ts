@@ -83,6 +83,7 @@ export const HELP = {
   systemHttp: 'System#https-access',
   systemRepoKeys: 'System#repository-keys',
   systemLeds: 'System#leds',
+  systemPlugins: 'System#plugins',
   systemMounts: 'System#mount-points',
   systemImport: 'System#import-a-backup',
   systemRestore: 'System#restore',

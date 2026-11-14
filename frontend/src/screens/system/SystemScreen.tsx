@@ -12,6 +12,7 @@ import { DiagnosticsTab } from './DiagnosticsTab'
 import { LedsTab } from './LedsTab'
 import { LogsTab } from './LogsTab'
 import { MountsTab } from './MountsTab'
+import { PluginsTab } from './PluginsTab'
 import { ProcessesTab } from './ProcessesTab'
 import { ServicesTab } from './ServicesTab'
 import { SettingsTab } from './SettingsTab'
@@ -24,6 +25,7 @@ const TABS = [
   ['diagnostics', 'Diagnostics'],
   ['settings', 'System and time'],
   ['access', 'Access'],
+  ['plugins', 'Plugins'],
   ['services', 'Services'],
   ['cron', 'Scheduled tasks'],
   ['leds', 'LEDs'],
@@ -74,6 +76,7 @@ export function SystemScreen() {
       {tab === 'diagnostics' && <DiagnosticsTab routerId={id} />}
       {tab === 'settings' && <SettingsTab routerId={id} routerName={name} />}
       {tab === 'access' && <AccessTab routerId={id} routerName={name} />}
+      {tab === 'plugins' && <PluginsTab routerId={id} routerName={name} />}
       {tab === 'services' && <ServicesTab routerId={id} routerName={name} />}
       {tab === 'cron' && <CronTab routerId={id} routerName={name} />}
       {tab === 'leds' && <LedsTab routerId={id} routerName={name} />}

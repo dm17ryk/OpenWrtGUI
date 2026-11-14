@@ -45,6 +45,12 @@ def test_a_native_page_names_its_screens_tab() -> None:
     assert views["admin/network/wireless"].tab is None  # a screen without tabs
 
 
+def test_plugins_is_system_plugins() -> None:
+    plugins = LuciPage("admin/system/plugins", "Plugins", "luci-mod-system", ("luci-mod-system-plugins",), (), ())
+    (view,) = page_views([plugins])
+    assert (view.native, view.tab) == ("system", "plugins")
+
+
 def test_every_tab_is_one_its_screen_has() -> None:
     for path, tab in NATIVE_TAB.items():
         assert path in NATIVE, path

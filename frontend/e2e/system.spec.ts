@@ -10,11 +10,21 @@ test('the System screen shows the model, the overview and three live charts', as
   await expect(page.getByRole('region', { name: 'Overview' })).toContainText('D-Link DWR-921 C3 (U-Boot)')
   await expect(page.locator('.rf-chart canvas')).toHaveCount(3)
   await noHorizontalScroll(page)
-  for (const tab of ['Logs', 'Processes', 'Diagnostics', 'System and time', 'Access', 'Services', 'Scheduled tasks', 'LEDs', 'Mount points', 'Backup and reboot']) {
+  for (const tab of ['Logs', 'Processes', 'Diagnostics', 'System and time', 'Access', 'Plugins', 'Services', 'Scheduled tasks', 'LEDs', 'Mount points', 'Backup and reboot']) {
     await page.getByRole('tab', { name: tab }).click()
     await expect(page.getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true')
     await noHorizontalScroll(page)
   }
+})
+
+test("System › Plugins shows LuCI's plugin switches and previews one", async ({ page }) => {
+  await open(page, '/routers/ap1/system?tab=plugins')
+  const on = page.getByLabel('Plugins on')
+  await expect(on).not.toBeChecked()
+  await expect(page.getByText('No plugins are installed on AP1.')).toBeVisible()
+  await on.check()
+  await expect(page.getByRole('region', { name: 'Command preview' })).toContainText("uci set luci_plugins.global.enabled='1'")
+  await noHorizontalScroll(page)
 })
 
 test('a host name change and back, a service restart and a backup in the simulator', async ({ page }, info) => {

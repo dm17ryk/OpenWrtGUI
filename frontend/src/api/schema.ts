@@ -2312,6 +2312,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/system/plugins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plugins */
+        get: operations["plugins_api_routers__router_id__system_plugins_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/plugins/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply */
+        post: operations["apply_api_routers__router_id__system_plugins_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/system/plugins/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview */
+        post: operations["preview_api_routers__router_id__system_plugins_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/system/processes": {
         parameters: {
             query?: never;
@@ -5912,6 +5963,102 @@ export interface components {
             router_id: string;
             /** Warnings */
             warnings: string[];
+        };
+        /** PluginApplyIn */
+        PluginApplyIn: {
+            /** Digest */
+            digest: string;
+            /** Enabled */
+            enabled?: boolean | null;
+            /**
+             * Groups
+             * @default {}
+             */
+            groups: {
+                [key: string]: boolean;
+            };
+            /**
+             * Plugins
+             * @default {}
+             */
+            plugins: {
+                [key: string]: boolean;
+            };
+            /**
+             * Remove
+             * @default []
+             */
+            remove: string[];
+        };
+        /** PluginChange */
+        PluginChange: {
+            /** Enabled */
+            enabled?: boolean | null;
+            /**
+             * Groups
+             * @default {}
+             */
+            groups: {
+                [key: string]: boolean;
+            };
+            /**
+             * Plugins
+             * @default {}
+             */
+            plugins: {
+                [key: string]: boolean;
+            };
+            /**
+             * Remove
+             * @default []
+             */
+            remove: string[];
+        };
+        /** PluginGroup */
+        PluginGroup: {
+            /** Enabled */
+            enabled: boolean;
+            /** Key */
+            key: string;
+        };
+        /** PluginRow */
+        PluginRow: {
+            /** Configured */
+            configured: boolean;
+            /** Description */
+            description: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Group */
+            group: string;
+            /** Id */
+            id: string;
+            /** Installed */
+            installed: boolean;
+            /** Name */
+            name: string;
+            /** Options */
+            options: {
+                [key: string]: string;
+            };
+            /** Title */
+            title: string;
+        };
+        /** PluginState */
+        PluginState: {
+            /** Enabled */
+            enabled: boolean;
+            /** Global Section */
+            global_section: boolean;
+            /** Groups */
+            groups: components["schemas"]["PluginGroup"][];
+            /**
+             * Missing
+             * @default []
+             */
+            missing: string[];
+            /** Plugins */
+            plugins: components["schemas"]["PluginRow"][];
         };
         /** PolicyApplyIn */
         PolicyApplyIn: {
@@ -12454,6 +12601,107 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plugins_api_routers__router_id__system_plugins_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_api_routers__router_id__system_plugins_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_api_routers__router_id__system_plugins_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginChange"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
