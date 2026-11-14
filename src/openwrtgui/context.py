@@ -43,6 +43,7 @@ from openwrtgui.store.keys import AppKey, load_or_create_app_key
 from openwrtgui.store.routers import RouterRecord, RouterStore, router_key_paths
 from openwrtgui.store.settings import SettingsStore
 from openwrtgui.system.access_service import AccessService
+from openwrtgui.system.plugins_service import PluginsService
 from openwrtgui.system.sampler import SystemHub
 from openwrtgui.system.service import SystemService
 from openwrtgui.terminal import TerminalSession
@@ -89,6 +90,7 @@ class AppContext:
     system: SystemService
     system_live: SystemHub
     access: AccessService
+    plugins: PluginsService  # v1.0a2 D4
     token: str
     port: int
     mode: Literal["real", "simulator"]
@@ -373,6 +375,7 @@ def build_context(
         system=system,
         system_live=SystemHub(pool=pool, routers=routers, busy=system.busy),
         access=access,
+        plugins=PluginsService(pool=pool, routers=routers, runner=runner),
         token=token,
         port=port,
         mode="simulator" if simulator is not None else "real",

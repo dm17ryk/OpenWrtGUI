@@ -24,6 +24,7 @@ from openwrtgui.api import (
     misc_api,
     net_api,
     onboard_api,
+    plugins_api,
     ports_api,
     rf_api,
     routers_api,
@@ -111,6 +112,7 @@ def create_app(ctx: AppContext) -> FastAPI:
         lte_api,
         system_api,
         system_access_api,
+        plugins_api,
     )
     for module in modules:
         app.include_router(module.router)
