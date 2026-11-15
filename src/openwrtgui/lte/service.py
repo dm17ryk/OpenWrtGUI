@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Literal
 
 from openwrtgui.forms import OptionRow
-from openwrtgui.guard.audit import AuditLog, mask
+from openwrtgui.guard.audit import AT_MASKED_COMMANDS, AuditLog, mask
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.guard.writes import run_audited
 from openwrtgui.lte import commands as c
@@ -43,12 +43,12 @@ NOT_IN_MODE = "The modem did not go {mode}{why}; it may need ifup lte or a power
 NEEDS_CONFIRM = "This command may change the modem; send it again with confirm"
 NO_MODEM_ANSWER = "No answer from the modem"
 IMEI_RULE = re.compile(r"[0-9]{15}")
-# An echo may put spaces around `=`: hide everything after +CPIN/+CLCK/+CPWD and `=` (v1.0b1 D4).
-_PIN_ECHO = re.compile(r"(\+(?:CPIN|CLCK|CPWD)\s*=).*", re.IGNORECASE)
+# Everything after a PIN or APN-password command's `=`, as the audit log hides it (v1.0b1 D4, final review).
+_PIN_ECHO = re.compile(rf"({AT_MASKED_COMMANDS}).*", re.IGNORECASE)
 
 
 def shown_answer(lines: Sequence[str]) -> tuple[str, ...]:
-    """The modem's lines as the console shows them: a PIN in an echo is hidden."""
+    """The modem's lines as the console shows them: a PIN or APN password in an echo is hidden."""
     return tuple(_PIN_ECHO.sub(r"\1<hidden>", mask(line, ())) for line in lines)
 
 
@@ -297,7 +297,7 @@ class LteService:
         the person's confirmation and the write lock."""
         rec = self._record(router_id)
         command = c.check_at(text)
-        shown = mask(command, ())  # what goes back to the screen: a SIM PIN is hidden (v1.0b1 D4)
+        (shown,) = shown_answer((command,))  # what goes back to the screen: a SIM PIN is hidden (v1.0b1 D4)
         query = is_query(command)
         if not query:
             self._guard.require_clear()

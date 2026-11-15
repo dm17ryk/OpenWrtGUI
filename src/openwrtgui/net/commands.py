@@ -5,6 +5,7 @@ Recordings key on the text, so the recorder and the app take these strings from 
 
 from __future__ import annotations
 
+from openwrtgui.ifname import checked_ifname
 from openwrtgui.net.model import Family
 from openwrtgui.transport.base import ubus_command
 
@@ -27,16 +28,17 @@ def ip_rules(family: Family) -> str:
     return f"ip -j -{family} rule show"
 
 
+# The switch name comes from the router (swconfig list): checked before the shell (v1.0b1 D5)
 def swconfig_show(switch: str) -> str:
-    return f"swconfig dev {switch} show"
+    return f"swconfig dev {checked_ifname(switch)} show"
 
 
 def swconfig_help(switch: str) -> str:
-    return f"swconfig dev {switch} help"
+    return f"swconfig dev {checked_ifname(switch)} help"
 
 
 def swconfig_arl(switch: str) -> str:
-    return f"swconfig dev {switch} get arl_table"
+    return f"swconfig dev {checked_ifname(switch)} get arl_table"
 
 
 def switch_features(switch: str) -> str:

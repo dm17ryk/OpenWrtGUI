@@ -14,8 +14,9 @@ function isQuery(text: string): boolean {
   return QUERY.test(text.trim())
 }
 
-// the same commands the server hides (src/openwrtgui/lte/service.py, v1.0b1 D4): a SIM PIN is never on screen
-const PIN = /(\+(?:CPIN|CLCK|CPWD)\s*=).*/i
+// the same commands the server hides (src/openwrtgui/guard/audit.py AT_MASKED_COMMANDS, v1.0b1 D4): a SIM PIN or
+// an APN password is never on screen; a `=?` query is shown as typed
+const PIN = /([+$]\s*(?:CPIN|CLCK|CPWD|CGAUTH|QICSGP|QCPDPP)\s*=(?!\s*\?)).*/i
 
 function hidePin(text: string): string {
   return text.replace(PIN, '$1<hidden>')

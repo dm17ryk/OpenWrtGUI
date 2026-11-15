@@ -55,11 +55,11 @@ installer runs. The installer is not Authenticode-signed yet.
 ## Secrets on screen and in the log
 
 - **The audit log** masks every command: the passwords you type, Wi-Fi keys and the other secret options by
-  name, SIM PINs in AT commands, and LuCI session ids.
+  name, SIM PINs and APN passwords in AT commands, and LuCI session ids.
 - **Discovery, Plugins and a LuCI page's change list** show a secret option as `<hidden>`: any option whose name
   contains `key`, `secret`, `pass`, `psk`, `token`, `pin` or `pwd`, and the audit log's list. Discovery still
   lists a secret that differs from the image, with both values hidden.
-- **The AT console** shows a SIM PIN as `<hidden>` and does not keep the command for Up/Down.
+- **The AT console** shows a SIM PIN or an APN password as `<hidden>` and does not keep the command for Up/Down.
 - **Backups** hold the router's secrets; they stay in `backups\`, readable by your Windows user only.
 
 ## How the code is checked

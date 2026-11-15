@@ -20,7 +20,11 @@ permissions:
 
 jobs:
   python-deps:
-    runs-on: ubuntu-latest
+    # pip-audit skips requirements whose markers are false where it runs: the installer ships the win32 ones
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7

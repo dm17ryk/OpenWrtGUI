@@ -235,3 +235,14 @@ async def test_dsa_router_not_managed(net: NetEnv) -> None:
     assert not state.managed and state.ports == ()
     with pytest.raises(ValueError, match="This router's switch is not managed by swconfig"):
         await net.ports.plan_ports("ap2", 2, False)
+
+
+async def test_a_switch_name_that_is_not_one_is_refused(net: NetEnv) -> None:
+    """v1.0b1 final review: the switch name comes from the router and goes into swconfig lines."""
+    from openwrtgui.ports.compile import enable_all_commands
+
+    state = replace(await net.ports.state("ap2"), switch="switch0;reboot")
+    with pytest.raises(ValueError, match="is not an interface name"):
+        enable_commands(state, 2, False, "AP2 · office")
+    with pytest.raises(ValueError, match="is not an interface name"):
+        enable_all_commands(state)

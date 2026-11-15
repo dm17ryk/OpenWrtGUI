@@ -9,6 +9,7 @@ from datetime import datetime
 from itertools import combinations
 from typing import Literal
 
+from openwrtgui.ifname import checked_ifname
 from openwrtgui.probe.board import BoardInfo
 from openwrtgui.probe.describe import SelfDescription
 from openwrtgui.transport.base import Transport, ubus_call
@@ -135,6 +136,16 @@ def ssid_sections(uci: Mapping[str, str], radio: str) -> list[str]:
     ]
 
 
+def phy_info_command(phy: str) -> str:
+    """The phy comes from the router (iwinfo phyname): checked before the shell (v1.0b1 D5)."""
+    return f"iw phy {checked_ifname(phy)} info"
+
+
+def dev_info_command(ifname: str) -> str:
+    """The interface comes from the router (network.wireless status): checked before the shell (v1.0b1 D5)."""
+    return f"iw dev {checked_ifname(ifname)} info"
+
+
 async def read_uci(t: Transport) -> dict[str, str]:
     return parse_uci_show((await t.run(UCI_SHOW)).stdout)
 
@@ -155,7 +166,7 @@ async def read_wifi(
         p = f"wireless.{name}."
         phy = str((await ubus_call(t, "iwinfo", "phyname", {"section": name}) or {}).get("phyname", "phy0"))
         band = uci.get(p + "band") or str(st.get("config", {}).get("band", "2g"))
-        phy_info = (await t.run(f"iw phy {phy} info")).stdout
+        phy_info = (await t.run(phy_info_command(phy))).stdout
         # The kernel's list first (Dmitry, 2026-11-09); iwinfo's only where iw lists no frequencies
         allowed = parse_phy_channels(phy_info) or parse_freqlist(
             await ubus_call(t, "iwinfo", "freqlist", {"device": name}) or {}
@@ -177,7 +188,7 @@ async def read_wifi(
         actual = None
         first = next(iter(ifnames.values()), None)
         if up and first:
-            actual = parse_iw_dev_info((await t.run(f"iw dev {first} info")).stdout)
+            actual = parse_iw_dev_info((await t.run(dev_info_command(first))).stdout)
         modes = modes_from_uci(uci, name, limits.max_htmode)
         mask: MaskState = "none"
         if modes.kind == "set" and up:

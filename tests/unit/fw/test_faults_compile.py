@@ -255,3 +255,12 @@ def test_netem_refused_without_the_netem_module() -> None:
     no = FaultCaps("bridge", frozenset(), True, True, netem=False)
     with pytest.raises(ValueError, match=r"^AP1 has no netem \(sch_netem\)$"):
         _compile(FaultRequest("netem", REF, netem=NetemParams(delay_ms=10)), target=PANEL_ETH, caps=no)
+
+
+def test_a_target_device_that_is_not_an_interface_is_refused() -> None:
+    """v1.0b1 final review: the device comes from the router and goes into tc and nft lines."""
+    bad = FaultTarget("panel", "e4:5f:01:aa:bb:01", "192.168.1.20", "wired", "eth0.1;reboot")
+    with pytest.raises(ValueError, match="is not an interface name"):
+        _compile(FaultRequest("netem", REF, netem=NetemParams(delay_ms=100)), target=bad, caps=BRIDGE)
+    with pytest.raises(ValueError, match="is not an interface name"):
+        _compile(FaultRequest("block", REF, flow="rtp_in", loss=30), target=bad)

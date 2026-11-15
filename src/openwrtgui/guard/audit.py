@@ -28,7 +28,10 @@ _UCI_SECRET = re.compile(
 _JSON_SECRET = re.compile(rf"(\"(?:{_SECRET_OPTIONS})\"\s*:\s*)\"(?:[^\"\\]|\\.)*\"")
 # SIM PINs sent as AT commands (3GPP 27.007 +CPIN, +CLCK, +CPWD): everything after `=` up to the end of the
 # shell-quoted argument (a ' inside written as '\''), so neither the PIN nor its pieces stay visible.
-_AT_SECRET = re.compile(r"(\+(?:CPIN|CLCK|CPWD)=)((?:'\\''|[^'\r\n])*)", re.IGNORECASE)
+# A modem ignores spaces, so `AT + CPIN = 1234` carries the PIN too, and APN passwords travel in +CGAUTH,
+# Quectel's +QICSGP and Qualcomm's $QCPDPP. A `=?` query carries nothing and stays readable (final review).
+AT_MASKED_COMMANDS = r"[+$]\s*(?:CPIN|CLCK|CPWD|CGAUTH|QICSGP|QCPDPP)\s*=(?!\s*\?)"
+_AT_SECRET = re.compile(rf"({AT_MASKED_COMMANDS})((?:'\\''|[^'\r\n])*)", re.IGNORECASE)
 
 
 def _hide_value(match: re.Match[str]) -> str:

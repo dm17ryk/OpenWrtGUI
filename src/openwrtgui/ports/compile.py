@@ -7,6 +7,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
 
+from openwrtgui.ifname import checked_ifname
 from openwrtgui.net.parse import options
 from openwrtgui.ports.model import Members
 from openwrtgui.ports.parse import render_members, switch_conf, switch_ports
@@ -34,7 +35,7 @@ class MirrorRequest:
 def _managed(state: PortsState) -> str:
     if not state.managed or state.switch is None:
         raise ValueError(NOT_MANAGED)
-    return state.switch
+    return checked_ifname(state.switch)  # from the router, into swconfig lines (v1.0b1 D5)
 
 
 def _label(state: PortsState, port: int) -> str:

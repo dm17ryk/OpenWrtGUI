@@ -53,7 +53,8 @@ HTTPS).
 
 - Discovery, Plugins and a LuCI page's change list hide every secret option, including names outside the audit
   log's list. Discovery still lists a secret that differs from the image, with both values hidden.
-- The AT console never shows a SIM PIN and does not keep it for Up/Down.
+- The AT console never shows a SIM PIN or an APN password and does not keep the command for Up/Down; the audit
+  log hides them too, also when typed with spaces.
 - Interface, phy and capture device names a router reports, and the radio names RF live and a step-through
   restore are given, are checked before they go into a command or a file name. LuCI page checks ask the router
   only about absolute paths.

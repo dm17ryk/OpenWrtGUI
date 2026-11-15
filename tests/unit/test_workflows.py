@@ -79,6 +79,8 @@ def test_security_audits_block_on_shipped_packages() -> None:
     """v1.0b1 D10: shipped packages block, build tools advise, and none of it can stop a release."""
     sec = _load(WORKFLOWS / "security.yml")
     assert {"push", "pull_request", "schedule"} <= set(_on(sec))
+    # pip-audit skips requirements whose markers are false where it runs; the installer ships the win32 ones
+    assert sec["jobs"]["python-deps"]["runs-on"] == "windows-latest"
     assert sec["permissions"] == {"contents": "read"}
     steps = {s["name"]: s for job in sec["jobs"].values() for s in job["steps"] if "name" in s}
     py = steps["Shipped Python packages"]

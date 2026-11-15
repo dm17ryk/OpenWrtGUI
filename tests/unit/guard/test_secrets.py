@@ -26,6 +26,8 @@ from openwrtgui.guard.secrets import HIDDEN, is_secret_option, shown
         "apikey",
         "totpsecret",
         "priv_key_pwd",
+        "snmpd.public.community",  # an SNMP community string is its password (final review)
+        "acme.example.credentials",  # holds the DNS API token, CF_Token=... (final review)
     ],
 )
 def test_secret_options(name: str) -> None:

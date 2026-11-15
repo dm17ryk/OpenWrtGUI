@@ -33,8 +33,9 @@ SECRET_OPTIONS = (
     "private_key",
     "preshared_key",  # WireGuard
 )
-# A substring on purpose: third-party plugin options are run together (`apikey`, `totpsecret`).
-_SECRET_PART = re.compile(r"key|secret|pass|psk|token|pin|pwd", re.IGNORECASE)
+# A substring on purpose: third-party plugin options are run together (`apikey`, `totpsecret`). `cred`: acme's
+# `credentials` hold the DNS API token; `community`: an SNMP community string is its password (final review).
+_SECRET_PART = re.compile(r"key|secret|pass|psk|token|pin|pwd|cred|community", re.IGNORECASE)
 # Flags whose value is exactly what a person should see: whether password login is on (dropbear).
 _SHOWN = frozenset({"PasswordAuth", "RootPasswordAuth"})
 

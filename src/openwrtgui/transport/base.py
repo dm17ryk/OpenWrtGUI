@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shlex
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
@@ -11,6 +12,8 @@ from typing import Any, Protocol, runtime_checkable
 
 UBUS_METHOD_NOT_FOUND = 3
 UBUS_NOT_FOUND = 4
+# `network.wireless`, `luci-rpc`, `hostapd.<ifname>` (the ifname from the router): no space or shell character
+_UBUS_OBJECT = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
 
 @dataclass(frozen=True)
@@ -133,6 +136,9 @@ class Forwarder(Protocol):
 
 
 def ubus_command(obj: str, method: str, args: Mapping[str, object] | None = None) -> str:
+    """The object reaches the shell unquoted: it is checked first (v1.0b1 D5, final review)."""
+    if not _UBUS_OBJECT.fullmatch(obj):
+        raise ValueError(f"{obj!r} is not a ubus object")
     cmd = f"ubus call {obj} {method}"
     if args:
         cmd += " " + shlex.quote(json.dumps(args, separators=(",", ":"), sort_keys=True))
