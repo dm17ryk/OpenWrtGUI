@@ -52,7 +52,7 @@ def test_command_texts() -> None:
 def test_ifname_rule() -> None:
     assert checked_ifname("phy0-ap0") == "phy0-ap0"
     assert checked_ifname("owgscan0") == "owgscan0"
-    for bad in ("a;b", "x y", "", "a" * 16):
+    for bad in ("a;b", "x y", "", "a" * 16, "-h", "phy0;reboot"):
         with pytest.raises(ValueError, match="is not an interface name"):
             checked_ifname(bad)
     with pytest.raises(ValueError):

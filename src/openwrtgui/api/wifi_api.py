@@ -237,7 +237,7 @@ class StepPlanOut(BaseModel):
 
 
 class RadioIn(BaseModel):
-    radio: str
+    radio: str = Field(pattern=r"^[A-Za-z0-9_]{1,15}$")  # openwrtgui.ifname.RADIO (v1.0b1 D5)
 
 
 @router.get("/step-through")

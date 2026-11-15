@@ -11,6 +11,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from openwrtgui.api.deps import WS_NOT_FOUND, ws_accept
 from openwrtgui.api.models import wire
+from openwrtgui.ifname import RADIO
 from openwrtgui.terminal import TerminalSession
 from openwrtgui.transport.base import TransportError
 
@@ -47,7 +48,11 @@ async def rf_live(ws: WebSocket, router_id: str) -> None:
     if ctx.routers.get(router_id) is None:
         await ws.close(code=WS_NOT_FOUND)
         return
-    sampler = ctx.rf.sampler(router_id, ws.query_params.get("radio", "radio0"))
+    radio = ws.query_params.get("radio", "radio0")
+    if not RADIO.fullmatch(radio):  # it names the CSV file and keys a sampler (v1.0b1 D5)
+        await ws.close(code=WS_NOT_FOUND)
+        return
+    sampler = ctx.rf.sampler(router_id, radio)
     queue = sampler.subscribe()
 
     async def send_samples() -> None:

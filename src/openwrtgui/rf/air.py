@@ -6,22 +6,13 @@ dump is a read.
 
 from __future__ import annotations
 
-import re
-
+from openwrtgui.ifname import checked_ifname
 from openwrtgui.transport.base import ubus_command
 from openwrtgui.wifi.monitor import MONITOR
 
 SCAN_IF = "owgscan0"
 SCAN_TIMEOUT_S = 30.0
 FRAME_WINDOW_S, FRAME_EVERY_S, FRAME_CAP, FRAMES_LIMIT_S = 3, 5, 2000, 1800
-IFNAME = re.compile(r"[A-Za-z0-9._-]{1,15}")
-RADIO = re.compile(r"[A-Za-z0-9_]{1,15}")
-
-
-def checked_ifname(name: str) -> str:
-    if not IFNAME.fullmatch(name):
-        raise ValueError(f"{name!r} is not an interface name")
-    return name
 
 
 def scan_add(phy: str) -> str:

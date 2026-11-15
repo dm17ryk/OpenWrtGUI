@@ -12,6 +12,7 @@ from typing import Any
 
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
+from openwrtgui.ifname import checked_radio
 from openwrtgui.paths import documents_dir
 from openwrtgui.rf.frames_service import FrameAnalyzer
 from openwrtgui.rf.parse import current_survey, parse_station_dump, parse_survey, split_sections
@@ -215,7 +216,7 @@ class RfHub:
         self._tasks: set[asyncio.Task[Any]] = set()
 
     def sampler(self, router_id: str, radio: str) -> RfSampler:
-        key = (router_id, radio)
+        key = (router_id, checked_radio(radio))  # it names the CSV file (v1.0b1 D5)
         if key not in self._samplers:
             sampler = RfSampler(
                 router_id, radio, pool=self._pool, routers=self._routers, recordings=self._recordings
@@ -225,7 +226,7 @@ class RfHub:
         return self._samplers[key]
 
     def frames(self, router_id: str, radio: str) -> FrameAnalyzer:
-        key = (router_id, radio)
+        key = (router_id, checked_radio(radio))
         if key not in self._frames:
             if self._guard is None or self._audit is None:
                 raise ValueError("Frame analysis needs Bench Guard and the audit log")

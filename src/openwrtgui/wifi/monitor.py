@@ -15,6 +15,7 @@ import asyncio
 import contextlib
 from collections.abc import AsyncIterator, Awaitable, Callable
 
+from openwrtgui.ifname import checked_ifname
 from openwrtgui.transport.base import CommandResult, Transport, TransportError
 
 MONITOR = "owgmon0"
@@ -27,6 +28,7 @@ RunFn = Callable[[str, bool], Awaitable[CommandResult]]  # (command, require_gua
 def add_command(phy: str, *, clear_leftover: bool) -> str:
     """With clear_leftover, the command the beacon check and capture always sent (recordings match it)."""
     head = f"iw dev {MONITOR} del 2>/dev/null; " if clear_leftover else ""
+    phy = checked_ifname(phy)  # from the router (iwinfo phyname), v1.0b1 D5
     return head + f"iw phy {phy} interface add {MONITOR} type monitor && ip link set {MONITOR} up"
 
 

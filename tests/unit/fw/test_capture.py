@@ -299,3 +299,9 @@ def test_wireshark_found_in_program_files(tmp_path: Path) -> None:
     exe.write_bytes(b"")
     assert find_wireshark({"ProgramFiles": str(tmp_path)}) == exe
     assert find_wireshark({"ProgramFiles": str(tmp_path / "none")}, which=lambda _: None) is None
+
+
+def test_a_device_name_that_is_not_an_interface_is_refused() -> None:
+    """v1.0b1 D5: the router lists the devices; a name goes into tcpdump and the file name only checked."""
+    with pytest.raises(ValueError, match="is not an interface name"):
+        capture_command(CaptureRequest("br-lan; reboot", "", 10), "192.168.1.10", 22)

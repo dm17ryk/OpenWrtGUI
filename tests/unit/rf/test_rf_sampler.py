@@ -194,3 +194,19 @@ def test_recording_goes_to_the_given_folder(tmp_path: Path) -> None:
 def test_documents_dir_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(paths, "_windows_documents", lambda: None)
     assert paths.documents_dir() == Path.home() / "Documents"
+
+
+class _BadPhy(_Count):
+    async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
+        if command.startswith("ubus call iwinfo phyname"):
+            self._calls.append(command)
+            return CommandResult(command, '{"phyname": "phy0;reboot"}', "", 0)
+        return await super().run(command, timeout=timeout)
+
+
+async def test_a_phy_name_that_is_not_a_name_is_never_sent(tmp_path: Path) -> None:
+    """v1.0b1 D5: the phy comes from the router; a bad one stops the sample before any command holds it."""
+    sampler, calls = _sampler(tmp_path, _BadPhy)
+    with pytest.raises(ValueError, match="is not an interface name"):
+        await sampler.tick()
+    assert not any("phy0;reboot" in c for c in calls if not c.startswith("ubus call iwinfo phyname"))
