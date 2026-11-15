@@ -14,6 +14,7 @@ import pytest
 
 from openwrtgui.system.archive import (
     MAX_ARCHIVE,
+    MAX_MEMBERS,
     ArchiveRefused,
     dropbear_key_fingerprint,
     read_archive,
@@ -197,3 +198,25 @@ def test_a_path_twice_in_the_archive_counts_once_as_its_last_copy() -> None:
     assert [f.path for f in info.files] == ["/etc/config/system"]
     assert info.files[0].sha256 == hashlib.sha256(last).hexdigest()
     assert info.hostname == "last"
+
+
+def _many(count: int) -> bytes:
+    return _archive({f"etc/many/f{i}": b"" for i in range(count)})
+
+
+def test_an_archive_of_1000_entries_is_read() -> None:
+    assert len(read_archive(_many(MAX_MEMBERS)).files) == MAX_MEMBERS
+
+
+def test_an_archive_of_more_entries_is_refused_before_its_data_is_read() -> None:
+    """v1.0b1 D6: empty tar headers compress to almost nothing; the count stops them."""
+    with pytest.raises(ArchiveRefused, match="more than 1000 entries"):
+        read_archive(_many(MAX_MEMBERS + 1))
+
+
+def test_directories_count_as_entries() -> None:
+    dirs = [tarfile.TarInfo(f"etc/d{i}") for i in range(MAX_MEMBERS + 1)]
+    for d in dirs:
+        d.type = tarfile.DIRTYPE
+    with pytest.raises(ArchiveRefused, match="more than 1000 entries"):
+        read_archive(_archive({}, extra=dirs))

@@ -27,6 +27,8 @@ from openwrtgui.transport.base import Transport
 PATH_DIRS = ("/bin", "/sbin", "/usr/bin", "/usr/sbin", "/usr/libexec")
 HASH_LIMIT = 2**20
 READ_LIMIT = 8 * 2**20
+MAX_ENTRIES = 50_000  # an OpenWrt root file system has a few thousand (v1.0b1 D6)
+MAX_UNPACKED = 512 * 2**20  # declared file sizes; a bench image unpacks to some tens of MB
 _FOLDER = re.compile(r"[^A-Za-z0-9._,-]")
 
 
@@ -132,14 +134,23 @@ def _read(entries: dict[str, Any], path: str, limit: int = READ_LIMIT) -> bytes 
 
 def _entries(root: Any, name: str) -> dict[str, Any]:
     out: dict[str, Any] = {}
+    unpacked = 0
     try:
-        for entry in root.root.riter():
+        for seen, entry in enumerate(root.root.riter(), start=1):
+            if seen > MAX_ENTRIES:
+                raise ImageError(f"{name} holds more than {MAX_ENTRIES} entries")
             try:
                 path = entry.path
             except UnicodeDecodeError:
                 continue
             if path != "/" and not entry.is_dir:
+                if entry.is_file:
+                    unpacked += entry.size
+                    if unpacked > MAX_UNPACKED:
+                        raise ImageError(f"{name} unpacks to more than {MAX_UNPACKED // 2**20} MiB")
                 out[path] = entry
+    except ImageError:
+        raise
     except Exception as exc:  # a damaged squashfs can fail anywhere inside the reader
         raise ImageError(f"{name}: the root file system could not be read ({exc})") from exc
     return out

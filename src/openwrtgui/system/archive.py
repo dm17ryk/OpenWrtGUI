@@ -19,6 +19,7 @@ from openwrtgui.system.sshkeys import parse_authorized_keys
 
 MAX_ARCHIVE = 4 * 1024 * 1024  # AP2's own backup is 7 KB; /tmp holds the upload (about 8 MB of RAM free)
 MAX_UNPACKED = 16 * 1024 * 1024
+MAX_MEMBERS = 1000  # entries, directories included; AP2's own backup has about 35 (v1.0b1 D6)
 GZIP = b"\x1f\x8b"
 _HOST_KEY_DIR = "/etc/dropbear/"
 _CONFIG_DIR = "/etc/config/"
@@ -71,7 +72,9 @@ def _members(data: bytes) -> list[tuple[str, bytes]]:
     unpacked = 0
     try:
         with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
-            for member in tar:
+            for count, member in enumerate(tar, start=1):
+                if count > MAX_MEMBERS:
+                    raise ArchiveRefused(f"The backup holds more than {MAX_MEMBERS} entries")
                 path = _path(member.name)
                 if member.isdir():
                     continue
