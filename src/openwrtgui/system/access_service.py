@@ -408,7 +408,8 @@ class AccessService:
         added: set[str] = set()
         for line in change.add:
             key = check_key_line(line)
-            assert key.fingerprint is not None
+            if key.fingerprint is None:
+                raise RuntimeError("a checked key line has a fingerprint")
             if key.fingerprint in present or key.fingerprint in added:
                 raise ValueError(f"This key is on {rec.name} already ({key.fingerprint})")
             added.add(key.fingerprint)
@@ -570,7 +571,8 @@ class AccessService:
         detail = "uhttpd does not listen on 127.0.0.1:80"
         for _ in range(int(LISTEN_WAIT_S)):
             web = {a for a, port in parse_listeners(await self._stdout(t, s.LISTENERS)) if port == 80}
-            loop = "127.0.0.1" in web or "0.0.0.0" in web
+            # S104: compares a router's listen addresses; binds nothing
+            loop = "127.0.0.1" in web or "0.0.0.0" in web  # noqa: S104
             outside = bool(web - {"127.0.0.1", "::1"})
             if loop and (on_network is None or outside == on_network):
                 where = "every address" if outside else "loopback only"

@@ -117,7 +117,8 @@ class BridgeVlanService:
         async def make(t: Transport) -> Planned:
             state, uci = await self._read_on(rec, t)
             plan, change = self._plan(rec, state, uci, upserts, deletes)
-            assert state.bridge is not None  # bridge_change refuses a router without one
+            if state.bridge is None:
+                raise RuntimeError("bridge_change refuses a router without a bridge")
             ports = frozenset(p.name for p in state.ports)
             return Planned(plan, self._verify(state.bridge, ports, change.want), network_snapshot(uci))
 

@@ -17,7 +17,8 @@ from openwrtgui.uci import UciOp
 FAMILIES = ("inet", "ip", "ip6", "bridge", "netdev", "arp")
 INCLUDE_DIR = "/etc/owg/nft"
 _TABLE_NAME = re.compile(r"[a-z][a-z0-9_]{0,27}")
-BACKUP = f"/tmp/owg/rb-{ROLLBACK_ID}.nft"
+# S108: a path on the router (OpenWrt's RAM /tmp, root only), never on this PC
+BACKUP = f"/tmp/owg/rb-{ROLLBACK_ID}.nft"  # noqa: S108
 
 
 @dataclass(frozen=True)
@@ -158,7 +159,8 @@ def _fw4_chain(
     warnings: tuple[str, ...],
 ) -> TableChange:
     chain = obj.chain
-    assert chain is not None
+    if chain is None:
+        raise RuntimeError("a rule change needs its chain")
     if req.action == "delete":
         raise ValueError("Only whole tables are deleted here")
     for name, _ in req.rules:

@@ -92,7 +92,8 @@ def open_data_dir(ctx: Ctx) -> Ok:
     if startfile is not None:
         startfile(ctx.data.root)
     else:
-        subprocess.Popen(["xdg-open", str(ctx.data.root)])
+        # S603/S607: the desktop's opener on the data folder: fixed argv, no shell
+        subprocess.Popen(["xdg-open", str(ctx.data.root)])  # noqa: S603, S607
     return Ok()
 
 

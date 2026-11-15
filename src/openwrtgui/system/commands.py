@@ -81,13 +81,16 @@ BLOCK_DETECT = "block detect"  # prints the fstab block-mount would write; write
 BLOCK_MOUNT = "/sbin/block mount"  # a write: what LuCI's ucitrack runs after an fstab change
 # A digest of root's shadow field (D2): proves a password change without the hash leaving the router.
 # Derived from a secret: compared live, never recorded, logged or shown.
-PASSWORD_DIGEST = """awk -F: '$1=="root"{print $2}' /etc/shadow | sha256sum"""
+# S105: a command that reads the digest, not a password
+PASSWORD_DIGEST = """awk -F: '$1=="root"{print $2}' /etc/shadow | sha256sum"""  # noqa: S105
 # the digest of a lone newline: root has no password
 EMPTY_DIGEST = "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
 
 # v0.6c writes
-PASSWD = "passwd root"  # the password goes twice on stdin, never into a command line (D2)
-RESTORE_FILE = "/tmp/owg/restore.tar.gz"
+# S105: the passwd command; the password goes twice on stdin, never into a command line (D2)
+PASSWD = "passwd root"  # noqa: S105
+# S108: a path on the router (OpenWrt's RAM /tmp, root only), never on this PC
+RESTORE_FILE = "/tmp/owg/restore.tar.gz"  # noqa: S108
 UPLOAD_RESTORE = f"mkdir -p /tmp/owg && cat > {RESTORE_FILE}"
 LIST_RESTORE = f"tar -tzf {RESTORE_FILE}"
 RESTORE = f"sysupgrade --restore-backup {RESTORE_FILE}"

@@ -89,8 +89,9 @@ def installer_command(installer: Path, install_dir: Path) -> list[str]:
 
 
 def launch_installer(cmd: list[str]) -> None:
+    # S603: the installer just downloaded, run after its SHA256 matched the release's SHA256SUMS.txt
     if sys.platform == "win32":
         flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-        subprocess.Popen(cmd, creationflags=flags, close_fds=True)
+        subprocess.Popen(cmd, creationflags=flags, close_fds=True)  # noqa: S603
     else:
-        subprocess.Popen(cmd, start_new_session=True, close_fds=True)
+        subprocess.Popen(cmd, start_new_session=True, close_fds=True)  # noqa: S603

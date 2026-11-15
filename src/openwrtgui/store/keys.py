@@ -31,8 +31,9 @@ def restrict_to_user(path: Path) -> None:
     """Make a file (the private key, a backup) or a folder (the backups) usable by the current user only."""
     if sys.platform == "win32":
         user = os.environ.get("USERNAME") or getpass.getuser()
-        subprocess.run(
-            ["icacls", str(path), "/inheritance:r", "/grant:r", f"{user}:F"],
+        # S603/S607: Windows' own icacls on the app's key: fixed argv, no shell
+        subprocess.run(  # noqa: S603
+            ["icacls", str(path), "/inheritance:r", "/grant:r", f"{user}:F"],  # noqa: S607
             check=True,
             capture_output=True,
         )

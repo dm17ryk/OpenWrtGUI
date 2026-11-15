@@ -27,7 +27,8 @@ def loopback_port(listen: str, default: int) -> int:
     127.0.0.1, or a bare port (every address). An IPv6-only list, or none, gives the default."""
     for entry in listen.split():
         address, sep, port = entry.rpartition(":")
-        if port.isdigit() and (not sep or address in ("0.0.0.0", "127.0.0.1")):
+        # S104: compares a router's listen address; binds nothing
+        if port.isdigit() and (not sep or address in ("0.0.0.0", "127.0.0.1")):  # noqa: S104
             return int(port)
     return default
 

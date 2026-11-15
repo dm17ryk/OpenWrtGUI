@@ -92,7 +92,8 @@ class PortsService:
         return (await self._read(router_id))[2]
 
     async def _show(self, t: Transport, state: PortsState) -> SwitchLive:
-        assert state.switch is not None
+        if state.switch is None:
+            raise RuntimeError("no swconfig switch to read")
         return parse_swconfig_show(state.switch, (await t.run(c.swconfig_show(state.switch))).stdout)
 
     async def _poll(self, t: Transport, state: PortsState, ok: Callable[[SwitchLive], bool]) -> SwitchLive:

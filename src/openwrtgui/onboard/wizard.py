@@ -39,7 +39,8 @@ log = logging.getLogger(__name__)
 AUTHORIZED_KEYS = "/etc/dropbear/authorized_keys"
 SCREEN = "Add router"
 DEFAULT_USER = "root"
-DEFAULT_PASSWORD = "root"
+# S105: OpenWrt's factory default, tried once by the Add-router wizard and never stored
+DEFAULT_PASSWORD = "root"  # noqa: S105
 
 # How the wizard got in: by itself (the first four) or with what the user typed (the last two).
 LoginMethod = Literal["app_key", "pc_key", "default_password", "no_password", "password", "key_file"]
@@ -185,7 +186,8 @@ class _Session:
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     transport: Transport | None = None
     trusted: bool = False
-    root_password: str = "unknown"
+    # S105 here and where it is compared or set: the root password's state (unknown, none, set), not one
+    root_password: str = "unknown"  # noqa: S105
     key_installed: bool = False
     key_verified: bool = False
     username: str = DEFAULT_USER
@@ -361,12 +363,12 @@ class OnboardService:
                 log.info("auto-login skipped: %s", exc)
                 continue
             await self._logged_in(s, transport, method)
-            if key is not None and s.root_password != "none":
+            if key is not None and s.root_password != "none":  # noqa: S105
                 s.key_verified = True
                 s.key_installed = method == "app_key"
                 s.key_path = key if method == "pc_key" else None
                 s.step = Step.IDENTIFY
-            elif s.root_password == "none":
+            elif s.root_password == "none":  # noqa: S105
                 s.login_method = "no_password"
             return self._view(s)
         return self._view(s)
@@ -422,7 +424,7 @@ class OnboardService:
 
     async def set_password(self, sid: str, new_password: str) -> SessionView:
         s = await self._get(sid)
-        if s.root_password != "none":
+        if s.root_password != "none":  # noqa: S105
             raise ValueError("The router already has a root password")
         if not new_password:
             raise ValueError("Type a password")
@@ -443,7 +445,7 @@ class OnboardService:
         )
         if not results[-1].ok:
             raise TransportError(results[-1].stderr.strip() or "Setting the password failed")
-        s.root_password = "set"
+        s.root_password = "set"  # noqa: S105
         return self._view(s)
 
     async def verify_key(self, sid: str) -> SessionView:

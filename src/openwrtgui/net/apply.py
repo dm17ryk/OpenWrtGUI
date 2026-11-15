@@ -348,7 +348,8 @@ async def saved_check(
     wrong = [op.path for op in rest if op.path not in lists and not _holds(op, shown)]
     wrong += [path for path, items in lists.items() if shown.get(path, "").split() != items]
     for (config, section), section_ops in by_section.items():
-        assert before is not None
+        if before is None:  # by_section is filled only when there is a snapshot
+            raise RuntimeError("a section check needs the snapshot")
         type_, options = _sections(before, config)[section]
         want = _after(options, section_ops)
         now = [o for t_, o in _sections(shown, config).values() if t_ == type_]
@@ -471,7 +472,8 @@ class ApplyRunner:
     ) -> NetApplyResult:
         """The apply itself; the caller holds the router's write lock and checked the digest."""
         if planned.plan.rollback:
-            assert guarded, "a rollback change is always checked by Bench Guard"
+            if not guarded:  # an error, not an assert: `python -O` strips asserts (v1.0b1 D9)
+                raise RuntimeError("a rollback change is always checked by Bench Guard")
             return await self._with_rollback(rec, t, planned.plan, planned.verify, planned.snapshot)
         return await self._plain(rec, t, planned.plan, planned.verify, guarded)
 
@@ -601,7 +603,8 @@ class ApplyRunner:
         verify: Verifier,
         snapshot: Snapshot | None,
     ) -> NetApplyResult:
-        assert plan.config is not None
+        if plan.config is None:
+            raise RuntimeError("a rollback change names its config")
         created = await self._run(t, rec, plan, create_command(), source="app")
         sid = str(json.loads(created.stdout)["ubus_rpc_session"])
         _, grant, apply, confirm, destroy = session_commands(sid, plan.config)

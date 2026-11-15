@@ -398,7 +398,8 @@ class FirewallService:
         async def make_include(t: Transport) -> Planned:
             uci = parse_uci_show((await t.run(c.UCI_FIREWALL)).stdout)
             plan = self._table_plans(rec, uci, change)[1]
-            assert plan is not None
+            if plan is None:
+                raise RuntimeError("the table change has no include to write")
 
             async def verify(t2: Transport) -> list[NetCheck]:
                 checks = [await saved_check(t2, c.UCI_FIREWALL, plan.ops, uci)]

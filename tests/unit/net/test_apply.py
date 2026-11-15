@@ -882,3 +882,14 @@ async def test_a_new_port_that_does_not_answer_rolls_back(env: Env) -> None:
     assert result.error is not None and "did not answer at 192.168.1.2 port 2222" in result.error
     assert "restores its previous settings" in result.error
     assert not any(c.startswith("ubus call uci confirm") for _, _, c in env.bench.log)
+
+
+async def test_a_rollback_change_never_runs_unguarded(env: Env) -> None:
+    """v1.0b1 D9: this was an assert, which `python -O` strips."""
+
+    async def make(t: Transport) -> Planned:
+        return Planned(_lan_plan(), _verify_ok, Snapshot("uci -X show network", SNAPSHOT))
+
+    with pytest.raises(RuntimeError, match="always checked by Bench Guard"):
+        await env.runner.run_planned(env.rec, make, None, guarded=False)
+    assert env.commands() == []

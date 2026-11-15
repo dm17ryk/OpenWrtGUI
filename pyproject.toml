@@ -46,10 +46,19 @@ target-version = "py313"
 src = ["src", "tests", "tools"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "B", "UP", "SIM", "ASYNC"]
+select = ["E", "F", "I", "B", "UP", "SIM", "ASYNC", "S"]
 # ASYNC109: the transport contract takes a per-command timeout that the SSH layer passes to asyncssh.
 # ASYNC240: small local file writes (downloads, audit lines) run on the single-user event loop on purpose.
 ignore = ["ASYNC109", "ASYNC240"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests assert, use made-up passwords and the router's /tmp paths, and start local tools (v1.0b1 D9).
+"tests/**" = ["S"]
+# The simulator and the test transport fake routers: made-up passwords, content hashes, invariants as asserts.
+"src/openwrtgui/sim*.py" = ["S101", "S104", "S105", "S108", "S311", "S324"]
+"src/openwrtgui/transport/fake.py" = ["S101", "S105"]
+# One-off hardware spikes, kept as the record of O14 and O15.
+"tools/*_spike.py" = ["S101", "S108"]
 
 [tool.mypy]
 strict = true

@@ -52,9 +52,8 @@ def _who(t: FaultTarget) -> str:
 
 
 def _station(t: FaultTarget) -> str:
-    if t.via in (None, "wired"):
+    if t.via is None or t.via == "wired":
         raise ValueError(f"{_who(t)} is not on Wi-Fi (no station of an SSID on air)")
-    assert t.via is not None
     return t.via
 
 
