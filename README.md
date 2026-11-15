@@ -14,7 +14,10 @@ is connected, and how each router describes itself. It never disturbs a test run
 
 ![Dashboard: three routers, the 2.4 GHz air map and one station](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/dashboard.png)
 
-> v0.7 adds the test helpers: a step-through that walks a radio through modes, channels and TX powers, each
+> v0.8 adds LuCI parity: the LuCI page list shows only the pages LuCI itself shows on each router, and the
+> remaining LuCI pages have screens here (Plugins, Mount points editing, Legacy iptables, and a bridge VLAN
+> editor for DSA routers).
+> v0.7 added the test helpers: a step-through that walks a radio through modes, channels and TX powers, each
 > step proven on air, and waits on a timer, by hand or until a station re-joins; frame analysis (rate mix, RX
 > signal, retries and broken frames) from a monitor interface; and a passive channel analysis of the networks
 > around the router.
@@ -29,6 +32,20 @@ is connected, and how each router describes itself. It never disturbs a test run
 > a router-side rollback, DHCP, DNS, routes, ports and VLANs); v0.2 Wi-Fi with proof on air, RF live and the
 > LuCI fallback; v0.1 the foundation: install, update, add routers, the dashboard, Bench Guard, the terminal
 > and the audit log. What comes next is in the [roadmap](ROADMAP.md).
+
+## What v0.8 adds
+
+| Screen | What you get |
+|---|---|
+| **LuCI pages** | The list shows the pages LuCI itself shows on that router, read from LuCI's own menu rules. The others are under **Not on this router**, each with what it needs (a program, a configuration). A page with a screen here opens that screen, on its own tab. Status › Realtime Graphs › Wireless opens RF live. |
+| **System › Plugins** | LuCI's plugin switches: the global one, one per group and one per plugin. A plugin's options are shown, secret ones hidden; they are edited in LuCI. |
+| **System › Mount points** | On a router with block-mount: the settings, mounts and swap from fstab, Mount attached devices, Generate config and Unmount. Without block-mount the page is read only. |
+| **Firewall › Legacy iptables** | On a router with iptables: each table's rules with their counters, Reset counters and Restart firewall. |
+| **Ports › VLANs on a DSA router** | The bridge VLANs as a VLAN × port matrix (not a member, untagged, tagged), the local switch per VLAN, add and delete, with the 60 s rollback. A VLAN carrying the app's own connection cannot be cut off. |
+
+Proven on the bench router (read only): the page list and the three System and Firewall reads. Proven in the
+simulator only: switching plugins, editing mount points, the iptables actions and the VLAN editor, because no
+bench router has plugins, block-mount, iptables or a DSA switch.
 
 ## What v0.7 adds
 

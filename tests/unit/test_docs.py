@@ -157,8 +157,8 @@ def test_v1_0a3_vlan_editor_is_documented() -> None:
         assert words in ports, words
     assert "## A router that does not come back after a rollback" in _read(MANUAL / "Troubleshooting.md")
     assert "Switch/VLAN config opens the Ports screen" in _read(MANUAL / "LuCI-pages.md")
-    unreleased = _read(ROOT / "CHANGELOG.md").split("## [", 2)[1]
-    assert unreleased.startswith("Unreleased]") and "bridge VLAN" in unreleased
+    released = _read(ROOT / "CHANGELOG.md").split("## [0.8.0]", 1)[1].split("## [", 1)[0]
+    assert "bridge VLAN" in released  # shipped in 0.8.0
     assert "AP5" not in ports  # the simulator's router is not the user's
 
 

@@ -7,6 +7,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-15
+
+LuCI parity.
+
+Proven on the bench router (2026-11-15, read only): the LuCI page list shows the pages LuCI itself shows there,
+and lists the others under **Not on this router** with what each one needs; Realtime Graphs › Wireless opens
+RF live; the Plugins, Mount points and Legacy iptables screens read the router (it has no plugins, no
+block-mount and no iptables, so they show that).
+
+Proven in the simulator only: switching Plugins, editing Mount points (fstab with block-mount), Legacy
+iptables (Reset counters, Restart firewall) and the bridge VLAN editor on a DSA router. No bench router has any
+of these.
+
+Not yet proven on a real router: the HTTPS redirect with the LuCI pages behind it (the bench router serves no
+HTTPS).
+
 ### Added
 
 - LuCI page lists show only the pages LuCI itself shows on each router. The others are listed under **Not on this
@@ -305,7 +321,8 @@ The foundation: install, update, add routers, see them, and stay out of a runnin
 - Router simulator built from recorded router output, used for e2e tests, screenshots and demos.
 - CI, pre-release and release workflows, wiki sync, CodeQL and Dependabot.
 
-[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.8.0
 [0.7.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.7.0
 [0.6.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.6.0
 [0.5.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.5.0
