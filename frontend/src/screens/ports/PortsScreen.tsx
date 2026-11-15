@@ -46,15 +46,16 @@ export function PortsScreen() {
       </div>
       <RouterSections routerId={id} name={name} current="ports" />
       {ports.isError && <div className="note x">{ports.error instanceof ApiError ? ports.error.detail : String(ports.error)}</div>}
-      {unmanaged && bridge.data?.bridge && <BridgeVlanCard {...cards} state={bridge.data} />}
+      {/* each card keeps its draft per router: keyed by id, it starts fresh on another router (Codex, PR #66) */}
+      {unmanaged && bridge.data?.bridge && <BridgeVlanCard key={id} {...cards} state={bridge.data} />}
       {unmanaged && bridge.data && !bridge.data.bridge && (
         <div className="note w">{bridge.data.blocker ?? "This router's switch is not managed by swconfig, so the app shows no ports for it. Its network devices are on LuCI's Network pages."}</div>
       )}
       {state?.managed && (
         <>
-          <FrontPanel {...cards} state={state} />
-          <VlanMatrix {...cards} state={state} />
-          <MirrorCard {...cards} state={state} />
+          <FrontPanel key={`panel-${id}`} {...cards} state={state} />
+          <VlanMatrix key={`vlans-${id}`} {...cards} state={state} />
+          <MirrorCard key={`mirror-${id}`} {...cards} state={state} />
         </>
       )}
     </main>
