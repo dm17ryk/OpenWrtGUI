@@ -92,6 +92,10 @@ export type VlanIn = Body<S['VlanIn'], 'vlan' | 'members'>
 export type VlansIn = { upserts: VlanIn[]; deletes: string[] }
 export type MirrorIn = Partial<S['MirrorIn']>
 export type PortEnableIn = Partial<S['PortEnableIn']>
+// The VLAN editor on a DSA router (v1.0a3)
+export type BridgeState = S['BridgeState']
+export type BridgeVlanIn = Body<S['BridgeVlanIn'], 'vlan' | 'members'>
+export type BridgeVlansIn = { upserts: BridgeVlanIn[]; deletes: string[] }
 
 // Firewall, Faults and capture (v0.4)
 export type FirewallState = S['FirewallState']

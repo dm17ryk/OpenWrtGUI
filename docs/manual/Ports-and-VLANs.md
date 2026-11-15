@@ -30,6 +30,12 @@ that carries an interface (such as `lan` on `eth0.1`) cannot be deleted until th
 device. **+ Add VLAN** adds a row with the next free number. VLAN changes apply with the 60 s
 [rollback](Network-and-DHCP#rollback).
 
+## VLANs on a DSA router
+
+A router with a DSA switch has no swconfig switch: its ports (`lan1`, `lan2`, ...) are members of a bridge, and the
+bridge's VLANs are `bridge-vlan` sections. On such a router the Ports screen shows **VLANs · switch** (the bridge's
+name), which is LuCI's **Network › Switch/VLAN config**.
+
 ## Switch port mirror
 
 Choose a **Monitor port** and tick the sources: **RX** copies what a socket receives, **TX** what it sends. The
