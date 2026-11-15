@@ -336,7 +336,7 @@ class SimAccess:
         for path in re.findall(r"'([^']+)'", quoted):
             data = self._file_bytes(path)
             if data is None:
-                err += f"sha256sum: {path}: No such file or directory\n"
+                err += f"sha256sum: can't open '{path}': No such file or directory\n"  # as AP2's BusyBox
             else:
                 out += f"{hashlib.sha256(data).hexdigest()}  {path}\n"
         return CommandResult(c, out, err, 1 if err else 0)

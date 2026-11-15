@@ -47,6 +47,7 @@ HTTPS).
 
 - After the app changes a router's settings, its LuCI page list is read again at once.
 - A LuCI page opened in the app gets the access its menu parents grant too.
+- A restore's proof no longer reports a setup script the router's first boot removed.
 
 ### Security
 

@@ -158,3 +158,18 @@ def test_a_config_name_uci_cannot_take_is_proven_by_its_sha256() -> None:
     odd = _archive({"etc/config/my.conf": "config x\n"})
     assert proven_configs(odd) == ()
     assert [f.path for f in provable(odd)] == ["/etc/config/my.conf"]
+
+
+async def test_busybox_saying_a_consumed_script_is_gone_is_not_a_difference() -> None:
+    """AP2, HW-3 2026-11-15: BusyBox's sha256sum writes "can't open '<path>'"; the closing quote hid it."""
+    gone = f"sha256sum: can't open '{DISABLE_PATH}': No such file or directory\n"
+    files = {FILES_CMD: CommandResult(FILES_CMD, f"{_digest(KEYS)}  {KEYS_PATH}\n", gone, 1)}
+    t = ReplayTransport(files | _firewall("'wan' 'wan6' 'lte' 'lte'") | _system("'OpenWrt'"))
+    assert await differing(t, provable(INFO), proven_configs(INFO)) == []
+
+
+async def test_busybox_saying_another_file_is_gone_still_differs() -> None:
+    gone = f"sha256sum: can't open '{KEYS_PATH}': No such file or directory\n"
+    files = {FILES_CMD: CommandResult(FILES_CMD, f"{_digest(DISABLE)}  {DISABLE_PATH}\n", gone, 1)}
+    t = ReplayTransport(files | _firewall("'wan' 'wan6' 'lte'") | _system("'OpenWrt'"))
+    assert await differing(t, provable(INFO), proven_configs(INFO)) == [KEYS_PATH]
