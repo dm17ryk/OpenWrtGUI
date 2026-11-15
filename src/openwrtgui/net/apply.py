@@ -165,6 +165,18 @@ def rollback_warning(router_name: str, target: str, what: str = "network setting
     )
 
 
+def recovery(router_name: str) -> str:
+    """What to do when the rollback did not bring the router back (v1.0a3 D3 layer 3). During the window
+    rpcd has the change committed to flash and the restore point in /var/run, so a power cut then keeps the
+    change."""
+    return (
+        f"If {router_name} still does not answer, wait until 2 minutes after the change, "
+        "then power-cycle it: after the rollback its flash holds the previous settings again. "
+        f"Not before: during the {ROLLBACK_S} s it holds the change. "
+        "If it still does not answer, use failsafe mode (see Troubleshooting)."
+    )
+
+
 def net_plan(
     *,
     router_id: str,
@@ -734,6 +746,8 @@ class ApplyRunner:
             f"{self._rollback_s:g} s after the change."
         )
         restored = await self._restore_check(rec, plan, applied_at, snapshot)
+        if restored.ok is False:
+            error = f"{error} {recovery(rec.name)}"
         return self._finish(
             rec, plan, False, [NetCheck("reconnected", False, reason), restored], error, rec.host
         )
@@ -755,6 +769,8 @@ class ApplyRunner:
         )
         reached = NetCheck("reconnected", True, f"{rec.name} answered at {target}")
         restored = await self._restore_check(rec, plan, applied_at, snapshot)
+        if restored.ok is False:
+            error = f"{error} {recovery(rec.name)}"
         return self._finish(rec, plan, False, [reached, *seen, restored], error, rec.host)
 
     async def _restore_check(

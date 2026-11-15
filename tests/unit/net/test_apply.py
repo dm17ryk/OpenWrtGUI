@@ -361,6 +361,25 @@ async def test_unreachable_after_apply_reports_restored(env: Env) -> None:
     assert not any(c.startswith("ubus call uci confirm") for c in env.commands())
 
 
+async def test_a_router_that_stays_away_after_the_rollback_gets_recovery_steps(env: Env) -> None:
+    """v1.0a3 D3 layer 3: the steps the user needs when rpcd's restore did not bring the router back."""
+    applied_at: list[datetime] = []
+
+    def note(command: str) -> None:
+        if command.startswith("ubus call uci apply"):
+            applied_at.append(env.clock.t)
+
+    env.bench.on_command = note
+    env.bench.answers_at = lambda host, now: host == "192.168.1.2" and not applied_at
+    result = await _apply(env, _lan_plan(target=None))
+    assert {c.name: c.ok for c in result.checks} == {"reconnected": False, "restored": False}
+    assert result.error is not None and result.error.endswith(
+        "If AP2 · office still does not answer, wait until 2 minutes after the change, then power-cycle it: "
+        "after the rollback its flash holds the previous settings again. Not before: during the 60 s it "
+        "holds the change. If it still does not answer, use failsafe mode (see Troubleshooting)."
+    )
+
+
 async def test_change_that_cuts_the_path_late_is_never_confirmed(env: Env) -> None:
     """The reload runs a few seconds after `uci apply` (procd's trigger delay, a busy router): a confirm
     sent while the old path still works would cancel the rollback of a change that then cuts the app off."""
