@@ -12,6 +12,7 @@ import { PortsScreen } from './PortsScreen'
 const calls: Array<{ path: string; body: unknown }> = []
 let ports: PortsState = AP2_PORTS
 let bridge: BridgeState = AP5_BRIDGE
+let bridgeFails = false
 const NO_BRIDGE: BridgeState = { ...AP5_BRIDGE, router_id: 'ap2', bridge: null, editable: false, ports: [], vlans: [], own_vlan: null }
 
 vi.mock('../../api/client', async (orig) => {
@@ -29,7 +30,10 @@ vi.mock('../../api/client', async (orig) => {
     if (path === '/api/routers/ap5') return { ...AP2, record: { ...AP2.record, id: 'ap5', name: 'AP5 · DSA image', host: '192.168.1.7' } }
     if (path === '/api/routers/ap5/ports') return { ...UNMANAGED, router_id: 'ap5' }
     if (path === '/api/routers/ap5/luci/pages') return []
-    if (path === '/api/routers/ap5/ports/bridge') return bridge
+    if (path === '/api/routers/ap5/ports/bridge') {
+      if (bridgeFails) throw new actual.ApiError(502, 'AP5 · DSA image does not answer', {})
+      return bridge
+    }
     if (path === '/api/routers/ap5/ports/bridge/preview') return BRIDGE_PLAN
     // a second router of each kind, whose sections have the same names (libuci names them by content)
     if (path === '/api/routers/ap6') return { ...AP2, record: { ...AP2.record, id: 'ap6', name: 'AP6 · DSA image', host: '192.168.1.8' } }
@@ -52,6 +56,7 @@ beforeEach(() => {
   calls.length = 0
   ports = AP2_PORTS
   bridge = AP5_BRIDGE
+  bridgeFails = false
 })
 
 /** A link to another router's Ports screen, as the sidebar gives one (same route, another id). */
@@ -171,6 +176,12 @@ test('a read-only bridge says why and offers no edit', async () => {
   expect(within(card).getByText(/lan uses switch itself/)).toBeInTheDocument()
   expect(within(card).queryByRole('button', { name: '+ Add VLAN' })).toBeNull()
   expect(within(card).getByRole('button', { name: 'VLAN 1 lan4 untagged' })).toBeDisabled()
+})
+
+test('a failed bridge read says so instead of leaving the screen blank (Codex review, PR #66)', async () => {
+  bridgeFails = true
+  renderPorts('ap5')
+  expect(await screen.findByText('AP5 · DSA image does not answer')).toBeInTheDocument()
 })
 
 test('a bridge VLAN draft stays with its router (Codex review, PR #66)', async () => {

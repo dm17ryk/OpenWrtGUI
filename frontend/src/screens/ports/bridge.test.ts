@@ -49,6 +49,16 @@ test('clicking the hidden native cell takes the port back, and the other VLAN le
   expect(bridgeRequest(AP5_BRIDGE, back)).toBeNull()
 })
 
+test('new rows never share a key, even after a remove and a renumber (Codex review, PR #66)', () => {
+  let rows = bridgeDraft(AP5_BRIDGE)
+  rows = [...rows, newBridgeVlan(AP5_BRIDGE, rows)] // VLAN 2
+  rows = [...rows, newBridgeVlan(AP5_BRIDGE, rows)] // VLAN 3
+  rows = rows.filter((r) => r.vlan !== 2) // the first new row removed
+  rows = rows.map((r) => (r.vlan === 3 ? { ...r, vlan: 2 } : r)) // the other renumbered to the freed 2
+  rows = [...rows, newBridgeVlan(AP5_BRIDGE, rows)] // VLAN 3 again
+  expect(new Set(rows.map((r) => r.key)).size).toBe(rows.length)
+})
+
 test('the local switch and a delete', () => {
   const rows = bridgeDraft(AP5_BRIDGE).map((r) => (r.vlan === 10 ? { ...r, local: false } : r))
   expect(bridgeRequest(AP5_BRIDGE, shown(rows))?.upserts).toEqual([{ section: 'cfg050f15', vlan: 10, members: { lan1: 't', lan4: 't' }, local: false }])

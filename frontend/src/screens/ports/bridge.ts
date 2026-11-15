@@ -48,12 +48,17 @@ export function setCell(state: BridgeState, rows: BridgeRow[], key: string, port
   })
 }
 
-/** A new VLAN with the lowest number no row uses, local on, no ports yet. */
+/** A new VLAN with the lowest number no row uses, local on, no ports yet. Its key is one past every new row's
+ * key so far, never reused after a remove and a renumber (Codex review, PR #66). */
 export function newBridgeVlan(state: BridgeState, rows: BridgeRow[]): BridgeRow {
   const used = new Set(rows.map((r) => r.vlan))
   let vlan = 1
   while (used.has(vlan) && vlan < MAX_VLAN) vlan += 1
-  return { key: `new-${rows.length}-${vlan}`, section: null, vlan, local: true, cells: emptyCells(state), deleted: false }
+  const taken = rows.flatMap((r) => {
+    const m = /^new-(\d+)$/.exec(r.key)
+    return m ? [Number(m[1])] : []
+  })
+  return { key: `new-${Math.max(0, ...taken) + 1}`, section: null, vlan, local: true, cells: emptyCells(state), deleted: false }
 }
 
 function members(cells: Record<string, Cell>): BridgeVlanIn['members'] {
