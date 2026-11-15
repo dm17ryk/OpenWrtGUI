@@ -70,6 +70,30 @@
     "seed": false
   },
   {
+    "id": "ap5",
+    "name": "AP5 · DSA image",
+    "host": "192.168.1.7",
+    "base": "ap2",
+    "files": "ap2.json",
+    "overlay": "ap5.overlay.json",
+    "wifi": "ap2.uci",
+    "net": "ap5.uci",
+    "fw": "ap2.json",
+    "auth": "key",
+    "https": false,
+    "seed": false,
+    "dsa": {
+      "ports": [
+        "lan1",
+        "lan2",
+        "lan3",
+        "lan4",
+        "wan"
+      ],
+      "pc_port": "lan3"
+    }
+  },
+  {
     "id": "new",
     "name": "",
     "host": "192.168.1.4",

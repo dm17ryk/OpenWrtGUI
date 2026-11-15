@@ -20,6 +20,7 @@ NATIVE: dict[str, str] = {
     "admin/status/routes": "network",
     "admin/status/routesj": "network",  # the JSON variant; LuCI shows one of the two
     "admin/network/switch": "ports",
+    "admin/network/switch-vlan": "ports",  # v1.0a3: the bridge VLAN editor on a DSA router
     "admin/network/firewall": "firewall",
     "admin/network/firewall/zones": "firewall",
     "admin/network/firewall/forwards": "firewall",

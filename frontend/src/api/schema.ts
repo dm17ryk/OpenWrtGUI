@@ -1778,6 +1778,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/ports/bridge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bridge State */
+        get: operations["bridge_state_api_routers__router_id__ports_bridge_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/ports/bridge/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bridge Apply */
+        post: operations["bridge_apply_api_routers__router_id__ports_bridge_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/ports/bridge/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bridge Preview */
+        post: operations["bridge_preview_api_routers__router_id__ports_bridge_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/ports/enable/apply": {
         parameters: {
             query?: never;
@@ -3679,6 +3730,41 @@ export interface components {
             /** Id */
             id: string;
         };
+        /** BridgePortView */
+        BridgePortView: {
+            /** Link */
+            link: boolean | null;
+            /** May Carry */
+            may_carry: boolean;
+            /** Name */
+            name: string;
+        };
+        /** BridgeState */
+        BridgeState: {
+            /** Blocker */
+            blocker: string | null;
+            /** Bridge */
+            bridge: string | null;
+            /** Editable */
+            editable: boolean;
+            /** Issues */
+            issues: string[];
+            /** Own Interface */
+            own_interface: string | null;
+            /** Own Vlan */
+            own_vlan: number | null;
+            /** Ports */
+            ports: components["schemas"]["BridgePortView"][];
+            /** Router Id */
+            router_id: string;
+            /**
+             * Runtime
+             * @default []
+             */
+            runtime: string[];
+            /** Vlans */
+            vlans: components["schemas"]["BridgeVlanView"][];
+        };
         /** BridgeView */
         BridgeView: {
             /**
@@ -3698,6 +3784,71 @@ export interface components {
             router_id: string;
             /** Url */
             url: string;
+        };
+        /** BridgeVlanIn */
+        BridgeVlanIn: {
+            /**
+             * Local
+             * @default true
+             */
+            local: boolean;
+            /** Members */
+            members: {
+                [key: string]: "u" | "t";
+            };
+            /** Section */
+            section?: string | null;
+            /** Vlan */
+            vlan: number;
+        };
+        /** BridgeVlanView */
+        BridgeVlanView: {
+            /** Entries */
+            entries: {
+                [key: string]: string;
+            };
+            /** Local */
+            local: boolean;
+            /** Members */
+            members: {
+                [key: string]: "u" | "t";
+            };
+            /** Own */
+            own: boolean;
+            /** Section */
+            section: string;
+            /** Used By */
+            used_by: string[];
+            /** Vlan */
+            vlan: number;
+        };
+        /** BridgeVlansApplyIn */
+        BridgeVlansApplyIn: {
+            /**
+             * Deletes
+             * @default []
+             */
+            deletes: string[];
+            /** Digest */
+            digest: string;
+            /**
+             * Upserts
+             * @default []
+             */
+            upserts: components["schemas"]["BridgeVlanIn"][];
+        };
+        /** BridgeVlansIn */
+        BridgeVlansIn: {
+            /**
+             * Deletes
+             * @default []
+             */
+            deletes: string[];
+            /**
+             * Upserts
+             * @default []
+             */
+            upserts: components["schemas"]["BridgeVlanIn"][];
         };
         /** Bss */
         Bss: {
@@ -11993,6 +12144,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PortsState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bridge_state_api_routers__router_id__ports_bridge_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BridgeState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bridge_apply_api_routers__router_id__ports_bridge_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BridgeVlansApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bridge_preview_api_routers__router_id__ports_bridge_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BridgeVlansIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
                 };
             };
             /** @description Validation Error */

@@ -1,15 +1,19 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router'
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router'
 import { beforeEach, expect, test, vi } from 'vitest'
-import type { PortsState } from '../../api/types'
+import type { BridgeState, PortsState } from '../../api/types'
+import { AP5_BRIDGE, BRIDGE_PLAN } from '../../testing/bridge'
 import { AP2 } from '../../testing/fixtures'
 import { AP2_PORTS, LAN2_OFF_PLAN, UNMANAGED, VLAN1_PLAN } from '../../testing/ports'
 import { PortsScreen } from './PortsScreen'
 
 const calls: Array<{ path: string; body: unknown }> = []
 let ports: PortsState = AP2_PORTS
+let bridge: BridgeState = AP5_BRIDGE
+let bridgeFails = false
+const NO_BRIDGE: BridgeState = { ...AP5_BRIDGE, router_id: 'ap2', bridge: null, editable: false, ports: [], vlans: [], own_vlan: null }
 
 vi.mock('../../api/client', async (orig) => {
   const actual = await orig<typeof import('../../api/client')>()
@@ -22,6 +26,23 @@ vi.mock('../../api/client', async (orig) => {
     if (path === '/api/routers/ap2/ports/vlans/preview') return VLAN1_PLAN
     if (path === '/api/routers/ap2/ports/vlans/apply') return new Promise(() => {}) // still waiting for the router
     if (path === '/api/routers/ap2/ports/mirror/preview') throw new actual.ApiError(422, 'LAN2 is the monitor port; it cannot also be a source.', {})
+    if (path === '/api/routers/ap2/ports/bridge') return NO_BRIDGE
+    if (path === '/api/routers/ap5') return { ...AP2, record: { ...AP2.record, id: 'ap5', name: 'AP5 · DSA image', host: '192.168.1.7' } }
+    if (path === '/api/routers/ap5/ports') return { ...UNMANAGED, router_id: 'ap5' }
+    if (path === '/api/routers/ap5/luci/pages') return []
+    if (path === '/api/routers/ap5/ports/bridge') {
+      if (bridgeFails) throw new actual.ApiError(502, 'AP5 · DSA image does not answer', {})
+      return bridge
+    }
+    if (path === '/api/routers/ap5/ports/bridge/preview') return BRIDGE_PLAN
+    // a second router of each kind, whose sections have the same names (libuci names them by content)
+    if (path === '/api/routers/ap6') return { ...AP2, record: { ...AP2.record, id: 'ap6', name: 'AP6 · DSA image', host: '192.168.1.8' } }
+    if (path === '/api/routers/ap6/ports') return { ...UNMANAGED, router_id: 'ap6' }
+    if (path === '/api/routers/ap6/luci/pages') return []
+    if (path === '/api/routers/ap6/ports/bridge') return { ...AP5_BRIDGE, router_id: 'ap6' }
+    if (path === '/api/routers/ap3') return { ...AP2, record: { ...AP2.record, id: 'ap3', name: 'AP3 · QA stands', host: '192.168.1.3' } }
+    if (path === '/api/routers/ap3/ports') return { ...AP2_PORTS, router_id: 'ap3' }
+    if (path === '/api/routers/ap3/luci/pages') return []
     throw new Error(`unexpected ${path}`)
   }
   return {
@@ -34,13 +55,28 @@ vi.mock('../../api/client', async (orig) => {
 beforeEach(() => {
   calls.length = 0
   ports = AP2_PORTS
+  bridge = AP5_BRIDGE
+  bridgeFails = false
 })
 
-function renderPorts() {
+/** A link to another router's Ports screen, as the sidebar gives one (same route, another id). */
+function GoTo({ id }: { id: string }) {
+  const navigate = useNavigate()
+  return (
+    <button type="button" onClick={() => void navigate(`/routers/${id}/ports`)}>
+      Go to {id}
+    </button>
+  )
+}
+
+function renderPorts(id = 'ap2', others: string[] = []) {
   const user = userEvent.setup()
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MemoryRouter initialEntries={['/routers/ap2/ports']}>
+      <MemoryRouter initialEntries={[`/routers/${id}/ports`]}>
+        {others.map((o) => (
+          <GoTo key={o} id={o} />
+        ))}
         <Routes>
           <Route path="/routers/:id/ports" element={<PortsScreen />} />
         </Routes>
@@ -112,6 +148,70 @@ test('a router without a managed switch says why', async () => {
   renderPorts()
   expect(await screen.findByText(/not managed by swconfig/)).toBeInTheDocument()
   expect(screen.queryByRole('region', { name: 'Front panel' })).toBeNull()
+})
+
+test('a DSA router shows its bridge VLANs and the SSH ports', async () => {
+  renderPorts('ap5')
+  const card = await screen.findByRole('region', { name: 'VLANs · switch' })
+  expect(within(card).getByRole('table', { name: 'Bridge VLAN membership' })).toBeInTheDocument()
+  expect(within(card).getByRole('columnheader', { name: /lan3/ })).toHaveTextContent('SSH')
+  expect(within(card).getByText(/lan3 may carry this app's SSH/)).toBeInTheDocument()
+  expect(screen.queryByText(/not managed by swconfig/)).toBeNull()
+  expect(screen.getByRole('button', { name: 'Help: VLANs on a DSA router' })).toBeInTheDocument()
+})
+
+test('a bridge cell click previews the change with the rollback', async () => {
+  const user = renderPorts('ap5')
+  const card = await screen.findByRole('region', { name: 'VLANs · switch' })
+  await user.click(within(card).getByRole('button', { name: 'VLAN 1 lan4 untagged' }))
+  expect(await within(card).findByRole('region', { name: 'Command preview' })).toHaveTextContent("add_list network.cfg040f15.ports='lan1'")
+  const body = calls.filter((c) => c.path.endsWith('/ports/bridge/preview')).at(-1)?.body
+  expect(body).toEqual({ upserts: [{ section: 'cfg040f15', vlan: 1, members: { lan1: 'u', lan2: 'u', lan3: 'u', lan4: 't' }, local: true }], deletes: [] })
+})
+
+test('a read-only bridge says why and offers no edit', async () => {
+  bridge = { ...AP5_BRIDGE, editable: false, blocker: 'lan uses switch itself, so the app cannot tell which VLAN carries its connection: edit these VLANs in LuCI.' }
+  renderPorts('ap5')
+  const card = await screen.findByRole('region', { name: 'VLANs · switch' })
+  expect(within(card).getByText(/lan uses switch itself/)).toBeInTheDocument()
+  expect(within(card).queryByRole('button', { name: '+ Add VLAN' })).toBeNull()
+  expect(within(card).getByRole('button', { name: 'VLAN 1 lan4 untagged' })).toBeDisabled()
+})
+
+test('a failed bridge read says so instead of leaving the screen blank (Codex review, PR #66)', async () => {
+  bridgeFails = true
+  renderPorts('ap5')
+  expect(await screen.findByText('AP5 · DSA image does not answer')).toBeInTheDocument()
+})
+
+test('a bridge VLAN draft stays with its router (Codex review, PR #66)', async () => {
+  // both routers' state cached first, so the screen does not unmount between them (the case Codex found)
+  const user = renderPorts('ap6', ['ap5', 'ap6'])
+  await screen.findByRole('region', { name: 'VLANs · switch' })
+  await user.click(screen.getByRole('button', { name: 'Go to ap5' }))
+  expect(await screen.findByText('192.168.1.7')).toBeInTheDocument()
+  const card = await screen.findByRole('region', { name: 'VLANs · switch' })
+  await user.click(within(card).getByRole('button', { name: 'VLAN 1 lan4 untagged' }))
+  expect(within(card).getByRole('button', { name: 'VLAN 1 lan4 tagged' })).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Go to ap6' }))
+  expect(await screen.findByText('192.168.1.8')).toBeInTheDocument()
+  const fresh = await screen.findByRole('region', { name: 'VLANs · switch' })
+  expect(within(fresh).getByRole('button', { name: 'VLAN 1 lan4 untagged' })).toBeInTheDocument() // ap6's own state
+  expect(within(fresh).queryByRole('region', { name: 'Command preview' })).toBeNull()
+})
+
+test('a swconfig VLAN draft stays with its router too', async () => {
+  const user = renderPorts('ap3', ['ap2', 'ap3'])
+  await screen.findByRole('table', { name: 'VLAN membership' })
+  await user.click(screen.getByRole('button', { name: 'Go to ap2' }))
+  expect(await screen.findByText('192.168.1.2')).toBeInTheDocument()
+  const matrix = await screen.findByRole('table', { name: 'VLAN membership' })
+  await user.click(within(matrix).getByRole('button', { name: 'VLAN 1 LAN4 untagged' }))
+  expect(within(matrix).getByRole('button', { name: 'VLAN 1 LAN4 tagged' })).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Go to ap3' }))
+  expect(await screen.findByText('192.168.1.3')).toBeInTheDocument()
+  const fresh = await screen.findByRole('table', { name: 'VLAN membership' })
+  expect(within(fresh).getByRole('button', { name: 'VLAN 1 LAN4 untagged' })).toBeInTheDocument()
 })
 
 test('a VLAN 1 apply says it is waiting for the router while the rollback runs', async () => {

@@ -3,8 +3,9 @@
 
 It answers the exact commands the app sends (plan v0.3, "Network rules"); anything else is not its
 business and falls through to the other simulators and the recordings. A failed script leaves nothing
-staged. The PC sits on switch port 3 at 192.168.1.10, so a change that moves lan out of its subnet, or
-drops port 3 from lan's VLAN, or turns port 3 off, cuts the app off until the rollback restores it.
+staged. The PC sits on switch port 3 at 192.168.1.10 (on a DSA router, on its `pc_port`, v1.0a3), so a
+change that moves lan out of its subnet, or drops the PC's port from lan's VLAN, or turns it off, cuts the app
+off until the rollback restores it.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
 from openwrtgui.net.parse import devices, interfaces, routes, rules
+from openwrtgui.ports.bridge import bridge_devices, bridge_vlans, members, netifd_spec, parse_spec
 from openwrtgui.ports.parse import render_members, switch_conf, switch_ports, switch_vlans
 from openwrtgui.transport.base import CommandResult
 from openwrtgui.uci import parse_uci_show, shell_quote
@@ -127,6 +129,8 @@ class SimNetwork:
         leases: Sequence[tuple[str, str, str]] = (),
         wifi_mirror: bool = False,
         arl: dict[str, int] | None = None,
+        dsa_ports: Sequence[str] = (),
+        dsa_pc_port: str | None = None,
     ) -> None:
         self._committed = parse_uci_show(uci_text)
         self._work: dict[str, dict[str, str]] = {}
@@ -146,6 +150,10 @@ class SimNetwork:
         self.extra_links: set[int] = set()  # more switch ports with a link than the PC's
         self.fw: Any = None  # the SimFirewall of the same router, which may cut the PC's SSH
         self.modem: SimModem | None = None  # the LTE modem: its session is the qmi interface's state
+        self.dsa_ports = tuple(dsa_ports)  # a DSA router's own port devices (v1.0a3 ap5); () on swconfig
+        self.dsa_pc_port = dsa_pc_port
+        self.dsa_links: set[str] = set()  # more DSA ports with a link than the PC's
+        self.dsa_wifi: list[str] = []  # Wi-Fi interfaces netifd adds to the bridge at run time
 
     # ---------------------------------------------------------------- what the connector asks
     def _expire(self) -> None:
@@ -187,6 +195,8 @@ class SimNetwork:
         network = ipaddress.ip_interface(str(lan.address)).network
         if ipaddress.ip_address(self.pc_ip) not in network:
             return False
+        if self.dsa_pc_port is not None:
+            return self._dsa_reachable(lan)
         vlans = switch_vlans(self._committed)
         if not vlans:
             return True
@@ -196,6 +206,25 @@ class SimNetwork:
             int(p.rsplit(".", 1)[1]) for p in ports if p.startswith("eth0.") and p.rsplit(".", 1)[1].isdigit()
         }
         return any(v.vlan in vids and (self.pc_port, False) in v.members for v in vlans)
+
+    def _dsa_reachable(self, lan: Any) -> bool:
+        """DSA (v1.0a3 ap5): lan sits on <bridge>.<vid>; the PC's port must be in that bridge VLAN without
+        `t`, and the router itself in it (`local`)."""
+        bridge, _, vid = (lan.device or "").partition(".")
+        if not vid.isdigit():
+            return False
+        for v in bridge_vlans(self._committed):
+            if v.device == bridge and v.vlan == int(vid):
+                specs = [s for s in map(parse_spec, v.entries) if s and s.port == self.dsa_pc_port]
+                return v.local and any(not s.tagged for s in specs)
+        return False
+
+    def pending_rollback(self, seconds: float) -> None:
+        """Another client's apply (LuCI) waits for its confirm: rpcd refuses a second rollback apply until
+        then."""
+        self._snapshot = dict(self._committed)
+        self._deadline = self._clock() + seconds
+        self._apply_sid = "another-client"
 
     # ---------------------------------------------------------------- entry point
     def answer(self, command: str) -> CommandResult | None:
@@ -453,6 +482,7 @@ class SimNetwork:
             out[d.name] = {"type": d.type or "Network device", "up": True, "bridge-members": list(d.ports)}
         for v in switch_vlans(self._committed):
             out.setdefault(f"eth0.{v.vid or v.vlan}", {"type": "VLAN", "up": True})
+        self._dsa_devices(out)
         if self.modem is not None and any(i.proto == "qmi" for i in interfaces(self._committed)):
             out["wwan0"] = {
                 "type": "Network device",
@@ -463,6 +493,30 @@ class SimNetwork:
         for name, d in out.items():  # the MACs AP2 reports (tests/fixtures/ap2/network.json)
             d["macaddr"] = DEVICE_MACS.get(name, "00:0c:43:76:20:77")
         return out
+
+    def _dsa_devices(self, out: dict[str, Any]) -> None:
+        """netifd's report on a DSA router (bridge.c): a bridge's members and VLANs, the port devices'
+        carrier."""
+        vlans = bridge_vlans(self._committed)
+        for b in bridge_devices(self._committed):
+            mine = [v for v in vlans if v.device == b.name and v.vlan is not None]
+            if b.name not in out or not mine:
+                continue
+            out[b.name]["bridge-members"] = [*members(b, mine), *self.dsa_wifi]
+            out[b.name]["bridge-vlans"] = [
+                {
+                    "id": v.vlan,
+                    "local": v.local,
+                    "local_pvid": False,
+                    "ports": [s for s in map(netifd_spec, v.entries) if s],
+                }
+                for v in mine
+            ]
+            for v in mine:
+                out.setdefault(f"{b.name}.{v.vlan}", {"type": "VLAN", "up": True})
+        for name in self.dsa_ports:
+            linked = name == self.dsa_pc_port or name in self.dsa_links
+            out[name] = {"type": "Network device", "up": True, "carrier": linked}
 
     def _l3(self, name: str | None) -> str | None:
         entry = next((i for i in self._dump() if i["interface"] == name and i["up"]), None)

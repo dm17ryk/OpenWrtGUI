@@ -94,6 +94,7 @@ export const HELP = {
   portsPanel: 'Ports-and-VLANs#front-panel',
   portsOwn: 'Ports-and-VLANs#this-apps-port',
   portsVlans: 'Ports-and-VLANs#vlans',
+  portsBridge: 'Ports-and-VLANs#vlans-on-a-dsa-router',
   portsMirror: 'Ports-and-VLANs#switch-port-mirror',
   portsWifiMirror: 'Ports-and-VLANs#wi-fi-mirror',
   // Firewall
