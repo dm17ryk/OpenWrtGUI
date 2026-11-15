@@ -14,11 +14,36 @@ export function bridgeDraft(state: BridgeState): BridgeRow[] {
   return state.vlans.map((v) => ({ key: v.section, section: v.section, vlan: v.vlan, local: v.local, cells: { ...emptyCells(state), ...v.members }, deleted: false }))
 }
 
-/** LuCI's move: a port made untagged in one VLAN leaves the VLAN it was untagged in; tagged memberships stay. */
-export function setCell(rows: BridgeRow[], key: string, port: string, cell: Cell): BridgeRow[] {
+/** The router's own cell for a row (`-` for a new VLAN). */
+function original(state: BridgeState, row: BridgeRow, port: string): Cell {
+  const v = row.section ? state.vlans.find((x) => x.section === row.section) : undefined
+  return (v?.members[port] as Cell | undefined) ?? '-'
+}
+
+/** A U the user set (not the router's own): it takes the port out of the VLAN it is natively untagged in. */
+const userU = (state: BridgeState, row: BridgeRow, port: string): boolean => !row.deleted && row.cells[port] === 'u' && original(state, row, port) !== 'u'
+
+/**
+ * The rows as shown and sent, with LuCI's move applied (review Important 1): a port's native U is hidden only
+ * while another VLAN holds a U the user set for it. Clicking on through U to T brings the native U back.
+ */
+export function effectiveRows(state: BridgeState, rows: BridgeRow[]): BridgeRow[] {
+  return rows.map((r) => {
+    const cells = Object.fromEntries(
+      Object.entries(r.cells).map(([port, c]) => {
+        const displaced = c === 'u' && original(state, r, port) === 'u' && rows.some((o) => o.key !== r.key && userU(state, o, port))
+        return [port, displaced ? '-' : c]
+      }),
+    ) as Record<string, Cell>
+    return { ...r, cells }
+  })
+}
+
+/** One click: a U set on a row lets go of the U the user set elsewhere for that port (the reverse move). */
+export function setCell(state: BridgeState, rows: BridgeRow[], key: string, port: string, cell: Cell): BridgeRow[] {
   return rows.map((r) => {
     if (r.key === key) return { ...r, cells: { ...r.cells, [port]: cell } }
-    if (cell === 'u' && !r.deleted && r.cells[port] === 'u') return { ...r, cells: { ...r.cells, [port]: '-' } }
+    if (cell === 'u' && userU(state, r, port)) return { ...r, cells: { ...r.cells, [port]: original(state, r, port) } }
     return r
   })
 }

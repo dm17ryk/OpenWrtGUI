@@ -4,7 +4,7 @@ import { usePlanApply } from '../../components/usePlanApply'
 import { Help } from '../../help/Help'
 import { HELP } from '../../help/topics'
 import { NetChange } from '../net/NetChange'
-import { bridgeDraft, bridgeRequest, newBridgeVlan, setCell, type BridgeRow } from './bridge'
+import { bridgeDraft, bridgeRequest, effectiveRows, newBridgeVlan, setCell, type BridgeRow } from './bridge'
 import { CELL_TEXT, nextCell } from './vlan'
 
 const MARK = { '-': '—', u: 'U', t: 'T' } as const
@@ -16,8 +16,9 @@ export function BridgeVlanCard({ routerId, short, state, onApplied }: Props) {
   // null: the rows follow the router's state (so an Apply's refresh shows what the router has now)
   const [edited, setEdited] = useState<BridgeRow[] | null>(null)
   const rows = edited ?? bridgeDraft(state)
+  const shown = effectiveRows(state, rows) // LuCI's untagged move, derived: clicking on through U undoes it
   const locked = !state.editable
-  const body = locked ? null : bridgeRequest(state, rows)
+  const body = locked ? null : bridgeRequest(state, shown)
   const change = usePlanApply(`/api/routers/${routerId}/ports/bridge`, body, () => {
     setEdited(null)
     onApplied()
@@ -74,7 +75,7 @@ export function BridgeVlanCard({ routerId, short, state, onApplied }: Props) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
+            {shown.map((row) => (
               <tr key={row.key} className={row.deleted ? 'muted' : undefined}>
                 <td>
                   {row.section ? (
@@ -92,7 +93,7 @@ export function BridgeVlanCard({ routerId, short, state, onApplied }: Props) {
                         type="button"
                         disabled={locked || row.deleted}
                         aria-label={`VLAN ${row.vlan} ${p.name} ${CELL_TEXT[cell]}`}
-                        onClick={() => setEdited(setCell(rows, row.key, p.name, nextCell(cell)))}
+                        onClick={() => setEdited(setCell(state, rows, row.key, p.name, nextCell(cell)))}
                       >
                         {MARK[cell]}
                       </button>

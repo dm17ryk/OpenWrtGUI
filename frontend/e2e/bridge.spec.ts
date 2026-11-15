@@ -7,9 +7,11 @@ test('a DSA router previews a bridge VLAN change with the rollback', async ({ pa
   const card = page.getByRole('region', { name: 'VLANs · switch' })
   await expect(card.getByRole('table', { name: 'Bridge VLAN membership' })).toBeVisible()
   await card.getByRole('button', { name: 'VLAN 10 lan2 not a member' }).click()
-  await card.getByRole('button', { name: 'VLAN 10 lan2 untagged' }).click() // untagged moved it from VLAN 1; now tagged
+  await card.getByRole('button', { name: 'VLAN 10 lan2 untagged' }).click() // on through U to T: VLAN 1 keeps lan2
+  await expect(card.getByRole('button', { name: 'VLAN 1 lan2 untagged' })).toBeVisible()
   const preview = card.getByRole('region', { name: 'Command preview' })
   await expect(preview).toContainText("add_list network.cfg050f15.ports='lan2:t'")
+  await expect(preview).not.toContainText('cfg040f15')
   await expect(card.getByText(/60 s rollback/).first()).toBeVisible()
   await noHorizontalScroll(page)
 })
