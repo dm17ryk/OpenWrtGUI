@@ -47,6 +47,16 @@ async def test_ap2_has_no_bridge(authed: httpx.AsyncClient) -> None:
     assert state["bridge"] is None and state["vlans"] == []
 
 
+async def test_switch_vlan_config_is_native_on_a_dsa_router(ctx: AppContext) -> None:
+    """v1.0a3 D6: LuCI's depends hold on ap5 (a bridge `switch` with vlan_filtering); the page opens Ports."""
+    add_ap5(ctx)
+    pages = {p.path: p for p in await ctx.luci.pages("ap5")}
+    vlan = pages["admin/network/switch-vlan"]
+    assert (vlan.available, vlan.native, vlan.tab) == (True, "ports", None)
+    ap2 = {p.path: p for p in await ctx.luci.pages("ap2")}["admin/network/switch-vlan"]
+    assert (ap2.available, ap2.native) == (False, "ports")  # hidden on AP2 by LuCI's depends (D7)
+
+
 async def test_apply_is_refused_during_a_run(
     ctx_guard_live: AppContext, authed_guard_live: httpx.AsyncClient
 ) -> None:
