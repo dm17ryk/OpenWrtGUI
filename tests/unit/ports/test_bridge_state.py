@@ -126,6 +126,23 @@ async def test_a_bridge_port_used_directly_makes_the_card_read_only(bridge: Brid
     )
 
 
+async def test_an_unknown_own_interface_fails_closed(bridge: BridgeEnv) -> None:
+    """Codex review, PR #66: when the app cannot tell which interface its SSH comes in on (an IPv6 connection,
+    a failed interface dump), the card is read only, not treated like a connection from wan."""
+    await bridge.state("ap5")
+    rec = bridge.routers.get("ap5")
+    assert rec is not None
+    t = await bridge.pool.get(rec)
+    desc = bridge.descriptions["ap5"]
+    net, uci = await read_network(t, rec.id, desc)
+    state = await read_bridge(t, rec, desc, replace(net, own_interface=None), uci)
+    assert not state.editable and state.own_vlan is None
+    assert state.blocker == (
+        "The app cannot tell which interface its connection to this router comes in on, so it cannot keep "
+        "it safe: edit these VLANs in LuCI."
+    )
+
+
 async def test_luci_unsupported_config_keeps_the_card_read_only(bridge: BridgeEnv) -> None:
     state = await _with(bridge, {"network.cfg050f15.ports": "lan1:t* lan4:t"})
     assert not state.editable

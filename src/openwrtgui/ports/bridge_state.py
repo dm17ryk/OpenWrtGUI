@@ -85,7 +85,12 @@ def _own_vlan(
 ) -> tuple[int | None, str | None]:
     """The VLAN that carries the app's interface, or why the card stays read only. Unplaceable on this bridge
     fails closed (final review, Important 2)."""
-    own = net.conf(net.own_interface) if net.own_interface else None
+    if net.own_interface is None:  # Codex review, PR #66: unknown is not "from wan"
+        return None, (
+            "The app cannot tell which interface its connection to this router comes in on, so it cannot "
+            "keep it safe: edit these VLANs in LuCI."
+        )
+    own = net.conf(net.own_interface)
     if own is None or not own.device:
         return None, None
     names = _expanded(own.device.split(), net, vlans)

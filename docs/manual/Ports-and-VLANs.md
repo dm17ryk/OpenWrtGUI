@@ -61,7 +61,8 @@ way:
    - The ports with a link in that VLAN *may carry this app's SSH* (marked SSH in the header). At least one of them
      must keep its membership in that VLAN as it is.
    - When the interface sits on the bridge itself, or straight on one of its ports, the app cannot tell how a VLAN
-     change reaches it, so the card is read only.
+     change reaches it, so the card is read only. So it is when the app cannot tell which interface its
+     connection comes in on at all.
    - When that VLAN has no `bridge-vlan` section of its own (the bridge's default VLAN), the app does not add one
      here; set it up in LuCI.
 2. **The 60 s rollback.**
