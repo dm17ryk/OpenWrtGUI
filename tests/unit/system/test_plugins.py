@@ -136,6 +136,25 @@ def test_secret_options_are_hidden() -> None:
     assert row.options == {"key_root": "<hidden>", "type_root": "totp", "priority": "10"}
 
 
+def test_run_together_secret_names_are_hidden_too() -> None:
+    """v1.0b1 D2: the shared rule keeps the plugin screen's substring match and adds psk and pwd."""
+    pid = "bb4ea47fcffb44ec9bb3d3673c9b4ed2"
+    uci = {
+        f"luci_plugins.{pid}": "auth_login",
+        f"luci_plugins.{pid}.apikey": "made-up",
+        f"luci_plugins.{pid}.wpa_psk": "made-up",
+        f"luci_plugins.{pid}.admin_pwd": "made-up",
+        f"luci_plugins.{pid}.priority": "10",
+    }
+    (row,) = plugin_state(uci, []).plugins
+    assert row.options == {
+        "apikey": "<hidden>",
+        "wpa_psk": "<hidden>",
+        "admin_pwd": "<hidden>",
+        "priority": "10",
+    }
+
+
 def test_refusals() -> None:
     assert CSP is not None
     state = plugin_state(UCI, [CSP])

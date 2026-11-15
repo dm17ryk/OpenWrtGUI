@@ -8,7 +8,6 @@ values (Wi-Fi keys among them) have no image default to compare with.
 from __future__ import annotations
 
 import posixpath
-import re
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Literal
@@ -27,6 +26,7 @@ from openwrtgui.discovery.overlay import (
     parse_ls_ldn,
 )
 from openwrtgui.discovery.services import SERVICE_NAME, ServiceRow, read_service
+from openwrtgui.guard.secrets import shown
 from openwrtgui.images.apkdb import Package, is_custom, parse_apk_installed, parse_opkg_status
 from openwrtgui.images.profile import PATH_DIRS, Profile, ProfileKey
 from openwrtgui.images.usage import usage_text
@@ -35,8 +35,6 @@ from openwrtgui.transport.base import Transport
 from openwrtgui.uci import parse_uci_show
 
 BUILTIN_CARDS = {"dwr921-portctl": "ports"}  # a custom package a built-in screen already drives
-_SECRET = re.compile(r"(?i).*\.(key|password|psk|secret|passphrase)")
-HIDDEN = "<hidden>"
 
 
 class ProgramRow(BaseModel):
@@ -101,8 +99,19 @@ def no_match_note(board: str, revision: str) -> str:
     )
 
 
-def _masked(options: dict[str, str]) -> dict[str, str]:
-    return {k: HIDDEN if _SECRET.fullmatch(k) else v for k, v in options.items()}
+def hide_secrets(diffs: Sequence[ConfigDiff]) -> tuple[ConfigDiff, ...]:
+    """Compared on the real values, shown with secret ones hidden (v1.0b1 D3): a changed key stays listed."""
+    return tuple(
+        d.model_copy(
+            update={
+                "changes": tuple(
+                    c.model_copy(update={"image": shown(c.key, c.image), "router": shown(c.key, c.router)})
+                    for c in d.changes
+                )
+            }
+        )
+        for d in diffs
+    )
 
 
 async def _usage(t: Transport, path: str) -> str | None:
@@ -209,9 +218,8 @@ async def read_discovery(
     names = {n for n in (await t.run(cmd.CONFIG_LIST)).stdout.split() if cmd.CONFIG_NAME.fullmatch(n)}
     configs: dict[str, dict[str, str]] = {name: {} for name in names}
     for name in sorted(set(profile.configs) & names):
-        shown = await t.run(cmd.uci_show(name))
-        configs[name] = _masked(parse_uci_show(shown.stdout)) if shown.ok else {}
-    image_configs = {k: _masked(v) for k, v in profile.configs.items()}
+        result = await t.run(cmd.uci_show(name))
+        configs[name] = parse_uci_show(result.stdout) if result.ok else {}
     keep_list = await t.run(cmd.SYSUPGRADE_LIST)
     kept = set(keep_list.stdout.split()) if keep_list.ok else set()
     owned = {f for p in live for f in p.files}
@@ -229,7 +237,7 @@ async def read_discovery(
             "match_note": None,
             "overlay": overlay,
             "packages": diff_packages(live, profile),
-            "configs": diff_configs(configs, profile.model_copy(update={"configs": image_configs})),
+            "configs": hide_secrets(diff_configs(configs, profile)),
             "kept_on_flash": tuple(e.path for e in (*overlay.added, *overlay.replaced) if e.path in kept),
             "kept_known": keep_list.ok,
             "custom": custom,

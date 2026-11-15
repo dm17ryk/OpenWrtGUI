@@ -13,7 +13,7 @@ from collections.abc import Mapping, Sequence, Set
 
 from pydantic import BaseModel, ConfigDict
 
-from openwrtgui.guard.audit import HIDDEN
+from openwrtgui.guard.secrets import shown
 from openwrtgui.system.commands import PLUGIN_DIR
 from openwrtgui.uci import UciOp
 
@@ -24,8 +24,6 @@ _WORD = re.compile(r"[a-z][a-z0-9]{0,31}")  # a plugin class or type
 _FIELD = re.compile(
     r"""\b(class|type|name|id|title|description)\s*:\s*(?:_\(\s*)?(['"])((?:(?!\2).){0,300})\2"""
 )
-# a plugin's option that may hold a secret (LuCI's 2FA plugin keeps root's TOTP key in key_root): never shown
-_SECRET_OPTION = re.compile(r"key|secret|pass|token|pin", re.IGNORECASE)
 LOGIN_WARNING = (
     "A login plugin adds a step to LuCI's web login on this router. The LuCI pages in this app log in over "
     "SSH and are not affected."
@@ -138,11 +136,8 @@ def plugin_state(
                 readable=h is not None,
                 configured=pid in sections,
                 enabled=_runs(group, opts.get("enabled")),
-                options={
-                    k: HIDDEN if _SECRET_OPTION.search(k) else v
-                    for k, v in opts.items()
-                    if k not in ("name", "enabled")
-                },
+                # a secret option is never shown (LuCI's 2FA plugin keeps root's TOTP key in key_root)
+                options={k: str(shown(k, v)) for k, v in opts.items() if k not in ("name", "enabled")},
             )
         )
     groups = sorted({r.group for r in rows if r.group})
