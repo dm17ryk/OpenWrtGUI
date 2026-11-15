@@ -1,0 +1,10 @@
+{
+  "cat /etc/board.json": {
+    "stdout": "{\n\t\"model\": {\n\t\t\"id\": \"sim,dsa-router\",\n\t\t\"name\": \"Simulated DSA router\"\n\t},\n\t\"network\": {\n\t\t\"lan\": {\n\t\t\t\"ports\": [\n\t\t\t\t\"lan1\",\n\t\t\t\t\"lan2\",\n\t\t\t\t\"lan3\",\n\t\t\t\t\"lan4\"\n\t\t\t],\n\t\t\t\"protocol\": \"static\"\n\t\t},\n\t\t\"wan\": {\n\t\t\t\"device\": \"wan\",\n\t\t\t\"protocol\": \"dhcp\"\n\t\t}\n\t}\n}\n",
+    "exit": 0
+  },
+  "ubus call system board": {
+    "stdout": "{\n\t\"kernel\": \"6.12.60\",\n\t\"hostname\": \"AP5\",\n\t\"system\": \"ARMv8 Processor rev 4\",\n\t\"model\": \"Simulated DSA router\",\n\t\"board_name\": \"sim,dsa-router\",\n\t\"rootfs_type\": \"squashfs\",\n\t\"release\": {\n\t\t\"distribution\": \"OpenWrt\",\n\t\t\"version\": \"SNAPSHOT\",\n\t\t\"revision\": \"r35692-b8bffeefdf\",\n\t\t\"target\": \"mediatek/filogic\",\n\t\t\"description\": \"OpenWrt SNAPSHOT r35692-b8bffeefdf\"\n\t}\n}\n",
+    "exit": 0
+  }
+}

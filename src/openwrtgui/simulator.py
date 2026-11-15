@@ -165,8 +165,14 @@ class SimConnector:
         if entry.get("net"):
             text = (self._sim_dir / "net" / entry["net"]).read_text(encoding="utf-8")
             leases = [tuple(lease) for lease in entry.get("leases", [])]
+            dsa = entry.get("dsa") or {}  # v1.0a3 ap5: a DSA router's port devices and the PC's port
             net = SimNetwork(
-                text, leases=leases, wifi_mirror=bool(entry.get("wifi_mirror")), clock=self._clock
+                text,
+                leases=leases,
+                wifi_mirror=bool(entry.get("wifi_mirror")),
+                clock=self._clock,
+                dsa_ports=tuple(dsa.get("ports", ())),
+                dsa_pc_port=dsa.get("pc_port"),
             )
         fw = None
         if net is not None:
