@@ -27,6 +27,7 @@ dev = [
     "types-psutil",
     "pyyaml",
     "types-pyyaml",
+    "pip-audit>=2.10.1",
 ]
 build = [
     "pyinstaller",
