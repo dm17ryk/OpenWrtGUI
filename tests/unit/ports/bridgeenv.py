@@ -14,6 +14,7 @@ from openwrtgui.guard.bench_guard import BenchGuard, ProcessInfo
 from openwrtgui.net.apply import ApplyRunner
 from openwrtgui.net.state import read_network
 from openwrtgui.ports.bridge import BridgeState
+from openwrtgui.ports.bridge_service import BridgeVlanService
 from openwrtgui.ports.bridge_state import read_bridge
 from openwrtgui.probe.describe import SelfDescription, describe_router
 from openwrtgui.simnet import SimNetwork
@@ -55,6 +56,7 @@ class BridgeEnv:
     clock: Clock
     descriptions: dict[str, SelfDescription] = field(default_factory=dict)
     processes: list[ProcessInfo] = field(default_factory=list)
+    service: BridgeVlanService | None = None
 
     def sim(self, host: str = "192.168.1.7") -> SimNetwork:
         net = self.connector.state(host).net
@@ -99,4 +101,8 @@ async def build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> BridgeEnv:
         clock=clock.now,
         sleep=clock.sleep,
     )
-    return BridgeEnv(connector, routers, guard, audit, pool, runner, clock, processes=processes)
+    env = BridgeEnv(connector, routers, guard, audit, pool, runner, clock, processes=processes)
+    env.service = BridgeVlanService(
+        pool=pool, routers=routers, descriptions=env.descriptions, runner=runner, sleep=clock.sleep
+    )
+    return env

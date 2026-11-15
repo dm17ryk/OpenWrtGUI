@@ -34,6 +34,7 @@ from openwrtgui.onboard.pc_keys import find_pc_keys, ssh_dirs
 from openwrtgui.onboard.wizard import Connector, OnboardService, SshConnector
 from openwrtgui.paths import DataDir, documents_dir
 from openwrtgui.poller import StatusPoller
+from openwrtgui.ports.bridge_service import BridgeVlanService
 from openwrtgui.ports.service import PortsService
 from openwrtgui.probe.describe import SelfDescription
 from openwrtgui.probe.status import RouterStatus
@@ -81,6 +82,7 @@ class AppContext:
     luci: LuciBridgeService
     net: NetworkService
     ports: PortsService
+    bridge_vlans: BridgeVlanService  # v1.0a3: the VLAN editor on a DSA router
     fw: FirewallService
     faults: FaultsService
     captures: CaptureService
@@ -368,6 +370,7 @@ def build_context(
         luci=luci,
         net=net,
         ports=ports,
+        bridge_vlans=BridgeVlanService(pool=pool, routers=routers, descriptions=descriptions, runner=runner),
         fw=fw,
         faults=faults,
         captures=captures,
