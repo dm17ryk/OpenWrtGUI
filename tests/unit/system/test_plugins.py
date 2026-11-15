@@ -167,3 +167,28 @@ def test_refusals() -> None:
     assert plugin_ops(state, PluginChange(remove=[GONE_ID])) == [UciOp("delete", f"luci_plugins.{GONE_ID}")]
     with pytest.raises(ValueError, match="plugin id"):
         read_plugin_command("../../etc/shadow")
+
+
+def test_a_declaration_is_read_only_after_baseclass_extend() -> None:
+    """v1.0a2 minor: the first `class:` anywhere in the file used to win."""
+    text = (
+        "const decoy = { class: 'evil', type: 'x' };\n"
+        "return baseclass.extend({ class: 'http', type: 'headers', name: 'CSP' });\n"
+    )
+    header = parse_header(GONE_ID, text)
+    assert header is not None and (header.class_name, header.type_name) == ("http", "headers")
+    assert parse_header(GONE_ID, "const x = { class: 'http', type: 'headers' };") is None
+
+
+def test_a_section_type_that_is_not_a_group_reaches_no_uci_path() -> None:
+    """v1.0a2 minor: a header-less row's group is the router's section type; it must be `<word>_<word>`."""
+    lone = "a" * 32
+    state = plugin_state(
+        {"luci_plugins.global": "global", f"luci_plugins.{lone}": "bad-type"}, [], files={lone}
+    )
+    (row,) = state.plugins
+    assert (row.group, state.groups) == ("", [])
+    with pytest.raises(ValueError, match="configure it in LuCI"):
+        plugin_ops(state, PluginChange(plugins={lone: True}))
+    with pytest.raises(ValueError, match="No plugin group bad-type"):
+        plugin_ops(state, PluginChange(groups={"bad-type": True}))

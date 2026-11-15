@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from openwrtgui.system.fstab import (
     FstabChange,
@@ -204,3 +205,10 @@ def test_generate_replaces_the_sections_with_what_block_detect_prints() -> None:
     deletes = {op.path for op in ops if op.op == "delete"}
     assert deletes == {"fstab.cfg01a7f1", "fstab.cfg02a7f1", "fstab.cfg03a7f1"}
     assert UciOp("add", "fstab.$g", "global") in ops and UciOp("add", "fstab.$m1", "mount") in ops
+
+
+def test_delay_root_is_never_negative() -> None:
+    """v1.0a2 minor: LuCI's uinteger."""
+    assert FstabGlobal(delay_root=0).delay_root == 0
+    with pytest.raises(ValidationError):
+        FstabGlobal(delay_root=-1)

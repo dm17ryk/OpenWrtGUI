@@ -24,6 +24,8 @@ _WORD = re.compile(r"[a-z][a-z0-9]{0,31}")  # a plugin class or type
 _FIELD = re.compile(
     r"""\b(class|type|name|id|title|description)\s*:\s*(?:_\(\s*)?(['"])((?:(?!\2).){0,300})\2"""
 )
+_DECLARATION = re.compile(r"baseclass\s*\.\s*extend\s*\(")
+GROUP = re.compile(r"[a-z][a-z0-9]{0,31}_[a-z][a-z0-9]{0,31}")  # `<class>_<type>`, as _WORD builds it
 LOGIN_WARNING = (
     "A login plugin adds a step to LuCI's web login on this router. The LuCI pages in this app log in over "
     "SSH and are not affected."
@@ -89,9 +91,13 @@ def read_plugin_command(file_id: str) -> str:
 
 
 def parse_header(file_id: str, text: str) -> PluginHeader | None:
-    """The literal fields of a plugin's declaration. None when it names no class or type (no group)."""
+    """The literal fields of a plugin's declaration, read only after its `baseclass.extend(` (v1.0b1 D7). None
+    when there is no declaration, or it names no class or type (no group)."""
+    start = _DECLARATION.search(text)
+    if start is None:
+        return None
     found: dict[str, str] = {}
-    for m in _FIELD.finditer(text):
+    for m in _FIELD.finditer(text, start.end()):
         found.setdefault(m.group(1), m.group(3))
     cls, typ = found.get("class", ""), found.get("type", "")
     if not (_WORD.fullmatch(cls) and _WORD.fullmatch(typ)):
@@ -122,7 +128,9 @@ def plugin_state(
     rows: list[PluginRow] = []
     for pid in sorted(present | set(by_id) | {n for n in sections if PLUGIN_ID.fullmatch(n)}):
         h = by_id.get(pid)
-        group = f"{h.class_name}_{h.type_name}" if h else sections.get(pid, "")
+        section_type = sections.get(pid, "")  # a header-less row's group: only one GROUP allows (v1.0b1 D7)
+        typed = section_type if GROUP.fullmatch(section_type) else ""
+        group = f"{h.class_name}_{h.type_name}" if h else typed
         prefix = f"luci_plugins.{pid}."
         opts = {k.removeprefix(prefix): v for k, v in uci.items() if k.startswith(prefix)}
         rows.append(
@@ -157,8 +165,9 @@ def _switch(path: str, on: bool) -> UciOp:
 
 
 def plugin_ops(state: PluginState, change: PluginChange) -> list[UciOp]:
-    """Group keys and plugin ids reach a uci path unquoted: they come only from the router's own section types
-    and from _WORD / PLUGIN_ID, and every key of the change is checked against them first."""
+    """Group keys and plugin ids reach a uci path unquoted: a group is `<class>_<type>` from _WORD or a
+    router section type that matches GROUP, an id matches PLUGIN_ID, and every key of the change is checked
+    against the state's groups and rows first."""
     rows = {r.id: r for r in state.plugins}
     groups = {g.key for g in state.groups}
     ops: list[UciOp] = []
