@@ -202,17 +202,20 @@ def _port_name(entry: str) -> str:
     return entry.split(":", 1)[0]
 
 
-def live_vlans(status_json: str, bridge: str, ports: frozenset[str]) -> tuple[LiveVlan, ...]:
+def live_vlans(status_json: str, bridge: str, ports: frozenset[str]) -> tuple[LiveVlan, ...] | None:
     """`ubus call network.device status`: the bridge's `bridge-vlans`, counting the editor's own ports
-    only."""
+    only. None when the report cannot be read, which no wanted state ever matches (D4): netifd leaves out
+    `bridge-vlans` only for a bridge with no VLANs (final review)."""
     try:
         status = json.loads(status_json)
     except ValueError:
-        return ()
+        return None
     entry = status.get(bridge) if isinstance(status, dict) else None
-    listed = entry.get("bridge-vlans") if isinstance(entry, dict) else None
+    if not isinstance(entry, dict):
+        return None
+    listed = entry.get("bridge-vlans", [])
     if not isinstance(listed, list):
-        return ()
+        return None
     out = []
     for v in listed:
         if isinstance(v, dict) and isinstance(v.get("id"), int):

@@ -180,5 +180,8 @@ def test_live_vlans_count_own_ports_only() -> None:
         LiveVlan(1, True, frozenset({"lan1", "lan2", "lan3", "lan4"})),
         LiveVlan(10, True, frozenset({"lan1:t", "lan4:t"})),
     )
-    assert live_vlans("not json", "switch", OWN) == ()
-    assert live_vlans(json.dumps({"switch": {"type": "bridge"}}), "switch", OWN) == ()
+    # final review (Minor 2, re-graded Important): unreadable is never "no VLANs"
+    assert live_vlans("not json", "switch", OWN) is None
+    assert live_vlans(json.dumps({"lan1": {"carrier": True}}), "switch", OWN) is None  # no such bridge
+    assert live_vlans(json.dumps({"switch": {"type": "bridge", "bridge-vlans": "x"}}), "switch", OWN) is None
+    assert live_vlans(json.dumps({"switch": {"type": "bridge"}}), "switch", OWN) == ()  # netifd: no VLANs

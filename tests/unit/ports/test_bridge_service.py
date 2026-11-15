@@ -9,6 +9,7 @@ from bridgeenv import BridgeEnv
 from openwrtgui.guard.bench_guard import GuardLocked
 from openwrtgui.ports.bridge_rules import BridgeVlanRequest
 from openwrtgui.ports.bridge_service import BridgeVlanService
+from openwrtgui.transport.base import CommandResult
 from openwrtgui.wifi.service import PreviewChanged
 
 P = "uci -P /var/run/rpcd/uci-<session>"
@@ -91,6 +92,22 @@ async def test_nothing_to_apply_and_bench_guard(bridge: BridgeEnv) -> None:
     bridge.go_live()
     with pytest.raises(GuardLocked):
         await _svc(bridge).apply("ap5", [_req(None, 20, {"lan2": "t"})], [])
+
+
+class _FailingRead:
+    """A connection whose `network.device status` read fails (ubus down, a timeout)."""
+
+    async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
+        return CommandResult(command, "", "Command failed: Not found", 4)
+
+
+async def test_an_unreadable_report_never_proves_a_change_that_leaves_no_vlans(bridge: BridgeEnv) -> None:
+    """Final review (Minor 2, re-graded Important): D4, nothing is kept unseen. A change whose wanted state is
+    "no VLANs" must not be confirmed because the report could not be read."""
+    verify = _svc(bridge)._verify("switch", frozenset({"lan1", "lan2"}), ())
+    checks = await verify(_FailingRead())  # type: ignore[arg-type]
+    assert [(c.name, c.ok) for c in checks] == [("bridge", False)]
+    assert "could not be read" in checks[0].detail
 
 
 async def test_a_digest_that_differs_sends_nothing(bridge: BridgeEnv) -> None:

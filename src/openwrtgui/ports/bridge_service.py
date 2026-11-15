@@ -32,7 +32,9 @@ SETTLE_S = 10.0
 POLL_S = 1.0
 
 
-def _differs(want: Sequence[LiveVlan], now: Sequence[LiveVlan]) -> str:
+def _differs(want: Sequence[LiveVlan], now: Sequence[LiveVlan] | None) -> str:
+    if now is None:
+        return "its report could not be read"
     asked, got = {v.vlan: v for v in want}, {v.vlan: v for v in now}
     ids = sorted(v for v in {*asked, *got} if asked.get(v) != got.get(v))
     return ", ".join(f"VLAN {v}" for v in ids) or "no VLANs reported"
@@ -124,9 +126,9 @@ class BridgeVlanService:
     def _verify(
         self, bridge: str, ports: frozenset[str], want: tuple[LiveVlan, ...]
     ) -> Callable[[Transport], Awaitable[list[NetCheck]]]:
-        async def live(t2: Transport) -> tuple[LiveVlan, ...]:
+        async def live(t2: Transport) -> tuple[LiveVlan, ...] | None:
             r = await t2.run(c.DEVICE_STATUS)
-            return live_vlans(r.stdout if r.ok else "", bridge, ports)
+            return live_vlans(r.stdout, bridge, ports) if r.ok else None  # a failed read proves nothing
 
         async def verify(t2: Transport) -> list[NetCheck]:
             now = await live(t2)
