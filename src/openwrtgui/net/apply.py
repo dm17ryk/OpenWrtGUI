@@ -177,6 +177,15 @@ def recovery(router_name: str) -> str:
     )
 
 
+def differs_hint(router_name: str, what: str) -> str:
+    """The router answers after the rollback but its saved settings differ (Codex review, PR #66): a reboot
+    would load them, so never advise a power-cycle here."""
+    return (
+        f"{router_name} answers, but its saved {what} differ from before the change: check them before you "
+        "reboot it, since a reboot loads them."
+    )
+
+
 def net_plan(
     *,
     router_id: str,
@@ -745,9 +754,8 @@ class ApplyRunner:
             f"Not applied: {reason}. The router restores its previous {_settings(plan)} "
             f"{self._rollback_s:g} s after the change."
         )
-        restored = await self._restore_check(rec, plan, applied_at, snapshot)
-        if restored.ok is False:
-            error = f"{error} {recovery(rec.name)}"
+        restored, away = await self._restore_check(rec, plan, applied_at, snapshot)
+        error += self._hint(rec, plan, restored, away)
         return self._finish(
             rec, plan, False, [NetCheck("reconnected", False, reason), restored], error, rec.host
         )
@@ -768,17 +776,24 @@ class ApplyRunner:
             f"{_settings(plan)} {self._rollback_s:g} s after the change."
         )
         reached = NetCheck("reconnected", True, f"{rec.name} answered at {target}")
-        restored = await self._restore_check(rec, plan, applied_at, snapshot)
-        if restored.ok is False:
-            error = f"{error} {recovery(rec.name)}"
+        restored, away = await self._restore_check(rec, plan, applied_at, snapshot)
+        error += self._hint(rec, plan, restored, away)
         return self._finish(rec, plan, False, [reached, *seen, restored], error, rec.host)
+
+    @staticmethod
+    def _hint(rec: RouterRecord, plan: NetPlan, restored: NetCheck, away: bool) -> str:
+        """What to do when `restored` failed: recover a router that stays away; check, not reboot, one whose
+        saved settings differ."""
+        if restored.ok is not False:
+            return ""
+        return " " + (recovery(rec.name) if away else differs_hint(rec.name, _settings(plan)))
 
     async def _restore_check(
         self, rec: RouterRecord, plan: NetPlan, applied_at: datetime, snapshot: Snapshot | None
-    ) -> NetCheck:
-        """`restored`: after the rollback the router answers at its old address with its old settings. It may
-        still be coming back at 65 s, so connecting is tried again for a while; a read that fails is "could
-        not read", never "differs"."""
+    ) -> tuple[NetCheck, bool]:
+        """`restored`, and whether the router stayed away: after the rollback it answers at its old address
+        with its old settings. It may still be coming back at 65 s, so connecting is tried again for a while;
+        a read that fails is "could not read", never "differs"."""
         await self._sleep(max(0.0, self._restore_s - self._elapsed(applied_at)))
         started = self._clock()
         while True:
@@ -788,8 +803,14 @@ class ApplyRunner:
             except TransportError as exc:
                 if self._elapsed(started) >= RESTORE_RETRY_S:
                     gone = f"{rec.name} does not answer at {rec.host} either: {exc}"
-                    return NetCheck("restored", False, gone)
+                    return NetCheck("restored", False, gone), True
                 await self._sleep(self._every_s)
+        return await self._restore_read(rec, plan, t, snapshot), False
+
+    async def _restore_read(
+        self, rec: RouterRecord, plan: NetPlan, t: Transport, snapshot: Snapshot | None
+    ) -> NetCheck:
+        """The settings read back over the connection that answered, compared with the snapshot."""
         if snapshot is None:
             return NetCheck("restored", None, f"{rec.name} answers again at {rec.host}")
         try:

@@ -636,6 +636,27 @@ async def test_restore_unreadable_is_not_differs(env: Env) -> None:
     assert restored.detail == "could not read the settings back: uci: I/O error"
 
 
+async def test_settings_that_differ_after_the_rollback_get_no_power_cycle_advice(env: Env) -> None:
+    """Codex review, PR #66 (P1): the router answers, but its saved settings differ from before, so a reboot
+    would load the changed ones. The result says to check them, never to power-cycle."""
+    _cut_after_apply(env, 64.0)
+
+    def changed(command: str) -> CommandResult | None:
+        if command == "uci -X show network":
+            return CommandResult(command, "network.lan=interface\nnetwork.lan.ipaddr='10.9.9.1'\n", "", 0)
+        return None
+
+    env.bench.respond = changed
+    result = await _apply(env, _lan_plan(target=None))
+    restored = next(c for c in result.checks if c.name == "restored")
+    assert (restored.ok, restored.detail) == (False, "the settings differ from before the change")
+    assert result.error is not None and "power-cycle" not in result.error
+    assert result.error.endswith(
+        "AP2 · office answers, but its saved network settings differ from before the change: check them "
+        "before you reboot it, since a reboot loads them."
+    )
+
+
 async def test_rollback_reconnect_not_queued_behind_reads(env: Env) -> None:
     """#33: a read issued while the router is changing waits until the apply confirmed; it never takes the
     connection the runner needs to reach the router and confirm."""

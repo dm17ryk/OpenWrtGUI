@@ -77,6 +77,9 @@ after a network change.
    and reach it at its failsafe address (192.168.1.1) with a cable. Run `firstboot` only if you mean to reset every
    setting.
 
+If the app says instead that the router answers but its saved settings differ from before the change, do not
+reboot it: a reboot loads those settings. Check them on the Network screen or in LuCI first.
+
 ## Where are the logs?
 
 `logs\app.log` in the data folder (Settings → **Open data folder**). Attach its end, with the audit-log
