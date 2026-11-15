@@ -7,6 +7,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- A restore's proof no longer reports a setup script the router's first boot removed.
+
+### Security
+
+- Discovery, Plugins and a LuCI page's change list hide every secret option, including names outside the audit
+  log's list. Discovery still lists a secret that differs from the image, with both values hidden.
+- The AT console never shows a SIM PIN or an APN password and does not keep the command for Up/Down; the audit
+  log hides them too, also when typed with spaces.
+- Interface, phy and capture device names a router reports, and the radio names RF live and a step-through
+  restore are given, are checked before they go into a command or a file name. LuCI page checks ask the router
+  only about absolute paths.
+- A backup archive with more than 1,000 entries is refused, and so is an image whose root file system has more
+  than 50,000 entries or unpacks to more than 512 MiB.
+- Plugin headers are read only from the plugin's declaration; Mount points refuse a negative root delay.
+- CI runs ruff's bandit rules, pip-audit and npm audit.
+
 ## [0.8.0] - 2026-11-15
 
 LuCI parity.
@@ -47,21 +65,6 @@ HTTPS).
 
 - After the app changes a router's settings, its LuCI page list is read again at once.
 - A LuCI page opened in the app gets the access its menu parents grant too.
-- A restore's proof no longer reports a setup script the router's first boot removed.
-
-### Security
-
-- Discovery, Plugins and a LuCI page's change list hide every secret option, including names outside the audit
-  log's list. Discovery still lists a secret that differs from the image, with both values hidden.
-- The AT console never shows a SIM PIN or an APN password and does not keep the command for Up/Down; the audit
-  log hides them too, also when typed with spaces.
-- Interface, phy and capture device names a router reports, and the radio names RF live and a step-through
-  restore are given, are checked before they go into a command or a file name. LuCI page checks ask the router
-  only about absolute paths.
-- A backup archive with more than 1,000 entries is refused, and so is an image whose root file system has more
-  than 50,000 entries or unpacks to more than 512 MiB.
-- Plugin headers are read only from the plugin's declaration; Mount points refuse a negative root delay.
-- CI runs ruff's bandit rules, pip-audit and npm audit.
 
 ## [0.7.0] - 2026-11-13
 
