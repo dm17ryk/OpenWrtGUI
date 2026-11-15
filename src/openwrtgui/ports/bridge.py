@@ -97,6 +97,22 @@ def bridge_devices(uci: Mapping[str, str]) -> list[BridgeDevice]:
     return out
 
 
+def vlan_devices(uci: Mapping[str, str]) -> dict[str, str]:
+    """VLAN device sections (`type 8021q`/`8021ad`, `ifname`, `vid`) as the `<ifname>.<vid>` they stand
+    for, by name: an interface on such a device sits on that bridge VLAN (final review, Important 2)."""
+    out: dict[str, str] = {}
+    for section in sections(uci, "network", "device"):
+        o = options(uci, "network", section)
+        if (
+            o.get("type") in ("8021q", "8021ad")
+            and o.get("name")
+            and o.get("ifname")
+            and _VID.fullmatch(o.get("vid", ""))
+        ):
+            out[o["name"]] = f"{o['ifname']}.{int(o['vid'])}"
+    return out
+
+
 def _vid(raw: str) -> int | None:
     return int(raw) if _VID.fullmatch(raw) and MIN_VLAN <= int(raw) <= MAX_VLAN else None
 

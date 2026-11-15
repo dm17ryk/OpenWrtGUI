@@ -12,16 +12,17 @@ from openwrtgui.ports.bridge import BridgeState
 from openwrtgui.ports.bridge_state import board_ports, read_bridge
 
 
-async def _with(bridge: BridgeEnv, change: dict[str, str]) -> BridgeState:
-    """ap5's state as read_bridge makes it from ap5's network read with `change` applied to the uci. The
-    sim's own config stays as it is, so the app still reaches it (lan on `switch` or wan would cut it off)."""
+async def _with(bridge: BridgeEnv, change: dict[str, str], drop: tuple[str, ...] = ()) -> BridgeState:
+    """ap5's state as read_bridge makes it from ap5's network read with `change` applied to the uci (and the
+    keys under `drop` removed). The sim's own config stays as it is, so the app still reaches it."""
     await bridge.state("ap5")
     rec = bridge.routers.get("ap5")
     assert rec is not None
     t = await bridge.pool.get(rec)
     desc = bridge.descriptions["ap5"]
     net, uci = await read_network(t, rec.id, desc)
-    changed = uci | change
+    kept = {k: v for k, v in uci.items() if not (drop and k.startswith(drop))}
+    changed = kept | change
     views = tuple(InterfaceView(i, None, i.name == net.own_interface, None) for i in interfaces(changed))
     moved = replace(net, interfaces=views, devices=tuple(devices(changed)))
     return await read_bridge(t, rec, desc, moved, changed)
@@ -78,6 +79,51 @@ async def test_the_own_vlan_wherever_lan_sits(bridge: BridgeEnv) -> None:
     on_wan = await _with(bridge, {"network.lan.device": "wan"})
     assert (on_wan.own_vlan, on_wan.editable) == (None, True)
     assert not any(p.may_carry for p in on_wan.ports)
+
+
+async def test_an_own_vlan_without_a_section_stays_the_own_vlan(bridge: BridgeEnv) -> None:
+    """Final review Important 2a: lan on switch.1 with no bridge-vlan for VLAN 1 (the bridge filters because
+    of VLAN 10): VLAN 1 is still the app's own, so a section for it is refused in the rules."""
+    state = await _with(bridge, {}, drop=("network.cfg040f15",))
+    assert [v.vlan for v in state.vlans] == [10]
+    assert (state.own_vlan, state.editable) == (1, True)
+
+
+async def test_an_8021q_device_or_an_alias_places_the_own_vlan(bridge: BridgeEnv) -> None:
+    """Final review Important 2b: lan on a VLAN device section (`type 8021q`, `ifname switch`, `vid 1`), or on
+    an alias (`@base`) of an interface on switch.1."""
+    vlan_device = {
+        "network.lan.device": "vlan1",
+        "network.d8": "device",
+        "network.d8.type": "8021q",
+        "network.d8.ifname": "switch",
+        "network.d8.vid": "1",
+        "network.d8.name": "vlan1",
+    }
+    state = await _with(bridge, vlan_device)
+    assert (state.own_vlan, state.editable) == (1, True)
+    assert next(v for v in state.vlans if v.vlan == 1).used_by == ("lan",)
+    assert [p.name for p in state.ports if p.may_carry] == ["lan3"]
+    alias = {
+        "network.lan.device": "@base",
+        "network.base": "interface",
+        "network.base.device": "switch.1",
+        "network.base.proto": "none",
+    }
+    aliased = await _with(bridge, alias)
+    assert (aliased.own_vlan, aliased.editable) == (1, True)
+    assert "lan" in next(v for v in aliased.vlans if v.vlan == 1).used_by
+
+
+async def test_a_bridge_port_used_directly_makes_the_card_read_only(bridge: BridgeEnv) -> None:
+    """Final review Important 2: when the own interface's device is one of the bridge's ports, the app
+    cannot tell how a VLAN change reaches its connection, so it fails closed."""
+    state = await _with(bridge, {"network.lan.device": "lan3"})
+    assert not state.editable and state.own_vlan is None
+    assert state.blocker == (
+        "lan uses lan3, a port of switch, so the app cannot tell how VLAN changes reach its connection: "
+        "edit these VLANs in LuCI."
+    )
 
 
 async def test_luci_unsupported_config_keeps_the_card_read_only(bridge: BridgeEnv) -> None:

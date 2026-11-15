@@ -155,6 +155,18 @@ def test_the_management_path_rule() -> None:
     assert bridge_change(elsewhere, [_req(1, ALL | {"lan3": "t"}, "cfg040f15")], [], NAME).ops
 
 
+def test_a_section_for_an_own_vlan_without_one_is_refused() -> None:
+    """Final review Important 2a: the app comes in on switch.1 although VLAN 1 has no bridge-vlan section;
+    adding one here could leave the PC's port or the router out of it."""
+    sectionless = replace(
+        AP5, vlans=(VLAN10,), ports=tuple(replace(p, may_carry=False) for p in AP5.ports), own_vlan=1
+    )
+    refusal = "VLAN 1 carries lan, this app's connection, but has no bridge-vlan section"
+    with pytest.raises(ValueError, match=refusal):
+        bridge_change(sectionless, [_req(1, ALL)], [], NAME)
+    assert bridge_change(sectionless, [_req(20, {"lan2": "t"})], [], NAME).ops  # other VLANs stay editable
+
+
 def test_a_read_only_card_refuses_every_change() -> None:
     blocked = replace(AP5, editable=False, blocker="lan uses switch itself")
     with pytest.raises(ValueError, match="lan uses switch itself"):

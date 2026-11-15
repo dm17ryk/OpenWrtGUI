@@ -60,8 +60,10 @@ way:
      deleted or renumbered, and its **Local** stays on.
    - The ports with a link in that VLAN *may carry this app's SSH* (marked SSH in the header). At least one of them
      must keep its membership in that VLAN as it is.
-   - When the interface sits on the bridge itself, the app cannot tell which VLAN carries it, so the card is read
-     only.
+   - When the interface sits on the bridge itself, or straight on one of its ports, the app cannot tell how a VLAN
+     change reaches it, so the card is read only.
+   - When that VLAN has no `bridge-vlan` section of its own (the bridge's default VLAN), the app does not add one
+     here; set it up in LuCI.
 2. **The 60 s rollback.**
    - Every change applies with a 60 s rollback, as LuCI's Save & Apply does.
    - The app reconnects over a new connection and checks netifd's own report of the bridge's VLANs. Only then does

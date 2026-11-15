@@ -68,8 +68,9 @@ def _checked(
     req: BridgeVlanRequest,
     by_section: Mapping[str, BridgeVlanView],
     final: Mapping[int, _Final],
-    own: str | None,
+    state: BridgeState,
 ) -> BridgeVlanView | None:
+    own = state.own_interface
     old = by_section.get(req.section) if req.section is not None else None
     if req.section is not None and old is None:
         raise ValueError(f"There is no VLAN {req.section}")
@@ -81,6 +82,12 @@ def _checked(
         raise ValueError(f"VLAN numbers are {MIN_VLAN} to {MAX_VLAN}")
     if req.vlan in final:
         raise ValueError(f"There is already a VLAN {req.vlan}")
+    sectionless = not any(v.vlan == state.own_vlan for v in state.vlans)
+    if old is None and req.vlan == state.own_vlan and sectionless:  # final review Important 2a
+        raise ValueError(
+            f"VLAN {req.vlan} carries {own}, this app's connection, but has no bridge-vlan section here: "
+            "adding one could leave this PC's port or the router out of it. Set it up in LuCI."
+        )
     if old is not None and old.own and not req.local:  # D3 layer 1
         raise ValueError(
             f"VLAN {old.vlan} carries {own}, this app's connection: the router stays in it, "
@@ -196,7 +203,7 @@ def bridge_change(
     ops: list[UciOp] = []
     warnings: list[str] = []
     for n, req in enumerate(upserts, 1):
-        old = _checked(req, by_section, final, state.own_interface)
+        old = _checked(req, by_section, final, state)
         entries = _entries(req, old, ports, bridge)
         final[req.vlan] = _Final(req.local, entries)
         ops += _upsert_ops(n, req, old, entries, bridge)

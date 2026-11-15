@@ -23,6 +23,7 @@ from openwrtgui.ports.bridge import (
     natural,
     parse_spec,
     unsupported,
+    vlan_devices,
 )
 from openwrtgui.probe.describe import SelfDescription
 from openwrtgui.store.routers import RouterRecord
@@ -55,25 +56,39 @@ async def _status(t: Transport) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
-def _expanded(names: Sequence[str], net: NetworkState) -> list[str]:
-    """Devices and, one hop down, the ports of the bridges among them (a legacy `ifname` lists several)."""
+def _expanded(names: Sequence[str], net: NetworkState, vlans: Mapping[str, str]) -> list[str]:
+    """The devices behind an interface's device list (a legacy `ifname` lists several): an `@alias` names
+    another interface, a VLAN device section is the `<ifname>.<vid>` it stands for, and a bridge's ports count
+    one hop down (final review, Important 2)."""
+    direct: list[str] = []
+    for name in names:
+        if not name.startswith("@"):
+            direct.append(name)
+            continue
+        target = net.conf(name[1:])  # an alias: the other interface's devices
+        direct += (target.device or "").split() if target is not None else []
+    resolved = [vlans.get(n, n) for n in direct]
     bridges = {d.name: d for d in net.devices if d.type == "bridge"}
-    return [*names, *(p for n in names if n in bridges for p in bridges[n].ports)]
+    return [*resolved, *(vlans.get(p, p) for n in resolved if n in bridges for p in bridges[n].ports)]
 
 
-def _used_by(vlan_device: str, net: NetworkState) -> tuple[str, ...]:
+def _used_by(vlan_device: str, net: NetworkState, vlans: Mapping[str, str]) -> tuple[str, ...]:
     return tuple(
         v.conf.name
         for v in net.interfaces
-        if v.conf is not None and vlan_device in _expanded((v.conf.device or "").split(), net)
+        if v.conf is not None and vlan_device in _expanded((v.conf.device or "").split(), net, vlans)
     )
 
 
-def _own_vlan(bridge: str, net: NetworkState) -> tuple[int | None, str | None]:
+def _own_vlan(
+    bridge: str, ports: Sequence[str], net: NetworkState, vlans: Mapping[str, str]
+) -> tuple[int | None, str | None]:
+    """The VLAN that carries the app's interface, or why the card stays read only. Unplaceable on this bridge
+    fails closed (final review, Important 2)."""
     own = net.conf(net.own_interface) if net.own_interface else None
     if own is None or not own.device:
         return None, None
-    names = _expanded(own.device.split(), net)
+    names = _expanded(own.device.split(), net, vlans)
     if bridge in names:
         return None, (
             f"{own.name} uses {bridge} itself, so the app cannot tell which VLAN carries its connection: "
@@ -83,11 +98,21 @@ def _own_vlan(bridge: str, net: NetworkState) -> tuple[int | None, str | None]:
         head, _, vid = name.partition(".")
         if head == bridge and vid.isdigit():
             return int(vid), None
+    direct = next((n for n in names if n.split(".")[0] in ports), None)
+    if direct is not None:
+        return None, (
+            f"{own.name} uses {direct}, a port of {bridge}, so the app cannot tell how VLAN changes reach "
+            "its connection: edit these VLANs in LuCI."
+        )
     return None, None
 
 
 def _views(
-    bridge: str, vlans: Sequence[BridgeVlanConf], net: NetworkState, own_vlan: int | None
+    bridge: str,
+    vlans: Sequence[BridgeVlanConf],
+    net: NetworkState,
+    own_vlan: int | None,
+    devices: Mapping[str, str],
 ) -> list[BridgeVlanView]:
     out = []
     for v in vlans:
@@ -96,7 +121,7 @@ def _views(
         parsed = [(text, parse_spec(text)) for text in v.entries]
         cells = {s.port: cell_of(s) for _, s in parsed if s}
         entries = {s.port: text for text, s in parsed if s}
-        used = _used_by(f"{bridge}.{v.vlan}", net)
+        used = _used_by(f"{bridge}.{v.vlan}", net, devices)
         out.append(BridgeVlanView(v.section, v.vlan, v.local, cells, entries, used, v.vlan == own_vlan))
     return sorted(out, key=lambda x: x.vlan)
 
@@ -148,11 +173,11 @@ async def read_bridge(
     live = entry.get("bridge-members", []) if isinstance(entry, dict) else []
     runtime = tuple(sorted((m for m in live if isinstance(m, str) and m not in physical), key=natural))
     issues = tuple(unsupported(active.name, vlans))
-    own_vlan, placement = _own_vlan(active.name, net)
-    views = _views(active.name, vlans, net, own_vlan)
-    own = next((v for v in views if v.own), None)
-    if own is None:
-        own_vlan = None
+    ports = members(active, vlans)
+    vlan_names = vlan_devices(uci)
+    own_vlan, placement = _own_vlan(active.name, ports, net, vlan_names)
+    views = _views(active.name, vlans, net, own_vlan, vlan_names)
+    own = next((v for v in views if v.own), None)  # None with own_vlan set: VLAN 1 by the bridge's default
     blocker = UNSUPPORTED if issues else placement
     return BridgeState(
         router_id=rec.id,
@@ -160,7 +185,7 @@ async def read_bridge(
         editable=blocker is None,
         blocker=blocker,
         issues=issues,
-        ports=_ports(members(active, vlans), status, own),
+        ports=_ports(ports, status, own),
         vlans=tuple(views),
         own_interface=net.own_interface,
         own_vlan=own_vlan,
