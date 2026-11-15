@@ -18,6 +18,7 @@ from openwrtgui.discovery.service import DiscoveryService
 from openwrtgui.discovery.tools import ToolStore
 from openwrtgui.faults.service import FaultsService
 from openwrtgui.flash.service import FlashService
+from openwrtgui.fw.iptables_service import IptablesService
 from openwrtgui.fw.service import FirewallService
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard, psutil_lister
@@ -43,6 +44,8 @@ from openwrtgui.store.keys import AppKey, load_or_create_app_key
 from openwrtgui.store.routers import RouterRecord, RouterStore, router_key_paths
 from openwrtgui.store.settings import SettingsStore
 from openwrtgui.system.access_service import AccessService
+from openwrtgui.system.fstab_service import FstabService
+from openwrtgui.system.plugins_service import PluginsService
 from openwrtgui.system.sampler import SystemHub
 from openwrtgui.system.service import SystemService
 from openwrtgui.terminal import TerminalSession
@@ -89,6 +92,9 @@ class AppContext:
     system: SystemService
     system_live: SystemHub
     access: AccessService
+    plugins: PluginsService  # v1.0a2 D4
+    fstab: FstabService  # v1.0a2 D5
+    iptables: IptablesService  # v1.0a2 D6
     token: str
     port: int
     mode: Literal["real", "simulator"]
@@ -231,6 +237,7 @@ def build_context(
         upstream_factory=_sim_upstream(descriptions) if simulator is not None else _ssh_upstream,
     )
     runner = ApplyRunner(pool=pool, routers=routers, guard=guard, audit=audit, host_keys=host_keys)
+    runner.on_applied.append(luci.forget_facts)
     net = NetworkService(
         pool=pool,
         routers=routers,
@@ -372,6 +379,9 @@ def build_context(
         system=system,
         system_live=SystemHub(pool=pool, routers=routers, busy=system.busy),
         access=access,
+        plugins=PluginsService(pool=pool, routers=routers, runner=runner),
+        fstab=FstabService(pool=pool, routers=routers, runner=runner),
+        iptables=IptablesService(pool=pool, routers=routers, runner=runner),
         token=token,
         port=port,
         mode="simulator" if simulator is not None else "real",

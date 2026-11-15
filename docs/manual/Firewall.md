@@ -81,3 +81,18 @@ there stay true.
 ## Raw ruleset
 
 The router's whole nftables ruleset (`nft -a list ruleset`), read-only, with each table's owner.
+
+## Legacy iptables
+
+LuCI's iptables view, on routers that have `/usr/sbin/iptables`: an older firewall (fw3), whose screen here
+shows only this tab, or fw4 with iptables installed beside nftables. Both of LuCI's pages for it open this tab.
+
+The rules of each table LuCI shows (filter, nat, mangle, raw, and the same for IPv6 when ip6tables is there),
+chain by chain, with the policy or the references, each rule's counters, target, protocol, interfaces,
+addresses and options, and its comment. **Hide empty chains** keeps only chains with rules.
+
+- **Reset counters** clears the filter table's counters (iptables and ip6tables), as LuCI's button does; nat,
+  mangle and raw keep theirs. The proof is the filter table counting less than before.
+- **Restart firewall** restarts the firewall service; the proof is the filter table's rules back.
+
+On the bench image (fw4, no iptables) the tab says so: fw4's rules are under Raw ruleset.

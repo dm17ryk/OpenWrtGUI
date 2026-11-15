@@ -12,12 +12,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - LuCI page lists show only the pages LuCI itself shows on each router. The others are listed under **Not on this
   router**, with what they need, such as a program or a configuration.
 - Status › Realtime Graphs › Wireless opens RF live.
+- System › Plugins: LuCI's plugin switches (the global one, each group's, each plugin's).
+- Mount points edits fstab on routers with block-mount: settings, mounts and swap, Mount attached devices,
+  Generate config, Unmount.
+- Firewall › Legacy iptables: the rules of a router with iptables, Reset counters, Restart firewall.
+- A LuCI page with a screen here opens that screen's own tab.
 
 ### Changed
 
 - The README (with what 0.7 added), the manual's home page, FAQ and Bench Guard page describe the current
   release. SECURITY.md lists every data folder. Flashing a router with too little free memory, such as the
   bench's AP2, is documented: use LuCI or the terminal.
+
+### Fixed
+
+- After the app changes a router's settings, its LuCI page list is read again at once.
+- A LuCI page opened in the app gets the access its menu parents grant too.
 
 ## [0.7.0] - 2026-11-13
 

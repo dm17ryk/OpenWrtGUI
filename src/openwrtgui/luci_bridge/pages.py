@@ -28,8 +28,11 @@ NATIVE: dict[str, str] = {
     "admin/network/firewall/ipsets": "firewall",
     "admin/network/firewall/custom": "firewall",
     "admin/status/nftables": "firewall",
-    # v0.6b D11: the System screen; v0.6c D1: Administration and LEDs too (Mount points stays LuCI's: its page
-    # needs block-mount, D8)
+    # v1.0a2 D6: LuCI's iptables view, on fw3 routers and as fw4's sub-route: Firewall › Legacy iptables
+    "admin/status/iptables": "firewall",
+    "admin/status/nftables/iptables": "firewall",
+    # v0.6b D11: the System screen; v0.6c D1: Administration and LEDs too; Mount points too (v1.0a2 D5: edited
+    # natively on routers with block-mount)
     "admin/system/admin": "system",
     "admin/system/admin/password": "system",
     "admin/system/admin/pwpolicy": "system",
@@ -38,6 +41,8 @@ NATIVE: dict[str, str] = {
     "admin/system/admin/uhttpd": "system",
     "admin/system/admin/repokeys": "system",
     "admin/system/leds": "system",
+    "admin/system/plugins": "system",  # v1.0a2 D4: System › Plugins
+    "admin/system/mounts": "system",
     "admin/status/logs": "system",
     "admin/status/logs/syslog": "system",
     "admin/status/logs/dmesg": "system",
@@ -58,6 +63,38 @@ NATIVE: dict[str, str] = {
     "admin/status/realtime/wireless": "rf",
 }
 
+# A native page that is one tab of its screen opens that tab (`?tab=`, v1.0a2 D3); the others open the screen.
+NATIVE_TAB: dict[str, str] = {
+    "admin/network/firewall/rules": "rules",
+    "admin/network/firewall/forwards": "forwards",
+    "admin/network/firewall/snats": "nat",
+    "admin/network/firewall/ipsets": "ipsets",
+    "admin/network/firewall/custom": "custom",
+    "admin/status/nftables": "raw",
+    "admin/status/iptables": "iptables",
+    "admin/status/nftables/iptables": "iptables",
+    "admin/system/admin": "access",
+    "admin/system/admin/password": "access",
+    "admin/system/admin/pwpolicy": "access",
+    "admin/system/admin/dropbear": "access",
+    "admin/system/admin/sshkeys": "access",
+    "admin/system/admin/uhttpd": "access",
+    "admin/system/admin/repokeys": "access",
+    "admin/system/leds": "leds",
+    "admin/system/plugins": "plugins",
+    "admin/system/mounts": "mounts",
+    "admin/status/logs": "logs",
+    "admin/status/logs/syslog": "logs",
+    "admin/status/logs/dmesg": "logs",
+    "admin/status/processes": "processes",
+    "admin/system/system": "settings",
+    "admin/system/startup": "services",
+    "admin/system/crontab": "cron",
+    "admin/system/reboot": "backup",
+    "admin/system/flash": "backup",
+    "admin/network/diagnostics": "diagnostics",
+}
+
 
 @dataclass(frozen=True)
 class PageView:
@@ -70,6 +107,7 @@ class PageView:
     available: bool = True  # LuCI shows it on this router (v1.0a1 D4)
     missing: str | None = None  # why LuCI does not: "needs /sbin/block"
     checked: bool = True  # False: the router's facts could not be read, so nothing is hidden (D3)
+    tab: str | None = None  # the tab of `native` that replaces it (v1.0a2 D3); None: the screen itself
 
 
 def _label(p: LuciPage) -> str:
@@ -93,6 +131,7 @@ def page_views(pages: Sequence[LuciPage], facts: Facts | None = None) -> list[Pa
                 available=missing is None,
                 missing=missing,
                 checked=facts.checked if facts is not None else True,
+                tab=NATIVE_TAB.get(p.path),
             )
         )
     return views

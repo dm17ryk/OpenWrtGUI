@@ -169,3 +169,4 @@ rpcd.cfg024999.username='root'
 rpcd.cfg024999.password='$p$root'
 rpcd.cfg024999.read='*'
 rpcd.cfg024999.write='*'
+luci_plugins.global=global

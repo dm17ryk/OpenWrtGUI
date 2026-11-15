@@ -27,8 +27,9 @@ if TYPE_CHECKING:
     from openwrtgui.simmodem import SimModem
 
 PC_MAC = "08:3a:88:5c:a8:39"
-# system: the System screen's plain uci apply (v0.6b); dropbear, uhttpd, rpcd: its Access tab (v0.6c)
-CONFIGS = ("network", "dhcp", "firewall", "system", "dropbear", "uhttpd", "rpcd")
+# system: the System screen's plain uci apply (v0.6b); dropbear, uhttpd, rpcd: its Access tab (v0.6c);
+# fstab, luci_plugins: Mount points and Plugins (v1.0a2)
+CONFIGS = ("network", "dhcp", "firewall", "system", "dropbear", "uhttpd", "rpcd", "fstab", "luci_plugins")
 DEFAULT = ""  # the default staging folder (/tmp/.uci)
 SWITCH = "switch0"
 DEVICE_MACS = {"br-lan": "00:0c:43:76:20:17", "eth0.1": "00:0c:43:76:20:17", "eth0.2": "00:0c:43:76:20:16"}

@@ -71,6 +71,14 @@ HAS_BLOCK = "test -x /sbin/block"  # LuCI shows Mount points only with block-mou
 KEPT = "cat /etc/sysupgrade.conf"
 BACKUP_LIST = "sysupgrade -l"
 LISTENERS = "cat /proc/net/tcp /proc/net/tcp6"
+# v1.0a2 reads: Plugins (D4) and Mount points with block-mount (D5), LuCI's own
+UCI_PLUGINS = "uci -X show luci_plugins"
+PLUGIN_DIR = "/www/luci-static/resources/view/plugins"
+LIST_PLUGINS = f"ls -1 {PLUGIN_DIR}"
+UCI_FSTAB = "uci -X show fstab"
+BLOCK_DEVICES = "ubus call luci getBlockDevices"
+BLOCK_DETECT = "block detect"  # prints the fstab block-mount would write; writes nothing
+BLOCK_MOUNT = "/sbin/block mount"  # a write: what LuCI's ucitrack runs after an fstab change
 # A digest of root's shadow field (D2): proves a password change without the hash leaving the router.
 # Derived from a secret: compared live, never recorded, logged or shown.
 PASSWORD_DIGEST = """awk -F: '$1=="root"{print $2}' /etc/shadow | sha256sum"""

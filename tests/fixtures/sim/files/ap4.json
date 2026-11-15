@@ -1,0 +1,14 @@
+{
+  "/sbin/block": "executable",
+  "/sbin/fw3": "executable",
+  "/sbin/swconfig": "executable",
+  "/sys/class/leds": "directory",
+  "/usr/libexec/ip-full": "executable",
+  "/usr/sbin/dnsmasq": "executable",
+  "/usr/sbin/dropbear": "executable",
+  "/usr/sbin/ip6tables": "executable",
+  "/usr/sbin/iptables": "executable",
+  "/usr/sbin/nft": "executable",
+  "/usr/sbin/odhcpd": "executable",
+  "/usr/sbin/uhttpd": "executable"
+}

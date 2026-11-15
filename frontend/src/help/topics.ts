@@ -83,6 +83,7 @@ export const HELP = {
   systemHttp: 'System#https-access',
   systemRepoKeys: 'System#repository-keys',
   systemLeds: 'System#leds',
+  systemPlugins: 'System#plugins',
   systemMounts: 'System#mount-points',
   systemImport: 'System#import-a-backup',
   systemRestore: 'System#restore',
@@ -107,6 +108,7 @@ export const HELP = {
   fwCustom: 'Firewall#custom-rules',
   fwTables: 'Firewall#other-nftables-tables',
   fwRaw: 'Firewall#raw-ruleset',
+  firewallIptables: 'Firewall#legacy-iptables',
   // Faults and capture
   faults: 'Faults-and-capture',
   faultTarget: 'Faults-and-capture#target',

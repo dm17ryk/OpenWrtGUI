@@ -396,16 +396,17 @@ The wizard described in section 5.
 | Status › Overview | Dashboard; System › Status |
 | Status › Routing | Network › Static routes (live table) |
 | Status › Firewall (nftables) | Firewall › Raw ruleset |
+| Status › Firewall (iptables), and nftables' iptables sub-page | Firewall › Legacy iptables — native since v1.0a2 (D6) |
 | Status › System log, Kernel log | System › Status |
 | Status › Processes | System › Status |
 | Status › Channel analysis | RF live › Channel analysis |
 | Status › Realtime graphs (load, bandwidth, wireless, connections) | System › Status (load, bandwidth, connections); RF live (wireless) — native since v1.0a1 (D5) |
 | System › System | System › System |
 | System › Administration (router password, password policy, SSH access, SSH keys, HTTP(S) access, repo public keys) | System › Access (repo keys: read-only list) |
-| System › Plugins | not applicable (LuCI's internal plugin switches) |
+| System › Plugins | System › Plugins (the switches; a plugin's own options in LuCI) — native since v1.0a2 (D4) |
 | System › Startup | System › Services |
 | System › Scheduled tasks | System › Scheduled tasks |
-| System › Mount points | System › Mount points |
+| System › Mount points | System › Mount points (fstab editing with block-mount since v1.0a2, D5; mount points on the router's own file systems refused: /, /overlay, /rom, /tmp, /dev, /proc, /sys, /etc, /usr, /var, /www) |
 | System › LED configuration | System › LEDs |
 | System › Backup / Flash firmware | System › Backup and firmware |
 | System › Reboot | System › Reboot |

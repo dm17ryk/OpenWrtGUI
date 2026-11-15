@@ -18,7 +18,7 @@ vi.mock('../../api/client', async (orig) => {
 test('the mounted file systems with their usage, and the block-mount note', async () => {
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <MountsTab routerId="ap2" />
+      <MountsTab routerId="ap2" routerName="AP2 · office" />
     </QueryClientProvider>,
   )
   const table = await screen.findByRole('table', { name: 'Mount points' })

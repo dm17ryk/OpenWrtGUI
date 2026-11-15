@@ -6,7 +6,7 @@ import { HELP } from '../../help/topics'
 import { luciPageLink, nativeScreen, useLuciPages } from './pages'
 
 function InThisApp({ page, routerId }: { page: LuciPageView; routerId: string }) {
-  const screen = page.native ? nativeScreen(page.native, routerId, page.path) : null
+  const screen = page.native ? nativeScreen(page.native, routerId, page.path, page.tab) : null
   if (!screen) return <span className="b har">no screen here yet</span>
   return (
     <>

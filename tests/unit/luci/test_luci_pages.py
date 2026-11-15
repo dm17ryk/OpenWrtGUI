@@ -100,8 +100,8 @@ def test_page_views_mark_native() -> None:
     for path in ("/zones", "/forwards", "/rules", "/snats", "/ipsets", "/custom"):
         assert views[f"admin/network/firewall{path}"].native == "firewall"
     assert views["admin/status/nftables"].native == "firewall"
-    iptables = views.get("admin/status/nftables/iptables")  # the legacy iptables view stays a fallback
-    assert iptables is None or iptables.native is None
+    iptables = views.get("admin/status/nftables/iptables")  # v1.0a2 D6: Firewall › Legacy iptables
+    assert iptables is None or (iptables.native, iptables.tab) == ("firewall", "iptables")
 
 
 def test_system_pages_are_native() -> None:
@@ -127,7 +127,7 @@ def test_system_pages_are_native() -> None:
         "admin/system/admin/uhttpd",
     ):
         assert views[path].native == "system", path
-    assert views["admin/system/mounts"].native is None
+    assert views["admin/system/mounts"].native == "system"  # v1.0a2 D5: edited natively with block-mount
     assert views["admin/status/realtime/wireless"].native == "rf"  # v1.0a1 D5: RF live replaces it
 
 
