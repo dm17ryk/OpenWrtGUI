@@ -17,6 +17,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Generate config, Unmount.
 - Firewall › Legacy iptables: the rules of a router with iptables, Reset counters, Restart firewall.
 - A LuCI page with a screen here opens that screen's own tab.
+- Ports: the bridge VLAN editor on a DSA router (LuCI's Switch/VLAN config), with the 60 s rollback, the
+  management-path rule and a check by netifd's own report. Proven on a simulated DSA router.
+- A network change whose rollback does not bring the router back now says how to recover.
 
 ### Changed
 

@@ -66,6 +66,17 @@ A harness run is live, so every router is read-only. The red banner in the top b
 to end, or check the watch list in Settings if the banner names something that is not really a run.
 See [Bench Guard](Bench-Guard).
 
+## A router that does not come back after a rollback
+
+The app says "Not applied" and the `restored` check failed: the router did not answer at its old address 65 s
+after a network change.
+1. Wait until 2 minutes after the change. rpcd's rollback puts the previous settings back at 60 s.
+2. Power-cycle the router. After the rollback, its flash holds the previous settings, so it boots with them. Do
+   not power-cycle during the first 60 s: then the flash still holds the change.
+3. If it still does not answer, use OpenWrt's failsafe mode: power it on, press a button when the LED blinks fast,
+   and reach it at its failsafe address (192.168.1.1) with a cable. Run `firstboot` only if you mean to reset every
+   setting.
+
 ## Where are the logs?
 
 `logs\app.log` in the data folder (Settings → **Open data folder**). Attach its end, with the audit-log

@@ -2,7 +2,8 @@
 
 The router's switch: its sockets, the VLANs they carry, and port mirroring, as LuCI's Network › Switch page does
 them. This works on routers whose switch `swconfig` manages, such as the bench's D-Link DWR-921 (`switch0`, five
-sockets). For any other router, the screen says its switch is not managed and shows no ports.
+sockets). On a DSA router, the screen edits the bridge's VLANs (see [VLANs on a DSA router](#vlans-on-a-dsa-router)).
+For any other router, the screen says its switch is not managed and shows no ports.
 
 ![Ports, VLANs, mirroring](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/ports.png)
 
@@ -35,6 +36,49 @@ device. **+ Add VLAN** adds a row with the next free number. VLAN changes apply 
 A router with a DSA switch has no swconfig switch: its ports (`lan1`, `lan2`, ...) are members of a bridge, and the
 bridge's VLANs are `bridge-vlan` sections. On such a router the Ports screen shows **VLANs · switch** (the bridge's
 name), which is LuCI's **Network › Switch/VLAN config**.
+
+- Each row is a VLAN, and each column is one of the router's own ports, as board.json lists them. Click a cell to
+  go from **—** (not a member) to **U** (untagged, the port's native VLAN) to **T** (tagged).
+- Making a port untagged in one VLAN takes it out of the VLAN it was untagged in, as LuCI does. Its tagged
+  memberships stay.
+- **Local** means the router itself is in the VLAN. A new VLAN has it on.
+- **+ Add VLAN** adds a VLAN with the lowest free number (1-4094). **Delete** removes a VLAN that no interface uses.
+- An existing VLAN keeps its number. To renumber it, add the new VLAN and remove the old one.
+- An entry you did not change is written back as it was. LuCI rewrites, for example, `lan2:u*` as `lan2`.
+- When LuCI's own page would refuse the configuration (a VLAN number out of range, an entry such as `lan1:t*`, a
+  port untagged in two VLANs), the card lists the reasons and stays read only. Fix those in LuCI's device dialog or
+  the terminal.
+- Ports that Wi-Fi joins at run time are listed under the matrix and never edited.
+- Port on/off, link state and mirroring on a DSA router are not here yet. LuCI's port and VLAN labels are left to
+  LuCI.
+
+**How the app keeps its own connection.** A VLAN change can cut the app off its router. Three things stand in the
+way:
+
+1. **Refused before the preview.**
+   - The VLAN that carries the app's connection (the interface its SSH comes in on, on `switch.<vid>`) cannot be
+     deleted or renumbered, and its **Local** stays on.
+   - The ports with a link in that VLAN *may carry this app's SSH* (marked SSH in the header). At least one of them
+     must keep its membership in that VLAN as it is.
+   - When the interface sits on the bridge itself, the app cannot tell which VLAN carries it, so the card is read
+     only.
+2. **The 60 s rollback.**
+   - Every change applies with a 60 s rollback, as LuCI's Save & Apply does.
+   - The app reconnects over a new connection and checks netifd's own report of the bridge's VLANs. Only then does
+     it confirm.
+   - If the change cut the app off, nothing confirms it, and the router restores its previous network settings by
+     itself 60 s after the change. This happens even if the app or the PC is gone.
+3. **If the router does not come back.** The app checks at 65 s that the router answers again with its previous
+   settings. If it does not:
+   - Wait until **2 minutes** after the change, then **power-cycle** the router. After the rollback its flash holds
+     the previous settings again.
+   - Do not power-cycle sooner: during the 60 s window the flash holds the change.
+   - If the router still does not answer, see
+     [Troubleshooting](Troubleshooting#a-router-that-does-not-come-back-after-a-rollback).
+
+The app cannot yet tell which port is your PC's, because standard images cannot list the bridge's address table.
+So with two linked ports in its VLAN, it lets you move either one, and if you move your own, the rollback brings
+the router back. The exact **own-port lock** comes later.
 
 ## Switch port mirror
 

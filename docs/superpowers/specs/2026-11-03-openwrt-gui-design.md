@@ -156,7 +156,7 @@ docs/            manual/ (user manual, synced to the wiki) · design/ · superpo
 - 5 and 6 GHz radios use the same uci `wireless` and `iw` model. Bands and widths come from `board.json`; channel and power lists from `iwinfo` / `iw phy` for the country code.
 - DFS channels show the radar-check wait (CAC: 60 s, or 10 min on channels 120–128).
 - On 6 GHz only SAE or OWE with PMF can be selected.
-- The DSA switch backend implements the same interface as swconfig. It is built when the first DSA router and its image are on the bench.
+- The bridge VLAN editor (LuCI's Switch/VLAN config) is built for DSA routers since v1.0a3 and proven on a simulated DSA router. The rest of the DSA backend (front panel, own-port lock by the bridge FDB, mirroring) is built when the first DSA router and its image are on the bench.
 
 ## 6. Safety
 
@@ -167,7 +167,7 @@ docs/            manual/ (user manual, synced to the wiki) · design/ · superpo
 | Preview | Every write shows the exact commands before Apply. Secrets are masked |
 | Verify by effect | A write is reported as done only when the effect is proven. Radio park: uci committed + netifd settled + no AP in `iw dev`. Link up: polled for up to 20 s. nft rule: present, ahead of `ct state established accept`, counter readable |
 | Rollback | Changes that can cut the app's own path (lan address, VLAN 1, firewall input on the app's zone, bridge members) arm a router-side 60 s restore timer first. The app reconnects, confirms and cancels the timer; otherwise the router restores itself. The timer is rpcd's own, as LuCI uses it: changes staged in an rpcd session (`uci -P /var/run/rpcd/uci-<session>`), `ubus call uci apply` with rollback, then `ubus call uci confirm` from the reconnected session (O14) |
-| Own path | The PC's switch port and the app's SSH rule cannot be disabled from the UI |
+| Own path | The PC's switch port and the app's SSH rule cannot be disabled from the UI. On a DSA router (v1.0a3), the VLAN carrying the app's interface keeps one linked port's membership, and its Local stays on |
 | Ownership | Every nft table and tc hook has an owner: fw4, the app, the harness, or unknown. Tables owned by someone else are locked by default. **Unlock** names the owner and what depends on it (e.g. "dima_night expects BENCHSIPGUARD") and asks for confirmation; after that edit, delete and add are allowed (D12). Bench Guard still wins during a run |
 | Timed faults | A timer on the router clears them, so they end on time even if the PC goes away |
 | DHCP conflict | Before enabling a DHCP server, the app checks the other routers on the same subnet |
@@ -231,6 +231,7 @@ Mockups for screens 1–12 are on the canvas (`docs/design/canvas/project/`). Sc
 ### 7.5 Ports, VLANs, mirroring (3)
 - **Front panel**: printed labels ↔ internal ports (from `board.json`), link/speed, per-port enable via `dwr921-portctl` or `swconfig … enable`. The SSH port is locked. "Enable all ports" button.
 - **VLAN matrix** (— / U / T per port, CPU included). Changes to VLAN 1 apply with rollback.
+- **VLANs on a DSA router** (v1.0a3): the bridge's VLAN × port matrix (— / U / T), Local per VLAN, add and delete; every change applies with the rollback.
 - **Switch port mirror**: monitor port, sources with RX/TX.
 - **Wi-Fi mirror** (`wifi-mirror` where present): status, stop/restart, excluded MACs, warning before iperf.
   v0.3 shows the status only (present, running or stopped, from `ubus call service list`); stop/restart, the
@@ -412,7 +413,7 @@ The wizard described in section 5.
 | System › Reboot | System › Reboot |
 | Network › Interfaces (incl. protocols qmi, ppp, ipv6) | Network & DHCP › Router addresses; LTE modem |
 | Network › Wireless | Wi-Fi; Network & DHCP › Wi-Fi access by MAC |
-| Network › Switch, Switch/VLAN config | Ports, VLANs, mirroring |
+| Network › Switch, Switch/VLAN config | Ports, VLANs, mirroring (swconfig; on DSA the bridge VLAN editor since v1.0a3) |
 | Network › Routing | Network & DHCP › Static routes and rules |
 | Network › DHCP, DNS | Network & DHCP › DHCP server, Fixed addresses, DNS |
 | Network › Diagnostics | System › Status › Diagnostics |
