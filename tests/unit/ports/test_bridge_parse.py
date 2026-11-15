@@ -185,3 +185,17 @@ def test_live_vlans_count_own_ports_only() -> None:
     assert live_vlans(json.dumps({"lan1": {"carrier": True}}), "switch", OWN) is None  # no such bridge
     assert live_vlans(json.dumps({"switch": {"type": "bridge", "bridge-vlans": "x"}}), "switch", OWN) is None
     assert live_vlans(json.dumps({"switch": {"type": "bridge"}}), "switch", OWN) == ()  # netifd: no VLANs
+    # Codex review, PR #66: a malformed `ports` is an unreadable report, not a TypeError mid-apply
+    for ports in (None, {"lan1": True}, 7):
+        malformed = {"switch": {"bridge-vlans": [{"id": 1, "local": True, "ports": ports}]}}
+        assert live_vlans(json.dumps(malformed), "switch", OWN) is None
+
+
+def test_a_port_listed_twice_in_one_vlan_is_unsupported() -> None:
+    """Codex review, PR #66: `lan1 lan1:t` would collapse to one entry and an edit of another cell would drop
+    the other, so the card stays read only."""
+    twice = AP5 | {
+        "network.cfg040f15.ports": "lan2 lan3 lan4",
+        "network.cfg050f15.ports": "lan1 lan1:t lan4:t",
+    }
+    assert unsupported("switch", bridge_vlans(twice)) == ["VLAN 10: lan1 is listed twice (lan1:t)"]

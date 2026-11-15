@@ -176,8 +176,14 @@ def unsupported(bridge: str, vlans: Sequence[BridgeVlanConf]) -> list[str]:
         if v.vlan in seen:
             issues.append(f"VLAN {v.vlan} is configured twice")
         seen.add(v.vlan)
+        here: set[str] = set()
         for text in v.entries:
             spec = parse_spec(text)
+            if spec is not None and spec.port in here:  # Codex review, PR #66: entries would collapse
+                issues.append(f"VLAN {v.vlan}: {spec.port} is listed twice ({text})")
+                continue
+            if spec is not None:
+                here.add(spec.port)
             issue = _entry_issue(v.vlan, text, spec)
             if issue is not None:
                 issues.append(issue)
@@ -219,7 +225,10 @@ def live_vlans(status_json: str, bridge: str, ports: frozenset[str]) -> tuple[Li
     out = []
     for v in listed:
         if isinstance(v, dict) and isinstance(v.get("id"), int):
-            entries = [p for p in v.get("ports", []) if isinstance(p, str) and _port_name(p) in ports]
+            members = v.get("ports", [])
+            if not isinstance(members, list):  # Codex review, PR #66: malformed is unreadable, not a 500
+                return None
+            entries = [p for p in members if isinstance(p, str) and _port_name(p) in ports]
             out.append(LiveVlan(v["id"], bool(v.get("local", True)), frozenset(entries)))
     return tuple(sorted(out, key=lambda x: x.vlan))
 
