@@ -52,6 +52,8 @@ async def test_at_text_is_one_shell_quoted_printf_argument(ctx: AppContext) -> N
         'at+clck="SC",0,"1234"',
         'AT+CPWD="SC","1234","5678"',
         "AT+CPIN=12'34",
+        "at+cpin=1234",
+        "AT+CPIN=12345678,1234",
     ],
 )
 async def test_a_sim_pin_sent_in_the_console_is_hidden_in_the_audit(ctx: AppContext, text: str) -> None:
@@ -60,6 +62,25 @@ async def test_a_sim_pin_sent_in_the_console_is_hidden_in_the_audit(ctx: AppCont
     commands = _commands(ctx)
     assert "<hidden>" in commands[-1]
     assert not any(pin in command for command in commands for pin in ("1234", "5678", "34"))
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["AT+CPIN=1234", "at+cpin=1234", 'AT+CPIN="1234"', "AT+CPIN=12345678,1234", 'AT+CPWD="SC","1234","5678"'],
+)
+async def test_a_sim_pin_is_hidden_in_what_the_console_returns(ctx: AppContext, text: str) -> None:
+    """v1.0b1 D4: the answer echoes the command; the PIN in it is hidden, the PIN still reached the modem."""
+    result = await ctx.lte.at_command("ap2", text, confirmed=True)
+    assert result.status == "OK" and "<hidden>" in result.command
+    shown = [result.command, *result.lines]
+    assert not any(pin in line for line in shown for pin in ("1234", "5678"))
+
+
+def test_a_modem_echo_that_differs_from_the_text_is_hidden_too() -> None:
+    """`mask`'s `_AT_SECRET` needs `+CPIN=` with no space; a modem echo may put one before `=`."""
+    from openwrtgui.lte.service import shown_answer
+
+    assert shown_answer(("AT+CPIN = 1234", "+CPIN: READY")) == ("AT+CPIN =<hidden>", "+CPIN: READY")
 
 
 async def test_at_console_during_a_run(ctx_guard_live: AppContext) -> None:

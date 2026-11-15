@@ -88,6 +88,21 @@ test('during a run a command that may change the modem is disabled and a query i
   expect(send).toBeEnabled()
 })
 
+test('a SIM PIN is shown hidden and never recalled with Up', async () => {
+  const user = userEvent.setup()
+  const { input, send } = renderConsole()
+  await user.type(input, 'AT+CPIN=1234')
+  await user.click(send)
+  await user.click(within(screen.getByRole('group', { name: 'Confirm AT command' })).getByRole('button', { name: 'Send' }))
+  expect(calls).toEqual([{ path: '/api/routers/ap2/lte/at', body: { command: 'AT+CPIN=1234', confirmed: true } }])
+  const log = await screen.findByRole('log', { name: 'AT console output' })
+  expect(within(log).getByText('> AT+CPIN=<hidden>')).toBeInTheDocument()
+  expect(log).not.toHaveTextContent('1234')
+  await user.click(input)
+  await user.keyboard('{ArrowUp}')
+  expect(input).toHaveValue('')
+})
+
 test('Up recalls the last command and Down goes back to an empty line', async () => {
   const user = userEvent.setup()
   const { input, send } = renderConsole()

@@ -14,6 +14,13 @@ function isQuery(text: string): boolean {
   return QUERY.test(text.trim())
 }
 
+// the same commands the server hides (src/openwrtgui/lte/service.py, v1.0b1 D4): a SIM PIN is never on screen
+const PIN = /(\+(?:CPIN|CLCK|CPWD)\s*=).*/i
+
+function hidePin(text: string): string {
+  return text.replace(PIN, '$1<hidden>')
+}
+
 type Entry = { id: number; command: string; result?: AtResult; error?: string }
 
 function Answer({ entry }: { entry: Entry }) {
@@ -49,15 +56,17 @@ export function AtConsole({ routerId }: { routerId: string }) {
   const send = async (confirmed: boolean): Promise<void> => {
     setAsking(false)
     setBusy(true)
-    setHistory((h) => [...h.filter((c) => c !== command), command].slice(-HISTORY))
+    const shown = hidePin(command)
+    // a command with a PIN is not kept for Up / Down: raw it shows the PIN, hidden it would send `<hidden>`
+    if (shown === command) setHistory((h) => [...h.filter((c) => c !== command), command].slice(-HISTORY))
     setRecall(null)
     setText('')
     const id = Date.now() + Math.random()
     try {
       const result = await postJson<AtResult>(`/api/routers/${routerId}/lte/at`, { command, confirmed })
-      setEntries((e) => [...e, { id, command, result }].slice(-HISTORY))
+      setEntries((e) => [...e, { id, command: shown, result }].slice(-HISTORY))
     } catch (err) {
-      setEntries((e) => [...e, { id, command, error: err instanceof ApiError ? err.detail : String(err) }].slice(-HISTORY))
+      setEntries((e) => [...e, { id, command: shown, error: err instanceof ApiError ? err.detail : String(err) }].slice(-HISTORY))
     } finally {
       setBusy(false)
     }
