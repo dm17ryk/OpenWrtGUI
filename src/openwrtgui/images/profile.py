@@ -97,6 +97,7 @@ class Profile(BaseModel):
     services: tuple[str, ...]
     uci_defaults: tuple[str, ...]
     built_at: datetime
+    origin: str | None = None  # the release page of an image downloaded from the image library
 
 
 def profile_paths(p: Profile) -> frozenset[str]:

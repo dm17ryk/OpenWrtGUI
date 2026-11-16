@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -85,3 +86,39 @@ def test_unreadable_profile_is_left_out(tmp_path: Path) -> None:
     (broken / "profile.json").write_text("{not json", encoding="utf-8")
     assert store.list() == [p]
     assert hashlib.sha256(store.image_bytes(p.key)).hexdigest() == p.key.sha256
+
+
+def test_import_records_its_origin(tmp_path: Path) -> None:
+    store = ProfileStore(tmp_path)
+    origin = "https://github.com/dm17ryk/openwrt/releases/tag/v25.12.5"
+    p = store.import_image(MINI, "mini-r35692.bin", NOW, origin=origin)
+    assert p.origin == origin
+    assert [q.origin for q in store.list()] == [origin]
+
+
+def test_import_with_the_wrong_expected_build_stores_nothing(tmp_path: Path) -> None:
+    store = ProfileStore(tmp_path)
+    with pytest.raises(
+        ValueError,
+        match=r"^mini-r35692\.bin is for dlink,dwr-921-c3-uboot r35692-b8bffeefdf, "
+        r"not x,y r1 as its release says; nothing was imported\.$",
+    ):
+        store.import_image(MINI, "mini-r35692.bin", NOW, expect=("x,y", "r1"))
+    assert store.list() == []
+    assert not any(tmp_path.iterdir())
+
+
+def test_import_with_the_expected_build_succeeds(tmp_path: Path) -> None:
+    store = ProfileStore(tmp_path)
+    expect = ("dlink,dwr-921-c3-uboot", "r35692-b8bffeefdf")
+    assert store.import_image(MINI, "mini-r35692.bin", NOW, expect=expect).origin is None
+
+
+def test_old_profile_json_without_origin_loads(tmp_path: Path) -> None:
+    store = ProfileStore(tmp_path)
+    p = store.import_image(MINI, "mini-r35692.bin", NOW)
+    path = tmp_path / "dlink,dwr-921-c3-uboot" / p.key.folder / "profile.json"
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    doc.pop("origin")
+    path.write_text(json.dumps(doc), encoding="utf-8")
+    assert [q.origin for q in store.list()] == [None]

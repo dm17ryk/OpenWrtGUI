@@ -2,18 +2,26 @@
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import json
+from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
 import httpx
 from pydantic import BaseModel, ConfigDict
 
+from openwrtgui.images.profile import Profile
+from openwrtgui.images.store import ProfileStore
+from openwrtgui.images.sysupgrade import MAX_IMAGE
 from openwrtgui.version import APP_VERSION
 
 RELEASES_URL = "https://api.github.com/repos/dm17ryk/openwrt/releases"
 MAX_PROFILES = 2**20
 PROFILES_NAME = "profiles.json"
+CACHE_SECONDS = 600
+ERROR_CACHE_SECONDS = 60
 _HEADERS = {"Accept": "application/vnd.github+json", "User-Agent": f"OpenWrtGUI/{APP_VERSION}"}
 
 
@@ -159,12 +167,16 @@ async def _profiles_bytes(client: httpx.AsyncClient, url: str) -> bytes | None:
                 if len(body) > MAX_PROFILES:
                     return None
             return bytes(body)
-    except httpx.HTTPError:
+    except (httpx.HTTPError, httpx.InvalidURL):
         return None
 
 
 def _unreachable(reason: str) -> LibraryError:
     return LibraryError(f"The image library on GitHub could not be reached: {reason}.")
+
+
+def _reason(exc: Exception) -> str:
+    return str(exc) or type(exc).__name__
 
 
 def _list_error(response: httpx.Response) -> LibraryError:
@@ -190,7 +202,7 @@ async def fetch_catalog(client: httpx.AsyncClient) -> tuple[list[LibraryEntry], 
     try:
         response = await client.get(RELEASES_URL, params={"per_page": 100}, headers=_HEADERS, timeout=20.0)
     except httpx.HTTPError as exc:
-        raise _unreachable(str(exc) or type(exc).__name__) from exc
+        raise _unreachable(_reason(exc)) from exc
     if response.status_code // 100 != 2:
         raise _list_error(response)
     try:
@@ -221,3 +233,110 @@ async def fetch_catalog(client: httpx.AsyncClient) -> tuple[list[LibraryEntry], 
                 seen.add(entry.sha256)
                 entries.append(entry)
     return entries, skipped
+
+
+class LibraryRead(BaseModel):
+    """What the last look at GitHub found; `entries` survive a later failed read."""
+
+    model_config = ConfigDict(frozen=True)
+
+    entries: tuple[LibraryEntry, ...] = ()
+    read_at: datetime | None = None
+    skipped: int = 0
+    error: str | None = None
+
+
+class ImageLibrary:
+    """The catalog (cached) and the download of one of its images into the profile store."""
+
+    def __init__(
+        self,
+        profiles: ProfileStore,
+        client_factory: Callable[[], httpx.AsyncClient],
+        clock: Callable[[], datetime] = datetime.now,
+    ) -> None:
+        self._profiles = profiles
+        self._client_factory = client_factory
+        self._clock = clock
+        self._cached: LibraryRead | None = None
+        self._lock = asyncio.Lock()
+        self._busy: set[str] = set()
+
+    def _fresh(self, cached: LibraryRead, now: datetime) -> bool:
+        if cached.read_at is None:
+            return False
+        limit = ERROR_CACHE_SECONDS if cached.error else CACHE_SECONDS
+        return (now - cached.read_at).total_seconds() < limit
+
+    async def read(self, force: bool = False) -> LibraryRead:
+        async with self._lock:
+            now = self._clock()
+            previous = self._cached
+            if not force and previous is not None and self._fresh(previous, now):
+                return previous
+            try:
+                async with self._client_factory() as client:
+                    entries, skipped = await fetch_catalog(client)
+            except LibraryError as exc:
+                result = LibraryRead(
+                    entries=previous.entries if previous else (),
+                    read_at=now,
+                    skipped=previous.skipped if previous else 0,
+                    error=str(exc),
+                )
+            else:
+                result = LibraryRead(entries=tuple(entries), read_at=now, skipped=skipped)
+            self._cached = result
+            return result
+
+    async def download(self, sha256: str) -> Profile:
+        """Fetch one catalog image and import it. KeyError: not in the catalog; ValueError: anything else."""
+        entry = next((e for e in (await self.read()).entries if e.sha256 == sha256), None)
+        if entry is None:
+            raise KeyError(sha256)
+        if sha256 in self._busy:
+            raise ValueError(f"{entry.image_name} is already downloading.")
+        self._busy.add(sha256)
+        try:
+            known = next((p for p in self._profiles.list() if p.key.sha256 == sha256), None)
+            if known is not None:
+                raise ValueError(f"This image is already imported ({known.key.label})")
+            data = await self._fetch(entry)
+            return await asyncio.to_thread(
+                self._profiles.import_image,
+                data,
+                entry.image_name,
+                self._clock(),
+                origin=entry.release_url,
+                expect=(entry.board, entry.revision),
+            )
+        finally:
+            self._busy.discard(sha256)
+
+    async def _fetch(self, entry: LibraryEntry) -> bytes:
+        limit = min(entry.size, MAX_IMAGE)
+        too_large = ValueError(f"{entry.image_name} is larger than its release says; nothing was imported.")
+        body = bytearray()
+        try:
+            async with (
+                self._client_factory() as client,
+                client.stream(
+                    "GET", entry.url, headers=_HEADERS, timeout=60.0, follow_redirects=True
+                ) as response,
+            ):
+                if response.status_code // 100 != 2:
+                    raise _unreachable(f"HTTP {response.status_code}")
+                declared = response.headers.get("content-length", "")
+                if declared.isdigit() and int(declared) > limit:
+                    raise too_large
+                async for chunk in response.aiter_bytes():
+                    body += chunk
+                    if len(body) > limit:
+                        raise too_large
+        except (httpx.HTTPError, httpx.InvalidURL) as exc:
+            raise _unreachable(_reason(exc)) from exc
+        if hashlib.sha256(body).hexdigest() != entry.sha256:
+            raise ValueError(
+                f"{entry.image_name} does not match its release's profiles.json; nothing was imported."
+            )
+        return bytes(body)

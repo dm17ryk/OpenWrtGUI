@@ -42,8 +42,23 @@ class ProfileStore:
     def get(self, key: ProfileKey) -> Profile | None:
         return next((p for p in self.list() if p.key == key), None)
 
-    def import_image(self, data: bytes, name: str, now: datetime) -> Profile:
+    def import_image(
+        self,
+        data: bytes,
+        name: str,
+        now: datetime,
+        *,
+        origin: str | None = None,
+        expect: tuple[str, str] | None = None,
+    ) -> Profile:
         profile = build_profile(data, name, now)
+        if expect is not None and (profile.key.board, profile.key.revision) != expect:
+            raise ValueError(
+                f"{name} is for {profile.key.board} {profile.key.revision}, "
+                f"not {expect[0]} {expect[1]} as its release says; nothing was imported."
+            )
+        if origin is not None:
+            profile = profile.model_copy(update={"origin": origin})
         if any(p.key.sha256 == profile.key.sha256 for p in self.list()):
             raise ValueError(f"This image is already imported ({profile.key.label})")
         folder = self._folder(profile.key)

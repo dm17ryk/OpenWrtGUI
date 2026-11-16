@@ -177,6 +177,16 @@ async def test_an_unreadable_profiles_json_is_skipped_and_counted(bad: bytes | i
     assert ([e.release_tag for e in entries], skipped) == (["v25.12.5"], 1)
 
 
+async def test_a_malformed_profiles_url_is_skipped_and_counted() -> None:
+    broken = _newer()
+    for a in broken["release"]["assets"]:
+        if a["name"] == "profiles.json":
+            a["browser_download_url"] = "http://dl.test:bad/x"
+    async with _client([_bench(), broken]) as client:
+        entries, skipped = await fetch_catalog(client)
+    assert ([e.release_tag for e in entries], skipped) == (["v25.12.5"], 1)
+
+
 async def test_drafts_are_ignored() -> None:
     draft = _newer()
     draft["release"]["draft"] = True
