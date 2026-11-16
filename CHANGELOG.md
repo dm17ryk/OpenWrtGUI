@@ -17,6 +17,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   empty read or write part counts.
 - Legacy iptables: Reset counters is proven for ip6tables too, and stays proven after an earlier reset with
   traffic since; lines the app cannot read are counted on the tab, not dropped silently.
+- Firewall: a run that starts after a confirmed table change is reported ("not saved as an fw4 include"), not
+  answered 423; table-level lines such as flags and comment survive an edit; an IP set entry takes one field per
+  match; a rule or set of one family refuses an address of the other.
 
 ### Security
 

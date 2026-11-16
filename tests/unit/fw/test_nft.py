@@ -185,3 +185,14 @@ def test_table_shape_ignores_how_nft_prints_a_rule() -> None:
     assert table_shape(listed) == table_shape(typed) == (("c", 2),)
     fewer = TableText("ip", "owg_t", (), (ChainText("c", None, ("ip saddr 10.0.0.1 counter",)),))
     assert table_shape(fewer) != table_shape(listed)
+
+
+def test_table_level_statements_survive_a_round_trip() -> None:
+    """v0.4 minor, Review Focus 2: `flags` and a table `comment` are one-line statements at depth 1."""
+    text = (
+        'table inet lab {\n\tflags dormant\n\tcomment "bench"\n\tchain c {\n'
+        "\t\ttype filter hook input priority filter; policy accept;\n\t\tcounter\n\t}\n}\n"
+    )
+    rendered = render_table(table_texts(text)[("inet", "lab")])
+    assert "\tflags dormant\n" in rendered and '\tcomment "bench"\n' in rendered
+    assert rendered.index("flags dormant") < rendered.index("chain c")

@@ -197,3 +197,26 @@ async def test_guard_live_refuses_unlock_and_edit(env: FwEnv) -> None:
     env.go_live()
     with pytest.raises(GuardLocked):
         await env.fw.apply_table("ap1", req, plan.digest)
+
+
+async def test_a_run_that_starts_after_the_confirm_is_reported_not_refused(
+    env: FwEnv, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """v0.4 minor, v1.0b2 D5: the runtime change was confirmed; the include is not written and the answer
+    says so, instead of a 423 that hides the applied change."""
+    real = env.runner.run_planned
+
+    async def then_live(*args: object, **kw: object) -> object:
+        result = await real(*args, **kw)  # type: ignore[arg-type]
+        env.go_live()  # a harness run starts between the confirmed change and its include
+        return result
+
+    monkeypatch.setattr(env.runner, "run_planned", then_live)
+    req = TableRequest(VOIP, "edit", override=True, rules=VOIP_RULES, keep="include")
+    plan = await env.fw.plan_table("ap1", req)
+    result = await env.fw.apply_table("ap1", req, plan.digest)
+    assert result.applied and not result.verified
+    assert result.error is not None
+    text = "Applied at runtime; not saved as an fw4 include: Bench Guard went live"
+    assert result.error.startswith(text), result
+    assert not any(e.command.startswith("cat > /etc/owg/") for e in env.audit.query())

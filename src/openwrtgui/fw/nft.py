@@ -153,7 +153,7 @@ class ChainText:
 class TableText:
     family: str
     name: str
-    sets: tuple[str, ...]  # named sets, maps, flowtables… as listed (tab-indented blocks)
+    sets: tuple[str, ...]  # named sets, maps, flowtables… (tab-indented blocks) and one-line table statements
     chains: tuple[ChainText, ...]
 
 
@@ -185,8 +185,10 @@ def table_texts(text: str) -> dict[tuple[str, str], TableText]:
                     block = None
             elif m := _CHAIN.match(body):
                 chain = (m.group(1), None, [])
-            else:
+            elif body.endswith("{"):
                 block = ["\t" + body]
+            else:  # a one-line table statement (`flags dormant`, `comment "…"`), kept as is (v1.0b2 D5)
+                sets.append("\t" + body)
         elif chain is not None:
             if body.startswith("type ") and chain[1] is None and not chain[2]:
                 chain = (chain[0], body, chain[2])
