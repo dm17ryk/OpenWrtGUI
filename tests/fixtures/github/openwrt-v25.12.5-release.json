@@ -1,0 +1,172 @@
+{
+ "tag_name": "v25.12.5",
+ "name": "DWR_921-c3-uboot-qmifix3",
+ "html_url": "https://github.com/dm17ryk/openwrt/releases/tag/v25.12.5",
+ "published_at": "2026-10-06T08:54:20Z",
+ "prerelease": false,
+ "draft": false,
+ "assets": [
+  {
+   "name": "20180503_1817_DWR_921_POST.bootstrap_master_def_internal__sdk-master.transit.stage1.internal.bin",
+   "size": 7814710,
+   "digest": "sha256:dfba6024b26f0e637ab6681347a97865281a40e79e0dcac03eb2347ef1c04c8c",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/20180503_1817_DWR_921_POST.bootstrap_master_def_internal__sdk-master.transit.stage1.internal.bin"
+  },
+  {
+   "name": "2023.07.20-15.22_DWR_921_POST_4.0.2_release.bin",
+   "size": 9521823,
+   "digest": "sha256:d42f1e664f54201b0a7c6c4876690beadcc76ade896d295fe97f40873f82d859",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/2023.07.20-15.22_DWR_921_POST_4.0.2_release.bin"
+  },
+  {
+   "name": "2026.02.17-17.10_DWR_921_POST_4.0.0_release.bin",
+   "size": 9638050,
+   "digest": "sha256:8d7a9e75689b82dfc702e618483cfd82d61dcd33df875874a133a098e3fede99",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/2026.02.17-17.10_DWR_921_POST_4.0.0_release.bin"
+  },
+  {
+   "name": "config.buildinfo",
+   "size": 1614,
+   "digest": "sha256:a1d5c070626de8620bdff9236666f8a76327b87da858e7bce1c4a19f52e79c87",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/config.buildinfo"
+  },
+  {
+   "name": "dwr921-c3-capabilities.md",
+   "size": 4721,
+   "digest": "sha256:3963622f29f15a743974166cb1e8d65aab9cfa369813f5df45bb2aa7fdd3bcfd",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/dwr921-c3-capabilities.md"
+  },
+  {
+   "name": "dwr921-c3-stock-to-openwrt.md",
+   "size": 6999,
+   "digest": "sha256:a769371e18d7357155afdae3f6bab0b0741229acc787d5eda048a2fb1e96bb72",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/dwr921-c3-stock-to-openwrt.md"
+  },
+  {
+   "name": "dwr921-c3-unit2-jboot-to-openwrt.md",
+   "size": 5633,
+   "digest": "sha256:a943b9462b3995fbc72eb40a66f97684af4b3fc506051a4c89d674b20cd1044d",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/dwr921-c3-unit2-jboot-to-openwrt.md"
+  },
+  {
+   "name": "DWR_921-c3-uboot-qmifix3-20260815-095045-squashfs-sysupgrade.bin.7z",
+   "size": 11255665,
+   "digest": "sha256:e3dde31ba91ecd26023953dd3a4b0333baf82838dd694c29836a12be55cbdce8",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/DWR_921-c3-uboot-qmifix3-20260815-095045-squashfs-sysupgrade.bin.7z"
+  },
+  {
+   "name": "feeds.buildinfo",
+   "size": 487,
+   "digest": "sha256:aacaff8f08fc8f782bfcb01e95296314b4e721768566bc32f3eb56af82f04c4f",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/feeds.buildinfo"
+  },
+  {
+   "name": "openwrt-ramips-mt7620-aigale_ai-br100-initramfs-kernel.bin",
+   "size": 6218798,
+   "digest": "sha256:dcf6639ea34eca6f367583ed91978473aa70c4af71cfdd748e1bd3b2df02558a",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/openwrt-ramips-mt7620-aigale_ai-br100-initramfs-kernel.bin"
+  },
+  {
+   "name": "openwrt-ramips-mt7620-aigale_ai-br100-squashfs-sysupgrade.bin",
+   "size": 6357275,
+   "digest": "sha256:4a3fc9a90b8676f9fc8a425645dc2e6a0bb5e171201c3fcaf6d4c7ba4fb9e113",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/openwrt-ramips-mt7620-aigale_ai-br100-squashfs-sysupgrade.bin"
+  },
+  {
+   "name": "openwrt-ramips-mt7620-aigale_ai-br100.manifest",
+   "size": 3200,
+   "digest": "sha256:f34a67091cd1b8621c9e241fd30fcd188584fcc9805367e017d4908621312c6e",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/openwrt-ramips-mt7620-aigale_ai-br100.manifest"
+  },
+  {
+   "name": "openwrt-ramips-mt7620-dlink-dwr-921-c3-uboot-ramtest.manifest",
+   "size": 6930,
+   "digest": "sha256:d52d5bed0fd814903b6f03b2da37ed7adb9cd6ed1ad95274e61a1aac844ba305",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/openwrt-ramips-mt7620-dlink-dwr-921-c3-uboot-ramtest.manifest"
+  },
+  {
+   "name": "openwrt-ramips-mt7620-dlink_dwr-921-c3-initramfs-kernel.bin",
+   "size": 6940906,
+   "digest": "sha256:e1aec86d5c8d2709b7fbd011f6d0fa813f0812243ad160c3f73289119ed6e47d",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/openwrt-ramips-mt7620-dlink_dwr-921-c3-initramfs-kernel.bin"
+  },
+  {
+   "name": "openwrt-ramips-mt7620-dlink_dwr-921-c3-squashfs-factory.bin",
+   "size": 7143508,
+   "digest": "sha256:75f79d37ad9b88a8273e8ed425a66582c480a76e3b513b8eef02fb6fd3e9cac2",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/openwrt-ramips-mt7620-dlink_dwr-921-c3-squashfs-factory.bin"
+  },
+  {
+   "name": "openwrt-ramips-mt7620-dlink_dwr-921-c3-squashfs-sysupgrade.bin",
+   "size": 7143698,
+   "digest": "sha256:1f22455462a40543bffb19bad02014750c6fd6209f4e4eb101ae0303a33936fa",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/openwrt-ramips-mt7620-dlink_dwr-921-c3-squashfs-sysupgrade.bin"
+  },
+  {
+   "name": "openwrt-ramips-mt7620-dlink_dwr-921-c3-uboot-initramfs-kernel.bin",
+   "size": 11028311,
+   "digest": "sha256:88122361d8eedfcf67f288fa74ec751d870da2ab9c8dbb46988f2a48d5647039",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/openwrt-ramips-mt7620-dlink_dwr-921-c3-uboot-initramfs-kernel.bin"
+  },
+  {
+   "name": "openwrt-ramips-mt7620-dlink_dwr-921-c3-uboot-ramtest-initramfs-kernel.bin",
+   "size": 6053152,
+   "digest": "sha256:bd44fc651d5c2fe00f374192104132c29032138efda5abd55371c98159a704c6",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/openwrt-ramips-mt7620-dlink_dwr-921-c3-uboot-ramtest-initramfs-kernel.bin"
+  },
+  {
+   "name": "openwrt-ramips-mt7620-dlink_dwr-921-c3-uboot-ramtest.manifest",
+   "size": 3176,
+   "digest": "sha256:943c0d8f6fedee0927b152b538e17986e2ec9ce42ca169fcc225e0f6eb75aff9",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/openwrt-ramips-mt7620-dlink_dwr-921-c3-uboot-ramtest.manifest"
+  },
+  {
+   "name": "openwrt-ramips-mt7620-dlink_dwr-921-c3-uboot-squashfs-factory.bin",
+   "size": 11272478,
+   "digest": "sha256:d340a53f2de057a8d1d703239a22e9bd24b834dcd9a0e7397bf80861ff25cc10",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/openwrt-ramips-mt7620-dlink_dwr-921-c3-uboot-squashfs-factory.bin"
+  },
+  {
+   "name": "openwrt-ramips-mt7620-dlink_dwr-921-c3-uboot-squashfs-sysupgrade.bin",
+   "size": 11272478,
+   "digest": "sha256:d340a53f2de057a8d1d703239a22e9bd24b834dcd9a0e7397bf80861ff25cc10",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/openwrt-ramips-mt7620-dlink_dwr-921-c3-uboot-squashfs-sysupgrade.bin"
+  },
+  {
+   "name": "openwrt-ramips-mt7620-dlink_dwr-921-c3-uboot.manifest",
+   "size": 6930,
+   "digest": "sha256:d52d5bed0fd814903b6f03b2da37ed7adb9cd6ed1ad95274e61a1aac844ba305",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/openwrt-ramips-mt7620-dlink_dwr-921-c3-uboot.manifest"
+  },
+  {
+   "name": "openwrt-ramips-mt7620-dlink_dwr-921-c3.manifest",
+   "size": 4124,
+   "digest": "sha256:eb464f10a4529a2936459b40ffbb5e64fc4da9657a95a14667d0a98b293e1059",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/openwrt-ramips-mt7620-dlink_dwr-921-c3.manifest"
+  },
+  {
+   "name": "profiles.json",
+   "size": 3515,
+   "digest": "sha256:8cf11eef94cdb52dd0cfab545bd2c9c0445956f1507049ef125a9e7757e0835e",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/profiles.json"
+  },
+  {
+   "name": "sha256sums",
+   "size": 2105,
+   "digest": "sha256:7aa73f8e5038c96a0261f5f77c841d103d172be98c0339ed50866da72f630b4b",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/sha256sums"
+  },
+  {
+   "name": "Updating_DWR-921_C3_from_Chinese_firmware_to_Russian.pdf",
+   "size": 271846,
+   "digest": "sha256:e807b35b947ab6a6c3ced1b4ac4ad87024b2ae6a3288c6c35f33537e882b244a",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/Updating_DWR-921_C3_from_Chinese_firmware_to_Russian.pdf"
+  },
+  {
+   "name": "version.buildinfo",
+   "size": 18,
+   "digest": "sha256:71516eb4b25d8118f56888e7c8849dbfbfc34ed4e00ba63487cc6eb4677cb3ac",
+   "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/v25.12.5/version.buildinfo"
+  }
+ ]
+}
