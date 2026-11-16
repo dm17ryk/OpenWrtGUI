@@ -51,6 +51,16 @@ with the size and the bench's own packages it holds. **Import image…** reads a
 [Adding a router family](Adding-a-router-family)); **Delete** removes the profile and its copy of the image.
 A router whose board and revision match a profile shows how it differs on [Discovery](Discovery).
 
+## Image library
+
+Every image the library offers for these routers, read from the releases of `dm17ryk/openwrt` on GitHub. Each row
+shows the board, the revision, the size and the release it comes from (marked **pre-release** when it is one).
+**Download** fetches the image, checks it against its release and imports it, like **Import image…** above; the
+row then says **Imported**. Nothing is downloaded until you click. **Refresh** reads the releases again; **Read
+at** shows when they were last read. A release whose `profiles.json` cannot be read is only counted ("1 release
+could not be read"). An image imported from the library shows a **from the image library** link to its release
+in [Images](#images).
+
 ## App SSH key
 
 The app's own key (ed25519), created on first start. Shown with its fingerprint; **Export public key**

@@ -4,6 +4,7 @@ import { ApiError, apiFetch, downloadFile, postJson, putJson } from '../api/clie
 import type { AppInfo, AppKeyOut, GuardWatchList, KnownDevice, KnownTable, Settings, UpdateOut } from '../api/types'
 import { Help, HelpTip } from '../help/Help'
 import { HELP } from '../help/topics'
+import { ImageLibrarySection } from './ImageLibrarySection'
 import { ImagesSection } from './ImagesSection'
 
 type Progress = { version: string; done: number; total: number }
@@ -377,6 +378,8 @@ export function SettingsScreen() {
       </div>
 
       <ImagesSection />
+
+      <ImageLibrarySection />
 
       <div className="cards">
         <section className="card stack" aria-labelledby="key-h">
