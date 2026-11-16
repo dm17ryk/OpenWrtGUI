@@ -1,13 +1,13 @@
 ; Per-user installer for OpenWrtGUI (no admin rights).
-; Build: ISCC.exe /DAppVersion=0.8.1 /DAppNumVersion=0.8.1.0 installer\OpenWrtGUI.iss
+; Build: ISCC.exe /DAppVersion=0.8.2 /DAppNumVersion=0.8.2.0 installer\OpenWrtGUI.iss
 ; tools/build_windows.ps1 and the release workflows pass both values.
 ; The updater runs it as: /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR=<app> /RELAUNCH=1
 
 #ifndef AppVersion
-  #define AppVersion "0.8.1-dev"
+  #define AppVersion "0.8.2-dev"
 #endif
 #ifndef AppNumVersion
-  #define AppNumVersion "0.8.1.0"
+  #define AppNumVersion "0.8.2.0"
 #endif
 
 [Setup]
