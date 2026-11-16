@@ -1,0 +1,23 @@
+{
+  "metadata_version": 1,
+  "target": "ramips/mt7620",
+  "version_code": "r35692-b8bffeefdf",
+  "version_number": "SNAPSHOT",
+  "arch_packages": "mipsel_24kc",
+  "profiles": {
+    "dlink_dwr-921-c3-uboot": {
+      "image_prefix": "mini",
+      "supported_devices": ["dlink,dwr-921-c3-uboot"],
+      "titles": [{"vendor": "D-Link", "model": "DWR-921", "variant": "C3 (U-Boot)"}],
+      "images": [
+        {
+          "type": "sysupgrade",
+          "filesystem": "squashfs",
+          "name": "mini-r35692.bin",
+          "sha256": "4ede1b92baa19361c0b8bde87dbee473de75a9409351f24104b415bce32fcec0",
+          "size": 65840
+        }
+      ]
+    }
+  }
+}

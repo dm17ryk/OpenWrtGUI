@@ -87,12 +87,24 @@ def seed_routers(sim_dir: Path, store: RouterStore) -> None:
 
 
 def sim_http_client(sim_dir: Path) -> httpx.AsyncClient:
-    """GitHub stand-in for the updater: serves tests/fixtures/github/releases.json."""
-    releases = json.loads((sim_dir.parent / "github" / "releases.json").read_text(encoding="utf-8"))
+    """GitHub stand-in: the updater's releases, and a one-image firmware release for the image library."""
+    github = sim_dir.parent / "github"
+    releases = json.loads((github / "releases.json").read_text(encoding="utf-8"))
+    firmware = json.loads((github / "openwrt-sim-release.json").read_text(encoding="utf-8"))
+    profiles = (github / "openwrt-sim-profiles.json").read_bytes()
+    mini = (sim_dir.parent / "images" / "mini-r35692.bin").read_bytes()
+    download = "/dm17ryk/openwrt/releases/download/sim/"
 
     def handle(request: httpx.Request) -> httpx.Response:
-        if request.url.path.endswith("/releases"):
+        path = request.url.path
+        if path == "/repos/dm17ryk/OpenWrtGUI/releases":
             return httpx.Response(200, json=releases)
+        if path == "/repos/dm17ryk/openwrt/releases":
+            return httpx.Response(200, json=[firmware])
+        if path == download + "profiles.json":
+            return httpx.Response(200, content=profiles)
+        if path == download + "mini-r35692.bin":
+            return httpx.Response(200, content=mini)
         return httpx.Response(404)
 
     return httpx.AsyncClient(transport=httpx.MockTransport(handle))
