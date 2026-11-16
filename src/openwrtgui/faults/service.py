@@ -34,6 +34,7 @@ from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.store.settings import SettingsStore
 from openwrtgui.timer import alive_command, arm_command, cancel_command
 from openwrtgui.transport.base import Transport, ubus_call
+from openwrtgui.transport.memo import once_reads
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.uci import shell_quote
 
@@ -228,6 +229,7 @@ class FaultsService:
     async def _read_on(
         self, rec: RouterRecord, t: Transport
     ) -> tuple[FaultsState, NetworkState, list[Qdisc]]:
+        t = once_reads(t)  # the ports, targets and wireless reads ask some things alike (v1.0c Task 6)
         desc = self._descriptions.get(rec.id)
         if desc is None:
             desc = await describe_router(t)
