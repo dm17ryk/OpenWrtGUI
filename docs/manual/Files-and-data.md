@@ -61,10 +61,13 @@ The app never deletes these files.
 
   To move, quit the app, copy the folder's contents to the new place, and point one of those at it.
 - **Uninstall** (Windows Settings › Apps) removes the program and the data-folder setting. Then it asks "Also
-  delete the data folder (routers, keys, audit log)?"; the default is **No**.
-  - **Yes** deletes `routers.json`, `settings.json`, `known_hosts`, `keys\`, `audit\`, `updates\` and `logs\`.
-  - `backups\`, `exports\`, `profiles\`, `reflash\`, `tools\` and `steps\` stay, and so does the folder while
-    they are in it: delete them by hand if you no longer need them.
+  delete the data folder (routers, keys, backups, audit log)?"; the default is **No**.
+  - **Yes** deletes `routers.json`, `settings.json`, `known_hosts`, `keys\`, `audit\`, `updates\`, `logs\` and
+    `backups\` (the routers' backups hold password hashes and Wi-Fi keys).
+  - If a program still has a file open in the backups or keys folder, that folder cannot be deleted. The
+    uninstaller then says which folders are still there; delete them by hand.
+  - `exports\`, `profiles\`, `reflash\`, `tools\` and `steps\` stay, and so does the folder while they are in it:
+    delete them by hand if you no longer need them.
   - A silent uninstall keeps the whole folder.
 - **Start again empty.** Quit the app, move the data folder away and start the app: it creates a new, empty one.
   Every router then needs to be added again.

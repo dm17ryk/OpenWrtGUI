@@ -423,6 +423,33 @@ def test_files_and_data_matches_security() -> None:
     assert security and security == files, sorted(security ^ files)
 
 
+_ISS_DELETES = re.compile(r"(?:DeleteFile|DelTree)\(Dir \+ '\\([^']+)'")
+
+
+def test_uninstall_deletes_backups_and_the_manual_says_what() -> None:
+    """2026-11-16 decision: uninstall's Yes also deletes backups\\ (password hashes, Wi-Fi keys). The manual's
+    "Yes deletes" list is the installer's DeleteAppData list, scratch files aside."""
+    iss = _read(ROOT / "installer" / "OpenWrtGUI.iss")
+    deleted = {n for n in _ISS_DELETES.findall(iss) if not n.endswith((".tmp", ".bad", ".lock"))}
+    assert "backups" in deleted
+    yes = _section("Files-and-data", "Moving or removing").split("**Yes** deletes", 1)[1].split(" - ", 1)[0]
+    documented = set(re.findall(r"`([a-z_.]+)\\?`", yes))
+    assert documented == deleted, sorted(documented ^ deleted)
+
+
+def test_uninstall_says_when_secrets_remain() -> None:
+    """PR #74 review (2026-11-16): a locked or access-denied file can keep backups\\ or keys\\ after Yes, and
+    DelTree's result was ignored. The uninstaller then names the folders still there instead of finishing
+    silently, without failing the uninstall."""
+    iss = _read(ROOT / "installer" / "OpenWrtGUI.iss")
+    body = iss.split("procedure DeleteAppData", 1)[1].split("\nend;", 1)[0]
+    for folder in ("backups", "keys"):
+        assert f"DirExists(Dir + '\\{folder}')" in body, folder
+    assert "mbError, MB_OK" in body and "by hand" in body
+    files = _section("Files-and-data", "Moving or removing")
+    assert "cannot be deleted" in files and "by hand" in files
+
+
 def test_bench_router_names_only_in_pictures_and_examples() -> None:
     """v1.0d D3: AP1/AP2 appear in screenshot alt text and `code` examples, not in sentences."""
     found = []

@@ -123,7 +123,7 @@ begin
   end;
 end;
 
-{ Uninstall may delete the data folder's logs, keys, audit and updates subfolders, so the data
+{ Uninstall may delete the data folder's logs, keys, audit, updates and backups subfolders, so the data
   folder must be the app's own: new, empty, or an OpenWrtGUI data folder already. }
 function DataDirProblem(Dir: String): String;
 begin
@@ -192,6 +192,8 @@ end;
 { Deletes only what the app itself keeps there (see DataDir in src/openwrtgui/paths.py),
   then the folder if it is empty, so a data folder chosen as e.g. C:\Essence_SC stays intact. }
 procedure DeleteAppData(Dir: String);
+var
+  Left: String;
 begin
   DeleteFile(Dir + '\routers.json');
   DeleteFile(Dir + '\routers.json.tmp');
@@ -205,7 +207,19 @@ begin
   DelTree(Dir + '\audit', True, True, True);
   DelTree(Dir + '\updates', True, True, True);
   DelTree(Dir + '\logs', True, True, True);
+  { Routers' configuration backups hold password hashes and Wi-Fi keys: Yes removes them too (2026-11-16). }
+  DelTree(Dir + '\backups', True, True, True);
   RemoveDir(Dir);
+  { A locked or access-denied file keeps its folder: name the secrets still there instead of finishing
+    silently. The uninstall itself goes on (PR #74 review, 2026-11-16). }
+  Left := '';
+  if DirExists(Dir + '\backups') then
+    Left := Left + #13#10 + '    backups (router backups: password hashes and Wi-Fi keys)';
+  if DirExists(Dir + '\keys') then
+    Left := Left + #13#10 + '    keys (the app''s SSH key)';
+  if Left <> '' then
+    MsgBox('OpenWrtGUI could not delete these folders in ' + Dir + ':' + Left + #13#10#13#10 +
+           'A program may still have a file in them open. Delete them by hand.', mbError, MB_OK);
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
@@ -219,7 +233,7 @@ begin
   { Only a folder that holds the app's own files: never a shared folder chosen some other way. }
   if (CurUninstallStep = usPostUninstall) and not UninstallSilent and IsOwnDataDir(UninstallDataDir) then
   begin
-    if MsgBox('Also delete the data folder (routers, keys, audit log)?' + #13#10#13#10 + UninstallDataDir,
+    if MsgBox('Also delete the data folder (routers, keys, backups, audit log)?' + #13#10#13#10 + UninstallDataDir,
               mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
       DeleteAppData(UninstallDataDir);
   end;
