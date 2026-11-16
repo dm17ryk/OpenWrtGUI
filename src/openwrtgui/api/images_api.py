@@ -8,11 +8,12 @@ import re
 from datetime import datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, Request, Response
 from pydantic import BaseModel
 
 from openwrtgui.api.deps import get_ctx, require_token
 from openwrtgui.context import AppContext
+from openwrtgui.images.library import LibraryEntry, LibraryRead
 from openwrtgui.images.profile import Profile, ProfileKey
 from openwrtgui.images.sysupgrade import MAX_IMAGE
 
@@ -34,6 +35,7 @@ class ProfileOut(BaseModel):
     packages: int
     custom: list[str]
     built_at: datetime
+    origin: str | None
 
     @classmethod
     def of(cls, p: Profile) -> ProfileOut:
@@ -49,6 +51,54 @@ class ProfileOut(BaseModel):
             packages=len(p.packages),
             custom=[c.name for c in p.custom],
             built_at=p.built_at,
+            origin=p.origin,
+        )
+
+
+class LibraryEntryOut(BaseModel):
+    sha256: str
+    board: str
+    boards: list[str]
+    revision: str
+    target: str
+    title: str
+    image_name: str
+    size: int
+    url: str
+    release_tag: str
+    release_name: str
+    release_url: str
+    published_at: datetime | None
+    prerelease: bool
+    imported: bool
+
+    @classmethod
+    def of(cls, e: LibraryEntry, imported: bool) -> LibraryEntryOut:
+        return cls(
+            **e.model_dump(exclude={"boards"}), board=e.board, boards=list(e.boards), imported=imported
+        )
+
+
+class LibraryOut(BaseModel):
+    entries: list[LibraryEntryOut]
+    read_at: datetime | None
+    skipped: int
+    error: str | None
+
+    @classmethod
+    def of(
+        cls, read: LibraryRead, ctx: AppContext, board: str | None = None, revision: str | None = None
+    ) -> LibraryOut:
+        have = {p.key.sha256 for p in ctx.profiles.list()}
+        return cls(
+            entries=[
+                LibraryEntryOut.of(e, e.sha256 in have)
+                for e in read.entries
+                if (board is None or e.board == board) and (revision is None or e.revision == revision)
+            ],
+            read_at=read.read_at,
+            skipped=read.skipped,
+            error=read.error,
         )
 
 
@@ -100,3 +150,23 @@ async def rom_profile(router_id: str, ctx: Ctx) -> ProfileOut:
     if ctx.routers.get(router_id) is None:
         raise HTTPException(status_code=404, detail=f"No router {router_id}")
     return ProfileOut.of(await ctx.discovery.rom_profile(router_id))
+
+
+@router.get("/api/images/library")
+async def library(ctx: Ctx, board: str | None = None, revision: str | None = None) -> LibraryOut:
+    return LibraryOut.of(await ctx.library.read(), ctx, board, revision)
+
+
+@router.post("/api/images/library/refresh")
+async def library_refresh(ctx: Ctx) -> LibraryOut:
+    return LibraryOut.of(await ctx.library.read(force=True), ctx)
+
+
+@router.post("/api/images/library/{sha256}")
+async def library_download(sha256: Annotated[str, Path(pattern=r"^[0-9a-f]{64}$")], ctx: Ctx) -> ProfileOut:
+    try:
+        profile = await ctx.library.download(sha256)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"No image {sha256[:12]} in the image library") from None
+    ctx.discovery.summaries.clear()
+    return ProfileOut.of(profile)

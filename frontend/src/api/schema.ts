@@ -175,6 +175,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/images/library": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Library */
+        get: operations["library_api_images_library_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/library/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Library Refresh */
+        post: operations["library_refresh_api_images_library_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/images/library/{sha256}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Library Download */
+        post: operations["library_download_api_images_library__sha256__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/images/{board}/{folder}": {
         parameters: {
             query?: never;
@@ -5730,6 +5781,50 @@ export interface components {
                 [key: string]: string[];
             };
         };
+        /** LibraryEntryOut */
+        LibraryEntryOut: {
+            /** Board */
+            board: string;
+            /** Boards */
+            boards: string[];
+            /** Image Name */
+            image_name: string;
+            /** Imported */
+            imported: boolean;
+            /** Prerelease */
+            prerelease: boolean;
+            /** Published At */
+            published_at: string | null;
+            /** Release Name */
+            release_name: string;
+            /** Release Tag */
+            release_tag: string;
+            /** Release Url */
+            release_url: string;
+            /** Revision */
+            revision: string;
+            /** Sha256 */
+            sha256: string;
+            /** Size */
+            size: number;
+            /** Target */
+            target: string;
+            /** Title */
+            title: string;
+            /** Url */
+            url: string;
+        };
+        /** LibraryOut */
+        LibraryOut: {
+            /** Entries */
+            entries: components["schemas"]["LibraryEntryOut"][];
+            /** Error */
+            error: string | null;
+            /** Read At */
+            read_at: string | null;
+            /** Skipped */
+            skipped: number;
+        };
         /** LiveRoute */
         LiveRoute: {
             /** Dev */
@@ -6877,6 +6972,8 @@ export interface components {
             key: components["schemas"]["ProfileKey"];
             /** Label */
             label: string;
+            /** Origin */
+            origin: string | null;
             /** Packages */
             packages: number;
             /** Revision */
@@ -8957,6 +9054,89 @@ export interface operations {
                 "x-file-name"?: string;
             };
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    library_api_images_library_get: {
+        parameters: {
+            query?: {
+                board?: string | null;
+                revision?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    library_refresh_api_images_library_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LibraryOut"];
+                };
+            };
+        };
+    };
+    library_download_api_images_library__sha256__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sha256: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
