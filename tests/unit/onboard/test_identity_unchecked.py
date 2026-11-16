@@ -40,6 +40,22 @@ async def test_a_refused_read_is_no_answer_and_closes(monkeypatch: pytest.Monkey
     assert conn.closed
 
 
+async def test_the_unchecked_read_looks_for_no_certificates_in_the_ssh_folder(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # unset, asyncssh looks for ~/.ssh/ca-bundle.crt and ~/.ssh/crt, a folder the installed app may not enter
+    seen: dict[str, object] = {}
+
+    async def connect(*args: object, **kwargs: object) -> _Conn:
+        seen.update(kwargs)
+        return _Conn()
+
+    monkeypatch.setattr(wizard.asyncssh, "connect", connect)
+    await wizard.read_identity_unchecked("192.168.1.1", 22)
+    assert "x509_trusted_certs" in seen and seen["x509_trusted_certs"] is None
+    assert "x509_trusted_cert_paths" in seen and seen["x509_trusted_cert_paths"] is None
+
+
 async def test_a_read_that_times_out_is_no_answer(monkeypatch: pytest.MonkeyPatch) -> None:
     conn = _Conn()
 
