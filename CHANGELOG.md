@@ -35,6 +35,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   row; the password policy is checked under the write lock.
 - Flash: the audit's upload line names the whole image file, "openwrt (1).bin" included; the flash steps are read
   by name. Tool cards: a file that cannot be read is moved aside before a save, not overwritten.
+- LTE: the modem's AT port is used by one exchange at a time per router (the state read and the console no longer
+  run two microcom at once); the metric is a whole number from 0 to 4294967295.
 
 ### Security
 

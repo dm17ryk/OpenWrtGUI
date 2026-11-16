@@ -13,6 +13,7 @@ Auth = Literal["none", "pap", "chap", "both"]
 PdpType = Literal["ipv4", "ipv6", "ipv4v6"]
 PIN = re.compile(r"[0-9]{4,8}")
 PIN_MESSAGE = "A SIM PIN is 4 to 8 digits"
+METRIC_MAX = 4_294_967_295  # netifd's route metric is unsigned 32-bit (v1.0b2 D11)
 _TEXT = ("apn", "auth", "username", "password", "pdptype")
 
 
@@ -44,6 +45,8 @@ def _named(name: str, s: LteSettings) -> list[OptionEdit]:
             raise ValueError(PIN_MESSAGE)
         named.append(OptionEdit(name, "pincode", s.pincode or None))
     if s.metric is not None:
+        if not 0 <= s.metric <= METRIC_MAX:
+            raise ValueError(f"The metric is a whole number from 0 to {METRIC_MAX}")
         named.append(OptionEdit(name, "metric", str(s.metric)))
     if s.defaultroute is not None:
         named.append(OptionEdit(name, "defaultroute", "1" if s.defaultroute else "0"))

@@ -14,7 +14,7 @@ from openwrtgui.context import AppContext
 from openwrtgui.forms import OptionEdit, OptionRow
 from openwrtgui.lte.at import AtResult
 from openwrtgui.lte.service import AtNeedsConfirm, LteAction, LteBusy
-from openwrtgui.lte.settings import Auth, LteSettings, PdpType
+from openwrtgui.lte.settings import METRIC_MAX, Auth, LteSettings, PdpType
 from openwrtgui.lte.state import LteState
 from openwrtgui.net.apply import NetApplyResult
 
@@ -47,7 +47,7 @@ class LteSettingsIn(BaseModel):
     pincode: str | None = Field(default=None, repr=False)
     pdptype: PdpType | None = None
     mtu: int | None = None
-    metric: int | None = None
+    metric: int | None = Field(default=None, ge=0, le=METRIC_MAX)  # netifd unsigned 32-bit (v1.0b2 D11)
     auto: bool | None = None
     defaultroute: bool | None = None
     edits: list[OptionEditIn] = []
