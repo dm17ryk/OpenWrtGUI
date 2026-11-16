@@ -22,6 +22,7 @@ import { RfLive } from './screens/rf/RfLive'
 import { WifiScreen } from './screens/wifi/WifiScreen'
 import { GuardBanner } from './shell/GuardBanner'
 import { Header } from './shell/Header'
+import { RouteBoundary } from './shell/ScreenBoundary'
 import { applyTheme, prefersDark, resolveTheme } from './theme'
 
 function useSystemDark(): boolean {
@@ -58,7 +59,8 @@ export function App() {
     <HashRouter>
       <Header guard={guard.data} theme={resolved} onToggleTheme={() => void toggleTheme()} updateAvailable={update.data?.available ?? false} />
       <GuardBanner guard={guard.data} />
-      <Routes>
+      <RouteBoundary>
+        <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/add" element={<AddRouter />} />
         <Route path="/routers/:id" element={<RouterOverview />} />
@@ -75,7 +77,8 @@ export function App() {
         <Route path="/terminal/:id?" element={<Terminal />} />
         <Route path="/audit" element={<AuditLog />} />
         <Route path="/settings" element={<SettingsScreen />} />
-      </Routes>
+        </Routes>
+      </RouteBoundary>
     </HashRouter>
   )
 }
