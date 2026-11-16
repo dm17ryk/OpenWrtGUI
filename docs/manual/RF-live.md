@@ -33,6 +33,10 @@ signal where the driver reports one.
 moment. **Pause** freezes the charts; the samples keep arriving and the charts catch up when you resume. A
 station that leaves is marked "left" and its lines stop.
 
+If the screen loses its live connection to the app, it says "Lost the connection to OpenWrtGUI; reconnecting
+(attempt N)" and tries again by itself: after 1, 2, 4 and 8 seconds, then every 15 seconds while the screen is
+open. The charts keep their samples and go on once the connection is back.
+
 ## Which rates reach the station
 
 From the router's rate control (minstrel): for each rate, how often the AP tried it, how many frames the
@@ -43,6 +47,9 @@ in this version; the table says so.
 
 **Record to CSV** writes one row per station per second to `Documents\OpenWrtGUI\` (the file name has the
 router, the radio and the start time). **Stop recording** closes the file; leaving the screen stops it too.
+A recording also stops when the screen loses its connection to the app: the screen then says "Recording stopped
+when the connection was lost: <file>", the file keeps the rows written until then, and **Record to CSV** stays
+grey until the connection is back.
 
 ## Frame analysis
 

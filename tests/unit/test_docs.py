@@ -243,6 +243,46 @@ def test_faq_answers_the_common_questions() -> None:
         assert re.search(rf"^\*\*[^*\n]*{question}[^*\n]*\*\*$", faq, re.MULTILINE | re.IGNORECASE), question
 
 
+GUARDED = {  # each module that calls require_clear() -> the words "What is refused" uses for it (v1.0d)
+    "discovery/service.py": "Discovery",
+    "flash/service.py": "flash",
+    "guard/writes.py": "Apply",
+    "lte/service.py": "LTE",
+    "net/apply.py": "rollback",
+    "net/service.py": "Network",
+    "rf/frames_service.py": "frame analysis",
+    "rf/scan_service.py": "channel scan",
+    "system/access_service.py": "router password",
+    "system/jobs.py": "reboot",
+    "system/service.py": "diagnostics",
+    "wifi/step_service.py": "step-through",
+}
+
+
+def test_bench_guard_names_every_guarded_area() -> None:
+    src = ROOT / "src" / "openwrtgui"
+    calling = {p.relative_to(src).as_posix() for p in src.rglob("*.py") if "require_clear()" in _read(p)}
+    assert calling == set(GUARDED), sorted(calling ^ set(GUARDED))
+    refused = _sections(_read(MANUAL / "Bench-Guard.md"))["What is refused"]
+    assert sorted(w for w in set(GUARDED.values()) if w not in refused) == []
+
+
+def test_v1_0c_behaviour_is_documented() -> None:
+    pages = _user_pages()
+    wanted = {
+        "LTE-modem": ("reconnecting (attempt",),
+        "RF-live": ("reconnecting (attempt", "Recording stopped when the connection was lost"),
+        "System": ("reconnecting (attempt",),
+        "Faults-and-capture": ("Wireshark fell behind", "has no conntrack", "this PC"),
+        "Dashboard": ("Remove from the app",),
+        "Discovery": ("**Flash** stays grey while a run is live",),
+        "Ports-and-VLANs": ("greyed", "LuCI lists the entries in its own order"),
+    }
+    flat = {p: " ".join(pages[p].split()) for p in wanted}  # a quoted message may wrap across lines
+    missing = [(p, w) for p, words in wanted.items() for w in words if w not in flat[p]]
+    assert missing == []
+
+
 _ROW = re.compile(r"^\| `([^`]+)` \|", re.MULTILINE)
 
 

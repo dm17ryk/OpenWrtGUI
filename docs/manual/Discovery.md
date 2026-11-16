@@ -32,6 +32,7 @@ the image goes to `/tmp/owg` on the router, its sha256 is checked, the router va
 (`validate_firmware_image` and `sysupgrade -T`), and `sysupgrade` is started by a timer on the router two seconds
 later. The router is off the network for about three minutes; once `sysupgrade` starts it cannot be stopped.
 **Flash** stays grey until you type the router's name (its short name, such as `AP2`, is enough).
+**Flash** stays grey while a run is live too: the dialog shows "Bench Guard: …" with the run.
 
 The dialog then shows the upload, **Checking the image on …**, **Starting sysupgrade**, **Waiting for … to come
 back** with the time so far, and **Checking the new firmware**. A reflash checklist is saved first, and the flash

@@ -23,7 +23,9 @@ part does not answer, the screen names it ("No answer from the router for: board
 While the Status tab is open, the router is read every 3 seconds: the load average, the bytes per second of
 each interface (pick one; received and sent are drawn apart), and the number of tracked connections. One read
 covers all three, as LuCI's realtime graphs do. When the router does not answer, the reason shows above the
-charts and the charts keep the last samples.
+charts and the charts keep the last samples. If the screen loses its live connection to the app, it says "Lost
+the connection to OpenWrtGUI; reconnecting (attempt N)" and tries again by itself (after 1, 2, 4 and 8 seconds,
+then every 15 seconds); the charts go on once it is back.
 
 ## Connections
 

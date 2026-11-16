@@ -44,6 +44,10 @@ name), which is LuCI's **Network › Switch/VLAN config**.
 - **Local** means the router itself is in the VLAN. A new VLAN has it on.
 - **+ Add VLAN** adds a VLAN with the lowest free number (1-4094). **Delete** removes a VLAN that no interface uses.
 - An existing VLAN keeps its number. To renumber it, add the new VLAN and remove the old one.
+- A control the router would refuse is greyed: rest the pointer on it to read why (for example a port that may
+  carry this app's SSH, or a VLAN an interface still uses).
+- Saving puts the entries in the order LuCI uses. LuCI lists the entries in its own order, and so does this
+  editor after an Apply, so a VLAN may move in the list.
 - An entry you did not change is written back as it was. LuCI rewrites, for example, `lan2:u*` as `lan2`.
 - When LuCI's own page would refuse the configuration (a VLAN number out of range, an entry such as `lan1:t*`, a
   port untagged in two VLANs), the card lists the reasons and stays read only. Fix those in LuCI's device dialog or

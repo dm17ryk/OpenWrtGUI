@@ -33,6 +33,10 @@ write, and every line typed in the terminal. The dashboard's routine 5-second re
 | Exit | The exit code; empty for lines typed in the full shell, where the app does not see one |
 | Source | `wizard`, `terminal`, `user` (a write you confirmed) or `app` (something the app did on its own) |
 
+What is masked: the passwords you type, Wi-Fi keys and the other secret options by their name, SIM PINs and APN
+passwords in AT commands, and LuCI session ids. A setting whose name only looks like a secret (such as
+`igmp_snooping`, `ping` or `key_type`) is shown as it is.
+
 Filter by **Router**, by **Text**, and by **Since** (a date).
 
 **Export for a bug report** saves `openwrtgui-audit.zip` with one file per day, holding what this page

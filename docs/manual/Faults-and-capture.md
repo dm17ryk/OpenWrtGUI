@@ -13,7 +13,8 @@ While [Bench Guard](Bench-Guard) shows a run, nothing can be armed; clearing sti
 The device the fault hits: a Wi-Fi station, a host from the router's DHCP leases or address table, or a
 [known device](Settings#known-devices). **other IP / MAC…** takes any address; the app fills in the other half
 from what the router knows. **Remember as** keeps a MAC under a name. A panel's Ethernet and Wi-Fi MAC addresses
-are unrelated, so the app never matches by vendor prefix. This PC and the router itself are refused as targets.
+are unrelated, so the app never matches by vendor prefix. The router itself is refused as a target, and this PC
+is not offered as one: a fault on it would cut the app off from the router.
 
 ## Link down
 
@@ -33,6 +34,10 @@ Drops some of the target's traffic: **rtp_in** / **rtp_out** (the RTP ports of i
 connection tracking, so start the call first), **sip_in** (SIP to it, from or to port 5060 or 5061),
 **all_in**, **all_out** or **blackout** (both ways). **Loss** below 100 % drops that share of the packets at
 random. The rules sit ahead of fw4's `ct state established accept`, so they also hit a call already in progress.
+
+**rtp_in** and **rtp_out** need the router's connection tracking (`conntrack`). On a router without it the block is
+refused before anything runs: "… has no conntrack: RTP ports cannot be found; use all_in or all_out". With no
+call in progress it says "No RTP flow of … in conntrack: start the call first, or use all_in / all_out."
 
 ## Impair (netem)
 
@@ -76,3 +81,7 @@ filter such as `host 192.168.1.30 and udp`; **Duration** is 1 to 3600 s. **Save 
 own SSH connection is never captured. Captures keep working during a run. A Wi-Fi reload (an Apply, a step of a
 step-through) removes `mon0` under a running capture: the capture ends early and says so, and the file keeps what
 it caught until then.
+
+A live capture never waits for Wireshark. When Wireshark cannot keep up, the app drops whole packets from what
+Wireshark shows, never part of one, and the capture card says "Wireshark fell behind: N MB not shown; the capture
+goes on".

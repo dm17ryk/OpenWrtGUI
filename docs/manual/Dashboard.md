@@ -81,7 +81,13 @@ ubus services, the typed Wi-Fi option lists, feature flags and the LuCI menu. **
 internal switch port with its printed label and the label saved for this router. **Probe again** reads
 it all once more; **Open terminal** opens a shell on the router.
 
-The row of buttons under the title opens the router's other screens: [Wi-Fi](Wi-Fi), RF live,
-[Network & DHCP](Network-and-DHCP), [Ports & VLANs](Ports-and-VLANs), [Firewall](Firewall),
-[Faults & capture](Faults-and-capture) and the terminal, then every LuCI page
-that has no screen in the app yet.
+The row of links under the title opens the router's other screens:
+- [Discovery](Discovery), [Wi-Fi](Wi-Fi), [RF live](RF-live) and [Network & DHCP](Network-and-DHCP);
+- [LTE](LTE-modem), [Ports & VLANs](Ports-and-VLANs), [Firewall](Firewall) and [Faults & capture](Faults-and-capture);
+- [System](System) and the terminal;
+- then **LuCI pages (N)**, a folded list of the LuCI pages that have no screen here
+  ([LuCI pages](LuCI-pages)).
+
+**Remove from the app** at the bottom makes the app forget the router. It first asks "Remove … from OpenWrtGUI?
+The router itself is not changed." Then the router leaves the dashboard and the app drops its connection. The app
+key, the settings and the address stay on the router, so [adding it again](First-router) logs in with the key.

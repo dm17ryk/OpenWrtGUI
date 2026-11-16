@@ -42,6 +42,10 @@ RSSI, RSRP, RSRQ and SNR over the last minute, 5 minutes or hour, one sample eve
 is open. A sample the modem does not answer is a gap in the lines and a note, not a change of state. Reading
 the signal changes nothing, so the charts keep working during a harness run.
 
+If the screen loses its live connection to the app, it says "Lost the connection to OpenWrtGUI; reconnecting
+(attempt N)" and tries again by itself: after 1, 2, 4 and 8 seconds, then every 15 seconds while the screen is
+open. The charts keep the samples they have and go on once the connection is back.
+
 ## Settings
 
 The APN, authentication (none, PAP, CHAP or both), user name, password, SIM PIN (4 to 8 digits), PDP type
