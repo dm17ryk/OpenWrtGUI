@@ -15,7 +15,7 @@ import pytest
 
 from conftest import WifiEnv
 from openwrtgui.guard.bench_guard import GuardLocked
-from openwrtgui.transport.base import CommandResult, Transport
+from openwrtgui.transport.base import CommandResult, Transport, TransportError
 from openwrtgui.wifi.service import PreviewChanged
 from openwrtgui.wifi.step_service import StepBusy, StepJob, StepService
 from openwrtgui.wifi.steps import StepRequest
@@ -107,6 +107,12 @@ def _job(steps: StepService, router_id: str = "ap2") -> StepJob:
     job = steps.job(router_id)
     assert job is not None
     return job
+
+
+def _phase(steps: StepService | None, router_id: str = "ap2") -> str | None:
+    """The job's phase, or None before Start has made the job (a scripted rule runs during Start's reads)."""
+    job = steps.job(router_id) if steps is not None else None
+    return job.phase if job is not None else None
 
 
 async def _parked(env: WifiEnv, router_id: str = "ap2") -> bool:
@@ -431,3 +437,82 @@ async def test_pending_restore_blocks_a_new_start(env: WifiEnv, tmp_path: Path) 
     plan = await steps.preview("ap2", TWO_BY_TWO)
     with pytest.raises(StepBusy, match="^Restore radio0 on .* first"):
         await steps.start("ap2", TWO_BY_TWO, plan.digest)
+
+
+async def test_an_error_in_the_restore_never_leaves_the_run_restoring(env: WifiEnv, tmp_path: Path) -> None:
+    """Review Focus 1, v0.7 minor: the job ends failed with Restore offered, and the router is free again."""
+    steps: StepService | None = None
+
+    def broken_restore(command: str, n: int) -> CommandResult | None:
+        restoring = _phase(steps) == "restoring"
+        if restoring and command.startswith("ubus call uci get"):
+            raise RuntimeError("boom")
+        return None
+
+    env.wrap.append(lambda t: _Scripted(t, broken_restore))  # type: ignore[arg-type,return-value]
+    steps = _service(env, tmp_path, _Clock())
+    await _run(steps, "ap2", StepRequest("radio0", ("g",), (1,), dwell_s=10))
+    await _until(lambda: _job(steps).phase in DONE)
+    job = _job(steps)
+    assert job.phase == "failed" and job.restore_pending
+    assert job.error is not None and "boom" in job.error and job.error.endswith("Restore it")
+    assert steps.busy("ap2") is None
+
+
+async def test_a_cancelled_run_ends_failed_with_restore_offered(env: WifiEnv, tmp_path: Path) -> None:
+    """v1.0b2 D7: a task cancelled while it waits (an app shutdown past its limit) does not stay running."""
+    steps = _service(env, tmp_path, _Clock())
+    await _run(steps, "ap2", StepRequest("radio0", ("g",), (1,), advance="manual"))
+    await _until(lambda: _job(steps).phase == "waiting for Next")
+    task = steps._controls["ap2"].task
+    assert task is not None
+    task.cancel()
+    await _until(task.done)
+    job = _job(steps)
+    assert (job.phase, job.restore_pending) == ("failed", True)
+    assert job.error == "radio0 was not restored: Restore it"
+    assert steps.busy("ap2") is None
+
+
+async def test_a_proven_step_is_kept_when_its_wait_loses_the_router(env: WifiEnv, tmp_path: Path) -> None:
+    """v0.7 minor (#41): the step was proven on air; losing the connection while waiting for the station must
+    not drop it from the results and the CSV."""
+    steps: StepService | None = None
+
+    def lost(command: str, n: int) -> CommandResult | None:
+        waiting = _phase(steps) == "waiting for station"
+        if waiting and command.startswith("ubus call network.wireless status"):
+            raise TransportError("connection lost")
+        return None
+
+    env.wrap.append(lambda t: _Scripted(t, lost))  # type: ignore[arg-type,return-value]
+    steps = _service(env, tmp_path, _Clock())
+    req = StepRequest("radio0", ("g",), (1,), advance="rejoin", station="F4:12:FA:F3:57:68", dwell_s=10)
+    await _run(steps, "ap2", req)
+    await _until(lambda: _job(steps).phase in DONE)
+    job = _job(steps)
+    assert [r.proven for r in job.results] == [True]
+    assert job.error is not None and "connection lost" in job.error
+    assert job.csv_path is not None and len(Path(job.csv_path).read_text().splitlines()) == 2
+
+
+async def test_a_next_for_the_station_wait_does_not_skip_the_dwell(env: WifiEnv, tmp_path: Path) -> None:
+    """v0.7 minor (#42): Next acts on the phase on screen; one pressed while the station came back is not
+    carried into the dwell."""
+    steps: StepService | None = None
+    joined = '{"clients": {"f4:12:fa:f3:57:68": {"assoc": true, "authorized": true}}}'
+
+    def back_with_a_next(command: str, n: int) -> CommandResult | None:
+        if steps is not None and "get_clients" in command and _phase(steps) == "waiting for station":
+            steps.next("ap2")  # pressed while the station re-joins
+            return CommandResult(command, joined, "", 0)
+        return None
+
+    env.wrap.append(lambda t: _Scripted(t, back_with_a_next))  # type: ignore[arg-type,return-value]
+    steps = _service(env, tmp_path, _Clock())
+    req = StepRequest("radio0", ("g",), (1,), advance="rejoin", station="F4:12:FA:F3:57:68", dwell_s=10)
+    await _run(steps, "ap2", req)
+    await _until(lambda: _job(steps).phase in DONE)
+    (result,) = _job(steps).results
+    assert result.rejoined and result.ended_at is not None
+    assert result.ended_at - result.started_at >= timedelta(seconds=10)  # the dwell ran

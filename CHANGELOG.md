@@ -22,6 +22,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   match; a rule or set of one family refuses an address of the other.
 - Faults: a record in /tmp/owg the app cannot read no longer takes the screen and Clear everything down; the
   screen says how many there are.
+- Step-through: an error during the restore or a cancelled run ends it as failed with Restore offered, instead of
+  leaving the router "restoring"; a proven step is kept when its wait loses the router; Next acts only on the wait
+  on screen.
 
 ### Security
 
