@@ -56,6 +56,11 @@ from openwrtgui.wifi.service import PreviewChanged
 log = logging.getLogger(__name__)
 
 SCREEN = "System"
+BUSY_TEXT = {
+    "reboot": "is already rebooting",
+    "restore": "is restoring a backup",
+    "reset": "is resetting to defaults",
+}
 
 
 class JobsMixin:
@@ -120,6 +125,12 @@ class JobsMixin:
         job = self._reboots.get(router_id)
         return job is not None and job.phase in ("armed", "waiting")
 
+    def _busy(self, rec: RouterRecord) -> RebootBusy:
+        """Names the job that holds the router (v0.6c minor #32, v1.0c Task 12)."""
+        job = self._reboots.get(rec.id)
+        doing = BUSY_TEXT[job.kind] if job is not None else BUSY_TEXT["reboot"]
+        return RebootBusy(f"{rec.name} {doing}")
+
     async def _run(self, t: Transport, rec: RouterRecord, command: str, what: str) -> None:
         """One audited step of a job; a refusal is a ValueError naming the step."""
         done = await run_audited(
@@ -140,16 +151,15 @@ class JobsMixin:
     ) -> RebootJob:
         """One job per router, whatever its kind: the check is under the write lock, so two starts at once
         never both arm (v0.6b minor). The steps run audited; the wait runs in the background."""
-        busy = RebootBusy(f"{rec.name} is already rebooting")
         if self.rebooting(rec.id):  # at once: a running job holds the pool, so get() would wait for its end
-            raise busy
+            raise self._busy(rec)
         self._guard.require_clear()
         if plan.digest != digest:
             raise PreviewChanged(rec.name)
         t = await self._pool.get(rec)
         async with self._pool.write_lock(rec.id):
             if self.rebooting(rec.id):  # again under the lock: two starts at once never both arm
-                raise busy
+                raise self._busy(rec)
             await steps(t)
             armed_at = self._monotonic()
             job = RebootJob(router_id=rec.id, kind=kind, phase="armed", started_at=self._clock())

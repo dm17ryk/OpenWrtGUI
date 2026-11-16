@@ -63,3 +63,12 @@ async def test_one_failed_login_is_not_gone() -> None:
 
 async def test_never_three_in_a_row_is_not_gone_by_the_limit() -> None:
     assert await _gone([False, True] * 10) == (False, 10)
+
+
+async def test_a_router_that_goes_away_just_before_the_limit_counts_as_gone() -> None:
+    """v1.0b2 deferred minor: the streak that starts at the last poll before the limit is finished first."""
+    assert await _gone([True] * 9 + [False, False, False]) == (True, 12)
+
+
+async def test_a_streak_past_the_limit_that_breaks_is_not_gone() -> None:
+    assert await _gone([True] * 9 + [False, True, False]) == (False, 11)

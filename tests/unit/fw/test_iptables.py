@@ -7,7 +7,17 @@ from pathlib import Path
 
 import pytest
 
-from openwrtgui.fw.iptables import listing, parse_listing, reset_proven, skipped_lines
+from openwrtgui.fw.iptables import (
+    IPT_STATE,
+    MARK,
+    IptablesPresence,
+    listing,
+    parse_listing,
+    reset_proven,
+    skipped_lines,
+    split_state,
+)
+from openwrtgui.guard.readonly import is_read_only_command
 
 LATER = json.loads(
     (Path(__file__).resolve().parents[2] / "fixtures" / "sim" / "later" / "ap4.json").read_text("utf-8")
@@ -74,3 +84,64 @@ def test_lines_the_parser_cannot_read_are_counted() -> None:
     text = _listing(10, 10) + "1  2  3  something iptables printed that the app does not know\n\n"
     assert skipped_lines(text) == 1
     assert skipped_lines(_listing(10, 10)) == 0
+
+
+def test_a_warning_iptables_prints_is_not_a_line_the_app_cannot_read() -> None:
+    """The final review: the one-command read folds stderr into a table's text; iptables-nft's warning line
+    must not show as "1 line not shown" on every table."""
+    warning = "# Warning: iptables-legacy tables present, use iptables-legacy to see them\n"
+    assert skipped_lines(warning + _listing(10, 10)) == 0
+
+
+def test_a_counter_missing_afterwards_proves_nothing() -> None:
+    """v1.0b2 deferred minor: a listing that lost the rule (or failed) is no proof of a reset."""
+    before = _listing(policy_bytes=0, rule_bytes=500)
+    assert reset_proven(before, "") is False  # the after-listing came back empty
+    assert reset_proven(before, _listing(policy_bytes=0, rule_bytes=0)) is True
+
+
+RAW_FAILED = "iptables v1.8.10 (legacy): can't initialize iptables table `raw': Table does not exist\n"
+
+
+def _section(program: str, table: str, text: str, status: int = 0) -> str:
+    return f"{MARK} {program} {table}\n{text}{MARK} exit {status}\n"
+
+
+def _state_text(raw_status: int = 0) -> str:
+    """iptables present with its four tables (raw may fail); ip6tables absent, its tables not found."""
+    parts = [f"{MARK} iptables present\n"]
+    for table in ("filter", "nat", "mangle"):
+        parts.append(_section("iptables", table, LATER["iptables"][table]))
+    raw_text = LATER["iptables"]["raw"] if raw_status == 0 else RAW_FAILED
+    parts.append(_section("iptables", "raw", raw_text, raw_status))
+    parts.append(f"{MARK} ip6tables absent\n")
+    for table in ("filter", "nat", "mangle", "raw"):
+        parts.append(_section("ip6tables", table, "sh: ip6tables: not found\n", 127))
+    return "".join(parts)
+
+
+def test_the_state_splits_per_program_and_table() -> None:
+    """v1.0c Task 3: one command answers every table; presence and each table's exit come back with it."""
+    presence, tables = split_state(_state_text())
+    assert presence == IptablesPresence(iptables=True, ip6tables=False)
+    assert tables[("iptables", "filter")] == (0, LATER["iptables"]["filter"])
+    assert tables[("ip6tables", "filter")][0] == 127
+
+
+def test_a_table_that_fails_keeps_its_error_and_the_others_show() -> None:
+    _, tables = split_state(_state_text(raw_status=1))
+    assert tables[("iptables", "raw")] == (1, RAW_FAILED)
+    assert tables[("iptables", "filter")][0] == 0
+
+
+def test_a_cut_off_answer_names_no_table_it_did_not_finish() -> None:
+    text = _state_text()
+    _, tables = split_state(text[: text.index(f"{MARK} iptables nat") + 40])
+    assert ("iptables", "filter") in tables and ("iptables", "nat") not in tables
+
+
+def test_the_state_read_is_one_read_only_command() -> None:
+    assert is_read_only_command(IPT_STATE)
+    for program in ("iptables", "ip6tables"):
+        for table in ("filter", "nat", "mangle", "raw"):
+            assert listing(program, table) in IPT_STATE  # LuCI's own listing, unchanged

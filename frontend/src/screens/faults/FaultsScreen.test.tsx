@@ -239,3 +239,15 @@ test('Clear everything stays open when only unreadable records are left', async 
   expect(await screen.findByText('nothing armed')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Clear everything' })).toBeEnabled()
 })
+
+test('one unreadable record is a record', async () => {
+  faults = { ...AP1_FAULTS, unreadable: 1 }
+  renderFaults()
+  expect(await screen.findByText(/^1 fault record on the router could not be read/)).toBeInTheDocument()
+})
+
+test('a Wireshark that fell behind says how much it did not show', async () => {
+  captures = [{ ...CAPTURING, output: 'wireshark', dropped: 3_100_000 }]
+  renderFaults()
+  expect(await screen.findByText('Wireshark fell behind: 3.1 MB not shown; the capture goes on')).toBeInTheDocument()
+})

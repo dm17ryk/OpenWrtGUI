@@ -7,6 +7,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+from readcount import commands_of
 
 from openwrtgui.context import AppContext
 from openwrtgui.discovery.tools import ToolCard, ToolCommand
@@ -41,6 +42,16 @@ async def test_help_runs_audited_and_guarded(ctx: AppContext) -> None:
     result = await ctx.discovery.apply_help("ap1", "/usr/sbin/wifi-mirror", plan.digest)
     assert result.output.startswith("Usage: wifi-mirror {start|stop|status}")
     assert any(e.screen == "Discovery" and "--help" in e.command for e in ctx.audit.query())
+
+
+async def test_an_apply_reads_two_commands_then_runs_help(ctx: AppContext) -> None:
+    """v1.0c Task 5 (#17): the check before a Run --help is two reads, not the whole Discovery page."""
+    import_mini(ctx)
+    plan = await ctx.discovery.plan_help("ap1", "/usr/sbin/wifi-mirror")
+    sent = await commands_of(ctx, "ap1")
+    before = len(sent)
+    await ctx.discovery.apply_help("ap1", "/usr/sbin/wifi-mirror", plan.digest)
+    assert len(sent) - before == 3 and sent[-1] == plan.lines[0]
 
 
 async def test_help_only_for_listed_programs(ctx: AppContext) -> None:

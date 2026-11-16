@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import secrets
@@ -124,6 +125,10 @@ class LuciBridgeService:
         self._bridges: dict[str, _Bridge] = {}
         # router id -> (read at, the description read for, facts); a new description reads them again
         self._facts: dict[str, tuple[datetime, SelfDescription | None, Facts]] = {}
+        # v1.0c Task 4: the read in flight per router, shared by every caller (#54), and a count of the app's
+        # changes per router, so a read a change overtook is answered but not kept
+        self._facts_reads: dict[str, asyncio.Future[Facts]] = {}
+        self._facts_gen: dict[str, int] = {}
 
     async def _connect(self, router_id: str) -> tuple[RouterRecord, Transport]:
         rec = self._routers.get(router_id)
@@ -171,14 +176,33 @@ class LuciBridgeService:
         cached = self._facts.get(rec.id)
         if cached is not None and cached[1] is desc and self._clock() - cached[0] < FACTS_TTL:
             return cached[2]
-        facts = await self._read_facts(rec, t, pages)
-        if facts.checked:
-            self._facts[rec.id] = (self._clock(), desc, facts)
-        return facts
+        read = self._facts_reads.get(rec.id)
+        if read is None:
+            read = asyncio.ensure_future(self._read_facts(rec, t, pages))
+            self._facts_reads[rec.id] = read
+            gen = self._facts_gen.get(rec.id, 0)
+            read.add_done_callback(lambda done: self._facts_read(rec.id, done, desc, gen))
+        return await asyncio.shield(read)  # one caller giving up does not end the read for the others
+
+    def _facts_read(
+        self, router_id: str, done: asyncio.Future[Facts], desc: SelfDescription | None, gen: int
+    ) -> None:
+        """Keep a finished read only when it is whole and no change of the app's overtook it."""
+        if self._facts_reads.get(router_id) is done:
+            del self._facts_reads[router_id]
+        if done.cancelled() or done.exception() is not None:
+            return
+        facts = done.result()
+        overtaken = self._facts_gen.get(router_id, 0) != gen or self._descriptions.get(router_id) is not desc
+        if facts.checked and not overtaken:
+            self._facts[router_id] = (self._clock(), desc, facts)
 
     def forget_facts(self, router_id: str) -> None:
-        """The app changed the router's config (v1.0a2 D10a): the next page list asks it again."""
+        """The app changed the router's config (v1.0a2 D10a): the next page list asks it again, and a read
+        already in flight is not kept (v1.0c Task 4)."""
         self._facts.pop(router_id, None)
+        self._facts_reads.pop(router_id, None)
+        self._facts_gen[router_id] = self._facts_gen.get(router_id, 0) + 1
 
     async def pages(self, router_id: str) -> list[PageView]:
         rec, t = await self._connect(router_id)

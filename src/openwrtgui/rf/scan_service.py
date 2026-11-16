@@ -97,7 +97,10 @@ class ScanService:
         self._monotonic = monotonic
         self._last: dict[tuple[str, str], ScanResult] = {}
 
-    async def _where(self, router_id: str, radio: str) -> tuple[RouterRecord, Transport, RadioState, str]:
+    async def _where(
+        self, router_id: str, radio: str
+    ) -> tuple[RouterRecord, Transport, RadioState, str, bool]:
+        """The router, its connection, the radio, its phy, and whether an earlier scan left owgscan0."""
         if not RADIO.fullmatch(radio):
             raise ValueError(f"{radio!r} is not a radio name")
         rec = self._routers.get(router_id)
@@ -109,7 +112,8 @@ class ScanService:
             raise ValueError(f"{radio} is not a radio of {rec.name}")
         t = await self._pool.get(rec)
         phy = (await ubus_call(t, "iwinfo", "phyname", {"section": radio}) or {}).get("phyname", "phy0")
-        return rec, t, found, checked_ifname(str(phy))
+        leftover = self._ap(found) is None and (await t.run(SCAN_INFO)).ok  # only a temporary scan adds it
+        return rec, t, found, checked_ifname(str(phy)), leftover
 
     @staticmethod
     def _ap(radio: RadioState) -> str | None:
@@ -117,18 +121,22 @@ class ScanService:
             return checked_ifname(radio.actual.ifname)
         return None
 
-    def _plan(self, rec: RouterRecord, radio: RadioState, phy: str) -> ScanPlan:
+    def _plan(self, rec: RouterRecord, radio: RadioState, phy: str, *, leftover: bool) -> ScanPlan:
         ap = self._ap(radio)
         if ap is not None:
             names = ", ".join(s.ssid for s in radio.ssids) or radio.name
             warning = f"Stations on {names} may miss up to about 2 s of traffic during the scan."
             return ScanPlan(rec.id, radio.name, "ap", (scan_command(ap, on_ap=True),), (warning,))
         lines = (scan_add(phy), scan_command(SCAN_IF, on_ap=False), SCAN_DEL)
-        return ScanPlan(rec.id, radio.name, "temporary", lines, ())
+        if not leftover:
+            return ScanPlan(rec.id, radio.name, "temporary", lines, ())
+        # a scan whose cleanup ran over a dead connection left it (v1.0c Task 10): removed first
+        left = f"{SCAN_IF} is left from an earlier scan on {rec.name}: it is removed first."
+        return ScanPlan(rec.id, radio.name, "temporary", (SCAN_DEL, *lines), (left,))
 
     async def preview(self, router_id: str, radio: str) -> ScanPlan:
-        rec, _t, found, phy = await self._where(router_id, radio)
-        return self._plan(rec, found, phy)
+        rec, _t, found, phy, leftover = await self._where(router_id, radio)
+        return self._plan(rec, found, phy, leftover=leftover)
 
     def last(self, router_id: str, radio: str) -> ScanResult | None:
         return self._last.get((router_id, radio))
@@ -157,10 +165,10 @@ class ScanService:
 
     async def scan(self, router_id: str, radio: str, digest: str) -> ScanResult:
         self._guard.require_clear()
-        rec, t, found, phy = await self._where(router_id, radio)
+        rec, t, found, phy, leftover = await self._where(router_id, radio)
         if (why := self.busy(rec.id)) is not None:
             raise RouterBusy(why)
-        plan = self._plan(rec, found, phy)
+        plan = self._plan(rec, found, phy, leftover=leftover)
         if plan.digest != digest:
             raise PreviewChanged(rec.name)
         own = {
@@ -170,8 +178,10 @@ class ScanService:
         iface = self._ap(found) or SCAN_IF
         async with self._pool.write_lock(rec.id):
             if plan.via == "temporary":
+                if leftover:
+                    await self._remove_leftover(t, rec)
                 try:
-                    added = await self._run(t, rec, plan.lines[0])
+                    added = await self._run(t, rec, scan_add(phy))
                 except TransportError:  # made before the connection dropped? remove it (v1.0b2 D8)
                     with contextlib.suppress(TransportError, ValueError):
                         await self._cleanup(t, rec)
@@ -206,6 +216,13 @@ class ScanService:
         )
         self._last[(rec.id, radio)] = result
         return result
+
+    async def _remove_leftover(self, t: Transport, rec: RouterRecord) -> None:
+        """The previewed first line: an owgscan0 an earlier scan left. Gone counts as removed."""
+        done = await self._run(t, rec, SCAN_DEL)
+        if not done.ok and (await t.run(SCAN_INFO)).ok:
+            why = _reason(done)
+            raise ValueError(f"{SCAN_IF} is still on {rec.name}: {why}. Remove it with `{SCAN_DEL}`.")
 
     async def _cleanup(self, t: Transport, rec: RouterRecord) -> None:
         """Remove the temporary interface: allowed during a run, it only undoes what the scan made. A refused

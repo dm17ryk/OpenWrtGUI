@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -15,9 +17,17 @@ from openwrtgui.update.service import UpdateFailed, UpdateInProgress
 from openwrtgui.wifi.service import PreviewChanged
 
 ROUTER_REFUSED = "The router refused the login."
+UNEXPECTED = "Unexpected error in OpenWrtGUI ({kind}). The details are in the app log."
+log = logging.getLogger(__name__)
 
 
 def install(app: FastAPI) -> None:
+    @app.exception_handler(Exception)
+    async def unexpected(request: Request, exc: Exception) -> JSONResponse:
+        """An error nobody planned for (v1.0c D8): a plain answer; the traceback goes to the app log only."""
+        log.error("unexpected error in %s %s", request.method, request.url.path, exc_info=exc)
+        return JSONResponse(status_code=500, content={"detail": UNEXPECTED.format(kind=type(exc).__name__)})
+
     @app.exception_handler(GuardLocked)
     async def guard_locked(request: Request, exc: GuardLocked) -> JSONResponse:
         detail = exc.state.reasons[0].text if exc.state.reasons else "Bench Guard: read-only"

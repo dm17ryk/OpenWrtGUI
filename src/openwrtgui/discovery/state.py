@@ -19,6 +19,7 @@ from openwrtgui.discovery.capabilities import CapabilityRow, capability_map
 from openwrtgui.discovery.overlay import (
     ConfigDiff,
     OverlayDiff,
+    OverlayEntry,
     PackageDiff,
     diff_configs,
     diff_overlay,
@@ -129,6 +130,35 @@ async def _live_packages(t: Transport) -> tuple[Package, ...]:
     return parse_opkg_status(opkg.stdout, {}) if opkg.ok else ()
 
 
+def _added_packages(profile: Profile, live: Sequence[Package]) -> list[Package]:
+    """Custom packages installed after flashing: live, custom, and not in the image."""
+    image = {p.name for p in profile.packages}
+    return [p for p in live if p.name not in image and is_custom(p)]
+
+
+def _program_files(files: Sequence[str]) -> list[str]:
+    return [f for f in files if posixpath.dirname(f) in PATH_DIRS]
+
+
+def _overlay_programs(overlay: OverlayDiff, owned: set[str]) -> list[OverlayEntry]:
+    """Files added in a program folder that no live package owns."""
+    return [e for e in overlay.added if posixpath.dirname(e.path) in PATH_DIRS and e.path not in owned]
+
+
+async def listed_programs(t: Transport, profile: Profile | None) -> frozenset[str]:
+    """The custom programs the Discovery page lists, read in two commands (v1.0c Task 5, #17): the overlay
+    listing and the live packages, without the configs, usages and services the page also reads."""
+    if profile is None:
+        return frozenset()  # without a matched image the page lists no programs
+    entries, unreadable = parse_ls_ldn((await t.run(cmd.OVERLAY_LS)).stdout, "/overlay/upper")
+    live = await _live_packages(t)
+    owned = {f for p in live for f in p.files}
+    from_image = {p.path for c in profile.custom for p in c.programs}
+    added = {f for p in _added_packages(profile, live) for f in _program_files(p.files)}
+    overlay = {e.path for e in _overlay_programs(diff_overlay(entries, unreadable, profile), owned)}
+    return frozenset(from_image | added | overlay)
+
+
 async def _custom_rows(
     t: Transport, profile: Profile, live: Sequence[Package], card_paths: frozenset[str]
 ) -> tuple[CustomRow, ...]:
@@ -139,16 +169,12 @@ async def _custom_rows(
             for p in c.programs
         )
         rows.append(_row(c.name, c.version, c.description, "image", programs, c.service))
-    image = {p.name for p in profile.packages}
-    for p in live:
-        if p.name in image or not is_custom(p):
-            continue
+    for p in _added_packages(profile, live):
         added: list[ProgramRow] = []
-        for f in p.files:
-            if posixpath.dirname(f) in PATH_DIRS:
-                added.append(
-                    ProgramRow(path=f, usage=await _usage(t, f), source="custom", has_card=f in card_paths)
-                )
+        for f in _program_files(p.files):
+            added.append(
+                ProgramRow(path=f, usage=await _usage(t, f), source="custom", has_card=f in card_paths)
+            )
         services = [posixpath.basename(f) for f in p.files if posixpath.dirname(f) == "/etc/init.d"]
         rows.append(
             _row(
@@ -225,12 +251,9 @@ async def read_discovery(
     owned = {f for p in live for f in p.files}
     custom = await _custom_rows(t, profile, live, card_paths)
     programs: list[ProgramRow] = []
-    for e in overlay.added:
-        if posixpath.dirname(e.path) in PATH_DIRS and e.path not in owned:
-            usage = await _usage(t, e.path) if e.kind == "file" else None
-            programs.append(
-                ProgramRow(path=e.path, usage=usage, source="overlay", has_card=e.path in card_paths)
-            )
+    for e in _overlay_programs(overlay, owned):
+        usage = await _usage(t, e.path) if e.kind == "file" else None
+        programs.append(ProgramRow(path=e.path, usage=usage, source="overlay", has_card=e.path in card_paths))
     return empty.model_copy(
         update={
             "profile": profile.key,

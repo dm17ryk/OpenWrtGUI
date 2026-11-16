@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type ReactNode } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { ApiError, apiFetch, postJson } from '../api/client'
 import type { DescriptionSummary, RouterDetail } from '../api/types'
 import { Help } from '../help/Help'
@@ -67,9 +67,24 @@ function Sources({ s }: { s: DescriptionSummary }) {
 export function RouterOverview() {
   const { id = '' } = useParams()
   const client = useQueryClient()
+  const navigate = useNavigate()
   const [probeError, setProbeError] = useState<string | null>(null)
   const detail = useQuery({ queryKey: ['router', id], queryFn: () => apiFetch<RouterDetail>(`/api/routers/${id}`) })
   const d = detail.data
+
+  // the app forgets the router; nothing is sent to it (inventory: the API had no button, v1.0c Task 13)
+  const remove = async (name: string): Promise<void> => {
+    if (!window.confirm(`Remove ${name} from OpenWrtGUI? The router itself is not changed.`)) return
+    setProbeError(null)
+    try {
+      await apiFetch(`/api/routers/${id}`, { method: 'DELETE' })
+      client.removeQueries({ queryKey: ['router', id] })
+      void client.invalidateQueries({ queryKey: ['routers'] })
+      void navigate('/')
+    } catch (err) {
+      setProbeError(err instanceof ApiError ? err.detail : String(err))
+    }
+  }
 
   const probe = async (): Promise<void> => {
     setProbeError(null)
@@ -168,6 +183,13 @@ export function RouterOverview() {
           </div>
         </section>
       )}
+      <div className="row">
+        <span className="muted small">The app forgets {d.record.name}: its key, settings and address stay on the router.</span>
+        <span className="spacer" />
+        <button className="btn danger" type="button" onClick={() => void remove(d.record.name)}>
+          Remove from the app
+        </button>
+      </div>
     </main>
   )
 }

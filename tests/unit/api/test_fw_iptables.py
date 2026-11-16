@@ -6,9 +6,10 @@ from datetime import datetime
 
 import httpx
 import pytest
+from readcount import commands_of
 
 from openwrtgui.context import AppContext
-from openwrtgui.fw.iptables import RESET_NOTE
+from openwrtgui.fw.iptables import IPT_STATE, RESET_NOTE, listing, parse_listing, skipped_lines
 from openwrtgui.guard.bench_guard import GuardLocked
 from openwrtgui.store.routers import RouterRecord
 
@@ -36,6 +37,29 @@ async def test_ap4_lists_its_tables(ctx: AppContext) -> None:
         ("iptables", "raw"),
     ]
     assert state.tables[0].chains[0].name == "INPUT" and state.tables[0].error is None
+
+
+async def test_the_tab_reads_in_one_command(ctx: AppContext) -> None:
+    """v1.0c Task 3: one command instead of a presence check and eight listings (#63)."""
+    add_ap4(ctx)
+    await ctx.iptables.state("ap4")
+    sent = await commands_of(ctx, "ap4")
+    before = len(sent)
+    await ctx.iptables.state("ap4")
+    assert sent[before:] == [IPT_STATE]
+
+
+async def test_the_one_command_shows_what_the_eight_listings_showed(ctx: AppContext) -> None:
+    add_ap4(ctx)
+    state = await ctx.iptables.state("ap4")
+    t = await ctx.pool.get(ctx.routers.get("ap4"))  # type: ignore[arg-type]
+    expected = []
+    for program in ("iptables", "ip6tables"):
+        for table in ("filter", "nat", "mangle", "raw"):
+            done = await t.run(listing(program, table))
+            expected.append((program, table, parse_listing(done.stdout), skipped_lines(done.stdout)))
+    assert [(x.program, x.table, x.chains, x.skipped) for x in state.tables] == expected
+    assert all(x.error is None for x in state.tables)
 
 
 async def test_ap2_has_no_iptables(ctx: AppContext) -> None:

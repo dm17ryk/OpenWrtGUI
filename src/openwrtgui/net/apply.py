@@ -80,6 +80,7 @@ class NetPlan:
     backup: tuple[str, ...] = ()
     restore: tuple[str, ...] = ()
     target_port: int | None = None  # v0.6c: the SSH port the router answers on after the change
+    first: tuple[str, ...] = ()  # run before the uci script: a file the change names (v1.0c Task 11)
 
     @property
     def timer(self) -> bool:
@@ -202,12 +203,17 @@ def net_plan(
     backup: Sequence[str] = (),
     restore: Sequence[str] = (),
     target_port: int | None = None,
+    first: Sequence[str] = (),
 ) -> NetPlan:
-    """The exact preview: only changes, section deletes last; nothing left is refused with NOTHING."""
+    """The exact preview: only changes, section deletes last; nothing left is refused with NOTHING. `first`
+    runs before the uci script: a file the change names is written before the change (v1.0c Task 11)."""
     kept = order_for_script(drop_unchanged(ops, current), current)
-    if not kept and not commands:
+    if not kept and not commands and not first:
         raise ValueError(NOTHING)
+    if first and rollback:
+        raise ValueError("A change with rollback takes no first lines")
     shown = [line for command in commands for line in command.splitlines()]  # a heredoc, line by line
+    before = [line for command in first for line in command.splitlines()]
     if rollback and restore:
         armed, cancel = timer_lines(backup, restore, ROLLBACK_ID)
         script = _script(kept, config, None).splitlines() if kept else []
@@ -219,7 +225,7 @@ def net_plan(
         script = _script(kept, config, SESSION).splitlines()
         lines = [create, grant, *script, apply, *shown, confirm, destroy]
     else:
-        lines = [*(_script(kept, config, None).splitlines() if kept else []), *shown, *reloads]
+        lines = [*before, *(_script(kept, config, None).splitlines() if kept else []), *shown, *reloads]
     return NetPlan(
         router_id=router_id,
         screen=screen,
@@ -235,6 +241,7 @@ def net_plan(
         backup=tuple(backup),
         restore=tuple(restore),
         target_port=target_port,
+        first=tuple(first),
     )
 
 
@@ -477,6 +484,21 @@ class ApplyRunner:
     ) -> NetApplyResult:
         applied = False
         try:
+            for command in plan.first:  # a file the uci change names, written before it (v1.0c Task 11)
+                done = await self._run(
+                    t,
+                    rec,
+                    plan,
+                    command,
+                    secrets=plan.secrets,
+                    timeout=SCRIPT_TIMEOUT_S,
+                    require_guard=guarded,
+                )
+                if not done.ok:
+                    return self._finish(
+                        rec, plan, applied, (), f"{command} failed: {_reason(done)}", rec.host
+                    )
+                applied = True
             if plan.ops:
                 try:
                     done = await self._run(

@@ -73,6 +73,7 @@ export const CAPTURING: CaptureView = {
   running: true,
   path: null,
   error: null,
+  dropped: 0,
 }
 
 export const CAPTURED: CaptureView = {

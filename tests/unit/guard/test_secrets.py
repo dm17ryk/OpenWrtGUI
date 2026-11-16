@@ -51,6 +51,17 @@ def test_options_that_stay_shown(name: str) -> None:
     assert not is_secret_option(name)
 
 
+@pytest.mark.parametrize("name", ["igmp_snooping", "ping", "mapping", "passive", "key_type"])
+def test_known_flags_are_shown(name: str) -> None:
+    """v1.0b1 final review: the substring rule hid these; an exact list shows them (v1.0c D9)."""
+    assert not is_secret_option(name)
+
+
+@pytest.mark.parametrize("name", ["apikey", "totpsecret", "wpa_psk", "sae_password", "credentials", "pin"])
+def test_run_together_secrets_stay_hidden(name: str) -> None:
+    assert is_secret_option(name)
+
+
 def test_shown_hides_a_secret_value_and_keeps_none() -> None:
     assert shown("wireless.default_radio0.key", "a-made-up-key") == HIDDEN
     assert shown("wireless.default_radio0.key", None) is None

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import datetime, timedelta
 from typing import cast
 
@@ -63,6 +64,19 @@ async def test_apply_l3_verified_in_sim(env: FwEnv) -> None:
     t = await env.sim("ap1")
     rules = parse_ruleset_json((await t.run("nft -j list table netdev benchfault")).stdout).rules
     assert len(rules) == 1 and rules[0].comment == f"owg:{armed.id}"
+
+
+async def test_rtp_ports_need_conntrack(env: FwEnv) -> None:
+    """v0.4 minor (#9), v1.0c Task 12: without conntrack the RTP ports cannot be found; it is not run."""
+    faults = _faults(env)
+    caps = (await faults.state("ap1")).caps
+    faults._caps["ap1"] = replace(caps, conntrack=False)
+    t = await env.sim("ap1")
+    before = len(t.calls)  # type: ignore[attr-defined]
+    text = r"^AP1 · bench has no conntrack: RTP ports cannot be found; use all_in or all_out$"
+    with pytest.raises(ValueError, match=text):
+        await faults.plan_fault("ap1", FaultRequest("block", PANEL, flow="rtp_in", loss=30))
+    assert "conntrack -L -p udp" not in t.calls[before:]  # type: ignore[attr-defined]
 
 
 async def test_held_fault_cleared_by_router_timer_in_sim(env: FwEnv) -> None:

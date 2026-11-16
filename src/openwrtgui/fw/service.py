@@ -327,13 +327,17 @@ class FirewallService:
         )
         if not change.include_ops and not change.include_commands:
             return runtime, None
+        # a saved include writes its file before the section that loads it, so a stop in between never
+        # leaves fw4 a section naming a missing file; a delete removes the section, then the file (v1.0c T11)
+        writes_file = change.include_file is not None
         include = net_plan(
             router_id=rec.id,
             screen=SCREEN,
             config="firewall",
             ops=change.include_ops,
             current=uci,
-            commands=change.include_commands,
+            commands=() if writes_file else change.include_commands,
+            first=change.include_commands if writes_file else (),
         )
         return replace(runtime, lines=(*runtime.lines, *include.lines)), include
 
@@ -415,7 +419,8 @@ class FirewallService:
         try:
             second = await self._runner.run_planned(rec, make_include, None)
         except GuardLocked as exc:  # a run started after the confirm: the change stays at runtime (v1.0b2 D5)
-            unsaved = f"Applied at runtime; not saved as an fw4 include: Bench Guard went live ({exc})"
+            why = exc.state.reasons[0].text if exc.state.reasons else "a harness run started"
+            unsaved = f"Applied at runtime; not saved as an fw4 include because Bench Guard went live: {why}"
             return NetApplyResult(rec.id, True, False, first.checks, unsaved, first.host)
         error = first.error
         if not second.applied or second.error:  # the uci part may be saved while the file is not

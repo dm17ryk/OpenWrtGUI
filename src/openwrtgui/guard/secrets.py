@@ -36,8 +36,12 @@ SECRET_OPTIONS = (
 # A substring on purpose: third-party plugin options are run together (`apikey`, `totpsecret`). `cred`: acme's
 # `credentials` hold the DNS API token; `community`: an SNMP community string is its password (final review).
 _SECRET_PART = re.compile(r"key|secret|pass|psk|token|pin|pwd|cred|community", re.IGNORECASE)
-# Flags whose value is exactly what a person should see: whether password login is on (dropbear).
-_SHOWN = frozenset({"PasswordAuth", "RootPasswordAuth"})
+# Names whose value is exactly what a person should see: whether password login is on (dropbear), and flags
+# the substring rule caught by a word inside them (v1.0b1 final review, v1.0c D9). An unreviewed name stays
+# hidden.
+_SHOWN = frozenset(
+    {"PasswordAuth", "RootPasswordAuth", "igmp_snooping", "ping", "mapping", "passive", "key_type"}
+)
 
 
 def is_secret_option(name: str) -> bool:

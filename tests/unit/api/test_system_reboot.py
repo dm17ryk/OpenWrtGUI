@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 
 import httpx
 import pytest
@@ -10,7 +11,7 @@ import pytest
 from openwrtgui import simsystem
 from openwrtgui.context import AppContext
 from openwrtgui.guard.bench_guard import GuardLocked
-from openwrtgui.system.reboot import RebootBusy, RebootJob
+from openwrtgui.system.reboot import JobKind, RebootBusy, RebootJob
 
 ARM = (
     "mkdir -p /tmp/owg && start-stop-daemon -S -b -m -p /tmp/owg/reboot.pid -x /bin/sh -- -c "
@@ -83,6 +84,24 @@ async def test_one_reboot_at_a_time(ctx: AppContext) -> None:
     with pytest.raises(RebootBusy, match="^AP2 · office is already rebooting$"):
         await ctx.system.start_reboot("ap2", plan.digest)
     await wait_job(ctx)
+
+
+@pytest.mark.parametrize(
+    ("kind", "text"),
+    [
+        ("reboot", "AP2 · office is already rebooting"),
+        ("restore", "AP2 · office is restoring a backup"),
+        ("reset", "AP2 · office is resetting to defaults"),
+    ],
+)
+async def test_the_busy_text_names_the_job_that_runs(ctx: AppContext, kind: JobKind, text: str) -> None:
+    """v0.6c minor (#32), v1.0c Task 12: a reboot asked during a restore or a reset says which job runs."""
+    plan = await ctx.system.plan_reboot("ap2")
+    ctx.system._reboots["ap2"] = RebootJob(
+        router_id="ap2", kind=kind, phase="waiting", started_at=datetime(2026, 11, 16, 9, 0)
+    )
+    with pytest.raises(RebootBusy, match=f"^{text}$"):
+        await ctx.system.start_reboot("ap2", plan.digest)
 
 
 async def test_reboot_waits_for_the_run(ctx_guard_live: AppContext) -> None:

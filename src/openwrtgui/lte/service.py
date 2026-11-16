@@ -15,7 +15,7 @@ from openwrtgui.guard.audit import AT_MASKED_COMMANDS, AuditLog, mask
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.guard.writes import run_audited
 from openwrtgui.lte import commands as c
-from openwrtgui.lte.at import AtResult, find_at_port, is_query
+from openwrtgui.lte.at import AtResult, ModemIdentity, find_at_port, is_query
 from openwrtgui.lte.commands import MODEM_DEVICE
 from openwrtgui.lte.parse import parse_at, parse_opmode
 from openwrtgui.lte.settings import LteSettings, settings_request
@@ -100,6 +100,8 @@ class LteService:
         self._sleep = sleep
         # router → (connection, AT port that answered on it); only a found port is kept
         self._ports: dict[str, tuple[weakref.ref[Transport], str]] = {}
+        # router → (connection, the modem's identity read on it): asked once per connection (v1.0c D2)
+        self._identity: dict[str, tuple[weakref.ref[Transport], ModemIdentity]] = {}
         self._busy: dict[str, asyncio.Lock] = {}
         self._at: dict[str, asyncio.Lock] = {}  # one AT exchange at a time per router (v1.0b2 D11)
         self.poll_s = POLL_S
@@ -139,6 +141,15 @@ class LteService:
     def forget_port(self, router_id: str) -> None:
         """The kept AT port gave no answer (the modem re-enumerated): probe again on the next use."""
         self._ports.pop(router_id, None)
+        self.forget_identity(router_id)
+
+    def forget_identity(self, router_id: str) -> None:
+        """An AT write or a modem reboot may change what the modem says of itself: ask it again (v1.0c D2)."""
+        self._identity.pop(router_id, None)
+
+    def _kept_identity(self, router_id: str, t: Transport) -> ModemIdentity | None:
+        kept = self._identity.get(router_id)
+        return kept[1] if kept is not None and kept[0]() is t else None
 
     async def state(self, router_id: str) -> LteState:
         rec = self._record(router_id)
@@ -146,7 +157,14 @@ class LteService:
         t = await self._pool.get(rec)
         async with self._at_lock(rec.id):  # one microcom on the modem's port at a time (v1.0b2 D11)
             port = await self.at_port(rec, t) if qmi is not None else None
-            state = await read_lte(t, router_id=rec.id, qmi=qmi, at_port=port, now=self._clock())
+            known = self._kept_identity(rec.id, t)
+            state, identity = await read_lte(
+                t, router_id=rec.id, qmi=qmi, at_port=port, now=self._clock(), identity=known
+            )
+            if identity is None:
+                self.forget_identity(rec.id)
+            else:
+                self._identity[rec.id] = (weakref.ref(t), identity)
         if "AT" in state.missing:
             self.forget_port(rec.id)
         return state
@@ -199,7 +217,11 @@ class LteService:
                 raise PreviewChanged(rec.name)
             t = await self._pool.get(rec)
             async with self._pool.write_lock(rec.id):
-                return await self._run_action(rec, t, action, plan.lines)
+                try:
+                    return await self._run_action(rec, t, action, plan.lines)
+                finally:
+                    if action == "reboot":  # a read during the reboot is not kept either (the final review)
+                        self.forget_identity(rec.id)
 
     async def _cmd(self, rec: RouterRecord, t: Transport, command: str) -> CommandResult:
         return await run_audited(
@@ -211,6 +233,7 @@ class LteService:
     ) -> NetApplyResult:
         checks: list[NetCheck] = []
         if action == "reboot":
+            self.forget_identity(rec.id)  # a rebooted modem is asked who it is again (v1.0c D2)
             for set_line, read_line, mode in (
                 (lines[0], lines[1], "low_power"),
                 (lines[2], lines[3], "online"),
@@ -319,7 +342,10 @@ class LteService:
             if busy.locked():
                 raise LteBusy(f"An LTE action is already running on {rec.name}")
             async with busy, self._pool.write_lock(rec.id), self._at_lock(rec.id):
-                port, done = await self._exchange(rec, t, command, write=True)
+                try:
+                    port, done = await self._exchange(rec, t, command, write=True)
+                finally:
+                    self.forget_identity(rec.id)  # the write may change the mode order (v1.0c D2)
         if port is None or done is None:
             return AtResult(
                 command=shown, lines=(), status="no answer", error=f"No AT port answered on {rec.name}"

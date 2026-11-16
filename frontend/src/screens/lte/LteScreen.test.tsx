@@ -86,6 +86,14 @@ test('status shows registration, radio, operator and the labelled signal', async
   }
 })
 
+test('a lost connection says it is reconnecting instead of asking to open the screen again', async () => {
+  renderLte()
+  await screen.findByRole('region', { name: 'Status' })
+  const lost = FakeSocket.last?.onclose as unknown as ((ev: { code: number; reason: string }) => void) | null
+  act(() => lost?.({ code: 1006, reason: '' }))
+  expect(screen.getByRole('status')).toHaveTextContent('Lost the connection to OpenWrtGUI; reconnecting (attempt 1)')
+})
+
 test('an operator name from QMI is marked as possibly garbled', async () => {
   state = { ...AP2_LTE, operator_source: 'qmi' }
   renderLte()

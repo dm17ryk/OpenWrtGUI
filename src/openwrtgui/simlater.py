@@ -10,6 +10,7 @@ import shlex
 from collections.abc import Mapping
 from typing import Any
 
+from openwrtgui.fw.iptables import IPT_STATE, MARK, PROGRAMS, TABLES, listing
 from openwrtgui.transport.base import CommandResult
 
 _MENU = "for f in /usr/share/luci/menu.d/"
@@ -50,6 +51,21 @@ class SimLater:
             text = _POLICY_COUNTERS.sub("0 packets, 0 bytes", _RULE_COUNTERS.sub(r"\g<1>0\g<2>0", text))
         return _ok(command, text)
 
+    def _state(self) -> str:
+        """IPT_STATE's answer, from the same listings the per-table commands answer (v1.0c Task 3)."""
+        out: list[str] = []
+        for program in PROGRAMS:
+            present = program in self._spec
+            out.append(f"{MARK} {program} {'present' if present else 'absent'}\n")
+            for table in TABLES:
+                out.append(f"{MARK} {program} {table}\n")
+                if present:
+                    out.append(self._listing(listing(program, table), program, table).stdout)
+                    out.append(f"{MARK} exit 0\n")
+                else:
+                    out.append(f"sh: {program}: not found\n{MARK} exit 127\n")
+        return "".join(out)
+
     def _unmount(self, command: str) -> CommandResult:
         target = shlex.split(command)[1]
         lines = self._mounts.splitlines(keepends=True)
@@ -87,6 +103,8 @@ class SimLater:
             return self._unmount(c)
         if m := _LISTING.fullmatch(c):
             return self._listing(c, m.group(1), m.group(2))
+        if c == IPT_STATE:
+            return _ok(c, self._state())
         if c in ("iptables -Z", "ip6tables -Z"):
             self._zeroed.add(c.split()[0])
             return _ok(c)

@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useParams, useSearchParams } from 'react-router'
-import { apiFetch, openSocket } from '../../api/client'
+import { apiFetch } from '../../api/client'
 import type { Bitrate, FrameState, RateRow, RfMessage, RfSample, RouterDetail, StationSample, WifiState } from '../../api/types'
+import { reconnectText, useLiveSocket } from '../../api/useLiveSocket'
 import { Help, HelpTip } from '../../help/Help'
 import { HELP } from '../../help/topics'
 import { RouterSections } from '../../shell/RouterSections'
@@ -72,49 +73,53 @@ export function RfLive() {
   const [recording, setRecording] = useState<string | null>(null)
   const [rates, setRates] = useState<{ mac: string; rows?: RateRow[]; error?: string } | null>(null)
   const [frames, setFrames] = useState<FrameState | null>(null)
-  const socket = useRef<WebSocket | null>(null)
   const pausedRef = useRef(paused)
   useEffect(() => {
     pausedRef.current = paused
   }, [paused])
-
+  // the app stops a recording when this socket closes: say so, never keep claiming one (the final review)
+  const [lostRecording, setLostRecording] = useState<string | null>(null)
+  const recordingRef = useRef(recording)
   useEffect(() => {
-    const ws = openSocket(`/ws/rf/${id}`, { radio })
-    socket.current = ws
-    ws.onmessage = (ev: MessageEvent<string>) => {
-      const msg = JSON.parse(ev.data) as RfMessage
-      if (msg.type === 'rf') {
-        setIdle(null)
-        if (pausedRef.current) return
-        setLatest(msg.sample)
-        setBuffers((b) => pushSample(b, msg.sample))
-        setLastSeen((seen) => ({ ...seen, ...Object.fromEntries(msg.sample.stations.map((s) => [s.mac, s])) }))
-      } else if (msg.type === 'rf-idle') {
-        setIdle(msg.reason)
-      } else if (msg.type === 'recording') {
-        setRecording(msg.path)
-      } else if (msg.type === 'rates') {
-        setRates(msg)
-      } else if (msg.type === 'frames') {
-        setFrames(msg.state)
-      }
+    recordingRef.current = recording
+  }, [recording])
+  const onLost = (): void => {
+    if (recordingRef.current === null) return
+    setLostRecording(recordingRef.current)
+    setRecording(null)
+  }
+
+  // the samples, rates, recording and frames, on one socket that reconnects by itself (v1.0c D7)
+  const live = useLiveSocket<RfMessage>(`/ws/rf/${id}`, { radio }, (msg) => {
+    if (msg.type === 'rf') {
+      setIdle(null)
+      if (pausedRef.current) return
+      setLatest(msg.sample)
+      setBuffers((b) => pushSample(b, msg.sample))
+      setLastSeen((seen) => ({ ...seen, ...Object.fromEntries(msg.sample.stations.map((s) => [s.mac, s])) }))
+    } else if (msg.type === 'rf-idle') {
+      setIdle(msg.reason)
+    } else if (msg.type === 'recording') {
+      setRecording(msg.path)
+      setLostRecording(null)
+    } else if (msg.type === 'rates') {
+      setRates(msg)
+    } else if (msg.type === 'frames') {
+      setFrames(msg.state)
     }
-    ws.onclose = () => setIdle('Lost the connection to OpenWrtGUI. Open RF live again.')
-    return () => {
-      ws.onclose = null
-      ws.close()
-      socket.current = null
-    }
-  }, [id, radio])
+  }, onLost)
+  const isLost = live.phase === 'reconnecting' || live.phase === 'ended'
+  const { send } = live
+  const isOpen = live.phase === 'open'
 
   const station = chosen ?? latest?.stations[0]?.mac ?? Object.keys(lastSeen)[0] ?? null
   useEffect(() => {
-    if (!station) return undefined
-    const ask = (): void => socket.current?.send(JSON.stringify({ type: 'rates', mac: station }))
+    if (!station || !isOpen) return undefined // asked again once the socket is (re)opened
+    const ask = (): void => send(JSON.stringify({ type: 'rates', mac: station }))
     ask()
     const timer = setInterval(ask, RATES_EVERY_MS)
     return () => clearInterval(timer)
-  }, [station])
+  }, [station, isOpen, send])
 
   const name = detail.data?.record.name ?? id
   const short = name.split(' · ')[0] || id
@@ -127,9 +132,10 @@ export function RfLive() {
   const now = latest ? Date.parse(latest.at) : 0 // charts are empty until the first sample
   const stations = Object.values(lastSeen)
   const record = (): void => {
-    socket.current?.send(JSON.stringify({ type: 'record', on: !recording }))
+    send(JSON.stringify({ type: 'record', on: !recording }))
     if (recording) setRecording(null)
   }
+  const note = reconnectText(live) ?? idle
 
   return (
     <main className="wrap">
@@ -150,7 +156,7 @@ export function RfLive() {
         </button>
         <div className="hrow">
           <HelpTip topic={HELP.rfRecord}>
-            <button className="btn pri" type="button" onClick={record}>
+            <button className="btn pri" type="button" disabled={isLost} onClick={record}>
               {recording ? 'Stop recording' : 'Record to CSV'}
             </button>
           </HelpTip>
@@ -159,9 +165,10 @@ export function RfLive() {
       </div>
       <RouterSections routerId={id} name={name} current="rf" />
       {recording && <div className="note">Recording to {recording}</div>}
-      {idle && (
+      {lostRecording && <div className="note w">{`Recording stopped when the connection was lost: ${lostRecording}`}</div>}
+      {note && (
         <div className="note w" role="status">
-          {idle}
+          {note}
         </div>
       )}
       <div className="hrow">

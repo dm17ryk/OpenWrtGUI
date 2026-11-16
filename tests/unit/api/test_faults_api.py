@@ -6,6 +6,7 @@ import asyncio
 
 import httpx
 import pytest
+from readcount import count_read
 
 from openwrtgui.context import AppContext
 from openwrtgui.simulator import SIM_GUARD_ENV
@@ -76,3 +77,13 @@ async def test_settings_known_devices_round_trip(authed: httpx.AsyncClient) -> N
     settings["known_devices"] = [{"name": "panel", "macs": ["f4:12:fa:f3:57:68", "e4:5f:01:aa:bb:01"]}]
     assert (await authed.put("/api/settings", json=settings)).status_code == 200
     assert (await authed.get("/api/settings")).json()["known_devices"][0]["name"] == "panel"
+
+
+async def test_each_refresh_reads_afresh_and_asks_nothing_twice(
+    authed: httpx.AsyncClient, ctx: AppContext
+) -> None:
+    """v1.0c Task 6: a refresh asks each read once; the next refresh asks again."""
+    await authed.get(FAULTS)
+    first = await count_read(authed, ctx, "ap1", "GET", FAULTS)
+    second = await count_read(authed, ctx, "ap1", "GET", FAULTS)
+    assert first == second and len(set(first)) == len(first)
