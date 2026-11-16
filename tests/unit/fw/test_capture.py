@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+import threading
+import time
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fwenv import FwEnv
 
 from openwrtgui.capture.service import CaptureRequest, CaptureService, capture_command
-from openwrtgui.capture.wireshark import find_wireshark
+from openwrtgui.capture.wireshark import LiveSink, find_wireshark
 from openwrtgui.simwifi import SimWifi
 from openwrtgui.transport.base import CommandResult, TransportError
 from openwrtgui.transport.fake import BytesStream, ReplayTransport
@@ -305,3 +309,89 @@ def test_a_device_name_that_is_not_an_interface_is_refused() -> None:
     """v1.0b1 D5: the router lists the devices; a name goes into tcpdump and the file name only checked."""
     with pytest.raises(ValueError, match="is not an interface name"):
         capture_command(CaptureRequest("br-lan; reboot", "", 10), "192.168.1.10", 22)
+
+
+class _Stdin:
+    """Wireshark's stdin: a write may block until released, or fail as a closed pipe does."""
+
+    def __init__(self, block_until: threading.Event | None = None, raises: OSError | None = None) -> None:
+        self.block_until = block_until
+        self.raises = raises
+
+    def write(self, data: bytes) -> int:
+        if self.block_until is not None:
+            self.block_until.wait(5)
+        if self.raises is not None:
+            raise self.raises
+        return len(data)
+
+    def flush(self) -> None:
+        return None
+
+    def close(self) -> None:
+        return None
+
+
+def _popen(stdin: _Stdin) -> Callable[..., Any]:
+    class _Process:
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            self.stdin = stdin
+
+    return _Process
+
+
+def test_a_stalled_wireshark_never_blocks_a_write() -> None:
+    """v1.0c Task 7 (#12): the pipe is fed from a thread; what does not fit its queue is counted."""
+    stuck = threading.Event()
+    sink = LiveSink(Path("Wireshark.exe"), popen=_popen(_Stdin(block_until=stuck)), queue_chunks=2)
+    started = time.monotonic()
+    for _ in range(10):
+        sink.write(b"x" * 65536)
+    assert time.monotonic() - started < 0.5
+    assert sink.dropped >= 7 * 65536
+    stuck.set()
+    sink.close()
+
+
+def test_a_closed_wireshark_ends_the_capture() -> None:
+    sink = LiveSink(Path("Wireshark.exe"), popen=_popen(_Stdin(raises=BrokenPipeError())))
+    sink.write(b"x")
+    with pytest.raises(OSError):
+        for _ in range(100):
+            sink.write(b"x")
+            time.sleep(0.01)
+    sink.close()
+
+
+class _DroppingSink:
+    """A Wireshark sink that took none of the bytes it was given."""
+
+    def __init__(self) -> None:
+        self.dropped = 0
+
+    def write(self, data: bytes) -> None:
+        self.dropped += len(data)
+
+    def close(self) -> None:
+        return None
+
+
+async def test_bytes_wireshark_did_not_show_are_in_the_view(
+    env: FwEnv, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sink = _DroppingSink()
+    monkeypatch.setattr("openwrtgui.capture.service.open_live", lambda exe: sink)
+    service = CaptureService(
+        pool=env.pool,
+        routers=env.routers,
+        guard=env.guard,
+        audit=env.audit,
+        net=env.net,
+        documents=tmp_path / "Documents",
+        wireshark=lambda: Path("Wireshark.exe"),
+        clock=env.clock.now,
+    )
+    view = await service.start("ap1", CaptureRequest("br-lan", "", 3, "wireshark"))
+    await _done(service, view.id)
+    done = next(v for v in service.list("ap1") if v.id == view.id)
+    assert done.dropped == done.bytes > 0

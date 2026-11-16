@@ -5,6 +5,11 @@ import type { CaptureDevices, CaptureIn, CaptureView } from '../../api/types'
 import { Help, HelpTip } from '../../help/Help'
 import { HELP } from '../../help/topics'
 
+/** Bytes as MB with one decimal, as the capture card says them (v1.0c D6). */
+function megabytes(bytes: number): string {
+  return `${(bytes / 1_000_000).toFixed(1)} MB`
+}
+
 /** Capture on a router interface to a .pcap in Documents, or straight into Wireshark (spec 7.7). */
 export function CaptureCard({ routerId }: { routerId: string }) {
   const client = useQueryClient()
@@ -98,7 +103,10 @@ export function CaptureCard({ routerId }: { routerId: string }) {
                   <td className="mono">{c.device}</td>
                   <td className="mono">{c.filter || '—'}</td>
                   <td className="mono">{c.bytes}</td>
-                  <td className="mono">{c.error ?? (c.output === 'wireshark' ? 'Wireshark' : (c.path ?? 'when it stops'))}</td>
+                  <td className="mono">
+                    {c.error ?? (c.output === 'wireshark' ? 'Wireshark' : (c.path ?? 'when it stops'))}
+                    {c.dropped > 0 && <div className="note w">{`Wireshark fell behind: ${megabytes(c.dropped)} not shown; the capture goes on`}</div>}
+                  </td>
                   <td>
                     {c.running && (
                       <button className="btn" type="button" onClick={() => void run(() => postJson(`/api/routers/${routerId}/captures/${c.id}/stop`))}>

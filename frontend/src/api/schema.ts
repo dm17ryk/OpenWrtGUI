@@ -3922,6 +3922,11 @@ export interface components {
             bytes: number;
             /** Device */
             device: string;
+            /**
+             * Dropped
+             * @default 0
+             */
+            dropped: number;
             /** Duration S */
             duration_s: number;
             /** Error */

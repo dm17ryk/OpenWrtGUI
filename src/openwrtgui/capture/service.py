@@ -61,6 +61,7 @@ class CaptureView:
     running: bool
     path: str | None
     error: str | None
+    dropped: int = 0  # bytes a Wireshark that fell behind did not show (v1.0c D6)
 
 
 def capture_command(req: CaptureRequest, pc_ip: str | None, ssh_port: int, device: str | None = None) -> str:
@@ -286,7 +287,8 @@ class CaptureService:
             while chunk := await stream.read(65536):
                 sink.write(chunk)
                 total += len(chunk)
-                self._views[capture_id] = replace(self._views[capture_id], bytes=total)
+                dropped = int(getattr(sink, "dropped", 0))
+                self._views[capture_id] = replace(self._views[capture_id], bytes=total, dropped=dropped)
                 if total >= self._max_bytes:
                     error = f"Stopped at the size cap ({_size(self._max_bytes)})"
                     break
