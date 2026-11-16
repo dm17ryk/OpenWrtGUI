@@ -4,7 +4,7 @@ Test harnesses on the bench (for example `dima_night`, `rh_soak`, `overnight_wif
 routers for hours. A change made by hand in the middle of a run spoils it. Bench Guard prevents that:
 **while a run is live, every router is read-only in OpenWrtGUI.**
 
-![Settings, with the Bench Guard watch list](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/settings.png)
+![A live run: the red banner names it, and every router is read-only](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/guard-banner.png)
 
 ## What it watches
 

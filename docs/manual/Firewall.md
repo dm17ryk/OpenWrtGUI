@@ -10,6 +10,8 @@ firewall rule on any zone can match this PC, so if the app cannot reach the rout
 restores its previous firewall by itself. While [Bench Guard](Bench-Guard) shows a run, changes are refused; the
 rules, the counters and the raw ruleset keep working.
 
+![Firewall: the filtering model, one row per zone](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/firewall.png)
+
 ## Filtering model
 
 One row per zone and one column per direction: **To this router** (input), **Through the router** (forward) and

@@ -22,10 +22,15 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+_SHOT = re.compile(r"shot\(page, [^,]+, '([a-z-]+)'\)")
+
+
 def _screens() -> set[str]:
-    """Screenshot names that frontend/e2e/screenshots.spec.ts writes (and the wiki workflow publishes)."""
-    spec = _read(ROOT / "frontend" / "e2e" / "screenshots.spec.ts")
-    return set(re.findall(r"\['([a-z-]+)', '/", spec))
+    """Screenshot names the e2e screenshot specs write (and the wiki workflow publishes)."""
+    names = set(re.findall(r"\['([a-z-]+)', '/", _read(ROOT / "frontend" / "e2e" / "screenshots.spec.ts")))
+    for spec in (ROOT / "frontend" / "e2e").glob("screenshots*.spec.ts"):
+        names |= set(_SHOT.findall(_read(spec)))
+    return names
 
 
 @pytest.mark.parametrize("name", ["bug.yml", "feature.yml", "router-support.yml"])
@@ -167,7 +172,9 @@ def test_no_manual_page_answers_for_v0_1() -> None:
     assert "Not in v0.1" not in _read(MANUAL / "FAQ.md")
 
 
-_INTERNAL = re.compile(r"open item|\(O\d{1,2}\)|\bO\d{1,2}\b|txctl|AP2 recording|not built yet|not offered yet")
+_INTERNAL = re.compile(
+    r"open item|\(O\d{1,2}\)|\bO\d{1,2}\b|txctl|AP2 recording|not built yet|not offered yet"
+)
 _TS_COMMENT = re.compile(r"//[^\n]*|/\*.*?\*/", re.DOTALL)
 _CODE_SPAN = re.compile(r"`[^`\n]*`")
 _IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
@@ -283,13 +290,64 @@ def test_v1_0c_behaviour_is_documented() -> None:
     assert missing == []
 
 
+SCREEN_PAGES = (
+    "Dashboard",
+    "First-router",
+    "Discovery",
+    "Wi-Fi",
+    "RF-live",
+    "Network-and-DHCP",
+    "LTE-modem",
+    "Ports-and-VLANs",
+    "Firewall",
+    "Faults-and-capture",
+    "System",
+    "LuCI-pages",
+    "Bench-Guard",
+    "Terminal-and-audit-log",
+    "Settings",
+)
+
+
+def _shown(text: str) -> set[str]:
+    return {
+        t.removeprefix(SCREENSHOT_URL).removesuffix(".png")
+        for t in _LINK.findall(text)
+        if t.startswith(SCREENSHOT_URL)
+    }
+
+
+def test_every_screen_page_shows_a_screenshot() -> None:
+    assert [p for p in SCREEN_PAGES if not _shown(_read(MANUAL / f"{p}.md"))] == []
+
+
+def test_every_screenshot_taken_is_used() -> None:
+    used = _shown(_read(ROOT / "README.md"))
+    for page in MANUAL.glob("*.md"):
+        used |= _shown(_read(page))
+    assert sorted(_screens() - used) == []
+    assert {
+        "step-through",
+        "channel-analysis",
+        "frame-analysis",
+        "flash-dialog",
+        "guard-banner",
+    } <= _screens()
+
+
 _ROW = re.compile(r"^\| `([^`]+)` \|", re.MULTILINE)
 
 
 def test_v1_0d_pages_exist() -> None:
     sidebar = _read(MANUAL / "_Sidebar.md")
     wanted = {
-        "How-changes-work": ("## Preview", "## Apply with rollback", "## Proof on air", "## Refused", "## Bench Guard"),
+        "How-changes-work": (
+            "## Preview",
+            "## Apply with rollback",
+            "## Proof on air",
+            "## Refused",
+            "## Bench Guard",
+        ),
         "Files-and-data": ("## The data folder", "## Documents", "## On a router", "## Moving or removing"),
         "Glossary": (
             "**App key**",
@@ -316,7 +374,11 @@ def test_v1_0d_pages_exist() -> None:
 def test_files_and_data_matches_security() -> None:
     """v1.0d D6: the user page and the security policy list the same data folder."""
     security = set(_ROW.findall(_read(ROOT / "SECURITY.md")))
-    files = set(_ROW.findall(_read(MANUAL / "Files-and-data.md"))) if (MANUAL / "Files-and-data.md").is_file() else set()
+    files = (
+        set(_ROW.findall(_read(MANUAL / "Files-and-data.md")))
+        if (MANUAL / "Files-and-data.md").is_file()
+        else set()
+    )
     assert security and security == files, sorted(security ^ files)
 
 

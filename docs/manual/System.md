@@ -80,6 +80,8 @@ password the router has now.
 
 ## SSH access
 
+![System, Access tab: router password, password policy and SSH access](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/system-access.png)
+
 dropbear's instances, one row each: on or off, the port, the interface it listens on (all interfaces or one),
 password logins, root password logins, and gateway ports. **Add instance** adds a row; **Remove** drops one
 at Apply. The instance the app connects through is marked "The app connects here": it cannot be turned off or

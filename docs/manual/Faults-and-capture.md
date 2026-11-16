@@ -8,6 +8,8 @@ after the app or this PC restarts. A reboot of the router ends every fault.
 
 While [Bench Guard](Bench-Guard) shows a run, nothing can be armed; clearing still works.
 
+![Faults and capture: a target, the fault cards and the capture card](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/faults.png)
+
 ## Target
 
 The device the fault hits: a Wi-Fi station, a host from the router's DHCP leases or address table, or a

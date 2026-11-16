@@ -45,6 +45,12 @@ export async function stepThroughClear(request: APIRequestContext, routerId: str
   await expect.poll(warnings, { timeout: 30_000, intervals: [500, 1000] }).toEqual([])
 }
 
+/** A full-page screenshot the wiki publishes: e2e-screenshots/<project>/<name>.png (v1.0d D5). */
+export async function shot(page: Page, project: string, name: string): Promise<void> {
+  await page.waitForTimeout(300)
+  await page.screenshot({ path: `e2e-screenshots/${project}/${name}.png`, fullPage: true })
+}
+
 export async function noHorizontalScroll(page: Page): Promise<void> {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   expect(overflow).toBeLessThanOrEqual(0)

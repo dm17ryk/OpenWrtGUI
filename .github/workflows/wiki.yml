@@ -35,7 +35,7 @@ jobs:
           npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
           npm run build
-          npx playwright test e2e/screenshots.spec.ts --project=desktop-light --project=desktop-dark
+          npx playwright test e2e/screenshots.spec.ts e2e/screenshots-guard.spec.ts --project=desktop-light --project=desktop-dark --project=guard
       - name: Push to the wiki
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}

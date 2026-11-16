@@ -26,6 +26,8 @@ router's CPU, so it runs only when you press it and not while [Bench Guard](Benc
 
 ## Flash this image
 
+![The flash dialog: the image, the steps it will run, and the name to type](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/flash-dialog.png)
+
 **Flash an image…** opens the flash dialog. Pick one of the imported images for this router's board (the dialog
 offers one whose revision differs from the running one). The preview lists every step before anything is sent:
 the image goes to `/tmp/owg` on the router, its sha256 is checked, the router validates it

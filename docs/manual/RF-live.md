@@ -53,6 +53,8 @@ grey until the connection is back.
 
 ## Frame analysis
 
+![Frame analysis: the rate mix, RX signal and retries of the last window](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/frame-analysis.png)
+
 Off by default, and only for a radio on air. **Frame analysis…** shows the commands first: it adds a monitor
 interface (`owgmon0`) on the radio, asks it for frames with a bad checksum too, and runs `tcpdump` for 3 s of
 every 5 s. The router only prints the frames; the app counts them. Blue is RX at the AP (frames stations sent
@@ -71,6 +73,8 @@ removed). A Wi-Fi Apply or a step-through step reloads the radio and removes the
 it again and says so. Starting it is refused while a harness run is live.
 
 ## Channel analysis
+
+![Channel analysis: the networks heard on each channel](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/channel-analysis.png)
 
 **Scan…** shows the command, then **Scan now** listens on every channel in turn (a passive scan: nothing is
 sent). On a radio on air the AP leaves its channel for about 2 s, so its stations may miss traffic meanwhile;

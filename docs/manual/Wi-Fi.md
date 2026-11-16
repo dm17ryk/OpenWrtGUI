@@ -93,6 +93,8 @@ preview, Apply and check.
 
 ## Step-through
 
+![Step-through: two modes and two channels ticked, the preview of four steps](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/step-through.png)
+
 Steps the radio through every ticked mode × ticked channel × ticked TX power, one pure mode per step, in the
 order mode (b, g, n20, n40), then channel, then power (no power ticked: the power stays as it is). At most
 200 steps. Each step is an Apply of exactly that mode, channel and power, proven on air like any Apply,
