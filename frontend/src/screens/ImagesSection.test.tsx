@@ -36,10 +36,10 @@ beforeEach(() => {
   importError = null
 })
 
-function renderImages() {
+function renderImages(client = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   const user = userEvent.setup()
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider client={client}>
       <ImagesSection />
     </QueryClientProvider>,
   )
@@ -85,4 +85,28 @@ test('deletes an image after confirming', async () => {
   await user.click(await screen.findByRole('button', { name: 'Delete' }))
   const deleted = calls.find((c) => c.init?.method === 'DELETE')
   expect(deleted?.path).toBe(`/api/images/dlink%2Cdwr-921-c3-uboot/${MINI_PROFILE.folder}`)
+})
+
+function libraryClient(): QueryClient {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  client.setQueryData(['library', 'all'], { entries: [], read_at: null, skipped: 0, error: null })
+  return client
+}
+
+test('deleting an image marks the image library out of date', async () => {
+  images = [MINI_PROFILE]
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  const client = libraryClient()
+  const user = renderImages(client)
+  await user.click(await screen.findByRole('button', { name: 'Delete' }))
+  await vi.waitFor(() => expect(client.getQueryState(['library', 'all'])?.isInvalidated).toBe(true))
+})
+
+test('importing an image marks the image library out of date', async () => {
+  const client = libraryClient()
+  const user = renderImages(client)
+  await screen.findByText(/No image imported yet/)
+  await user.upload(screen.getByLabelText('Import image…'), new File([new Uint8Array(8)], 'mini-r35692.bin'))
+  await screen.findByText(MINI_PROFILE.label)
+  await vi.waitFor(() => expect(client.getQueryState(['library', 'all'])?.isInvalidated).toBe(true))
 })

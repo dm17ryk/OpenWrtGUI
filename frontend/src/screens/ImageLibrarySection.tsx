@@ -9,7 +9,7 @@ import { HELP } from '../help/topics'
 const LIBRARY_KEY = ['library', 'all']
 
 const readTime = (readAt: string): string =>
-  new Date(readAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+  new Date(readAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
 
 const detail = (err: unknown): string => (err instanceof ApiError ? err.detail : String(err))
 
