@@ -2,12 +2,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { ApiError, apiFetch, postBytes } from '../api/client'
 import type { ProfileOut } from '../api/types'
+import { megabytes } from '../format'
 import { Help, HelpTip } from '../help/Help'
 import { HELP } from '../help/topics'
-
-export function megabytes(size: number | null): string {
-  return size === null ? '' : `${(size / 2 ** 20).toFixed(1)} MB`
-}
 
 /** Send a sysupgrade file to the app; it is read on this PC, nothing goes to a router. */
 async function importImage(file: File): Promise<ProfileOut> {
@@ -90,6 +87,11 @@ export function ImagesSection() {
               {p.source === 'rom' ? 'from a router’s /rom' : `${p.image_name} · ${megabytes(p.image_size)}`}
               {p.custom.length > 0 ? ` · custom: ${p.custom.join(', ')}` : ''}
             </span>
+            {p.origin && (
+              <a href={p.origin} target="_blank" rel="noopener noreferrer">
+                from the image library
+              </a>
+            )}
           </div>
           <span className="spacer" />
           <button className="btn" type="button" onClick={() => void remove(p)}>

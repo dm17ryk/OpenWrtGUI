@@ -55,6 +55,22 @@ test('imports an image and lists it', async () => {
   expect(calls.find((c) => c.name)).toEqual({ path: '/api/images', name: 'mini-r35692.bin' })
 })
 
+test('links an image from the library to its release', async () => {
+  images = [{ ...MINI_PROFILE, origin: 'https://github.com/dm17ryk/openwrt/releases/tag/x' }]
+  renderImages()
+  expect(await screen.findByRole('link', { name: 'from the image library' })).toHaveAttribute(
+    'href',
+    'https://github.com/dm17ryk/openwrt/releases/tag/x',
+  )
+})
+
+test('shows no library link for a hand-imported image', async () => {
+  images = [MINI_PROFILE]
+  renderImages()
+  await screen.findByText(MINI_PROFILE.label)
+  expect(screen.queryByRole('link', { name: 'from the image library' })).not.toBeInTheDocument()
+})
+
 test('shows why an import was refused', async () => {
   importError = new ApiError(422, 'No squashfs root file system in x.bin', null)
   const user = renderImages()

@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { ApiError, apiFetch, postJson } from '../../api/client'
 import type { LibraryOut, ProfileOut } from '../../api/types'
-import { megabytes } from '../ImagesSection'
+import { megabytes } from '../../format'
 
 type Props = {
   board: string
