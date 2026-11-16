@@ -7,6 +7,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-11-16
+
+The image library.
+
+### Added
+
+- Discovery finds a router's exact firmware build in the releases of dm17ryk/openwrt and downloads and imports it
+  on one click; Settings › Images lists every image the library offers. Nothing is downloaded without a click,
+  and a download that does not match its release's profiles.json is not kept.
+
 ## [0.8.1] - 2026-11-16
 
 A fix for Add router.
@@ -331,7 +341,8 @@ The foundation: install, update, add routers, see them, and stay out of a runnin
 - Router simulator built from recorded router output, used for e2e tests, screenshots and demos.
 - CI, pre-release and release workflows, wiki sync, CodeQL and Dependabot.
 
-[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.8.2
 [0.8.1]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.8.1
 [0.8.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.8.0
 [0.7.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.7.0
