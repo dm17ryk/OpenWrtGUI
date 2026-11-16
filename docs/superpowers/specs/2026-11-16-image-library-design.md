@@ -29,8 +29,11 @@ getting it too.
   - Other files that are not OpenWrt images for these routers (D-Link stock firmware, a PDF, guides, an
     unrelated board's images).
 - **How the app matches an image.** `ProfileStore.match(board, revision)` (`src/openwrtgui/images/store.py`)
-  compares the router's `board_name` and revision with each imported profile. The two values in `profiles.json`
-  are the same strings: `supported_devices[]` holds board names and `version_code` the revision.
+  compares the router's `board_name` with each profile's `key.board` and the revision with `key.revision`.
+  `key.board` is the first board in the image's own metadata (fwtool `supported_devices`), not every entry of
+  `profile.boards`; Flash, by contrast, accepts any entry of `profile.boards`. If several imported profiles match,
+  `match` prefers one from an image over one from `/rom`, then the newest import. In `profiles.json` the same
+  strings appear: `supported_devices[]` holds board names and `version_code` the revision.
 - **Import.** `POST /api/images` takes the raw bytes; `ProfileStore.import_image(data, name, now)` builds the
   profile from the image and stores `profile.json` plus a copy of the image under
   `<data>/profiles/<board>/<revision>-<sha256[:12]>/`. The limit is `MAX_IMAGE` (64 MB).
@@ -42,8 +45,9 @@ getting it too.
 
 ## Goals
 
-1. On Discovery, a router with no matching profile shows whether the image library has its exact build (same
-   board, same revision). If it does, one button downloads and imports it.
+1. On Discovery, a router with no matching image shows whether the image library has its exact build (same
+   board, same revision). This includes a router matched only by a profile built from its `/rom`. If the library
+   has the build, one button downloads and imports it.
 2. Settings › Images lists every image the library offers for these routers, with its board, revision, release,
    size and whether it is already imported, and can download any of them. This is how a person gets a different
    build to flash.
@@ -88,9 +92,12 @@ These would make it a failure even if it works:
   (`validate_firmware_image`, `sysupgrade -T`, the board check).
 - **Sizes.** `profiles.json` at most 1 MB. An image at most `MAX_IMAGE` (64 MB), checked against the catalog's
   `size` before downloading and while streaming.
-- **The simulator and CI never reach GitHub.** In simulator mode the library reads a built-in fake catalog served
-  by the simulator, and its download returns the simulator's image (`simimage.py`), so e2e tests and CI stay
-  offline and deterministic.
+- **The simulator and CI never reach GitHub.** In simulator mode GitHub is the simulator's stand-in
+  `simulator.sim_http_client`, the updater's mock. Today it answers any path ending in `/releases` with the
+  updater's `tests/fixtures/github/releases.json`, so it must be split by repository: `dm17ryk/openwrt/releases`
+  gets a fake firmware release whose `profiles.json` describes the simulator's image
+  (`tests/fixtures/images/mini-r35692.bin`, loaded in `simulator.py`), and that asset's URL returns those bytes.
+  e2e tests and CI stay offline and deterministic.
 - **The firmware workflow keeps attaching `profiles.json`** and the sysupgrade image to each release. A release
   without `profiles.json` is not in the library. This goes in the manual's "Adding a router family".
 
@@ -109,11 +116,11 @@ These would make it a failure even if it works:
 
 ### The catalog
 
-A library entry is one sysupgrade image from one release:
+A library entry is one sysupgrade image (one SHA-256), from the newest release that has it:
 
 | Field | From |
 |---|---|
-| board | each string in a device profile's `supported_devices` (one entry per board) |
+| boards | the device profile's `supported_devices`, in order. The entry is offered to a router whose board equals the first one, because that is the board an imported image is matched by (`key.board`). Changing `match` to look at every board is out of scope. *(My call.)* |
 | revision | `profiles.json` `version_code` |
 | target | `profiles.json` `target` (shown, not matched) |
 | title | the profile's `titles[0]`: vendor, model, variant |
@@ -143,7 +150,7 @@ A library entry is one sysupgrade image from one release:
 4. Compare the SHA-256 with the catalog's. A mismatch: "<name> does not match its release's profiles.json;
    nothing was imported."
 5. Import through `ProfileStore.import_image`, the same code as **Import image…**. If the profile it builds has a
-   different board or revision than the catalog entry, delete the new profile and refuse.
+   `key.board` other than the entry's first board, or a different revision, delete the new profile and refuse.
 6. Record where it came from: `Profile` gains `origin: str | None` (the release URL, default None so existing
    `profile.json` files still load).
 7. Clear the discovery summaries, as `POST /api/images` does.
@@ -161,9 +168,15 @@ A library entry is one sysupgrade image from one release:
 - `POST /api/images/library/{sha256}` downloads and imports, and returns `ProfileOut` like `POST /api/images`.
 - `ProfileOut` gains `origin`.
 
-### Discovery (Image card, no matching profile)
+### Discovery (Image card)
 
-The note and the two buttons stay. Underneath, the library line, from the separate query:
+The library line shows in two cases:
+- **No matching profile.** The note and the two buttons stay, with the library line underneath.
+- **The match is a profile built from `/rom`.** "Matches … (built from this router's /rom)" stays, and the library
+  line offers the image, because Check firmware and Flash need it. After the download, `match` already prefers the
+  image over the `/rom` profile. *(My call.)*
+
+Here is the first case, with the library line filled in from the separate query:
 
 ```text
 No imported image for dlink,dwr-921-c3-uboot r35692-b8bffeefdf. Import its sysupgrade image (Settings › Images),
@@ -177,6 +190,11 @@ Image library: D-Link DWR-921 C3 (U-Boot), r35692-b8bffeefdf, 11.3 MB, release D
   for <board> <revision>." On an error: the error text. In both cases the other two buttons work as today.
 - While downloading, the button reads "Downloading 11.3 MB…" and every button in the card is disabled. When it
   finishes, the card refreshes and shows the normal "Matches …" view.
+- **Several builds of one revision.** A rebuild from the same source commit with a different configuration keeps
+  the revision but changes the image. When the library has more than one image (different SHA-256) for the
+  router's board and revision, Discovery offers the one from the newest release and adds "N other builds of this
+  revision are listed in Settings › Images; Check firmware tells whether the router runs the one you
+  downloaded." `match` keeps its tie-break (the newest import) when several imported images match. *(My call.)*
 
 ### Settings › Images
 
@@ -203,7 +221,10 @@ This follows the 0.8.1 path:
    `[0.8.2]` section and link references.
 2. `release/v0.8.2` is cut from the `v0.8.1` tag. The feature commits are cherry-picked onto it, conflicts
    resolved there (master has changed `discovery/state.py`, `discovery/service.py` and `images/profile.py` since
-   v0.8.1), then the six version files go to 0.8.2:
+   v0.8.1). The release branch must also carry the CHANGELOG `[0.8.2]` section: `release.yml` builds the notes
+   with `tools/release_notes.py`, which fails when the tagged commit has no `## [0.8.2]` section. On 0.8.1 it
+   arrived with the cherry-picked fix commit, so put the section in a commit that is cherry-picked too. Then the
+   six version files go to 0.8.2:
    - `src/openwrtgui/version.py`;
    - `pyproject.toml`;
    - `uv.lock`;
@@ -236,13 +257,27 @@ This follows the 0.8.1 path:
   - the 403 rate-limit message names the reset time;
   - the cache serves a second read within 10 minutes, and Refresh bypasses it.
 - **API tests** for the three endpoints, plus a check that the Discovery read makes no request to GitHub.
+- **More catalog cases:** a device profile with two supported boards gives one entry, offered only for the first
+  board; two different images for one board and revision offer the newest and count the other.
 - **Frontend (vitest):**
-  - the Image card's library line in each state (looking, match, none, error, downloading);
+  - the Image card's library line in each state (looking, match, none, error, downloading), and with a `/rom`
+    match;
   - Settings › Images with the library table.
 - **e2e against the simulator:** a router with no profile shows the library match; **Download and import** turns
   the card into "Matches …".
 - **Not tested automatically:** the real GitHub API. Once on a bench PC, after 0.8.2 is installed: open AP2's
   Discovery and download its image from the library. This is read-only for the router.
+
+## Calls made without Dmitry
+
+A fresh reviewer read this design as its builder would. These are the calls I made on what it asked; each is
+marked *(My call.)* above.
+
+1. **Several builds of one revision:** Discovery offers the newest and counts the others; Check firmware tells
+   which one the router runs.
+2. **Images that list several boards:** one entry per image, offered only to a router whose board is the first
+   listed, as imported images are matched today.
+3. **A router matched only by a `/rom` profile** is offered the library image too.
 
 ## Left to the builder
 
