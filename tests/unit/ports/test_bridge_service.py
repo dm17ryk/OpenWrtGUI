@@ -3,10 +3,13 @@ itself."""
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from bridgeenv import BridgeEnv
 
 from openwrtgui.guard.bench_guard import GuardLocked
+from openwrtgui.ports.bridge import LiveVlan
 from openwrtgui.ports.bridge_rules import BridgeVlanRequest
 from openwrtgui.ports.bridge_service import BridgeVlanService
 from openwrtgui.transport.base import CommandResult
@@ -83,6 +86,7 @@ async def test_a_pending_rollback_of_another_client_refuses_the_change(bridge: B
     assert not result.applied
     assert result.error == "The router refused the change: Command failed: Permission denied"
     assert 20 not in {v.vlan for v in (await _svc(bridge).state("ap5")).vlans}
+    assert any(e.command.startswith("ubus call session destroy") for e in bridge.audit.query())  # #68
 
 
 async def test_nothing_to_apply_and_bench_guard(bridge: BridgeEnv) -> None:
@@ -113,3 +117,29 @@ async def test_an_unreadable_report_never_proves_a_change_that_leaves_no_vlans(b
 async def test_a_digest_that_differs_sends_nothing(bridge: BridgeEnv) -> None:
     with pytest.raises(PreviewChanged):
         await _svc(bridge).apply("ap5", [_req(None, 20, {"lan2": "t"})], [], "0" * 16)
+
+
+async def test_a_section_changed_twice_is_refused_before_the_preview(bridge: BridgeEnv) -> None:
+    """v1.0a3 minor (#66), v1.0b2 D12: the API can send it, the card cannot."""
+    s10 = (await _sections(bridge))[10]
+    with pytest.raises(ValueError, match=f"^{s10} is changed twice in one apply$"):
+        await _svc(bridge).plan("ap5", [_req(s10, 10, {"lan1": "t"})], [s10])
+    with pytest.raises(ValueError, match=f"^{s10} is changed twice in one apply$"):
+        await _svc(bridge).plan("ap5", [], [s10, s10])
+
+
+class _WithWifi:
+    """netifd's report with a Wi-Fi interface in VLAN 1: wireless interfaces join the bridge, not the
+    editor."""
+
+    async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
+        vlan = {"id": 1, "local": True, "ports": ["lan1", "lan2", "phy0-ap0"]}
+        return CommandResult(command, json.dumps({"switch": {"bridge-vlans": [vlan]}}), "", 0)
+
+
+async def test_a_wifi_interface_in_a_bridge_vlan_is_left_out_of_the_proof(bridge: BridgeEnv) -> None:
+    """v1.0a3 test gap (#68)."""
+    want = (LiveVlan(1, True, frozenset({"lan1", "lan2"})),)
+    verify = _svc(bridge)._verify("switch", frozenset({"lan1", "lan2"}), want)
+    checks = await verify(_WithWifi())  # type: ignore[arg-type]
+    assert [(c.name, c.ok) for c in checks] == [("bridge", True)]

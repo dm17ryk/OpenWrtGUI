@@ -37,6 +37,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   by name. Tool cards: a file that cannot be read is moved aside before a save, not overwritten.
 - LTE: the modem's AT port is used by one exchange at a time per router (the state read and the console no longer
   run two microcom at once); the metric is a whole number from 0 to 4294967295.
+- VLAN editor: a section deleted and changed, or changed twice, in one apply is refused before the preview.
 
 ### Security
 

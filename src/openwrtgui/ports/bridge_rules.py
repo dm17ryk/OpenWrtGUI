@@ -190,9 +190,20 @@ def _want(final: Mapping[int, _Final]) -> tuple[LiveVlan, ...]:
     )
 
 
+def _changed_once(upserts: Sequence[BridgeVlanRequest], deletes: Sequence[str]) -> None:
+    """A section is deleted or upserted once per apply: twice, the later op would act on what the first did
+    and the apply would roll back (v1.0b2 D12)."""
+    seen: set[str] = set()
+    for section in [*deletes, *(u.section for u in upserts if u.section)]:
+        if section in seen:
+            raise ValueError(f"{section} is changed twice in one apply")
+        seen.add(section)
+
+
 def bridge_change(
     state: BridgeState, upserts: Sequence[BridgeVlanRequest], deletes: Sequence[str], router_name: str
 ) -> BridgeChange:
+    _changed_once(upserts, deletes)
     bridge = _editable(state)
     by_section = {v.section: v for v in state.vlans}
     for section in deletes:
