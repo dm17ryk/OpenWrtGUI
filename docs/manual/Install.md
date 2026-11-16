@@ -51,6 +51,8 @@ data folder.
 
 - **Yes** deletes `routers.json`, `settings.json`, `known_hosts`, `keys\`, `audit\`, `updates\`, `logs\` and
   `backups\` (the routers' backups hold password hashes and Wi-Fi keys).
+- If a program still has a file open in the backups or keys folder, that folder cannot be deleted. The
+  uninstaller then says which folders are still there; delete them by hand.
 - `exports\`, `profiles\`, `reflash\`, `tools\` and `steps\` stay, and so does the folder while they are in it:
   delete them by hand if you no longer need them.
 

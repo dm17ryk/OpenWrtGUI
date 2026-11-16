@@ -179,3 +179,17 @@ def test_uninstall_deletes_backups_and_the_manual_says_what() -> None:
     yes = uninstall.split("**Yes** deletes", 1)[1].split("\n- ", 1)[0]
     documented = set(re.findall(r"`([a-z_.]+)\\?`", yes))
     assert documented == deleted, sorted(documented ^ deleted)
+
+
+def test_uninstall_says_when_secrets_remain() -> None:
+    """PR #74 review (2026-11-16): a locked or access-denied file can keep backups\\ or keys\\ after Yes, and
+    DelTree's result was ignored. The uninstaller then names the folders still there instead of finishing
+    silently, without failing the uninstall."""
+    iss = _read(ROOT / "installer" / "OpenWrtGUI.iss")
+    body = iss.split("procedure DeleteAppData", 1)[1].split("\nend;", 1)[0]
+    for folder in ("backups", "keys"):
+        assert f"DirExists(Dir + '\\{folder}')" in body, folder
+    assert "mbError, MB_OK" in body and "by hand" in body
+    uninstall = _read(MANUAL / "Install.md").split("## Uninstall", 1)[1].split("\n## ", 1)[0]
+    manual = " ".join(uninstall.split())
+    assert "cannot be deleted" in manual and "by hand" in manual
