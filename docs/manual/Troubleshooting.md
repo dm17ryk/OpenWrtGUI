@@ -29,7 +29,11 @@ The wizard tries `id_ed25519`, `id_ecdsa` and `id_rsa` from `%HOME%\.ssh` and fr
 profile's `.ssh`, as the user `root`. It skips:
 
 - keys protected by a passphrase (it cannot unlock them, and does not use an SSH agent);
-- keys with other file names or in other folders.
+- keys with other file names or in other folders;
+- a `.ssh` folder Windows does not let the app enter. A profile `.ssh` that is a junction (for example to
+  `C:\Essence_SC\home\.ssh`) can be one: Windows may refuse to follow it for the app ("untrusted mount
+  point") although `ssh` in a terminal follows it. Set `HOME` so `%HOME%\.ssh` is the real folder, or
+  choose the key file yourself.
 
 For those, choose **Use a key file I already have** in the login form and point to the file, or log in
 with the password once and let the app install its own key.

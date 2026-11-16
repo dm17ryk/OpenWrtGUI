@@ -25,6 +25,11 @@ from openwrtgui.transport.base import (
 
 log = logging.getLogger(__name__)
 
+# Unset, asyncssh looks for ~/.ssh/ca-bundle.crt and ~/.ssh/crt (X.509 CAs; the app pins host keys and uses
+# neither). The installed app may not enter a ~/.ssh that is a junction (WinError 448), and that look-up
+# failed every login, so every connect passes this.
+NO_X509: dict[str, None] = {"x509_trusted_certs": None, "x509_trusted_cert_paths": None}
+
 
 def _text(out: object) -> str:
     if isinstance(out, bytes):
@@ -198,6 +203,7 @@ class SshTransport:
                     config=[],
                     agent_path=None,
                     known_hosts=str(host_keys.path),
+                    **NO_X509,
                     disable_trivial_auth=prove,
                 ),
                 timeout,

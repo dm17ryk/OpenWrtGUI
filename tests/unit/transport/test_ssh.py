@@ -1,5 +1,7 @@
 import asyncio
+import errno
 import logging
+import os
 import socket
 from pathlib import Path
 
@@ -47,6 +49,29 @@ async def test_fetch_and_pin_then_password_login(ssh_server: SshServer, tmp_path
         assert (await t.run("echo hi")).stdout == "hi\n"
         r = await t.run("nope")
         assert r.exit_status == 127 and "unknown" in r.stderr
+    finally:
+        await t.close()
+
+
+async def test_a_login_reads_nothing_from_the_ssh_folder(
+    ssh_server: SshServer, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # asyncssh looks for ~/.ssh/crt (X.509 CAs) unless told not to. The installed app got WinError 448
+    # ("untrusted mount point") there, on a junction, and every typed login failed with it.
+    store = await _pinned(ssh_server, tmp_path)
+    real_stat = Path.stat
+
+    def stat(self: Path, *, follow_symlinks: bool = True) -> os.stat_result:
+        if ".ssh" in self.parts:
+            raise OSError(errno.EINVAL, "The path cannot be traversed: untrusted mount point", str(self))
+        return real_stat(self, follow_symlinks=follow_symlinks)
+
+    monkeypatch.setattr(Path, "stat", stat)
+    t = await SshTransport.connect(
+        "127.0.0.1", ssh_server.port, "root", host_keys=store, password=TEST_PASSWORD
+    )
+    try:
+        assert (await t.run("echo hi")).stdout == "hi\n"
     finally:
         await t.close()
 

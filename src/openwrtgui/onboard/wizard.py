@@ -32,7 +32,7 @@ from openwrtgui.store.keys import AppKey
 from openwrtgui.store.routers import RouterRecord, RouterStore, make_router_id
 from openwrtgui.transport.base import AuthFailed, HostKeyInfo, KeyFileError, Transport, TransportError
 from openwrtgui.transport.pool import ConnectionPool
-from openwrtgui.transport.ssh import HostKeyStore, SshTransport, fetch_host_key
+from openwrtgui.transport.ssh import NO_X509, HostKeyStore, SshTransport, fetch_host_key
 
 log = logging.getLogger(__name__)
 
@@ -87,6 +87,7 @@ async def read_identity_unchecked(host: str, port: int, timeout: float = 10.0) -
                 config=[],
                 agent_path=None,
                 known_hosts=None,
+                **NO_X509,
             ),
             timeout,
         )
