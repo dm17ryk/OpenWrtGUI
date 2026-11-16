@@ -16,6 +16,16 @@ test('Settings imports sysupgrade images', async ({ page, request, baseURL }, in
   await expect(images.getByText(`${BOARD} r35700-0c0ffee000`).first()).toBeVisible()
 })
 
+test('Discovery downloads AP1’s image from the library', async ({ page, request, baseURL }, info) => {
+  test.skip(info.project.name !== 'desktop-light', 'one project changes the image store')
+  await clearImages(request, baseURL ?? '')
+  await open(page, '/routers/ap1/discovery')
+  await expect(page.getByText(/^Image library: .*r35692-b8bffeefdf/)).toBeVisible()
+  await page.getByRole('button', { name: 'Download and import' }).click()
+  await expect(page.getByText('Matches', { exact: false }).first()).toContainText('dlink,dwr-921-c3-uboot r35692-b8bffeefdf')
+  await ensureImages(request, baseURL ?? '') // leave both mini images for the tests after it
+})
+
 test('Discovery shows what AP1 changed since flashing and fits the window', async ({ page, request, baseURL }) => {
   await ensureImages(request, baseURL ?? '')
   await open(page, '/routers/ap1/discovery')

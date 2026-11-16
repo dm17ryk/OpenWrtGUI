@@ -5,7 +5,7 @@ import type { ProfileOut } from '../api/types'
 import { Help, HelpTip } from '../help/Help'
 import { HELP } from '../help/topics'
 
-function megabytes(size: number | null): string {
+export function megabytes(size: number | null): string {
   return size === null ? '' : `${(size / 2 ** 20).toFixed(1)} MB`
 }
 
@@ -14,10 +14,10 @@ async function importImage(file: File): Promise<ProfileOut> {
   return postBytes<ProfileOut>('/api/images', await file.arrayBuffer(), file.name)
 }
 
-type ImportProps = { onImported: (profile: ProfileOut) => void }
+type ImportProps = { onImported: (profile: ProfileOut) => void; disabled?: boolean }
 
 /** The file picker with its busy and error states (Settings › Images and Discovery's no-match note). */
-export function ImportImage({ onImported }: ImportProps) {
+export function ImportImage({ onImported, disabled = false }: ImportProps) {
   const [isBusy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const pick = async (file: File | undefined): Promise<void> => {
@@ -42,7 +42,7 @@ export function ImportImage({ onImported }: ImportProps) {
             accept=".bin"
             aria-label="Import image…"
             hidden
-            disabled={isBusy}
+            disabled={isBusy || disabled}
             onChange={(e) => void pick(e.target.files?.[0])}
           />
         </label>
