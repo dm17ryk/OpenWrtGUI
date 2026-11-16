@@ -24,9 +24,22 @@ export function BridgeVlanCard({ routerId, short, state, onApplied }: Props) {
     onApplied()
   })
   const update = (key: string, patch: Partial<BridgeRow>): void => setEdited(rows.map((r) => (r.key === key ? { ...r, ...patch } : r)))
+  const vlanOf = (row: BridgeRow) => state.vlans.find((x) => x.section === row.section)
   const usedBy = (row: BridgeRow): string => {
-    const v = state.vlans.find((x) => x.section === row.section)
+    const v = vlanOf(row)
     return v ? v.used_by.join(' · ') || '—' : 'new'
+  }
+  // what the router would refuse is greyed, with its reason as the title (v1.0a3 minor #67, v1.0c Task 13)
+  const localLock = (row: BridgeRow): string | null => {
+    const v = vlanOf(row)
+    return v?.own && row.local ? `VLAN ${v.vlan} carries ${state.own_interface}, this app's connection: the router stays in it, so local stays on.` : null
+  }
+  const deleteLock = (row: BridgeRow): string | null => {
+    const v = vlanOf(row)
+    if (!v) return null
+    const iface = v.used_by[0]
+    if (iface) return `VLAN ${v.vlan} carries ${iface} (${state.bridge}.${v.vlan}). Move ${iface} to another device first.`
+    return v.own ? `VLAN ${v.vlan} carries ${state.own_interface}, this app's connection.` : null
   }
   const carry = state.ports.filter((p) => p.may_carry).map((p) => p.name)
   return (
@@ -101,12 +114,27 @@ export function BridgeVlanCard({ routerId, short, state, onApplied }: Props) {
                   )
                 })}
                 <td>
-                  <input type="checkbox" aria-label={`VLAN ${row.vlan} local`} checked={row.local} disabled={locked || row.deleted} onChange={(e) => update(row.key, { local: e.target.checked })} />
+                  <input
+                    type="checkbox"
+                    aria-label={`VLAN ${row.vlan} local`}
+                    checked={row.local}
+                    disabled={locked || row.deleted || localLock(row) !== null}
+                    title={localLock(row) ?? undefined}
+                    onChange={(e) => update(row.key, { local: e.target.checked })}
+                  />
                 </td>
                 <td className="mono">{usedBy(row)}</td>
                 <td>
                   {locked ? null : row.section ? (
-                    <button className="btn danger" type="button" aria-label={`Delete VLAN ${row.vlan}`} aria-pressed={row.deleted} onClick={() => update(row.key, { deleted: !row.deleted })}>
+                    <button
+                      className="btn danger"
+                      type="button"
+                      aria-label={`Delete VLAN ${row.vlan}`}
+                      aria-pressed={row.deleted}
+                      disabled={!row.deleted && deleteLock(row) !== null}
+                      title={row.deleted ? undefined : (deleteLock(row) ?? undefined)}
+                      onClick={() => update(row.key, { deleted: !row.deleted })}
+                    >
                       {row.deleted ? 'Keep' : 'Delete'}
                     </button>
                   ) : (

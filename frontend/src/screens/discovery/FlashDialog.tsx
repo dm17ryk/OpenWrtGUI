@@ -1,10 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { ApiError, apiFetch, postJson } from '../../api/client'
-import type { FlashJob, FlashPlanOut, ProfileOut } from '../../api/types'
+import type { FlashJob, FlashPlanOut, GuardOut, ProfileOut } from '../../api/types'
 import { PreviewApply } from '../../components/PreviewApply'
 import { Help } from '../../help/Help'
 import { HELP } from '../../help/topics'
+import { guardReasonText } from '../../shell/guardText'
 import { usePreview } from '../wifi/usePreview'
 import { CopyBack } from './CopyBack'
 
@@ -58,6 +59,9 @@ function Progress({ job, name }: { job: FlashJob; name: string }) {
 export function FlashDialog({ routerId, routerName, board, revision, pollMs = 1000, onClose }: Props) {
   const client = useQueryClient()
   const images = useQuery({ queryKey: ['images'], queryFn: () => apiFetch<ProfileOut[]>('/api/images') })
+  // a flash is refused while a harness run is live: grey it and say why (v0.5 minor #19, v1.0c Task 13)
+  const guard = useQuery({ queryKey: ['guard'], queryFn: () => apiFetch<GuardOut>('/api/guard') })
+  const runLive = guard.data?.live ?? false
   const job = useQuery({
     queryKey: ['flash', routerId],
     queryFn: () => apiFetch<FlashJob | null>(`/api/routers/${routerId}/flash`),
@@ -181,13 +185,14 @@ export function FlashDialog({ routerId, routerName, board, revision, pollMs = 10
                 Type the router’s name to flash it
                 <input value={typed} placeholder={routerName.split(' · ')[0]} onChange={(e) => setTyped(e.target.value)} />
               </label>
+              {runLive && guard.data && <div className="note w">{`Bench Guard: ${guardReasonText(guard.data)}`}</div>}
               <PreviewApply
                 heading={`Commands that will run on ${routerName}`}
                 lines={preview?.plan?.lines ?? []}
                 warnings={preview?.plan?.warnings ?? []}
                 error={startError ?? preview?.error ?? null}
                 isBusy={isStarting}
-                isDisabled={!isNamed(typed, routerName)}
+                isDisabled={!isNamed(typed, routerName) || runLive}
                 applyLabel="Flash"
                 onApply={() => void start()}
                 helpTopic={HELP.flash}

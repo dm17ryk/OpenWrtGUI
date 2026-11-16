@@ -160,6 +160,24 @@ test('a DSA router shows its bridge VLANs and the SSH ports', async () => {
   expect(screen.getByRole('button', { name: 'Help: VLANs on a DSA router' })).toBeInTheDocument()
 })
 
+test("the app's own VLAN keeps Local on and cannot be deleted", async () => {
+  renderPorts('ap5')
+  const card = await screen.findByRole('region', { name: 'VLANs · switch' })
+  const local = within(card).getByRole('checkbox', { name: 'VLAN 1 local' })
+  expect(local).toBeDisabled()
+  expect(local).toHaveAttribute('title', "VLAN 1 carries lan, this app's connection: the router stays in it, so local stays on.")
+  expect(within(card).getByRole('button', { name: 'Delete VLAN 1' })).toBeDisabled()
+})
+
+test('a VLAN an interface uses cannot be deleted, and says why', async () => {
+  renderPorts('ap5')
+  const card = await screen.findByRole('region', { name: 'VLANs · switch' })
+  const del = within(card).getByRole('button', { name: 'Delete VLAN 10' })
+  expect(del).toBeDisabled()
+  expect(del).toHaveAttribute('title', 'VLAN 10 carries iot (switch.10). Move iot to another device first.')
+  expect(within(card).getByRole('checkbox', { name: 'VLAN 10 local' })).toBeEnabled()
+})
+
 test('a bridge cell click previews the change with the rollback', async () => {
   const user = renderPorts('ap5')
   const card = await screen.findByRole('region', { name: 'VLANs · switch' })

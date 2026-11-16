@@ -2,10 +2,17 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, test, vi } from 'vitest'
-import type { FlashJob } from '../../api/types'
+import type { FlashJob, GuardOut } from '../../api/types'
 import { AP2_CHECKLIST, FLASH_PLAN, MINI_PROFILE, NEWER_PROFILE } from '../../testing/discovery'
 import { FlashDialog } from './FlashDialog'
 
+const CLEAR: GuardOut = { live: false, reasons: [], checked_at: '2026-11-08T12:00:00' }
+const LIVE: GuardOut = {
+  live: true,
+  reasons: [{ kind: 'process', detail: 'dima_night.py', pid: 18244, router: null, since: '21:04', text: 'dima_night.py started 21:04 (PID 18244)' }],
+  checked_at: '2026-11-08T21:05:00',
+}
+let guard: GuardOut = CLEAR
 const calls: Array<{ path: string; body?: unknown }> = []
 const START = '2026-11-08T12:00:00'
 const job = (phase: FlashJob['phase'], extra: Partial<FlashJob> = {}): FlashJob => ({
@@ -22,6 +29,7 @@ vi.mock('../../api/client', async (orig) => {
   const actual = await orig<typeof import('../../api/client')>()
   const respond = async (path: string, body?: unknown): Promise<unknown> => {
     calls.push({ path, body })
+    if (path === '/api/guard') return guard
     if (path === '/api/images') return [MINI_PROFILE, NEWER_PROFILE]
     if (path === '/api/routers/ap2/flash/preview') return FLASH_PLAN
     if (path === '/api/routers/ap2/flash/start') return job('upload', { sent: 0 })
@@ -39,6 +47,16 @@ vi.mock('../../api/client', async (orig) => {
 beforeEach(() => {
   calls.length = 0
   current = null
+  guard = CLEAR
+})
+
+test('Flash is greyed while a harness run is live', async () => {
+  guard = LIVE
+  const user = renderFlash()
+  await screen.findByRole('region', { name: 'Command preview' })
+  await user.type(screen.getByLabelText('Type the router’s name to flash it'), 'AP2')
+  expect(await screen.findByText('Bench Guard: dima_night.py started 21:04 (PID 18244)')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Flash' })).toBeDisabled()
 })
 
 function renderFlash() {
