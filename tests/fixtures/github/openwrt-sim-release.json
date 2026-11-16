@@ -1,0 +1,20 @@
+{
+  "tag_name": "sim",
+  "name": "Simulated bench firmware",
+  "html_url": "https://github.com/dm17ryk/openwrt/releases/tag/sim",
+  "published_at": "2026-11-01T09:00:00Z",
+  "prerelease": false,
+  "draft": false,
+  "assets": [
+    {
+      "name": "profiles.json",
+      "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/sim/profiles.json"
+    },
+    {
+      "name": "mini-r35692.bin",
+      "size": 65840,
+      "digest": "sha256:4ede1b92baa19361c0b8bde87dbee473de75a9409351f24104b415bce32fcec0",
+      "browser_download_url": "https://github.com/dm17ryk/openwrt/releases/download/sim/mini-r35692.bin"
+    }
+  ]
+}
