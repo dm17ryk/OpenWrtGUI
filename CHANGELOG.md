@@ -13,6 +13,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   alongside the operator query: about 2 s instead of 10-12 s per refresh.
 - Firewall › Legacy iptables reads every table in one command instead of nine, every 10 s.
 - LuCI pages: two lists asked at the same time read the router once, and a list read during a change is not kept.
+- Discovery: Run --help and tool cards check the program in two commands instead of reading the whole page again.
 
 ### Fixed
 

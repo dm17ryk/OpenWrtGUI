@@ -32,7 +32,7 @@ WARM = {
     ("ap1", "/api/routers/ap1/system/access"): 9,
 }
 AT_WARM = {("ap1", "/api/routers/ap1/lte"): 1}
-HELP_PREVIEW = 12  # Discovery Run --help preview on ap1 with the mini image's profile, the router described
+HELP_PREVIEW = 2  # Discovery Run --help preview on ap1 with the mini image's profile, the router described
 POLL_TICK = 7  # one status tick on ap1, after the first
 
 

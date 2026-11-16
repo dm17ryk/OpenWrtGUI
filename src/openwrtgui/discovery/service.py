@@ -18,7 +18,13 @@ from openwrtgui.discovery.copy import CopyRequest, SavedFile, check_copy_path, r
 from openwrtgui.discovery.firmware import FirmwareCheck, image_prefix_sha256, parse_proc_mtd
 from openwrtgui.discovery.overlay import parse_ls_ldn
 from openwrtgui.discovery.services import Action, read_service, service_command
-from openwrtgui.discovery.state import DiscoveryState, DiscoverySummary, no_match_note, read_discovery
+from openwrtgui.discovery.state import (
+    DiscoveryState,
+    DiscoverySummary,
+    listed_programs,
+    no_match_note,
+    read_discovery,
+)
 from openwrtgui.discovery.tools import ToolCard, ToolStore, help_command, tool_command
 from openwrtgui.fw import commands as fwc
 from openwrtgui.fw.nft import parse_ruleset_json
@@ -142,10 +148,9 @@ class DiscoveryService:
 
     # ---------------------------------------------------------------- Run --help and tool cards
     async def _program(self, router_id: str, path: str) -> tuple[RouterRecord, Transport, str]:
+        """Two reads, not the whole page again, for every Run --help and tool card (v1.0c Task 5, #17)."""
         rec, t, desc, profile = await self._context(router_id)
-        state = await self._read(rec, t, desc, profile)
-        listed = {p.path for row in state.custom for p in row.programs} | {p.path for p in state.programs}
-        if path not in listed:
+        if path not in await listed_programs(t, profile):
             raise ValueError(f"{path} is not a custom program of {rec.name}")
         return rec, t, desc.identity.board_name
 
