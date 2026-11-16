@@ -7,6 +7,9 @@ removes every interface on the phy, so a holder checks that it is still there an
 The leases never take the router's write lock: the beacon check already holds it, and asyncio's locks are not
 reentrant. Callers that do not hold it (capture, frame analysis) take it around `acquire`, `ensure` and
 `release`. `generation` moves on every add, so a holder sees that someone else put the monitor back.
+
+The monitor is on one phy at a time: while it is held, a holder that needs another phy is refused
+(`MonitorBusy`, v1.0b2 D8).
 """
 
 from __future__ import annotations
@@ -36,11 +39,22 @@ def _reason(result: CommandResult) -> str:
     return (result.stderr or result.stdout).strip() or f"exit {result.exit_status}"
 
 
+class MonitorBusy(ValueError):
+    """owgmon0 is held for another radio: one monitor never answers for two (v1.0b2 D8)."""
+
+
 class MonitorLeases:
     def __init__(self) -> None:
         self._holders: dict[str, list[str]] = {}
         self._locks: dict[str, asyncio.Lock] = {}
         self._generations: dict[str, int] = {}
+        self._phys: dict[str, str] = {}  # router id -> the phy owgmon0 is on while it is held
+
+    def _same_phy(self, router_id: str, holder: str, phy: str) -> None:
+        held = self._phys.get(router_id)
+        if self._holders.get(router_id) and held is not None and held != phy:
+            who = ", ".join(self._holders[router_id])
+            raise MonitorBusy(f"{MONITOR} is on {held} for {who}; {holder} needs {phy}")
 
     def _lock(self, router_id: str) -> asyncio.Lock:
         return self._locks.setdefault(router_id, asyncio.Lock())
@@ -61,6 +75,7 @@ class MonitorLeases:
         router refuses it; then this holder is not registered."""
         async with self._lock(router_id):
             if self._holders.get(router_id):
+                self._same_phy(router_id, holder, phy)
                 await self._ensure(router_id, phy, t, run)
             else:
                 try:
@@ -72,6 +87,7 @@ class MonitorLeases:
                 if not done.ok:
                     raise ValueError(_reason(done))
                 self._added(router_id)
+                self._phys[router_id] = phy
             self._holders.setdefault(router_id, []).append(holder)
 
     async def release(self, router_id: str, holder: str, run: RunFn, t: Transport) -> CommandResult | None:
@@ -86,6 +102,7 @@ class MonitorLeases:
             if held:
                 return None
             self._holders.pop(router_id, None)
+            self._phys.pop(router_id, None)
             done = await run(DEL, False)
             if done.ok:
                 return done

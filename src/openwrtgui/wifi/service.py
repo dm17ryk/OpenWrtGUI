@@ -33,7 +33,7 @@ from openwrtgui.wifi.compile import (
     tx_mask_args,
 )
 from openwrtgui.wifi.model import CCK_BASIC_KBPS, OFDM_BASIC_KBPS, ModeSelection, RadioRequest
-from openwrtgui.wifi.monitor import MONITOR, MonitorLeases
+from openwrtgui.wifi.monitor import MONITOR, MonitorBusy, MonitorLeases
 from openwrtgui.wifi.options import OptionEdit, OptionRow, compile_edits, option_rows
 from openwrtgui.wifi.parse import IwDevInfo, parse_beacon_rates, parse_iw_dev, parse_iw_dev_info
 from openwrtgui.wifi.state import (
@@ -674,6 +674,8 @@ class WifiService:
         holder = f"beacon check {rec.id} {phy}"
         try:  # a capture or frame analysis may hold owgmon0 already: it is shared, never removed under them
             await self._monitors.acquire(rec.id, holder, phy, t, run)
+        except MonitorBusy as exc:  # held for another radio: not heard here, not failed (v1.0b2 D8)
+            return Check("beacon rate", None, f"not checked: {exc}")
         except ValueError as exc:
             return Check("beacon rate", False, f"no monitor interface: {exc}")
         try:

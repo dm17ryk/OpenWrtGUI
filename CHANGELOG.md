@@ -27,6 +27,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   on screen.
 - Step-through: Restore waits for a System job or a flash as Start does; a saved file that lacks options restores
   nothing instead of deleting them; Start checks the radio name before anything else.
+- RF and the monitor: owgmon0 serves one radio at a time, so a beacon check on another radio says "not checked"
+  instead of reporting beacons from the wrong one; owgscan0 is removed after a dropped connection; an SSID such as
+  "MCS 7" no longer counts as a rate.
 
 ### Security
 
