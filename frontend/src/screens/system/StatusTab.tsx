@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router'
-import { ApiError, apiFetch, openSocket } from '../../api/client'
+import { ApiError, apiFetch } from '../../api/client'
+import { reconnectText, useLiveSocket } from '../../api/useLiveSocket'
 import type { Connections, SystemMessage, SystemOverview, SystemSample } from '../../api/types'
 import { Help } from '../../help/Help'
 import { HELP } from '../../help/topics'
@@ -9,30 +10,21 @@ import { uptimeText } from '../net/rows'
 import { LiveCharts } from './LiveCharts'
 import { EMPTY_SYSTEM, mib, pushSystem, type SystemSeries } from './live'
 
-/** One sample every 3 s from /ws/system while the Status tab is open. */
+/** One sample every 3 s from /ws/system while the Status tab is open; it reconnects (v1.0c D7). */
 function useLiveSystem(routerId: string) {
   const [series, setSeries] = useState<SystemSeries>(EMPTY_SYSTEM)
   const [sample, setSample] = useState<SystemSample | null>(null)
   const [idle, setIdle] = useState<string | null>(null)
-  useEffect(() => {
-    const ws = openSocket(`/ws/system/${routerId}`)
-    ws.onmessage = (ev: MessageEvent<string>) => {
-      const msg = JSON.parse(ev.data) as SystemMessage
-      if (msg.type === 'system') {
-        setIdle(null)
-        setSample(msg.sample)
-        setSeries((s) => pushSystem(s, msg.sample))
-      } else {
-        setIdle(msg.reason)
-      }
+  const live = useLiveSocket<SystemMessage>(`/ws/system/${routerId}`, undefined, (msg) => {
+    if (msg.type === 'system') {
+      setIdle(null)
+      setSample(msg.sample)
+      setSeries((s) => pushSystem(s, msg.sample))
+    } else {
+      setIdle(msg.reason)
     }
-    ws.onclose = () => setIdle('Lost the connection to OpenWrtGUI. Open the System screen again.')
-    return () => {
-      ws.onclose = null
-      ws.close()
-    }
-  }, [routerId])
-  return { series, sample, idle }
+  })
+  return { series, sample, idle: reconnectText(live) ?? idle }
 }
 
 function space(total: number | null | undefined, free: number | null | undefined): string {

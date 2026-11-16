@@ -1,7 +1,8 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams } from 'react-router'
-import { apiFetch, openSocket } from '../../api/client'
+import { apiFetch } from '../../api/client'
+import { reconnectText, useLiveSocket } from '../../api/useLiveSocket'
 import type { LteMessage, LteSample, LteState, RouterDetail } from '../../api/types'
 import { Help } from '../../help/Help'
 import { HELP } from '../../help/topics'
@@ -14,31 +15,21 @@ import { SignalCharts } from './SignalCharts'
 import { EMPTY_SERIES, pushLte, type LteSeries } from './signal'
 import { SignalTiles, StatusCard } from './StatusCard'
 
-/** The live signal: one sample every 10 s from /ws/lte while the screen is open. */
+/** The live signal: one sample every 10 s from /ws/lte while the screen is open; it reconnects (v1.0c D7). */
 function useLiveSignal(routerId: string, enabled: boolean) {
   const [series, setSeries] = useState<LteSeries>(EMPTY_SERIES)
   const [sample, setSample] = useState<LteSample | null>(null)
   const [idle, setIdle] = useState<string | null>(null)
-  useEffect(() => {
-    if (!enabled) return undefined
-    const ws = openSocket(`/ws/lte/${routerId}`)
-    ws.onmessage = (ev: MessageEvent<string>) => {
-      const msg = JSON.parse(ev.data) as LteMessage
-      if (msg.type === 'lte') {
-        setIdle(null)
-        setSample(msg.sample)
-        setSeries((s) => pushLte(s, msg.sample))
-      } else {
-        setIdle(msg.reason)
-      }
+  const live = useLiveSocket<LteMessage>(enabled ? `/ws/lte/${routerId}` : null, undefined, (msg) => {
+    if (msg.type === 'lte') {
+      setIdle(null)
+      setSample(msg.sample)
+      setSeries((s) => pushLte(s, msg.sample))
+    } else {
+      setIdle(msg.reason)
     }
-    ws.onclose = () => setIdle('Lost the connection to OpenWrtGUI. Open the LTE screen again.')
-    return () => {
-      ws.onclose = null
-      ws.close()
-    }
-  }, [routerId, enabled])
-  return { series, sample, idle }
+  })
+  return { series, sample, idle: reconnectText(live) ?? idle }
 }
 
 export function LteScreen() {
