@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import errno
+import os
 from pathlib import Path
 
 import asyncssh
@@ -49,6 +51,26 @@ def test_same_folder_twice_lists_each_key_once(tmp_path: Path) -> None:
 
 def test_missing_folders_are_fine(tmp_path: Path) -> None:
     assert find_pc_keys([tmp_path / "nope"]) == []
+
+
+def test_a_folder_this_process_may_not_enter_is_skipped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The installed app got WinError 448 ("untrusted mount point") on %USERPROFILE%\.ssh, a junction to
+    # C:\Essence_SC\home\.ssh, and the whole automatic login failed. Such a folder only has no keys to offer.
+    blocked = tmp_path / "profile" / ".ssh"
+    _key(blocked / "id_ed25519")
+    home = tmp_path / "home" / ".ssh"
+    rsa = _key(home / "id_rsa")
+    real_stat = Path.stat
+
+    def stat(self: Path, *, follow_symlinks: bool = True) -> os.stat_result:
+        if self == blocked or blocked in self.parents:
+            raise OSError(errno.EINVAL, "The path cannot be traversed: untrusted mount point", str(self))
+        return real_stat(self, follow_symlinks=follow_symlinks)
+
+    monkeypatch.setattr(Path, "stat", stat)
+    assert find_pc_keys([blocked, home]) == [rsa]
 
 
 def test_ssh_dirs_has_home_first_then_the_profile(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

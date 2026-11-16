@@ -53,6 +53,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Plugin headers are read only from the plugin's declaration; Mount points refuse a negative root delay.
 - CI runs ruff's bandit rules, pip-audit and npm audit.
 
+## [0.8.1] - 2026-11-16
+
+A fix for Add router.
+
+### Fixed
+
+- Add router: a profile `.ssh` that Windows will not let the app enter (a junction, "untrusted mount point",
+  WinError 448) no longer stops the login. The automatic login skips that folder, and a typed login no longer
+  looks in `.ssh` at all (asyncssh's X.509 certificate look-up is off; the app pins host keys).
+
 ## [0.8.0] - 2026-11-15
 
 LuCI parity.
@@ -367,7 +377,8 @@ The foundation: install, update, add routers, see them, and stay out of a runnin
 - Router simulator built from recorded router output, used for e2e tests, screenshots and demos.
 - CI, pre-release and release workflows, wiki sync, CodeQL and Dependabot.
 
-[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.8.1
 [0.8.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.8.0
 [0.7.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.7.0
 [0.6.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.6.0
