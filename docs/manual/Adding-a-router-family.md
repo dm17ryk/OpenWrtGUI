@@ -20,6 +20,13 @@ When no image file is at hand, **Build from this router's /rom** on [Discovery](
 router's read-only root file system and builds the same profile, without file hashes. It cannot check the
 firmware or flash: import the image file for that.
 
+## Publish it to the image library
+
+To give every app a family's image, make a release in `dm17ryk/openwrt` that holds the build's `profiles.json`
+and its sysupgrade image. Within ten minutes the image appears in every app's [image library](Settings#image-library),
+and [Discovery](Discovery#image) offers it to a router with that board and revision. A release without
+`profiles.json` is not in the library.
+
 ## After importing
 
 Every router with that board and revision matches the profile. Its [Discovery](Discovery) screen then shows what
