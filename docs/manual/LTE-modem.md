@@ -83,8 +83,10 @@ Reset to factory defaults is not offered yet (open item O1).
 ## AT console
 
 Type an AT command (printable text starting with AT, at most 200 characters) and press **Send**; the answer
-shows with its status (OK, ERROR or no answer). Up and Down recall the last 50 commands. Every command goes
-to the audit log.
+shows with its status (OK, ERROR or no answer). Up and Down recall the last 50 commands. A command with a SIM
+PIN (`AT+CPIN=`, `AT+CLCK=`, `AT+CPWD=`) or an APN password (`AT+CGAUTH=`, `AT+QICSGP=`, `AT$QCPDPP=`) shows
+everything after its `=` as `<hidden>`, here and in the audit log, and is not kept for recall; a `=?` query of
+them shows as typed. Every command goes to the audit log.
 
 Queries (`AT`, `ATI`, `AT+CSQ`, `AT+CGMI`, `AT+CGMM`, `AT+CGMR`, and any `AT+<name>?` or `AT+<name>=?`)
 cannot change the modem and work any time, also during a harness run. Any other command may change the modem:

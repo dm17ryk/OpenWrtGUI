@@ -10,6 +10,7 @@ from apiconst import BASE, TOKEN, WS
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
+from openwrtgui.api.deps import WS_NOT_FOUND
 from openwrtgui.app import create_app
 from openwrtgui.context import AppContext
 from openwrtgui.onboard.wizard import install_key_command
@@ -222,3 +223,18 @@ def test_ws_terminal_line_mode_in_simulator(ctx: AppContext) -> None:
         out = ws.receive_json()
         assert out["type"] == "output" and "dwr-921" in out["data"]
         assert ws.receive_json() == {"type": "exit", "status": 0}
+
+
+def test_ws_rf_refuses_a_radio_that_is_not_a_name(ctx: AppContext) -> None:
+    """v1.0b1 D5: the radio names the CSV file and keys a sampler; a path is refused before either."""
+    tc = _ws_client(ctx)
+    url = f"{WS}/ws/rf/ap2?t={TOKEN}&radio=..%2F..%2Fx"
+    with pytest.raises(WebSocketDisconnect) as refused, tc.websocket_connect(url) as ws:
+        ws.receive_json()
+    assert refused.value.code == WS_NOT_FOUND
+
+
+def test_the_rf_hub_refuses_a_radio_that_is_not_a_name(ctx: AppContext) -> None:
+    for make in (ctx.rf.sampler, ctx.rf.frames):
+        with pytest.raises(ValueError, match="is not a radio name"):
+            make("ap2", "../x")

@@ -179,3 +179,15 @@ def test_the_reason_names_what_fails() -> None:
 def test_unread_access_groups_hide_nothing() -> None:
     facts = Facts({"/sbin/block": "executable"}, {}, None)
     assert why_hidden(PAGES["admin/system/mounts"], facts) is None
+
+
+def test_only_absolute_paths_are_asked() -> None:
+    """v1.0a1 minor: a menu path starting with '-' would be an ls option; only absolute paths reach ls."""
+    page = _page({"fs": {"-rf": "executable", "/sbin/block": "executable"}})
+    assert fs_paths([page]) == ["/sbin/block"]
+    dirs = _page({"fs": {"-x": "directory", "/sys/class/leds": "directory"}})
+    assert dir_paths([dirs]) == ["/sys/class/leds"]
+    with pytest.raises(ValueError, match="not an absolute path"):
+        files_command(["-rf"])
+    with pytest.raises(ValueError, match="not an absolute path"):
+        listing_command("-x")

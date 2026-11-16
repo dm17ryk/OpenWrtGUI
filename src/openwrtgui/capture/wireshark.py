@@ -27,7 +27,8 @@ class LiveSink:
         self._process = subprocess.Popen([str(path), "-k", "-i", "-"], stdin=subprocess.PIPE)  # noqa: S603
 
     def write(self, data: bytes) -> None:
-        assert self._process.stdin is not None
+        if self._process.stdin is None:
+            raise RuntimeError("Wireshark was started without a pipe")
         self._process.stdin.write(data)
         self._process.stdin.flush()
 

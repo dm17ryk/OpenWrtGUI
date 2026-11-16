@@ -18,13 +18,12 @@ from openwrtgui.busy import RouterBusy
 from openwrtgui.guard.audit import AuditLog, Source
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.guard.writes import run_audited
+from openwrtgui.ifname import RADIO, checked_ifname
 from openwrtgui.rf.air import (
-    RADIO,
     SCAN_DEL,
     SCAN_IF,
     SCAN_INFO,
     SCAN_TIMEOUT_S,
-    checked_ifname,
     scan_add,
     scan_command,
     survey_command,

@@ -136,7 +136,10 @@ def _missing(expected: Mapping[str, str | tuple[str, ...]], got: Mapping[str, tu
 
 
 def _gone(stderr: str, path: str) -> bool:
-    return any(line.endswith(f"{path}: No such file or directory") for line in stderr.splitlines())
+    """sha256sum's "no such file": GNU writes `<path>: No such…`, BusyBox `can't open '<path>': No such…`
+    (AP2, HW-3 2026-11-15)."""
+    endings = (f"{path}: No such file or directory", f"can't open '{path}': No such file or directory")
+    return any(line.endswith(endings) for line in stderr.splitlines())
 
 
 async def differing(

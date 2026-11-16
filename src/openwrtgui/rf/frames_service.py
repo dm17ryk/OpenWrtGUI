@@ -21,13 +21,13 @@ from typing import Any
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked
 from openwrtgui.guard.writes import run_audited
+from openwrtgui.ifname import checked_ifname
 from openwrtgui.rf.air import (
     FRAME_EVERY_S,
     FRAME_WINDOW,
     FRAME_WINDOW_S,
     FRAMES_LIMIT_S,
     MONITOR_FLAGS,
-    checked_ifname,
 )
 from openwrtgui.rf.frames import FrameWindow, combine, summarize
 from openwrtgui.store.routers import RouterRecord, RouterStore

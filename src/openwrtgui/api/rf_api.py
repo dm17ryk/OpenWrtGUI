@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from openwrtgui.api.deps import get_ctx, require_token
 from openwrtgui.context import AppContext
-from openwrtgui.rf.air import RADIO
+from openwrtgui.ifname import RADIO
 from openwrtgui.rf.frames_service import FrameAnalyzer, FramePlan, FrameState
 from openwrtgui.rf.scan_service import ScanPlan, ScanResult, Via
 

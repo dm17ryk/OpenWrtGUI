@@ -159,3 +159,13 @@ async def test_shutdown_restores(ctx: AppContext) -> None:
     job = ctx.steps.job("ap2")
     assert job is not None and job.phase == "stopped" and not job.restore_pending
     assert not (ctx.data.steps_dir / "ap2-radio0.json").exists()
+
+
+async def test_a_restore_radio_that_is_not_a_name_is_refused(
+    authed: httpx.AsyncClient, ctx: AppContext
+) -> None:
+    """v1.0b1 D5: the radio names the saved file and the uci path `wireless.<radio>`."""
+    r = await authed.post(f"{W}/step-through/restore", json={"radio": "../../steps/x"})
+    assert r.status_code == 422 and r.json()["detail"][0]["loc"] == ["body", "radio"]
+    with pytest.raises(ValueError, match="is not a radio name"):
+        await ctx.steps.restore("ap2", "../x")

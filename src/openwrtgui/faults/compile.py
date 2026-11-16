@@ -13,6 +13,7 @@ from openwrtgui.faults.commands import FAMILY_CHECKS
 from openwrtgui.faults.model import ArmedFault, FaultCaps, FaultRequest, FaultTarget, NetemParams
 from openwrtgui.fw.owners import APP_IFB, APP_ROOT, KERNEL_DEFAULTS
 from openwrtgui.fw.tc import Qdisc
+from openwrtgui.ifname import checked_ifname
 from openwrtgui.ports.compile import enable_commands
 from openwrtgui.ports.state import PortsState
 from openwrtgui.wifi.stations import del_client_command
@@ -52,9 +53,8 @@ def _who(t: FaultTarget) -> str:
 
 
 def _station(t: FaultTarget) -> str:
-    if t.via in (None, "wired"):
+    if t.via is None or t.via == "wired":
         raise ValueError(f"{_who(t)} is not on Wi-Fi (no station of an SSID on air)")
-    assert t.via is not None
     return t.via
 
 
@@ -237,6 +237,8 @@ def compile_fault(
 ) -> CompiledFault:
     if req.hold_s is not None and not HOLD_MIN <= req.hold_s <= HOLD_MAX:
         raise ValueError(f"Hold for {HOLD_MIN} to {HOLD_MAX} s")
+    if target.device:  # from the router, into nft and tc lines (v1.0b1 D5)
+        checked_ifname(target.device)
     if req.kind in ("isolate", "block"):
         return _nft(req, target, caps, rtp, id)
     if req.kind == "netem":

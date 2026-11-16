@@ -25,8 +25,9 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from openwrtgui.busy import RouterBusy
 from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked
+from openwrtgui.ifname import checked_ifname, checked_radio
 from openwrtgui.probe.status import RouterStatus, ssids_on_air
-from openwrtgui.rf.air import checked_ifname, get_clients
+from openwrtgui.rf.air import get_clients
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import Transport, TransportError, ubus_call
 from openwrtgui.transport.pool import ConnectionPool
@@ -584,6 +585,7 @@ class StepService:
 
     async def restore(self, router_id: str, radio: str) -> ApplyResult:
         """A restore a step-through left pending (Bench Guard stopped it, or the app ended before it)."""
+        checked_radio(radio)  # it names the saved file and the uci path `wireless.<radio>` (v1.0b1 D5)
         self._guard.require_clear()
         rec = self._record_of(router_id)
         if (why := self.busy(rec.id)) is not None:

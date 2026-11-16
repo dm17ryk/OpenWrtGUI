@@ -40,12 +40,27 @@ def _fs_alternatives(pages: Iterable[LuciPage]) -> Iterator[dict[str, Any]]:
     return (alt for page in pages for d in page.requires for alt in _alternatives(d.get("fs")))
 
 
+def _absolute(path: str) -> str:
+    if not path.startswith("/"):
+        raise ValueError(f"{path!r} is not an absolute path")
+    return path
+
+
 def fs_paths(pages: Iterable[LuciPage]) -> list[str]:
-    return sorted({p for alt in _fs_alternatives(pages) for p in alt})
+    """Only absolute paths: anything else is never asked, so LuCI's check of it fails here as on the router
+    (a path starting with '-' would be an ls option; v1.0b1 D5)."""
+    return sorted({p for alt in _fs_alternatives(pages) for p in alt if p.startswith("/")})
 
 
 def dir_paths(pages: Iterable[LuciPage]) -> list[str]:
-    return sorted({p for alt in _fs_alternatives(pages) for p, kind in alt.items() if kind == "directory"})
+    return sorted(
+        {
+            p
+            for alt in _fs_alternatives(pages)
+            for p, kind in alt.items()
+            if kind == "directory" and p.startswith("/")
+        }
+    )
 
 
 def uci_configs(pages: Iterable[LuciPage]) -> list[str]:
@@ -54,11 +69,11 @@ def uci_configs(pages: Iterable[LuciPage]) -> list[str]:
 
 
 def files_command(paths: Iterable[str]) -> str:
-    return "ls -ldL " + " ".join(shlex.quote(p) for p in sorted(set(paths)))
+    return "ls -ldL " + " ".join(shlex.quote(_absolute(p)) for p in sorted(set(paths)))
 
 
 def listing_command(path: str) -> str:
-    return f"ls -A {shlex.quote(path)}"
+    return f"ls -A {shlex.quote(_absolute(path))}"
 
 
 def uci_command(config: str) -> str:

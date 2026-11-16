@@ -22,7 +22,8 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         ctx = build_context(
             DataDir.at(Path(tmp)),
-            token="x",
+            # S106: a placeholder token for the offline schema dump
+            token="x",  # noqa: S106
             port=1,
             simulator=ROOT / "tests" / "fixtures" / "sim",
             web_dir=None,

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
+from openwrtgui.ifname import checked_radio
 from openwrtgui.uci import UciOp, render_uci
 from openwrtgui.uci import drop_unchanged as drop_unchanged  # the Wi-Fi tests import them from here
 from openwrtgui.uci import shell_quote as shell_quote
@@ -155,7 +156,9 @@ def apply_script(radio: str, ops: Sequence[UciOp]) -> str:
 
 
 def reload_command(radio: str) -> str:
-    """Sent on its own after the commit, so a failed reload is told apart from a refused change."""
+    """Sent on its own after the commit, so a failed reload is told apart from a refused change. The radio is
+    the router's section name: checked before the shell (v1.0b1 D5)."""
+    radio = checked_radio(radio)
     return f"wifi down {radio}; wifi up {radio}"
 
 

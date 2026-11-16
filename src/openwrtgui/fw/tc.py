@@ -36,7 +36,8 @@ def parse_netem(params: str) -> dict[str, str]:
     out: dict[str, str] = {}
     for i, token in enumerate(tokens):
         nxt = tokens[i + 1] if i + 1 < len(tokens) else None
-        if token == "delay" and nxt:
+        # S105: a tc keyword, not a password
+        if token == "delay" and nxt:  # noqa: S105
             out["delay"] = nxt
             if i + 2 < len(tokens) and _TIME.match(tokens[i + 2]):
                 out["jitter"] = tokens[i + 2]

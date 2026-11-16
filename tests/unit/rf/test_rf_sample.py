@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime, timedelta
 
+import pytest
+
 from openwrtgui.rf.parse import Bitrate, StationRaw, SurveyEntry
 from openwrtgui.rf.sample import RawTick, derive, rf_command
 from openwrtgui.wifi.parse import IwDevInfo
@@ -45,6 +47,15 @@ def test_rf_command() -> None:
         "echo ===ACK; cat /sys/kernel/debug/ieee80211/phy0/statistics/dot11ACKFailureCount 2>/dev/null; "
         "echo ===INFO; iw dev phy0-ap0 info"
     )
+
+
+@pytest.mark.parametrize(
+    ("ifname", "phy"), [("phy0-ap0;reboot", "phy0"), ("phy0-ap0", "phy0$(id)"), ("-h", "phy0")]
+)
+def test_rf_command_refuses_a_name_that_is_not_an_interface(ifname: str, phy: str) -> None:
+    """v1.0b1 D5: the router reports both names; neither reaches the shell unchecked."""
+    with pytest.raises(ValueError, match="is not an interface name"):
+        rf_command(ifname, phy)
 
 
 def test_first_tick_has_no_rates() -> None:

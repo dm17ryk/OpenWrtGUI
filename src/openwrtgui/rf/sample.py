@@ -6,12 +6,15 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 
+from openwrtgui.ifname import checked_ifname
 from openwrtgui.rf.parse import Bitrate, StationRaw, SurveyEntry
 from openwrtgui.wifi.parse import IwDevInfo
 
 
 def rf_command(ifname: str, phy: str) -> str:
-    """Everything one sample needs in one exec, sectioned with ===NAME lines."""
+    """Everything one sample needs in one exec, sectioned with ===NAME lines. Both names come from the
+    router, so both are checked."""
+    ifname, phy = checked_ifname(ifname), checked_ifname(phy)
     return (
         f"echo ===STA; iw dev {ifname} station dump; echo ===SURVEY; iw dev {ifname} survey dump; "
         f"echo ===ACK; cat /sys/kernel/debug/ieee80211/{phy}/statistics/dot11ACKFailureCount 2>/dev/null; "

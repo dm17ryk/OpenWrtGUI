@@ -10,8 +10,9 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Any
 
-from openwrtgui.guard.audit import HIDDEN, SECRET_OPTIONS, AuditLog
+from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
+from openwrtgui.guard.secrets import shown
 from openwrtgui.guard.writes import run_audited
 from openwrtgui.luci_bridge.depends import (
     UNCHECKED,
@@ -95,9 +96,7 @@ def diff_uci(before: dict[str, str], after: dict[str, str]) -> tuple[UciChange, 
         old, new = before.get(option), after.get(option)
         if old == new:
             continue
-        if option.rsplit(".", 1)[-1] in SECRET_OPTIONS:
-            old, new = (HIDDEN if old is not None else None), (HIDDEN if new is not None else None)
-        changes.append(UciChange(option, old, new))
+        changes.append(UciChange(option, shown(option, old), shown(option, new)))
     return tuple(changes)
 
 

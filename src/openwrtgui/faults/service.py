@@ -39,7 +39,8 @@ from openwrtgui.uci import shell_quote
 SCREEN = "Faults"
 SETTLE_S = 20.0  # "Link up: polled for up to 20 s"
 POLL_S = 1.0
-RECORD_DIR = "/tmp/owg"
+# S108: a path on the router (OpenWrt's RAM /tmp, root only), never on this PC
+RECORD_DIR = "/tmp/owg"  # noqa: S108
 NOT_ON_AIR = "{router} has no SSID on air"
 NO_SWITCH = "This router's switch is not managed by swconfig"
 NO_FAMILY = "This router's nftables cannot filter bridged traffic (needs kmod-nft-netdev or kmod-nft-bridge)"
@@ -438,7 +439,8 @@ class FaultsService:
         )
 
     async def _port_check(self, t: Transport, state: FaultsState, c: CompiledFault) -> NetCheck:
-        assert state.ports is not None and state.ports.switch is not None
+        if state.ports is None or state.ports.switch is None:
+            raise RuntimeError("a port fault needs the switch")
         port = int(c.commands[0].split()[4])
         label = next((p.label for p in state.ports.ports if p.num == port), f"port {port}")
         for attempt in range(int(self._settle_s / self._poll_s) + 1):

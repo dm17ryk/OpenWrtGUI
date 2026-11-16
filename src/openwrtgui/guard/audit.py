@@ -12,36 +12,12 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
+# re-exported: the terminal, the forms and the masks below use them from here
+from openwrtgui.guard.secrets import HIDDEN as HIDDEN
+from openwrtgui.guard.secrets import SECRET_OPTIONS as SECRET_OPTIONS
+
 log = logging.getLogger(__name__)
 
-HIDDEN = "<hidden>"
-SECRET_OPTIONS = (
-    "key",
-    "key1",
-    "key2",
-    "key3",
-    "key4",  # WEP
-    "password",
-    "pincode",
-    "psk",
-    "sae_password",
-    "multi_ap_backhaul_key",  # a Wi-Fi passphrase
-    "auth_secret",
-    "acct_secret",
-    "dae_secret",
-    "auth_server_shared_secret",
-    "acct_server_shared_secret",
-    "priv_key_pwd",
-    "priv_key2_pwd",
-    "private_key_passwd",
-    "private_key2_passwd",
-    "wps_pin",
-    "ap_pin",
-    "r0kh",
-    "r1kh",  # FT key holders carry their keys
-    "private_key",
-    "preshared_key",  # WireGuard
-)
 _SECRET_OPTIONS = "|".join(SECRET_OPTIONS)
 # uci set <cfg>.<section>.<option>=value, with the value quoted '…' (a ' inside written as '\''),
 # "…" or bare.
@@ -52,7 +28,10 @@ _UCI_SECRET = re.compile(
 _JSON_SECRET = re.compile(rf"(\"(?:{_SECRET_OPTIONS})\"\s*:\s*)\"(?:[^\"\\]|\\.)*\"")
 # SIM PINs sent as AT commands (3GPP 27.007 +CPIN, +CLCK, +CPWD): everything after `=` up to the end of the
 # shell-quoted argument (a ' inside written as '\''), so neither the PIN nor its pieces stay visible.
-_AT_SECRET = re.compile(r"(\+(?:CPIN|CLCK|CPWD)=)((?:'\\''|[^'\r\n])*)", re.IGNORECASE)
+# A modem ignores spaces, so `AT + CPIN = 1234` carries the PIN too, and APN passwords travel in +CGAUTH,
+# Quectel's +QICSGP and Qualcomm's $QCPDPP. A `=?` query carries nothing and stays readable (final review).
+AT_MASKED_COMMANDS = r"[+$]\s*(?:CPIN|CLCK|CPWD|CGAUTH|QICSGP|QCPDPP)\s*=(?!\s*\?)"
+_AT_SECRET = re.compile(rf"({AT_MASKED_COMMANDS})((?:'\\''|[^'\r\n])*)", re.IGNORECASE)
 
 
 def _hide_value(match: re.Match[str]) -> str:

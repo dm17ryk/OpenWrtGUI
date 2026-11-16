@@ -14,8 +14,9 @@ from openwrtgui.net.apply import ROLLBACK_ID
 CUSTOM_DIR = "/etc/nftables.d"
 MAX_BYTES = 64 * 1024
 _NAME = re.compile(r"[A-Za-z0-9_-]{1,60}")
-BAK = f"/tmp/owg/rb-{ROLLBACK_ID}.bak"
-CHECK = f"/tmp/owg/rb-{ROLLBACK_ID}.check"
+# S108: paths on the router (OpenWrt's RAM /tmp, root only), never on this PC
+BAK = f"/tmp/owg/rb-{ROLLBACK_ID}.bak"  # noqa: S108
+CHECK = f"/tmp/owg/rb-{ROLLBACK_ID}.check"  # noqa: S108
 
 
 @dataclass(frozen=True)

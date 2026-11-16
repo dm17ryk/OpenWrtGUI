@@ -89,3 +89,10 @@ async def test_an_fstab_change_refused_during_a_run(ctx_guard_live: AppContext) 
     add_ap4(ctx_guard_live)
     with pytest.raises(GuardLocked):
         await ctx_guard_live.fstab.apply_mount("ap4", None)
+
+
+async def test_a_negative_delay_root_is_a_422(ctx: AppContext, authed: httpx.AsyncClient) -> None:
+    """v1.0a2 minor: LuCI's uinteger."""
+    add_ap4(ctx)
+    r = await authed.post("/api/routers/ap4/system/fstab/preview", json={"settings": {"delay_root": -1}})
+    assert r.status_code == 422

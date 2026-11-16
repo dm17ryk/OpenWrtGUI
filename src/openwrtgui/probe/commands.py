@@ -18,7 +18,8 @@ LUCI_MENU = 'for f in /usr/share/luci/menu.d/*.json; do [ -e "$f" ] && { echo "=
 LUCI_ACL = 'for f in /usr/share/rpcd/acl.d/*.json; do [ -e "$f" ] && { echo "=== $f"; cat "$f"; }; done'
 # The app's fault records (spec 7.7): one JSON line per armed fault, gone at reboot like the faults
 FAULT_RECORDS = "cat /tmp/owg/fault-*.json 2>/dev/null"
-ROOT_PASSWORD_STATE = 'awk -F: \'$1=="root"{print ($2=="" ? "none" : "set")}\' /etc/shadow'
+# S105: a command that reads whether root has a password, not a password
+ROOT_PASSWORD_STATE = 'awk -F: \'$1=="root"{print ($2=="" ? "none" : "set")}\' /etc/shadow'  # noqa: S105
 
 
 def wireless_validate(radio: str) -> str:

@@ -27,6 +27,7 @@ Everything lives in the data folder you picked at install time (default `%LOCALA
 | `updates\` | Downloaded installers (the current and the previous one) |
 | `logs\` | The app's own log |
 | `backups\` | Routers' configuration backups. They hold password hashes, host keys and Wi-Fi keys; the folder is readable by your Windows user only |
+| `exports\` | Audit-log exports (zip files), secrets masked as in the viewer |
 | `profiles\` | Imported router images and what the app read from them |
 | `reflash\` | Reflash checklists |
 | `tools\` | Promoted tool cards |
@@ -43,5 +44,41 @@ The UI and the local API listen on `127.0.0.1` only, on a random port, and every
 created at launch. Nothing listens on the network. The app makes outgoing connections to your routers
 (SSH) and to `api.github.com` / GitHub release downloads (update check).
 
+Opening a LuCI page from the app starts a second local server for that page, also on `127.0.0.1` and a random
+port. The app's window enters it with a key made for that page, which becomes a cookie only that window holds;
+every request must carry it. The server forwards to the router's own web server through the app's SSH
+connection, and closes when you close the page or after 5 minutes unused.
+
 Updates are downloaded over HTTPS and checked against the release's `SHA256SUMS.txt` before the
 installer runs. The installer is not Authenticode-signed yet.
+
+## Secrets on screen and in the log
+
+- **The audit log** masks every command: the passwords you type, Wi-Fi keys and the other secret options by
+  name, SIM PINs and APN passwords in AT commands, and LuCI session ids.
+- **Discovery, Plugins and a LuCI page's change list** show a secret option as `<hidden>`: any option whose name
+  contains `key`, `secret`, `pass`, `psk`, `token`, `pin` or `pwd`, and the audit log's list. Discovery still
+  lists a secret that differs from the image, with both values hidden.
+- **The AT console** shows a SIM PIN or an APN password as `<hidden>` and does not keep the command for Up/Down.
+- **Backups** hold the router's secrets; they stay in `backups\`, readable by your Windows user only.
+
+## How the code is checked
+
+- CodeQL (Python, TypeScript) on every push to `master`, every pull request and weekly.
+- ruff's bandit rules (`S`) on the shipped code, with every exception reasoned in place.
+- `pip-audit` over the shipped Python packages and `npm audit` over the shipped UI packages, on every push, every
+  pull request and weekly; Dependabot proposes updates weekly.
+
+## Known limits
+
+- **Signing:** the installer is not Authenticode-signed yet; SmartScreen and endpoint protection may warn.
+  Updates are checked against the release's `SHA256SUMS.txt` instead.
+- **App key rotation:** the app's SSH key is not rotated; replacing it is planned after 1.0.
+- **LuCI over HTTPS:** the LuCI bridge supports a router that serves LuCI over HTTPS, but no bench router does,
+  so it is untested on hardware.
+- **Flashing from the app:** refused on a router without enough free RAM for the image plus 4 MiB (the bench's
+  AP2 has about 8 MB); flash those with LuCI or the terminal.
+- **Bench Guard** knows the harness processes and lock files you list in Settings; a writer it does not know
+  about is not seen.
+- **Bench routers:** the app key is installed only on the routers the bench owner chose (not yet on AP1), and no
+  Claude GitHub Action runs on this repository.

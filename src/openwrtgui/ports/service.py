@@ -9,6 +9,7 @@ from typing import Any
 
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
+from openwrtgui.ifname import checked_ifname
 from openwrtgui.net import commands as c
 from openwrtgui.net.apply import (
     ApplyRunner,
@@ -92,7 +93,8 @@ class PortsService:
         return (await self._read(router_id))[2]
 
     async def _show(self, t: Transport, state: PortsState) -> SwitchLive:
-        assert state.switch is not None
+        if state.switch is None:
+            raise RuntimeError("no swconfig switch to read")
         return parse_swconfig_show(state.switch, (await t.run(c.swconfig_show(state.switch))).stdout)
 
     async def _poll(self, t: Transport, state: PortsState, ok: Callable[[SwitchLive], bool]) -> SwitchLive:
@@ -251,14 +253,15 @@ class PortsService:
         ops = compile_mirror(req, state, uci)
         # A reload sets the monitor port only when the config names one, so off puts it back by hand
         # (AP2, 2026-11-06: it stayed at 1 after the mirror was off).
-        off = req.monitor is None and drop_unchanged(ops, uci) and state.switch is not None
+        off = req.monitor is None and drop_unchanged(ops, uci)
+        switch = state.switch if off else None  # from the router: checked before the shell (v1.0b1 D5)
         return net_plan(
             router_id=rec.id,
             screen=SCREEN,
             config="network",
             ops=ops,
             current=uci,
-            commands=[f"swconfig dev {state.switch} set mirror_monitor_port 0"] if off else [],
+            commands=[f"swconfig dev {checked_ifname(switch)} set mirror_monitor_port 0"] if switch else [],
             rollback=True,
             warnings=[rollback_warning(rec.name, rec.host)],
         )

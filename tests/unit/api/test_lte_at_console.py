@@ -52,6 +52,8 @@ async def test_at_text_is_one_shell_quoted_printf_argument(ctx: AppContext) -> N
         'at+clck="SC",0,"1234"',
         'AT+CPWD="SC","1234","5678"',
         "AT+CPIN=12'34",
+        "at+cpin=1234",
+        "AT+CPIN=12345678,1234",
     ],
 )
 async def test_a_sim_pin_sent_in_the_console_is_hidden_in_the_audit(ctx: AppContext, text: str) -> None:
@@ -60,6 +62,41 @@ async def test_a_sim_pin_sent_in_the_console_is_hidden_in_the_audit(ctx: AppCont
     commands = _commands(ctx)
     assert "<hidden>" in commands[-1]
     assert not any(pin in command for command in commands for pin in ("1234", "5678", "34"))
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "AT+CPIN=1234",
+        "at+cpin=1234",
+        'AT+CPIN="1234"',
+        "AT+CPIN=12345678,1234",
+        'AT+CPWD="SC","1234","5678"',
+        "AT+CPIN=12'34",
+    ],
+)
+async def test_a_sim_pin_is_hidden_in_what_the_console_returns(ctx: AppContext, text: str) -> None:
+    """v1.0b1 D4: the answer echoes the command; the PIN in it is hidden, the PIN still reached the modem."""
+    result = await ctx.lte.at_command("ap2", text, confirmed=True)
+    assert result.status == "OK" and result.command.endswith("<hidden>")
+    shown = [result.command, *result.lines]
+    assert not any(pin in line for line in shown for pin in ("1234", "5678", "34"))
+
+
+@pytest.mark.parametrize("text", ["AT+CPIN = 1234", "AT+CPIN =1234", "AT + CPIN=1234", "at + cpwd = 1234"])
+async def test_a_sim_pin_typed_with_spaces_is_hidden_everywhere(ctx: AppContext, text: str) -> None:
+    """Final review: a modem ignores spaces, so the PIN in these is real; the simulated one answers ERROR."""
+    result = await ctx.lte.at_command("ap2", text, confirmed=True)
+    assert result.command.endswith("<hidden>")
+    shown = [result.command, *result.lines, *_commands(ctx)]
+    assert not any("1234" in line for line in shown)
+
+
+def test_a_modem_echo_that_differs_from_the_text_is_hidden_too() -> None:
+    """`mask`'s `_AT_SECRET` needs `+CPIN=` with no space; a modem echo may put one before `=`."""
+    from openwrtgui.lte.service import shown_answer
+
+    assert shown_answer(("AT+CPIN = 1234", "+CPIN: READY")) == ("AT+CPIN =<hidden>", "+CPIN: READY")
 
 
 async def test_at_console_during_a_run(ctx_guard_live: AppContext) -> None:
@@ -100,3 +137,28 @@ async def test_at_and_imei_endpoints(authed: httpx.AsyncClient, ctx: AppContext)
     imei = await authed.post("/api/routers/ap2/lte/imei")
     assert (imei.status_code, imei.json()) == (200, {"imei": "353000000000001"})
     assert not any(re.search(r"[0-9]{15}", e.command) for e in ctx.audit.query())
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        'AT+CGAUTH=1,1,"bench","apnpw42"',
+        'at + cgauth = 1,2,"bench","apnpw42"',
+        'AT+QICSGP=1,1,"internet","bench","apnpw42",1',
+        'AT$QCPDPP=1,1,"apnpw42","bench"',
+    ],
+)
+async def test_an_apn_password_is_hidden_everywhere(ctx: AppContext, text: str) -> None:
+    """Final review (re-graded Important): an APN password typed in the console is the same leak as a PIN."""
+    result = await ctx.lte.at_command("ap2", text, confirmed=True)
+    assert result.command.endswith("<hidden>")
+    shown = [result.command, *result.lines, *_commands(ctx)]
+    assert not any("apnpw42" in line for line in shown)
+
+
+@pytest.mark.parametrize("text", ["AT+CPIN?", "AT+CPIN=?", "AT+CGAUTH?", "AT+CGAUTH=?"])
+async def test_queries_of_the_hidden_commands_stay_readable(ctx: AppContext, text: str) -> None:
+    """A query carries no secret: `=?` lists the forms, so it is shown and audited as typed."""
+    result = await ctx.lte.at_command("ap2", text, confirmed=False)
+    assert result.command == text
+    assert any(text in command for command in _commands(ctx))

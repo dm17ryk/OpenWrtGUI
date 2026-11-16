@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 from ro_transport import LuciSessionTransport, ReadOnlyTransport, write_refusal
+from settle import settled
 
 from openwrtgui.capture.service import CaptureService
 from openwrtgui.faults.service import FaultsService
@@ -186,8 +187,8 @@ async def fw_window(
             pass  # nothing armed and no table
         await pool.close_all()
         t = await connect()
-        try:
-            assert await fw_found(t) == found, "AP2 is not as found"
+        try:  # a radio's AP interface may still be going down (AP2 window 2026-11-15)
+            assert await settled(lambda: fw_found(t), found) == found, "AP2 is not as found"
         finally:
             await t.close()
 

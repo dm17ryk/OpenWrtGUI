@@ -36,7 +36,15 @@ from openwrtgui.wifi.model import CCK_BASIC_KBPS, OFDM_BASIC_KBPS, ModeSelection
 from openwrtgui.wifi.monitor import MONITOR, MonitorLeases
 from openwrtgui.wifi.options import OptionEdit, OptionRow, compile_edits, option_rows
 from openwrtgui.wifi.parse import IwDevInfo, parse_beacon_rates, parse_iw_dev, parse_iw_dev_info
-from openwrtgui.wifi.state import RadioState, WifiState, modes_from_uci, read_uci, read_wifi, ssid_sections
+from openwrtgui.wifi.state import (
+    RadioState,
+    WifiState,
+    dev_info_command,
+    modes_from_uci,
+    read_uci,
+    read_wifi,
+    ssid_sections,
+)
 from openwrtgui.wifi.stations import Station, del_client_command, read_stations
 
 SCREEN = "Wi-Fi"
@@ -573,7 +581,7 @@ class WifiService:
         be in COUNTRY_UPDATE (AP2, 2026-11-09): no channel yet, and `set bitrates` fails."""
         waited = 0.0
         while True:
-            info = parse_iw_dev_info((await t.run(f"iw dev {ifname} info")).stdout)
+            info = parse_iw_dev_info((await t.run(dev_info_command(ifname))).stdout)
             if info.channel is not None or waited >= self._settle_timeout_s:
                 return info
             await self._sleep(self._poll_s)

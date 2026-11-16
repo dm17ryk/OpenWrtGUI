@@ -9,7 +9,8 @@ from collections.abc import Sequence
 
 from openwrtgui.uci import shell_quote
 
-TIMER_DIR = "/tmp/owg"
+# S108: a path on the router (OpenWrt's RAM /tmp, root only), never on this PC
+TIMER_DIR = "/tmp/owg"  # noqa: S108
 _NAME = re.compile(r"[a-z0-9-]{1,32}")
 
 

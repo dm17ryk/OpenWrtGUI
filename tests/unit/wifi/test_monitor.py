@@ -111,3 +111,9 @@ def test_add_command_matches_todays() -> None:
         f"iw dev {MONITOR} del 2>/dev/null; iw phy phy0 interface add {MONITOR} type monitor && "
         f"ip link set {MONITOR} up"
     )
+
+
+def test_add_command_refuses_a_phy_that_is_not_a_name() -> None:
+    """v1.0b1 D5: the phy comes from the router (iwinfo phyname)."""
+    with pytest.raises(ValueError, match="is not an interface name"):
+        add_command("phy0; reboot", clear_leftover=True)

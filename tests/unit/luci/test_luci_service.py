@@ -133,6 +133,15 @@ def test_wireguard_keys_in_a_luci_diff_are_hidden() -> None:
     assert change.after == "<hidden>"
 
 
+def test_a_plugin_key_in_a_luci_diff_is_hidden() -> None:
+    """v1.0b1 D2: names outside the exact list (LuCI's 2FA plugin keeps root's key in key_root)."""
+    from openwrtgui.luci_bridge.service import diff_uci
+
+    option = "luci_plugins.bb4ea47fcffb44ec9bb3d3673c9b4ed2.key_root"
+    (change,) = diff_uci({option: "OLDKEY"}, {option: "NEWKEY"})
+    assert (change.before, change.after) == ("<hidden>", "<hidden>")
+
+
 async def test_session_ids_never_reach_the_audit_log(env: Env) -> None:
     await env.service.open("ap1", "admin/network/wireless")
     assert not any("sim-1" in line for line in env.audit_lines())

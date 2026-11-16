@@ -20,6 +20,7 @@ from openwrtgui.capture.wireshark import find_wireshark, open_live
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.guard.writes import run_audited
+from openwrtgui.ifname import checked_ifname
 from openwrtgui.net.service import NetworkService
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import ByteStream, CommandResult, Transport, TransportError, ubus_call
@@ -75,7 +76,9 @@ def capture_command(req: CaptureRequest, pc_ip: str | None, ssh_port: int, devic
     expr = f"not (host {pc_ip} and tcp port {ssh_port})"
     if req.filter.strip():
         expr += f" and ({req.filter.strip()})"
-    return f"timeout {req.duration_s} tcpdump -i {device or req.device} -U -s 0 -w - {shell_quote(expr)}"
+    # the router lists the devices; the name goes into tcpdump here and into the file name (v1.0b1 D5)
+    device = checked_ifname(device or req.device)
+    return f"timeout {req.duration_s} tcpdump -i {device} -U -s 0 -w - {shell_quote(expr)}"
 
 
 def _size(n: int) -> str:

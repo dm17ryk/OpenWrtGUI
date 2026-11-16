@@ -11,7 +11,7 @@ import re
 from collections.abc import Callable, Mapping, Sequence
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from openwrtgui.uci import UciOp
 
@@ -39,7 +39,8 @@ class FstabGlobal(BaseModel):
     auto_swap: bool = True
     auto_mount: bool = True
     check_fs: bool = False
-    delay_root: int | None = None  # not shown (LuCI shows it neither); kept, and written by Generate
+    # LuCI's uinteger (v1.0b1 D7); not shown (LuCI shows it neither), kept, and written by Generate
+    delay_root: int | None = Field(default=None, ge=0)
 
 
 class FstabEntry(BaseModel):

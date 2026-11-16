@@ -54,7 +54,8 @@ class FlashPlan:
 
 
 def fw_path(sha256: str) -> str:
-    return f"/tmp/owg/fw-{sha256[:12]}.bin"
+    # S108: a path on the router (OpenWrt's RAM /tmp, root only), never on this PC
+    return f"/tmp/owg/fw-{sha256[:12]}.bin"  # noqa: S108
 
 
 def _kb(text: str, key: str) -> int:
