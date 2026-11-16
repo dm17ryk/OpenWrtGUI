@@ -192,6 +192,8 @@ end;
 { Deletes only what the app itself keeps there (see DataDir in src/openwrtgui/paths.py),
   then the folder if it is empty, so a data folder chosen as e.g. C:\Essence_SC stays intact. }
 procedure DeleteAppData(Dir: String);
+var
+  Left: String;
 begin
   DeleteFile(Dir + '\routers.json');
   DeleteFile(Dir + '\routers.json.tmp');
@@ -208,6 +210,16 @@ begin
   { Routers' configuration backups hold password hashes and Wi-Fi keys: Yes removes them too (2026-11-16). }
   DelTree(Dir + '\backups', True, True, True);
   RemoveDir(Dir);
+  { A locked or access-denied file keeps its folder: name the secrets still there instead of finishing
+    silently. The uninstall itself goes on (PR #74 review, 2026-11-16). }
+  Left := '';
+  if DirExists(Dir + '\backups') then
+    Left := Left + #13#10 + '    backups (router backups: password hashes and Wi-Fi keys)';
+  if DirExists(Dir + '\keys') then
+    Left := Left + #13#10 + '    keys (the app''s SSH key)';
+  if Left <> '' then
+    MsgBox('OpenWrtGUI could not delete these folders in ' + Dir + ':' + Left + #13#10#13#10 +
+           'A program may still have a file in them open. Delete them by hand.', mbError, MB_OK);
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);

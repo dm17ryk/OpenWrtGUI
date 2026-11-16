@@ -437,6 +437,19 @@ def test_uninstall_deletes_backups_and_the_manual_says_what() -> None:
     assert documented == deleted, sorted(documented ^ deleted)
 
 
+def test_uninstall_says_when_secrets_remain() -> None:
+    """PR #74 review (2026-11-16): a locked or access-denied file can keep backups\\ or keys\\ after Yes, and
+    DelTree's result was ignored. The uninstaller then names the folders still there instead of finishing
+    silently, without failing the uninstall."""
+    iss = _read(ROOT / "installer" / "OpenWrtGUI.iss")
+    body = iss.split("procedure DeleteAppData", 1)[1].split("\nend;", 1)[0]
+    for folder in ("backups", "keys"):
+        assert f"DirExists(Dir + '\\{folder}')" in body, folder
+    assert "mbError, MB_OK" in body and "by hand" in body
+    files = _section("Files-and-data", "Moving or removing")
+    assert "cannot be deleted" in files and "by hand" in files
+
+
 def test_bench_router_names_only_in_pictures_and_examples() -> None:
     """v1.0d D3: AP1/AP2 appear in screenshot alt text and `code` examples, not in sentences."""
     found = []
