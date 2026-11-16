@@ -86,6 +86,13 @@ def test_lines_the_parser_cannot_read_are_counted() -> None:
     assert skipped_lines(_listing(10, 10)) == 0
 
 
+def test_a_warning_iptables_prints_is_not_a_line_the_app_cannot_read() -> None:
+    """The final review: the one-command read folds stderr into a table's text; iptables-nft's warning line
+    must not show as "1 line not shown" on every table."""
+    warning = "# Warning: iptables-legacy tables present, use iptables-legacy to see them\n"
+    assert skipped_lines(warning + _listing(10, 10)) == 0
+
+
 def test_a_counter_missing_afterwards_proves_nothing() -> None:
     """v1.0b2 deferred minor: a listing that lost the rule (or failed) is no proof of a reset."""
     before = _listing(policy_bytes=0, rule_bytes=500)

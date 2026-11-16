@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import struct
 import threading
 import time
 from collections.abc import Callable
@@ -37,10 +38,11 @@ def _captures(env: FwEnv, tmp_path: Path, **kw: object) -> CaptureService:
 
 
 async def _done(service: CaptureService, capture_id: str) -> None:
-    for _ in range(100):
+    """Up to 5 s: the end closes its sink on a worker thread (the final review), more than a few loop turns."""
+    for _ in range(500):
         if not next(v for v in service.list_all() if v.id == capture_id).running:
             return
-        await asyncio.sleep(0)
+        await asyncio.sleep(0.01)
     raise AssertionError("the capture did not end")
 
 
@@ -317,19 +319,46 @@ class _Stdin:
     def __init__(self, block_until: threading.Event | None = None, raises: OSError | None = None) -> None:
         self.block_until = block_until
         self.raises = raises
+        self.data = bytearray()
+        self.closed = False
 
     def write(self, data: bytes) -> int:
         if self.block_until is not None:
             self.block_until.wait(5)
         if self.raises is not None:
             raise self.raises
+        self.data += data
         return len(data)
 
     def flush(self) -> None:
         return None
 
     def close(self) -> None:
-        return None
+        self.closed = True
+
+
+RECORD = 60_000  # bytes of one packet in the test stream; with its 16-byte header, 60,016 a record
+
+
+def _pcap(records: int) -> bytes:
+    """A little-endian pcap stream: the 24-byte file header, then `records` packets of RECORD bytes."""
+    out = bytearray(struct.pack("<IHHiIII", 0xA1B2C3D4, 2, 4, 0, 0, 262144, 1))
+    for i in range(records):
+        out += struct.pack("<IIII", i, 0, RECORD, RECORD) + bytes([i % 256]) * RECORD
+    return bytes(out)
+
+
+def _packets(stream: bytes) -> list[int]:
+    """The packet numbers in a pcap stream; fails when the stream is not whole records after its header."""
+    assert stream[:4] == bytes.fromhex("d4c3b2a1")
+    pos, seen = 24, []
+    while pos < len(stream):
+        number, _, incl, orig = struct.unpack_from("<IIII", stream, pos)
+        assert incl == orig == RECORD, f"not a record header at byte {pos}"
+        seen.append(number)
+        pos += 16 + incl
+    assert pos == len(stream)
+    return seen
 
 
 def _popen(stdin: _Stdin) -> Callable[..., Any]:
@@ -340,17 +369,34 @@ def _popen(stdin: _Stdin) -> Callable[..., Any]:
     return _Process
 
 
-def test_a_stalled_wireshark_never_blocks_a_write() -> None:
-    """v1.0c Task 7 (#12): the pipe is fed from a thread; what does not fit its queue is counted."""
+def test_a_stalled_wireshark_never_blocks_a_write_and_loses_whole_packets() -> None:
+    """v1.0c Task 7 (#12), the final review: the pipe is fed from a thread; what does not fit its budget is
+    dropped as whole packet records, so Wireshark still reads a valid pcap stream."""
     stuck = threading.Event()
-    sink = LiveSink(Path("Wireshark.exe"), popen=_popen(_Stdin(block_until=stuck)), queue_chunks=2)
+    stdin = _Stdin(block_until=stuck)
+    sink = LiveSink(Path("Wireshark.exe"), popen=_popen(stdin), queue_bytes=3 * (16 + RECORD))
+    stream = _pcap(10)
     started = time.monotonic()
-    for _ in range(10):
-        sink.write(b"x" * 65536)
+    for at in range(0, len(stream), 65536):
+        sink.write(stream[at : at + 65536])
     assert time.monotonic() - started < 0.5
-    assert sink.dropped >= 7 * 65536
+    assert sink.dropped > 0 and sink.dropped % (16 + RECORD) == 0
     stuck.set()
     sink.close()
+    kept = _packets(bytes(stdin.data))  # whole records after the header: nothing cut mid-packet
+    assert len(kept) == 10 - sink.dropped // (16 + RECORD) and stdin.closed
+
+
+def test_closing_a_stuck_wireshark_never_waits_for_it() -> None:
+    """The final review: a Wireshark that reads nothing must not hold the stop, nor have its pipe closed under
+    the feeder that is writing to it."""
+    stdin = _Stdin(block_until=threading.Event())  # never released (the test pipe gives up after 5 s)
+    sink = LiveSink(Path("Wireshark.exe"), popen=_popen(stdin), join_s=0.2)
+    sink.write(_pcap(1))
+    started = time.monotonic()
+    sink.close()
+    assert time.monotonic() - started < 1.0
+    assert not stdin.closed
 
 
 def test_a_closed_wireshark_ends_the_capture() -> None:
@@ -361,6 +407,52 @@ def test_a_closed_wireshark_ends_the_capture() -> None:
             sink.write(b"x")
             time.sleep(0.01)
     sink.close()
+
+
+class _SlowCloseSink:
+    """A Wireshark sink whose close takes a while, as a feeder finishing its last chunk does."""
+
+    dropped = 0
+
+    def write(self, data: bytes) -> None:
+        return None
+
+    def close(self) -> None:
+        time.sleep(0.3)
+
+
+async def test_a_slow_wireshark_close_does_not_stop_the_app(
+    env: FwEnv, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The final review: the capture's stop closes the sink off the event loop, so other requests go on."""
+    monkeypatch.setattr("openwrtgui.capture.service.open_live", lambda exe: _SlowCloseSink())
+    service = CaptureService(
+        pool=env.pool,
+        routers=env.routers,
+        guard=env.guard,
+        audit=env.audit,
+        net=env.net,
+        documents=tmp_path / "Documents",
+        wireshark=lambda: Path("Wireshark.exe"),
+        clock=env.clock.now,
+    )
+    ticks = 0
+
+    async def ticker() -> None:
+        nonlocal ticks
+        while True:
+            ticks += 1
+            await asyncio.sleep(0.01)
+
+    task = asyncio.create_task(ticker())
+    view = await service.start("ap1", CaptureRequest("br-lan", "", 3, "wireshark"))
+    for _ in range(200):
+        if not next(v for v in service.list_all() if v.id == view.id).running:
+            break
+        await asyncio.sleep(0.01)
+    task.cancel()
+    assert not next(v for v in service.list_all() if v.id == view.id).running
+    assert ticks >= 15  # the loop kept turning during the 0.3 s close
 
 
 class _DroppingSink:

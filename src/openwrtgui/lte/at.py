@@ -80,6 +80,21 @@ async def read_identity(t: Transport, port: str) -> ModemIdentity:
     )
 
 
+async def complete_identity(t: Transport, port: str, known: ModemIdentity | None) -> ModemIdentity:
+    """The kept identity with any part the modem did not answer asked again, alone (the final review: a modem
+    still coming up may skip one answer). Nothing kept: all four are asked."""
+    if known is None:
+        return await read_identity(t, port)
+    fields: dict[str, str | int | None] = {}
+    for name, command in zip(("manufacturer", "model", "firmware"), IDENTITY, strict=True):
+        if getattr(known, name) is None:
+            fields[name] = parse_identity((await t.run(c.at(port, command))).stdout, command)
+    if known.mode_order is None:
+        order = parse_at((await t.run(c.at(port, "AT+BMMODODR?"))).stdout, "AT+BMMODODR?")
+        fields["mode_order"] = parse_mode_order(order.lines) if order else None
+    return known.model_copy(update=fields) if fields else known
+
+
 async def operator_answer(t: Transport, port: str) -> AtAnswer | None:
     """AT+COPS?, asked on every read; None: the port gave no answer at all."""
     return parse_at((await t.run(c.at(port, "AT+COPS?"))).stdout, "AT+COPS?")

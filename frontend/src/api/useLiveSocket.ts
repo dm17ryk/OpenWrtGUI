@@ -28,16 +28,25 @@ export function reconnectText(state: LiveSocketState): string | null {
 /** A websocket that reconnects by itself after an unexpected close (LTE, RF live, System status). */
 const CONNECTING_STATE: LiveSocketState = { phase: 'connecting', attempt: 0, reason: null }
 
-export function useLiveSocket<T>(path: string | null, params: Record<string, string> | undefined, onMessage: (msg: T) => void): LiveSocket {
+/** `onLost` runs each time the socket closes while the screen is open: what the app tied to it (an RF
+ * recording) has ended on the app's side (the final review). */
+export function useLiveSocket<T>(
+  path: string | null,
+  params: Record<string, string> | undefined,
+  onMessage: (msg: T) => void,
+  onLost?: () => void,
+): LiveSocket {
   const query = new URLSearchParams(params ?? {}).toString()
   const key = path === null ? null : `${path}?${query}`
   // the state of the socket for one path; another path starts out connecting
   const [kept, setKept] = useState<{ key: string | null; state: LiveSocketState }>({ key: null, state: CONNECTING_STATE })
   const handler = useRef(onMessage)
+  const lostHandler = useRef(onLost)
   const socket = useRef<WebSocket | null>(null)
 
   useEffect(() => {
     handler.current = onMessage
+    lostHandler.current = onLost
   })
 
   useEffect(() => {
@@ -63,6 +72,7 @@ export function useLiveSocket<T>(path: string | null, params: Record<string, str
       ws.onclose = (ev: CloseEvent) => {
         socket.current = null
         if (stopped) return
+        lostHandler.current?.()
         if (ev.code >= APP_CLOSE) {
           setState({ phase: 'ended', attempt, reason: ev.reason || null })
           return

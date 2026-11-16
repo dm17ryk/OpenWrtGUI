@@ -217,7 +217,11 @@ class LteService:
                 raise PreviewChanged(rec.name)
             t = await self._pool.get(rec)
             async with self._pool.write_lock(rec.id):
-                return await self._run_action(rec, t, action, plan.lines)
+                try:
+                    return await self._run_action(rec, t, action, plan.lines)
+                finally:
+                    if action == "reboot":  # a read during the reboot is not kept either (the final review)
+                        self.forget_identity(rec.id)
 
     async def _cmd(self, rec: RouterRecord, t: Transport, command: str) -> CommandResult:
         return await run_audited(

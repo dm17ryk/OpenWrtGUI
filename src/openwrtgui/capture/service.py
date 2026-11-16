@@ -297,7 +297,7 @@ class CaptureService:
         finally:
             with contextlib.suppress(TransportError, OSError):
                 await stream.close()
-            sink.close()
+            await asyncio.to_thread(sink.close)  # a Wireshark behind never holds the loop (the final review)
             failed = stream.exit_status not in (0, 124, None) and capture_id not in self._stop_asked
             if error is None and failed and not total:
                 error = stream.stderr.strip() or f"tcpdump exited {stream.exit_status}"

@@ -12,7 +12,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict
 
 from openwrtgui.lte import commands as c
-from openwrtgui.lte.at import ModemIdentity, ModemInfo, modem_info, operator_answer, read_identity
+from openwrtgui.lte.at import ModemIdentity, ModemInfo, complete_identity, modem_info, operator_answer
 from openwrtgui.lte.parse import Signal, parse_cops, parse_opmode, parse_serving, parse_signal
 from openwrtgui.lte.quality import Metric, Quality, label
 from openwrtgui.net.interfaces import QMI_LOCKED
@@ -138,7 +138,7 @@ async def _read_at(
     """The operator every time; the identity only when none is kept for this connection (v1.0c D2)."""
     if port is None:
         return ModemInfo(), None
-    known = identity if identity is not None else await read_identity(t, port)
+    known = await complete_identity(t, port, identity)  # a part the modem skipped is asked again
     answer = await operator_answer(t, port)
     if answer is None and (identity is not None or known.silent):
         # the port answered once and is silent now: the modem re-enumerated, so nothing is kept for it

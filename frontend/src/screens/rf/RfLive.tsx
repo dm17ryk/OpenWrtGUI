@@ -77,6 +77,17 @@ export function RfLive() {
   useEffect(() => {
     pausedRef.current = paused
   }, [paused])
+  // the app stops a recording when this socket closes: say so, never keep claiming one (the final review)
+  const [lostRecording, setLostRecording] = useState<string | null>(null)
+  const recordingRef = useRef(recording)
+  useEffect(() => {
+    recordingRef.current = recording
+  }, [recording])
+  const onLost = (): void => {
+    if (recordingRef.current === null) return
+    setLostRecording(recordingRef.current)
+    setRecording(null)
+  }
 
   // the samples, rates, recording and frames, on one socket that reconnects by itself (v1.0c D7)
   const live = useLiveSocket<RfMessage>(`/ws/rf/${id}`, { radio }, (msg) => {
@@ -90,12 +101,14 @@ export function RfLive() {
       setIdle(msg.reason)
     } else if (msg.type === 'recording') {
       setRecording(msg.path)
+      setLostRecording(null)
     } else if (msg.type === 'rates') {
       setRates(msg)
     } else if (msg.type === 'frames') {
       setFrames(msg.state)
     }
-  })
+  }, onLost)
+  const isLost = live.phase === 'reconnecting' || live.phase === 'ended'
   const { send } = live
   const isOpen = live.phase === 'open'
 
@@ -143,7 +156,7 @@ export function RfLive() {
         </button>
         <div className="hrow">
           <HelpTip topic={HELP.rfRecord}>
-            <button className="btn pri" type="button" onClick={record}>
+            <button className="btn pri" type="button" disabled={isLost} onClick={record}>
               {recording ? 'Stop recording' : 'Record to CSV'}
             </button>
           </HelpTip>
@@ -152,6 +165,7 @@ export function RfLive() {
       </div>
       <RouterSections routerId={id} name={name} current="rf" />
       {recording && <div className="note">Recording to {recording}</div>}
+      {lostRecording && <div className="note w">{`Recording stopped when the connection was lost: ${lostRecording}`}</div>}
       {note && (
         <div className="note w" role="status">
           {note}

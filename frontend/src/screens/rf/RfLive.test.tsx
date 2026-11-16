@@ -98,6 +98,17 @@ test('Record asks the app and shows where the file goes', async () => {
   expect(screen.getByRole('button', { name: 'Stop recording' })).toBeInTheDocument()
 })
 
+test('a lost connection says the recording stopped and greys Record until it is back', async () => {
+  // the final review: the app stops a recording when its socket closes; the screen must not still claim one
+  renderRf()
+  await screen.findByRole('heading', { name: 'RF live', level: 1 })
+  FakeSocket.last?.emit({ type: 'recording', path: 'C:\\Users\\me\\Documents\\OpenWrtGUI\\rf-ap1-radio0-20261105-090000.csv' })
+  const lost = FakeSocket.last?.onclose as unknown as ((ev: { code: number; reason: string }) => void) | null
+  act(() => lost?.({ code: 1006, reason: '' }))
+  expect(screen.getByText('Recording stopped when the connection was lost: C:\\Users\\me\\Documents\\OpenWrtGUI\\rf-ap1-radio0-20261105-090000.csv')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Record to CSV' })).toBeDisabled()
+})
+
 test('an idle radio says why', async () => {
   renderRf()
   await screen.findByRole('heading', { name: 'RF live', level: 1 })

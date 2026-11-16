@@ -171,11 +171,13 @@ def parse_listing(text: str) -> list[IptChain]:
 
 
 def skipped_lines(text: str) -> int:
-    """Lines `parse_listing` shows nothing for: not a chain head, the column header, a rule or blank."""
+    """Lines `parse_listing` shows nothing for: not a chain head, the column header, a rule or blank. A `#`
+    line is iptables' own note (iptables-nft's warning, folded in from stderr), not a rule (final review)."""
     return sum(
         1
         for line in text.splitlines()
         if line.strip()
+        and not line.lstrip().startswith("#")
         and not _POLICY.fullmatch(line.strip())
         and not _REFS.fullmatch(line.strip())
         and not _HEADER.fullmatch(line.strip())

@@ -15,15 +15,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - LuCI pages: two lists asked at the same time read the router once, and a list read during a change is not kept.
 - Discovery: Run --help and tool cards check the program in two commands instead of reading the whole page again.
 - Faults: a refresh no longer asks the router the same thing twice (19 commands to 16).
-- Capture to Wireshark: a Wireshark that falls behind drops packets from its own view and says how many; the app
-  never waits for it.
+- Capture to Wireshark: a Wireshark that falls behind drops whole packets from its own view and says how many; the
+  app never waits for it, also when the capture stops.
 
 ### Fixed
 
 - An unexpected error shows a plain message instead of a blank screen or a bare 500; the details go to the app
   log.
 - LTE, RF live and System status reconnect by themselves after a lost connection instead of asking you to open the
-  screen again.
+  screen again; RF live says when a recording stopped with the lost connection.
 - Reset counters is no longer proven by a listing that lost the rule.
 - System › reset: a router that goes away just before the 2-minute limit counts as reset.
 - RF › scan removes an owgscan0 left by a scan that lost its connection.

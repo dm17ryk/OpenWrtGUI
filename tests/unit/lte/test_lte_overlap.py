@@ -77,6 +77,36 @@ async def test_the_modem_reads_overlap_the_at_exchange() -> None:
     assert not any("AT+CGM" in call for call in t.calls)  # a known identity is not asked again
 
 
+def answer_of(out: str) -> Answer:
+    async def answer() -> str:
+        return out
+
+    return answer
+
+
+async def test_a_partly_answered_identity_is_completed_on_the_next_read() -> None:
+    """The final review: a modem still coming up after Reboot modem may skip one identity answer; the next
+    read asks only the missing one, instead of showing it as unknown for the rest of the connection."""
+    partial = ModemIdentity(manufacturer="Maker", model="M1", firmware=None, mode_order=17)
+    t = Scripted(
+        {
+            c.at(PORT, "AT+CGMR"): answer_of("AT+CGMR\r\r\nF1.0\r\n\r\nOK\r\n"),
+            c.at(PORT, "AT+COPS?"): answer_of(COPS_OK),
+        }
+    )
+    state, identity = await read_lte(
+        t,  # type: ignore[arg-type]
+        router_id="ap1",
+        qmi=("lte", DEV),
+        at_port=PORT,
+        now=NOW,
+        identity=partial,
+    )
+    assert identity == ModemIdentity(manufacturer="Maker", model="M1", firmware="F1.0", mode_order=17)
+    assert state.modem.firmware == "F1.0"
+    assert [x for x in t.calls if "microcom" in x] == [c.at(PORT, "AT+CGMR"), c.at(PORT, "AT+COPS?")]
+
+
 async def test_a_dropped_connection_ends_both_halves_and_keeps_no_identity() -> None:
     t = Scripted({c.at(PORT, "AT+CGMI"): raises(TransportError("lost"))})  # the first identity read
     with pytest.raises(TransportError):
