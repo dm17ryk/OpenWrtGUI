@@ -215,6 +215,43 @@ def test_the_app_shows_no_open_items_or_bench_sessions() -> None:
     assert found == []
 
 
+_ROW = re.compile(r"^\| `([^`]+)` \|", re.MULTILINE)
+
+
+def test_v1_0d_pages_exist() -> None:
+    sidebar = _read(MANUAL / "_Sidebar.md")
+    wanted = {
+        "How-changes-work": ("## Preview", "## Apply with rollback", "## Proof on air", "## Refused", "## Bench Guard"),
+        "Files-and-data": ("## The data folder", "## Documents", "## On a router", "## Moving or removing"),
+        "Glossary": (
+            "**App key**",
+            "**Host key**",
+            "**Rollback**",
+            "**Proof on air**",
+            "**Overlay**",
+            "**Monitor interface**",
+            "**netem**",
+            "**DSA**",
+            "**swconfig**",
+            "**AT command**",
+            "**Run**",
+            "**Step-through**",
+        ),
+    }
+    for page, parts in wanted.items():
+        assert f"]({page})" in sidebar, page
+        assert (MANUAL / f"{page}.md").is_file(), page
+        text = _read(MANUAL / f"{page}.md")
+        assert [p for p in parts if p not in text] == [], page
+
+
+def test_files_and_data_matches_security() -> None:
+    """v1.0d D6: the user page and the security policy list the same data folder."""
+    security = set(_ROW.findall(_read(ROOT / "SECURITY.md")))
+    files = set(_ROW.findall(_read(MANUAL / "Files-and-data.md"))) if (MANUAL / "Files-and-data.md").is_file() else set()
+    assert security and security == files, sorted(security ^ files)
+
+
 def test_bench_router_names_only_in_pictures_and_examples() -> None:
     """v1.0d D3: AP1/AP2 appear in screenshot alt text and `code` examples, not in sentences."""
     found = []

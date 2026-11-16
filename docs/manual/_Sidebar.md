@@ -6,6 +6,7 @@
 - [First router](First-router)
 
 **Using it**
+- [How changes work](How-changes-work)
 - [Dashboard](Dashboard)
 - [Wi-Fi](Wi-Fi)
 - [RF live](RF-live)
@@ -25,3 +26,5 @@
 **Help**
 - [Troubleshooting](Troubleshooting)
 - [FAQ](FAQ)
+- [Files and data](Files-and-data)
+- [Glossary](Glossary)

@@ -33,7 +33,9 @@ Everything lives in the data folder you picked at install time (default `%LOCALA
 | `tools\` | Promoted tool cards |
 | `steps\` | The saved radio options of a step-through that has not been restored yet |
 
-RF recordings, step-through results and captures go to `Documents\OpenWrtGUI`.
+RF recordings, step-through results and captures go to `Documents\OpenWrtGUI`. The manual's
+[Files and data](https://github.com/dm17ryk/OpenWrtGUI/wiki/Files-and-data) page lists the same files, with
+what uninstall removes.
 
 The app **never stores router passwords**. The root password you type in the Add-router wizard is used
 for that one login, to install the app key, and is then discarded.

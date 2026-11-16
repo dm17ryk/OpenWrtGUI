@@ -37,10 +37,8 @@ services, scheduled tasks, access, LEDs, backups, restore). Every change shows i
 is checked on the router afterwards. A LuCI page the app has no screen for yet opens inside the app.
 
 **What does the app leave on a router?**
-The line in `/etc/dropbear/authorized_keys` that lets it log in. If you make the zone that carries the app's SSH
-block traffic to the router, the change adds the [pinned rules](Firewall#pinned-rules) `owg_pin_ssh` and
-`owg_pin_dhcpdns`, which stay until you remove them on the Firewall screen. An armed fault keeps its record under
-`/tmp/owg` until it ends. **Clear everything** on the Faults screen removes faults left from a closed session.
+The line in `/etc/dropbear/authorized_keys` that lets it log in, plus a few things only when you use the feature
+(pinned firewall rules, an armed fault's record). The full list is in [Files and data](Files-and-data#on-a-router).
 
 **Will it interfere with a harness run?**
 No. While [Bench Guard](Bench-Guard) sees a run, every router is read-only in the app. The dashboard's

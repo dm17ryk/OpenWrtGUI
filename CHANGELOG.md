@@ -7,6 +7,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Manual: How changes work, Files and data, and a Glossary.
+
 ### Changed
 
 - LTE: the modem's model, firmware and mode order are read once per connection and the rest of the read runs
