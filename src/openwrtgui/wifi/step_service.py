@@ -285,6 +285,8 @@ class StepService:
 
     # ---------------------------------------------------------------- start, next, stop
     async def start(self, router_id: str, req: StepRequest, digest: str) -> StepJob:
+        # it names the saved file: checked before the file is looked for (v1.0b1 final review, v1.0b2 D7)
+        checked_radio(req.radio)
         self._guard.require_clear()
         rec = self._record_of(router_id)
         req = self._normal(req)
@@ -625,6 +627,9 @@ class StepService:
         rec = self._record_of(router_id)
         if (why := self.busy(rec.id)) is not None:
             raise StepBusy(why)
+        for check in self._busy:  # a System job or a flash holds the router, as for Start (v1.0b2 D7)
+            if (why := check(rec.id)) is not None:
+                raise StepBusy(why)
         path = self._saved_path(rec.id, radio)
         try:
             saved = PendingRestore.model_validate_json(path.read_text(encoding="utf-8"))

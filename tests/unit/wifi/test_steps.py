@@ -143,3 +143,9 @@ def test_joined() -> None:
     assert not joined({"clients": {mac: {"auth": True, "assoc": False, "authorized": False}}}, mac)
     assert not joined({"clients": {}}, mac)
     assert not joined({}, mac)
+
+
+def test_saved_options_without_every_name_restore_nothing() -> None:
+    """v0.7 minor (#46): a missing name read as 'absent' would delete that option from the radio."""
+    with pytest.raises(ValueError, match="^The saved options lack htmode, noscan"):
+        saved_ops("radio0", {"channel": "6"})

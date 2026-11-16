@@ -25,6 +25,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Step-through: an error during the restore or a cancelled run ends it as failed with Restore offered, instead of
   leaving the router "restoring"; a proven step is kept when its wait loses the router; Next acts only on the wait
   on screen.
+- Step-through: Restore waits for a System job or a flash as Start does; a saved file that lacks options restores
+  nothing instead of deleting them; Start checks the radio name before anything else.
 
 ### Security
 

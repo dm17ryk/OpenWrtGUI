@@ -17,8 +17,8 @@ from conftest import WifiEnv
 from openwrtgui.guard.bench_guard import GuardLocked
 from openwrtgui.transport.base import CommandResult, Transport, TransportError
 from openwrtgui.wifi.service import PreviewChanged
-from openwrtgui.wifi.step_service import StepBusy, StepJob, StepService
-from openwrtgui.wifi.steps import StepRequest
+from openwrtgui.wifi.step_service import PendingRestore, StepBusy, StepJob, StepService
+from openwrtgui.wifi.steps import SAVED_OPTIONS, StepRequest
 
 DONE = ("done", "stopped", "failed")
 TWO_BY_TWO = StepRequest("radio0", ("b", "g"), (1, 6), dwell_s=10)
@@ -516,3 +516,40 @@ async def test_a_next_for_the_station_wait_does_not_skip_the_dwell(env: WifiEnv,
     (result,) = _job(steps).results
     assert result.rejoined and result.ended_at is not None
     assert result.ended_at - result.started_at >= timedelta(seconds=10)  # the dwell ran
+
+
+def _left_at_a_step(tmp_path: Path, options: dict[str, Any] | None = None) -> Path:
+    """A saved file as a run stopped by Bench Guard leaves it."""
+    base = dict.fromkeys(SAVED_OPTIONS) | {"channel": "6", "htmode": "HT20"}
+    saved = options if options is not None else base
+    record = PendingRestore(
+        router_id="ap2", radio="radio0", saved_at=datetime(2026, 11, 16, 9, 0), options=saved
+    )
+    path = tmp_path / "steps" / "ap2-radio0.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(record.model_dump_json(), encoding="utf-8")
+    return path
+
+
+async def test_restore_waits_for_a_system_job_as_start_does(env: WifiEnv, tmp_path: Path) -> None:
+    """v0.7 minor (#45): Restore refuses while a reboot or a flash holds the router."""
+    steps = _service(env, tmp_path, _Clock(), busy=[lambda router_id: "A reboot runs on AP2"])
+    path = _left_at_a_step(tmp_path)
+    with pytest.raises(StepBusy, match="^A reboot runs on AP2$"):
+        await steps.restore("ap2", "radio0")
+    assert path.exists()
+
+
+async def test_a_saved_file_without_every_option_restores_nothing(env: WifiEnv, tmp_path: Path) -> None:
+    steps = _service(env, tmp_path, _Clock())
+    path = _left_at_a_step(tmp_path, {"channel": "6"})
+    with pytest.raises(ValueError, match="lack htmode"):
+        await steps.restore("ap2", "radio0")
+    assert path.exists()
+
+
+async def test_start_checks_the_radio_name_before_any_file(env: WifiEnv, tmp_path: Path) -> None:
+    """v1.0b1 final review minor: the name builds a file path, so it is checked before the path is probed."""
+    steps = _service(env, tmp_path, _Clock())
+    with pytest.raises(ValueError, match="is not a radio name"):
+        await steps.start("ap2", StepRequest("../x", ("g",), (1,)), "0" * 16)
