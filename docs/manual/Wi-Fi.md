@@ -60,10 +60,13 @@ Apply is refused with "changed since the preview" and the new preview shows what
 - the TX mask;
 - the beacon rate, read from real beacons through a temporary monitor interface.
 
-A change counts as done only when these checks pass. If the connection drops while the change runs, or a
-harness run starts after it was committed, the result says "Applied, not verified" with the reason (a dropped
-connection may or may not have let the commit through; the screen reads the router again). While a harness run is live,
-Apply is refused and the banner names the run.
+A change counts as done only when these checks pass. The result says "Applied, not verified" in three cases:
+- a check fails: the result names the checks that failed, and the list below it shows what the router reported;
+- the connection drops while the change runs (a dropped connection may or may not have let the commit through;
+  the screen reads the router again);
+- a harness run starts after the change was committed.
+
+While a harness run is live, Apply is refused and the banner names the run.
 
 ## TX mask after a reload
 

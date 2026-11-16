@@ -38,7 +38,8 @@ A Wi-Fi change counts as done only when the radio shows it on air. The app check
 - the beacon rate, read from real beacons.
 
 The result then says "Applied and proven on air". The result says "Applied, not verified", with the reason, in
-two cases:
+three cases:
+- a check fails: the result names the checks that failed, and the list below it shows what the router reported;
 - the connection drops;
 - a harness run starts after the change was committed.
 

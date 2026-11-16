@@ -50,9 +50,9 @@ the router again and confirmed. So a wrong address or firewall rule cannot lock 
 [How changes work](How-changes-work#apply-with-rollback).
 
 **Why does a screen say the router is busy?**
-A router runs one job at a time (a reboot, a restore, a reset, a flash, an LTE action), and a second one is
-refused until the first ends. Nothing was sent for the refused one. See
-[Troubleshooting](Troubleshooting#the-router-is-busy).
+Some jobs run one at a time on a router. A reboot, a restore and a reset share one slot; a flash refuses a second
+flash, and an LTE action refuses a second LTE action. A refused job sends nothing; the message names the job that
+holds the router. See [Troubleshooting](Troubleshooting#the-router-is-busy).
 
 **Why does the LTE screen say "no address yet"?**
 The modem is registered, but the carrier has not given the router an address yet; a wrong APN is the usual

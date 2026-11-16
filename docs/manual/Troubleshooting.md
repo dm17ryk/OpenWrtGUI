@@ -92,22 +92,25 @@ nothing is sent for the refused one. You see, for example:
 - "A flash runs on this router already" (Discovery);
 - "An LTE action is already running on …" (LTE).
 
-Wait for the first job to finish, then try again. A reboot or a flash that takes longer than 5 minutes may not
-have come back: see the next entry. A step-through that left its radio at a step says "Restore … first";
+Wait for the first job to finish, then try again. A reboot that takes longer than 5 minutes, or a flash that
+takes longer than 10, may not have come back: see the next entry. A step-through that left its radio at a step says "Restore … first";
 see [A radio was left at a step-through step](#a-radio-was-left-at-a-step-through-step).
 
 ## A reboot or a flash does not come back
 
-- **A reboot.** A router that is not back 5 minutes after a reboot is reported "not back". A flash keeps the
-  router off the network for about three minutes; the dialog shows **Waiting for … to come back** with the time so
-  far.
-- **First check its power and LEDs**, and the cable to this PC.
-- **A flash that kept settings** comes back at its old address with the same host key, and the app reconnects.
-- **A flash without settings** comes back at 192.168.1.1 with no password. **Needs attention** then shows
-  "Reflashed without settings: add it again".
-- **Do not cut the power while `sysupgrade` writes the flash** (the first minutes after **Starting sysupgrade**).
-  Once 5 minutes have passed with no answer, power-cycle the router.
-- **If it still does not answer**, use OpenWrt's failsafe mode, as in
+- **A reboot.** A router that is not back 5 minutes after a reboot is reported "not back". Check its power, its
+  LEDs and the cable to this PC, then **Reconnect**. A router that still does not answer can be power-cycled: a
+  reboot writes nothing to the flash.
+- **A flash.** The router is off the network for about three minutes; the dialog shows **Waiting for … to come
+  back** with the time so far, and waits up to 10 minutes. After that it says "… did not come back within 10
+  minutes. It may still be writing flash: do not power it off; check its LEDs, then try Reconnect."
+  - **Do not cut the power while the router may still be writing the flash.** Cutting it then can leave the router
+    unable to start. Check its LEDs as the message says, give it more time, then try **Reconnect**.
+  - **A flash that kept settings** comes back at its old address with the same host key, and the app reconnects.
+  - **A flash without settings** comes back at 192.168.1.1 with no password. **Needs attention** then shows
+    "Reflashed without settings: add it again".
+- **If it still does not answer** once nothing is being written, power-cycle it. If that does not help, use
+  OpenWrt's failsafe mode, as in
   [A router that does not come back after a rollback](#a-router-that-does-not-come-back-after-a-rollback).
 
 ## An update does not download or install

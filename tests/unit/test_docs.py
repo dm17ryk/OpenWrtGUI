@@ -283,20 +283,52 @@ def test_bench_guard_names_every_guarded_area() -> None:
     assert sorted(w for w in set(GUARDED.values()) if w not in refused) == []
 
 
+def _section(page: str, heading: str) -> str:
+    """One `## ` section of a manual page, whitespace flattened: a quoted message may wrap across lines."""
+    return " ".join(_sections(_read(MANUAL / f"{page}.md")).get(heading, "").split())
+
+
 def test_v1_0c_behaviour_is_documented() -> None:
-    pages = _user_pages()
+    """Each line is looked for in the section that owns the behaviour, so a stray mention elsewhere on the
+    page does not count (the final review: "this PC" already matched the Faults page's intro)."""
     wanted = {
-        "LTE-modem": ("reconnecting (attempt",),
-        "RF-live": ("reconnecting (attempt", "Recording stopped when the connection was lost"),
-        "System": ("reconnecting (attempt",),
-        "Faults-and-capture": ("Wireshark fell behind", "has no conntrack", "this PC"),
-        "Dashboard": ("Remove from the app",),
-        "Discovery": ("**Flash** stays grey while a run is live",),
-        "Ports-and-VLANs": ("greyed", "LuCI lists the entries in its own order"),
+        ("LTE-modem", "Live signal"): ("reconnecting (attempt",),
+        ("RF-live", "Charts"): ("reconnecting (attempt",),
+        ("RF-live", "Record to CSV"): ("Recording stopped when the connection was lost",),
+        ("System", "Live load, bandwidth and connections"): ("reconnecting (attempt",),
+        ("Faults-and-capture", "Capture"): ("Wireshark fell behind",),
+        ("Faults-and-capture", "Block flows"): ("has no conntrack",),
+        ("Faults-and-capture", "Target"): ("this PC is not offered as one",),
+        ("Dashboard", "Router overview"): ("Remove from the app",),
+        ("Discovery", "Flash this image"): ("**Flash** stays grey while a run is live",),
+        ("Ports-and-VLANs", "VLANs on a DSA router"): ("greyed", "LuCI lists the entries in its own order"),
     }
-    flat = {p: " ".join(pages[p].split()) for p in wanted}  # a quoted message may wrap across lines
-    missing = [(p, w) for p, words in wanted.items() for w in words if w not in flat[p]]
+    missing = [(where, w) for where, words in wanted.items() for w in words if w not in _section(*where)]
     assert missing == []
+
+
+def test_flash_recovery_matches_the_app() -> None:
+    """The final review: the manual said to power-cycle a flash after 5 minutes, while the app waits 10 and
+    says not to power off a router that may still be writing flash."""
+    back = _section("Troubleshooting", "A reboot or a flash does not come back")
+    assert "It may still be writing flash: do not power it off" in back
+    assert "Once 5 minutes have passed" not in back
+    assert "a flash that takes longer than 5 minutes" not in _section("Troubleshooting", "The router is busy")
+
+
+def test_not_verified_names_every_cause() -> None:
+    """The final review: "Applied, not verified" also follows a failed check (CheckList.tsx names the
+    checks), not only a lost connection or a run."""
+    for page, heading in (("How-changes-work", "Proof on air"), ("Wi-Fi", "Apply and proof on air")):
+        assert "a check fails" in _section(page, heading), page
+
+
+def test_faq_busy_answer_matches_the_jobs() -> None:
+    """The final review: only a reboot, a restore and a reset share one slot; a flash refuses a second flash
+    and an LTE action a second LTE action."""
+    faq = " ".join(_read(MANUAL / "FAQ.md").split())
+    answer = faq.split("**Why does a screen say the router is busy?**", 1)[1].split("**", 1)[0]
+    assert "a second flash" in answer and "a second LTE action" in answer
 
 
 SCREEN_PAGES = (
