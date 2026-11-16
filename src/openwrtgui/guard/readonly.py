@@ -6,6 +6,7 @@ import re
 import shlex
 
 from openwrtgui.discovery.commands import OVERLAY_LS, ROM_LS
+from openwrtgui.fw.iptables import IPT_STATE
 from openwrtgui.lte.commands import TTY_LIST
 from openwrtgui.system.commands import BACKUP_SIZE, BLOCK_DETECT, HAS_BLOCK, PASSWORD_DIGEST
 
@@ -15,7 +16,9 @@ _FORBIDDEN = (";", "&", "||", ">", "<", "`", "$(", "\n")
 # screen's backup size (v0.6b): the archive goes to wc only, nothing is written on the router. Its
 # block-mount probe and password digest (v0.6c): `test` and `awk` are not open programs here. `block detect`
 # (v1.0a2): it only prints the fstab block-mount would write.
-_EXACT = frozenset({OVERLAY_LS, ROM_LS, TTY_LIST, BACKUP_SIZE, HAS_BLOCK, PASSWORD_DIGEST, BLOCK_DETECT})
+_EXACT = frozenset(
+    {OVERLAY_LS, ROM_LS, TTY_LIST, BACKUP_SIZE, HAS_BLOCK, PASSWORD_DIGEST, BLOCK_DETECT, IPT_STATE}
+)
 _FIRMWARE_HASH = re.compile(
     r"dd if=/dev/mtdblock\d{1,2} bs=65536 count=\d{1,6} 2>/dev/null \| head -c \d{1,10} \| sha256sum"
 )

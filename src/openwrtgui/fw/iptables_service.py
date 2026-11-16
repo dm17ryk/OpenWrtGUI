@@ -4,6 +4,7 @@ apply."""
 from __future__ import annotations
 
 from openwrtgui.fw.iptables import (
+    IPT_STATE,
     PROGRAMS,
     RESET_NOTE,
     RESTART,
@@ -17,6 +18,7 @@ from openwrtgui.fw.iptables import (
     parse_listing,
     reset_proven,
     skipped_lines,
+    split_state,
 )
 from openwrtgui.luci_bridge.depends import files_command, parse_ls
 from openwrtgui.net.apply import ApplyRunner, NetApplyResult, NetCheck, NetPlan, Planned, net_plan
@@ -72,15 +74,17 @@ class IptablesService:
         return await self._presence(await self._pool.get(self._record(router_id)))
 
     async def state(self, router_id: str) -> IptablesState:
+        """One command for every table, every 10 s while the tab is open (v1.0c Task 3, #63)."""
         t = await self._pool.get(self._record(router_id))
-        p = await self._presence(t)
+        done = await t.run(IPT_STATE)
+        p, sections = split_state(done.stdout)
         tables: list[IptTable] = []
         for program in self._programs(p):
             for table in TABLES:
-                r = await t.run(listing(program, table))
-                error = None if r.ok else ((r.stderr or r.stdout).strip() or f"exit {r.exit_status}")
-                chains = parse_listing(r.stdout) if r.ok else []
-                skipped = skipped_lines(r.stdout) if r.ok else 0
+                status, text = sections.get((program, table), (1, ""))
+                error = None if status == 0 else (text.strip() or done.stderr.strip() or f"exit {status}")
+                chains = parse_listing(text) if status == 0 else []
+                skipped = skipped_lines(text) if status == 0 else 0
                 tables.append(
                     IptTable(program=program, table=table, chains=chains, error=error, skipped=skipped)
                 )

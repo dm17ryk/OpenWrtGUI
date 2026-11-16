@@ -24,7 +24,7 @@ NOW = datetime(2026, 11, 16, 9, 0)
 WARM = {
     ("ap1", "/api/routers/ap1/lte"): 11,
     ("ap1", "/api/routers/ap1/faults"): 19,
-    ("ap4", "/api/routers/ap4/firewall/iptables"): 9,
+    ("ap4", "/api/routers/ap4/firewall/iptables"): 1,
     ("ap1", "/api/routers/ap1/firewall"): 9,
     ("ap1", "/api/routers/ap1/network"): 4,
     ("ap1", "/api/routers/ap1/wifi"): 6,
