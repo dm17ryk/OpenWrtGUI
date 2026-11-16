@@ -7,6 +7,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- LTE: the modem's model, firmware and mode order are read once per connection and the rest of the read runs
+  alongside the operator query: about 2 s instead of 10-12 s per refresh.
+
 ### Fixed
 
 - A restore's proof no longer reports a setup script the router's first boot removed.

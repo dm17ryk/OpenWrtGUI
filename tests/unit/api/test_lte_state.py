@@ -95,7 +95,7 @@ class Nothing:
 
 
 async def test_a_router_without_a_qmi_interface() -> None:
-    s = await read_lte(Nothing(), router_id="x", qmi=None, at_port=None, now=NOW)  # type: ignore[arg-type]
+    s, _ = await read_lte(Nothing(), router_id="x", qmi=None, at_port=None, now=NOW)  # type: ignore[arg-type]
     assert not s.available
     assert s.note == "This router has no LTE interface (no qmi interface in its network config)"
 

@@ -1,4 +1,4 @@
-"""How many SSH commands a request sends: the simulator's connection keeps every command in `calls` (v1.0c)."""
+"""How many SSH commands a request sends: the simulator's connection keeps each command in `calls` (v1.0c)."""
 
 from __future__ import annotations
 

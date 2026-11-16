@@ -87,7 +87,7 @@ def test_mode_order_reads() -> None:
 
 
 async def test_lte_status_reads() -> None:
-    s = await read_lte(Recorded(), router_id="ap2", qmi=("lte", DEVICE), at_port=AT_PORT, now=NOW)  # type: ignore[arg-type]
+    s, _ = await read_lte(Recorded(), router_id="ap2", qmi=("lte", DEVICE), at_port=AT_PORT, now=NOW)  # type: ignore[arg-type]
     assert s.available and (s.up, s.pending, s.uptime_s) == (True, False, 2222552)
     assert s.ipv4 is None  # lte_4 is pending on AP2: no DHCP lease yet, so no address to show
     assert (s.rx_bytes, s.tx_bytes) == (12173, 257532310)

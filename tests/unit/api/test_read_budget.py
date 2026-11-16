@@ -1,5 +1,5 @@
-"""The SSH command budget of the reads v1.0c speeds up (plan, Task 1). A task that speeds a read lowers its row
-first, sees it fail, then makes the read meet it; no row may grow."""
+"""The SSH command budget of the reads v1.0c speeds up (plan, Task 1). A task that speeds a read lowers its
+row first, sees it fail, then makes the read meet it; no row may grow."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ NOW = datetime(2026, 11, 16, 9, 0)
 
 # SSH commands of a warm read at 108a89e (2026-11-16); a task that speeds a read lowers its row first.
 WARM = {
-    ("ap1", "/api/routers/ap1/lte"): 15,
+    ("ap1", "/api/routers/ap1/lte"): 11,
     ("ap1", "/api/routers/ap1/faults"): 19,
     ("ap4", "/api/routers/ap4/firewall/iptables"): 9,
     ("ap1", "/api/routers/ap1/firewall"): 9,
@@ -31,7 +31,7 @@ WARM = {
     ("ap1", "/api/routers/ap1/ports"): 10,
     ("ap1", "/api/routers/ap1/system/access"): 9,
 }
-AT_WARM = {("ap1", "/api/routers/ap1/lte"): 5}
+AT_WARM = {("ap1", "/api/routers/ap1/lte"): 1}
 HELP_PREVIEW = 12  # Discovery Run --help preview on ap1 with the mini image's profile, the router described
 POLL_TICK = 7  # one status tick on ap1, after the first
 
@@ -40,7 +40,8 @@ POLL_TICK = 7  # one status tick on ap1, after the first
 def seeded_ctx(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[AppContext]:
     monkeypatch.delenv("OPENWRTGUI_SIM_GUARD", raising=False)
     monkeypatch.setenv("OPENWRTGUI_SIM_SEED", "ap4,ap5")
-    yield build_context(DataDir.at(tmp_path / "data"), token=TOKEN, port=PORT, simulator=SIM_DIR, web_dir=None)
+    data = DataDir.at(tmp_path / "data")
+    yield build_context(data, token=TOKEN, port=PORT, simulator=SIM_DIR, web_dir=None)
 
 
 @pytest.fixture
