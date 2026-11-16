@@ -12,8 +12,9 @@ Installed version, the update channel (**Stable** or **Pre-release (CI builds)**
 
 ## Appearance
 
-**System** (follows Windows light or dark), **Light** or **Dark**. The moon button in the top bar
-switches between light and dark directly.
+**System** (follows Windows light or dark), **Light** or **Dark**. The choice is saved at once and applies to
+every screen, the charts included; with **System** the app follows Windows' own setting. The moon button in the
+top bar switches between light and dark directly.
 
 ## Folders
 
@@ -26,8 +27,10 @@ chosen at install (stored under `HKCU\Software\OpenWrtGUI`), then `%LOCALAPPDATA
 
 ## Bench Guard
 
-The watch list: lock files, processes on this PC, and SSIDs on air on a router. While any of them is
-live, every router is read-only. See [Bench Guard](Bench-Guard).
+The watch list: **Lock files**, **Processes on this PC** and **SSIDs on air on a router**. While any of them is
+live, every router is read-only. The defaults are this bench's harnesses (such as `dima_night.py`,
+`voip.lock.own` and the run SSIDs); remove one with the **×** on its chip, and add one with the field below.
+Changes are saved at once. See [Bench Guard](Bench-Guard).
 
 ## Known devices
 
@@ -57,8 +60,12 @@ folder and is readable by your Windows user only.
 ## Audit log
 
 How long to keep the [audit log](Terminal-and-audit-log): **30 days**, **90 days** (default),
-**1 year** or **Forever**.
+**1 year** or **Forever**. The log is one file per day in the data folder's `audit\` folder; each time the app
+starts, it deletes the days older than this. **Forever** deletes nothing. Exports already saved in `exports\` are
+not touched.
 
 ## About
 
-The version and license, a link to the project, and **Quit** (closes the app and its local server).
+The version and licence (for example `OpenWrtGUI 1.0.0 · GPL-3.0`), a link to the project on GitHub, and
+**Quit**, which closes the app and its local server. Give this version when you report a problem in
+[Issues](https://github.com/dm17ryk/OpenWrtGUI/issues/new/choose).

@@ -8,7 +8,10 @@ on this screen changes a router.
 ## Headline
 
 The title counts the bench: routers, radios on air, stations connected. For example
-"3 routers · 1 radio on air · 1 station".
+"3 routers · 1 radio on air · 1 station". It follows the same 5-second refresh as the cards below, so a radio
+that goes down or a station that leaves changes the count within seconds. With no routers yet it says "No routers
+yet. Use Add router to connect the first one."; if the app cannot list its routers, it says "Could not load the
+routers" with the reason.
 
 ## Air map
 
@@ -65,7 +68,10 @@ Below the cards, anything that needs you:
 
 ## Router list
 
-The left column (top on narrow windows) lists every router with its state, and **+ Add router**.
+The left column (top on narrow windows) lists every router, one row each: a dot for its state (green on air,
+amber parked, red unreachable, grey needs app key or connecting), its name, its address and, once read, its
+radio. Click a row to open that router's overview. **+ Add router** at the bottom opens the
+[wizard](First-router).
 
 ## Router overview
 

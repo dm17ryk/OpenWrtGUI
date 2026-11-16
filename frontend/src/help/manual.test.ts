@@ -66,3 +66,13 @@ test.each(Object.entries(HELP))('help topic %s is a section of the manual', (_na
   expect(entry?.blocks.length).toBeGreaterThan(0)
   expect(entry?.url).toBe(WIKI + topic)
 })
+
+const MIN_HELP_WORDS = 30 // v1.0d D11: a ? that opens two lines does not answer anything
+
+test.each(Object.entries(HELP).filter(([, topic]) => topic.includes('#')))(
+  'help topic %s says enough',
+  (_name, topic) => {
+    const words = (helpFor(topic)?.blocks ?? []).join(' ').split(/\s+/).filter(Boolean).length
+    expect(words, topic).toBeGreaterThanOrEqual(MIN_HELP_WORDS)
+  },
+)

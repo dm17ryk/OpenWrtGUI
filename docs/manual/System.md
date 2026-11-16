@@ -108,8 +108,10 @@ the saved config and uhttpd listening where the switch says.
 
 ## Repository keys
 
-The names of the keys the package manager trusts (`/etc/apk/keys`, or `/etc/opkg/keys` on older firmware).
-They are shown, never changed here.
+The names of the keys the package manager trusts (`/etc/apk/keys`, or `/etc/opkg/keys` on older firmware), each
+with its kind. The package manager accepts package lists and packages signed by one of these keys. They are shown,
+never changed here: "Read only: this app does not change them." A router with none says "No repository keys
+found."
 
 ## Plugins
 

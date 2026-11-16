@@ -10,7 +10,8 @@ Before you start: the router runs OpenWrt, SSH (dropbear) is on, and this PC can
 ## 1. Where is the router?
 
 Open **Add router**, type the **Router address** (for example `192.168.1.2`) and, if it is not 22, the
-**SSH port**. **Connect**.
+**SSH port**. **Connect** opens an SSH connection and reads the router's host key; nothing is logged in and
+nothing changes on the router yet. The next step shows that key, so you can check it is the router you mean.
 
 ## 2. Check the router is the one you mean
 

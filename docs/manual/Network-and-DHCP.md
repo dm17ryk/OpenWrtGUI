@@ -60,8 +60,10 @@ every subnet of the router. Several changes go in one Apply.
 
 ## Active leases
 
-The devices that have an address from this router now, with how long their lease still runs. **Make fixed** fills
-in a fixed address for one of them.
+The devices that have an address from this router now (IPv4 and IPv6), refreshed every 10 s: host name, MAC,
+address and how long the lease still runs. **Make fixed** fills in a fixed address for an IPv4 device; one that
+already has a fixed address shows **fixed**. A device with a static address of its own never asks for a lease, so
+it is not listed; with none at all the table says "No leases: nothing has an address from this router."
 
 ## Wi-Fi access by MAC
 
