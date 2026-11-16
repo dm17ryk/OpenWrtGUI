@@ -60,6 +60,16 @@ class LteState(BaseModel):
     missing: tuple[str, ...] = ()
 
 
+def _flag(value: object) -> bool | None:
+    """netifd's true/false, or unknown for anything else (v0.6a minor #24)."""
+    return value if isinstance(value, bool) else None
+
+
+def _count(value: object) -> int | None:
+    """netifd's whole numbers, or unknown for anything else: a bool is not a count."""
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
 async def _stdout(t: Transport, command: str) -> str | None:
     result = await t.run(command)
     return result.stdout if result.ok else None
@@ -181,12 +191,12 @@ async def read_lte(
         read_at=now,
         available=True,
         device=dev,
-        up=session.get("up") if session else None,
-        pending=session.get("pending") if session else None,
-        uptime_s=session.get("uptime") if session else None,
+        up=_flag(session.get("up")) if session else None,
+        pending=_flag(session.get("pending")) if session else None,
+        uptime_s=_count(session.get("uptime")) if session else None,
         ipv4=ipv4,
-        rx_bytes=stats.get("rx_bytes") if stats else None,
-        tx_bytes=stats.get("tx_bytes") if stats else None,
+        rx_bytes=_count(stats.get("rx_bytes")) if stats else None,
+        tx_bytes=_count(stats.get("tx_bytes")) if stats else None,
         registration=serving.registration if serving else None,
         radio=serving.radio if serving else None,
         roaming=serving.roaming if serving else None,

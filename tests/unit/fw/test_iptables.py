@@ -86,6 +86,13 @@ def test_lines_the_parser_cannot_read_are_counted() -> None:
     assert skipped_lines(_listing(10, 10)) == 0
 
 
+def test_a_counter_missing_afterwards_proves_nothing() -> None:
+    """v1.0b2 deferred minor: a listing that lost the rule (or failed) is no proof of a reset."""
+    before = _listing(policy_bytes=0, rule_bytes=500)
+    assert reset_proven(before, "") is False  # the after-listing came back empty
+    assert reset_proven(before, _listing(policy_bytes=0, rule_bytes=0)) is True
+
+
 RAW_FAILED = "iptables v1.8.10 (legacy): can't initialize iptables table `raw': Table does not exist\n"
 
 

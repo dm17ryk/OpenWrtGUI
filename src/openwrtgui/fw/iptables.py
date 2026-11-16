@@ -198,4 +198,5 @@ def reset_proven(before: str, after: str) -> bool:
     after an earlier reset with traffic since (v1.0b2 D4). Nothing counted before: nothing to prove."""
     was, now = _counters(before), _counters(after)
     counted = {key: n for key, n in was.items() if n > 0}
-    return not counted or any(now.get(key, 0) < n for key, n in counted.items())
+    # a counter missing afterwards (the listing lost the rule, or failed) proves nothing (v1.0c Task 10)
+    return not counted or any(key in now and now[key] < n for key, n in counted.items())

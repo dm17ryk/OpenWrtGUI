@@ -222,10 +222,11 @@ async def wait_until_gone(
     limit_s: float = RESET_LIMIT_S,
 ) -> bool:
     """True once new logins at the router's address fail GONE_AFTER times in a row (firstboot took it
-    away), False after limit_s."""
+    away), False after limit_s. A streak begun before the limit is finished first (at most GONE_AFTER - 1
+    more polls), so a router that goes away just before it counts as gone (v1.0c Task 10)."""
     await pool.drop(rec.id)
     failed = 0
-    while clock() - armed_at < limit_s:
+    while clock() - armed_at < limit_s or failed > 0:
         await sleep(every_s)
         failed = 0 if await _logs_in(pool, rec) else failed + 1
         if failed >= GONE_AFTER:

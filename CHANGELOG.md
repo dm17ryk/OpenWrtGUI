@@ -24,6 +24,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   log.
 - LTE, RF live and System status reconnect by themselves after a lost connection instead of asking you to open the
   screen again.
+- Reset counters is no longer proven by a listing that lost the rule.
+- System › reset: a router that goes away just before the 2-minute limit counts as reset.
+- RF › scan removes an owgscan0 left by a scan that lost its connection.
+- LTE shows unknown for a netifd value of the wrong type instead of failing.
 - A restore's proof no longer reports a setup script the router's first boot removed.
 - LuCI's page list is read again after every change the app makes, not only after the apply runner's (Wi-Fi,
   System › Access, LTE, faults and the rest).

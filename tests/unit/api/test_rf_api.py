@@ -142,6 +142,22 @@ async def test_bad_radio_name_422(authed: httpx.AsyncClient) -> None:
         assert r.status_code == 422, (radio, r.text)
 
 
+async def test_a_scan_removes_owgscan0_left_from_an_earlier_one(
+    authed: httpx.AsyncClient, ctx: AppContext
+) -> None:
+    """v1.0b2 deferred minor: a scan whose cleanup ran over a dead connection left owgscan0 on the radio."""
+    rec = ctx.routers.get("ap2")
+    assert rec is not None
+    assert (await (await ctx.pool.get(rec)).run(scan_add("phy0"))).ok  # left by the earlier scan
+    preview = (await authed.post(f"{AP2}/scan/preview")).json()
+    assert preview["lines"][0] == SCAN_DEL
+    left = "owgscan0 is left from an earlier scan on AP2 · office: it is removed first."
+    assert preview["warnings"] == [left]
+    r = await authed.post(f"{AP2}/scan", json={"digest": preview["digest"]})
+    assert r.status_code == 200, r.text
+    assert "Interface owgscan0" not in await _iw_info(ctx)
+
+
 async def test_a_scan_whose_add_drops_the_connection_removes_owgscan0(
     authed: httpx.AsyncClient, ctx: AppContext, monkeypatch: pytest.MonkeyPatch
 ) -> None:
