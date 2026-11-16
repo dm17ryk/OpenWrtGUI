@@ -13,7 +13,7 @@ import asyncssh
 import pytest
 
 from openwrtgui.guard.audit import AuditLog
-from openwrtgui.guard.bench_guard import BenchGuard, ProcessInfo
+from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked, ProcessInfo
 from openwrtgui.net.apply import (
     ApplyRunner,
     NetApplyResult,
@@ -893,3 +893,19 @@ async def test_a_rollback_change_never_runs_unguarded(env: Env) -> None:
     with pytest.raises(RuntimeError, match="always checked by Bench Guard"):
         await env.runner.run_planned(env.rec, make, None, guarded=False)
     assert env.commands() == []
+
+
+async def test_a_live_guard_stops_run_planned_before_its_planner_reads(env: Env) -> None:
+    """v1.0b1 final review minor, v1.0b2 D13: the first layer refuses before anything is read or planned, so
+    losing it is noticed although run_audited would still refuse the write itself."""
+    env.processes.append(RUN)
+    env.guard.check_local()
+    asked: list[str] = []
+
+    async def make(t: Transport) -> Planned:
+        asked.append("planner")
+        return Planned(_lan_plan(), _verify_ok, Snapshot("uci -X show network", SNAPSHOT))
+
+    with pytest.raises(GuardLocked):
+        await env.runner.run_planned(env.rec, make, None)
+    assert asked == [] and env.commands() == []
