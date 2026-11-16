@@ -158,3 +158,13 @@ def test_since_filter_and_export(tmp_path: Path) -> None:
         names = z.namelist()
         assert len(names) == 1 and names[0].endswith(".jsonl")
         assert json.loads(z.read(names[0]).decode("utf-8").splitlines()[0])["command"] == "uname"
+
+
+def test_a_line_about_a_router_tells_the_listeners(tmp_path: Path) -> None:
+    """v1.0b2 D2: every change the app makes is audited, so a listener hears about all of them."""
+    audit = AuditLog(tmp_path)
+    heard: list[str] = []
+    audit.on_record.append(heard.append)
+    audit.record(router="ap2", screen="Wi-Fi", command="wifi reload radio0", exit_status=0, source="user")
+    audit.record(router=None, screen="Settings", command="settings saved", exit_status=None, source="app")
+    assert heard == ["ap2"]
