@@ -11,6 +11,7 @@ from openwrtgui.fw.tables import ChainEdit, TableRequest
 from openwrtgui.guard.bench_guard import GuardLocked
 from openwrtgui.simfw import SimFirewall
 from openwrtgui.transport.base import CommandResult
+from openwrtgui.transport.fake import ReplayTransport
 
 VOIP = "bridge voipdscp"
 SIP = "inet fw4 chain BENCHSIPGUARD"
@@ -217,6 +218,39 @@ async def test_a_run_that_starts_after_the_confirm_is_reported_not_refused(
     result = await env.fw.apply_table("ap1", req, plan.digest)
     assert result.applied and not result.verified
     assert result.error is not None
-    text = "Applied at runtime; not saved as an fw4 include: Bench Guard went live"
+    text = "Applied at runtime; not saved as an fw4 include because Bench Guard went live: "
     assert result.error.startswith(text), result
+    assert result.error.count("Bench Guard") == 1  # v1.0b2 deferred minor: it was said twice
     assert not any(e.command.startswith("cat > /etc/owg/") for e in env.audit.query())
+
+
+async def test_the_include_file_is_written_before_the_section_that_loads_it(env: FwEnv) -> None:
+    """v1.0b2 deferred minor: a section naming a missing file would stop fw4 loading the firewall."""
+    plan = await env.fw.plan_table(
+        "ap1", TableRequest(VOIP, "edit", override=True, rules=VOIP_RULES, keep="include")
+    )
+    file_line = plan.lines.index("cat > /etc/owg/nft/bridge-voipdscp.nft <<'OWG'")
+    assert file_line < plan.lines.index("uci set firewall.owg_bridge_voipdscp='include'")
+
+
+async def test_a_run_starting_after_the_include_file_leaves_no_section_naming_it(
+    env: FwEnv, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = ReplayTransport.run
+
+    async def run(self: ReplayTransport, command: str, *, timeout: float = 15.0) -> CommandResult:
+        done = await original(self, command, timeout=timeout)
+        if command.startswith("cat > /etc/owg/nft/"):
+            env.go_live()  # a harness run starts once the file is written
+        return done
+
+    monkeypatch.setattr(ReplayTransport, "run", run)  # the confirm reconnects: every connection
+    req = TableRequest(VOIP, "edit", override=True, rules=VOIP_RULES, keep="include")
+    plan = await env.fw.plan_table("ap1", req)
+    result = await env.fw.apply_table("ap1", req, plan.digest)
+    assert result.applied and not result.verified
+    assert result.error is not None and "dima_night.py" in result.error  # the run that stopped the save
+    rec = env.routers.get("ap1")
+    assert rec is not None
+    t = await env.pool.get(rec)
+    assert "owg_bridge_voipdscp" not in (await t.run("uci show firewall")).stdout

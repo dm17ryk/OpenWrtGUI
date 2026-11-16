@@ -28,6 +28,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - System › reset: a router that goes away just before the 2-minute limit counts as reset.
 - RF › scan removes an owgscan0 left by a scan that lost its connection.
 - LTE shows unknown for a netifd value of the wrong type instead of failing.
+- A table change saved as an fw4 include writes the file before the section that loads it, so a run starting in
+  between cannot leave the firewall an include it cannot read.
+- Clearer message when Bench Guard stops an fw4 include from being saved; "1 fault record" on the Faults screen.
+- igmp_snooping, ping, mapping, passive and key_type are no longer hidden as secrets.
 - A restore's proof no longer reports a setup script the router's first boot removed.
 - LuCI's page list is read again after every change the app makes, not only after the apply runner's (Wi-Fi,
   System › Access, LTE, faults and the rest).

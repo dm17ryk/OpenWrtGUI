@@ -266,6 +266,33 @@ def test_rollback_preview_shows_every_step_with_a_session_placeholder() -> None:
     )
 
 
+def test_first_lines_come_before_the_uci_script() -> None:
+    """v1.0c Task 11: a file the uci change names is written before the change, never after it."""
+    plan = net_plan(
+        router_id="ap1",
+        screen="Firewall",
+        config="firewall",
+        ops=[UciOp("set", "firewall.owg_t", "include")],
+        current={},
+        first=["cat > /etc/owg/nft/t.nft <<'EOF'", "table inet t {}", "EOF"],
+    )
+    assert plan.lines[0] == "cat > /etc/owg/nft/t.nft <<'EOF'"
+    assert plan.lines.index("EOF") < plan.lines.index("uci set firewall.owg_t='include'")
+
+
+def test_first_lines_are_refused_with_a_rollback() -> None:
+    with pytest.raises(ValueError, match="first lines"):
+        net_plan(
+            router_id="ap2",
+            screen="Network",
+            config="network",
+            ops=[UciOp("set", "network.lan.ipaddr", "192.168.1.12/24")],
+            current=SNAPSHOT,
+            rollback=True,
+            first=["true"],
+        )
+
+
 def test_nothing_to_apply_is_refused() -> None:
     with pytest.raises(ValueError, match="Nothing to apply: the router already has these settings."):
         net_plan(
