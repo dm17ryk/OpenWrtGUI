@@ -20,13 +20,14 @@ Guard, the terminal and the audit log. What comes next is on the
 ## All pages
 
 - [Install](Install) · [Updating](Updating)
+- [How changes work](How-changes-work)
 - [First router](First-router) · [Dashboard](Dashboard) · [Discovery](Discovery) ·
   [Adding a router family](Adding-a-router-family)
 - [Wi-Fi](Wi-Fi) · [RF live](RF-live) · [LuCI pages](LuCI-pages)
 - [Network and DHCP](Network-and-DHCP) · [LTE modem](LTE-modem) · [Ports, VLANs, mirroring](Ports-and-VLANs)
 - [Firewall](Firewall) · [Faults and capture](Faults-and-capture) · [System](System)
 - [Bench Guard](Bench-Guard) · [Terminal and audit log](Terminal-and-audit-log) · [Settings](Settings)
-- [Troubleshooting](Troubleshooting) · [FAQ](FAQ)
+- [Troubleshooting](Troubleshooting) · [FAQ](FAQ) · [Files and data](Files-and-data) · [Glossary](Glossary)
 
 ## Three things to know
 

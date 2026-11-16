@@ -33,18 +33,27 @@ signal where the driver reports one.
 moment. **Pause** freezes the charts; the samples keep arriving and the charts catch up when you resume. A
 station that leaves is marked "left" and its lines stop.
 
+If the screen loses its live connection to the app, it says "Lost the connection to OpenWrtGUI; reconnecting
+(attempt N)" and tries again by itself: after 1, 2, 4 and 8 seconds, then every 15 seconds while the screen is
+open. The charts keep their samples and go on once the connection is back.
+
 ## Which rates reach the station
 
 From the router's rate control (minstrel): for each rate, how often the AP tried it, how many frames the
-station acknowledged, and which rate is in use now. It needs a station on the radio and the router's debug
-file system; until the bench check of this file (open item O6) is done, the table says it is not available yet.
+station acknowledged, and which rate is in use now. It needs a station on the radio. Rate statistics are not read
+in this version; the table says so.
 
 ## Record to CSV
 
 **Record to CSV** writes one row per station per second to `Documents\OpenWrtGUI\` (the file name has the
 router, the radio and the start time). **Stop recording** closes the file; leaving the screen stops it too.
+A recording also stops when the screen loses its connection to the app: the screen then says "Recording stopped
+when the connection was lost: <file>", the file keeps the rows written until then, and **Record to CSV** stays
+grey until the connection is back.
 
 ## Frame analysis
+
+![Frame analysis: the rate mix, RX signal and retries of the last window](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/frame-analysis.png)
 
 Off by default, and only for a radio on air. **Frame analysis…** shows the commands first: it adds a monitor
 interface (`owgmon0`) on the radio, asks it for frames with a bad checksum too, and runs `tcpdump` for 3 s of
@@ -64,6 +73,8 @@ removed). A Wi-Fi Apply or a step-through step reloads the radio and removes the
 it again and says so. Starting it is refused while a harness run is live.
 
 ## Channel analysis
+
+![Channel analysis: the networks heard on each channel](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/channel-analysis.png)
 
 **Scan…** shows the command, then **Scan now** listens on every channel in turn (a passive scan: nothing is
 sent). On a radio on air the AP leaves its channel for about 2 s, so its stations may miss traffic meanwhile;

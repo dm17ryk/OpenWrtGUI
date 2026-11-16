@@ -20,7 +20,9 @@ or "Not checked yet."
 
 ## Installing an update
 
-When a newer version exists, Settings shows its name, size and release notes, with three buttons:
+When a newer version exists, Settings shows its name, size and release notes. **Update now** installs it in place
+and starts it again, **Skip this version** stops offering it, and **Later** hides the offer until the next check.
+In detail:
 
 - **Update now** downloads the installer and `SHA256SUMS.txt`, checks the SHA-256, then closes the app,
   installs into the same folder, and starts the new version. If a terminal is open, or a step-through, a

@@ -4,7 +4,7 @@ Test harnesses on the bench (for example `dima_night`, `rh_soak`, `overnight_wif
 routers for hours. A change made by hand in the middle of a run spoils it. Bench Guard prevents that:
 **while a run is live, every router is read-only in OpenWrtGUI.**
 
-![Settings, with the Bench Guard watch list](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/settings.png)
+![A live run: the red banner names it, and every router is read-only](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/guard-banner.png)
 
 ## What it watches
 
@@ -26,7 +26,8 @@ file it cannot open still counts as a run. Any other lock file, such as a PID fi
 while it exists.
 
 Add or remove entries with the fields and the **×** on each chip. Changes are saved at once; the guard
-checks every 2 seconds.
+checks every 2 seconds. The default entries are this bench's own harnesses: on another bench, remove them and add
+your harnesses' lock files, processes and run SSIDs.
 
 ## What you see
 
@@ -50,11 +51,30 @@ The top bar always shows the guard's state:
 
 ## What is refused
 
-Every write to a router: each screen's **Apply**, LTE actions (connect, disconnect, modem reboot, settings) and
-AT commands that are not queries, arming a fault, a flash or a firmware check, a restore, a reboot, a capture on
-`mon0`, RF live's channel scan and frame analysis (each adds an interface on the radio), System's diagnostics
-(ping and traceroute send traffic from a router under test), installing the app key, setting a root password in
-the wizard, and terminal commands that change something. The refusal names the run, so you know what to wait for.
+Every write to a router. Each refusal names the run, so you know what to wait for, and nothing is sent to the
+router. In detail:
+
+- Each screen's **Apply**, including every change that applies with the 60 s rollback (addresses, VLANs, the
+  firewall).
+- On the Network screen, Wi-Fi access by MAC too.
+- LTE actions (connect, disconnect, modem reboot, settings) and AT commands that are not queries.
+- On the System screen:
+  - a reboot, a restore or a reset;
+  - a new router password;
+  - diagnostics (ping and traceroute send traffic from a router under test).
+- On Discovery:
+  - Run --help;
+  - a tool card's command that writes;
+  - starting or stopping a custom service;
+  - copying files to another router.
+- A flash or a firmware check.
+- Arming a fault, and a capture on `mon0`.
+- RF live's channel scan and frame analysis (each adds an interface on the radio).
+- Starting a step-through, or its **Restore**.
+- Installing the app key, and setting a root password in the wizard.
+- Terminal commands that change something.
+
+**Clear everything** on the Faults screen still works: it only removes what this app armed.
 
 ## The test helpers when a run starts
 

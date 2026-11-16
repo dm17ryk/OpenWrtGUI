@@ -37,14 +37,34 @@ services, scheduled tasks, access, LEDs, backups, restore). Every change shows i
 is checked on the router afterwards. A LuCI page the app has no screen for yet opens inside the app.
 
 **What does the app leave on a router?**
-The line in `/etc/dropbear/authorized_keys` that lets it log in. If you make the zone that carries the app's SSH
-block traffic to the router, the change adds the [pinned rules](Firewall#pinned-rules) `owg_pin_ssh` and
-`owg_pin_dhcpdns`, which stay until you remove them on the Firewall screen. An armed fault keeps its record under
-`/tmp/owg` until it ends. **Clear everything** on the Faults screen removes faults left from a closed session.
+The line in `/etc/dropbear/authorized_keys` that lets it log in, plus a few things only when you use the feature
+(pinned firewall rules, an armed fault's record). The full list is in [Files and data](Files-and-data#on-a-router).
 
 **Will it interfere with a harness run?**
 No. While [Bench Guard](Bench-Guard) sees a run, every router is read-only in the app. The dashboard's
 reads are light (a few commands every 5 seconds per router).
+
+**What does the 60 s rollback do if a change cuts the app off?**
+The router keeps a copy of its settings and puts it back by itself 60 s after the change, unless the app reached
+the router again and confirmed. So a wrong address or firewall rule cannot lock you out for long. See
+[How changes work](How-changes-work#apply-with-rollback).
+
+**Why does a screen say the router is busy?**
+Some jobs run one at a time on a router. A reboot, a restore and a reset share one slot; a flash refuses a second
+flash, and an LTE action refuses a second LTE action. A refused job sends nothing; the message names the job that
+holds the router. See [Troubleshooting](Troubleshooting#the-router-is-busy).
+
+**Why does the LTE screen say "no address yet"?**
+The modem is registered, but the carrier has not given the router an address yet; a wrong APN is the usual
+cause when it stays. See [Troubleshooting](Troubleshooting#the-lte-modem-has-no-address).
+
+**When would I still use a LuCI page?**
+Every LuCI page on the bench image has a screen here. A LuCI page opens inside the app for what a newer image adds.
+Changes saved in LuCI skip this app's preview and use LuCI's own rollback. See [LuCI pages](LuCI-pages).
+
+**Do I need Wireshark?**
+Only to watch a capture live. A capture to a file needs nothing extra: it goes to `Documents\OpenWrtGUI\captures`
+and opens in Wireshark later. See [Faults and capture](Faults-and-capture#capture).
 
 **Is there a demo without routers?**
 Yes, for developers: run it with `--simulator tests/fixtures/sim` from a source checkout (see

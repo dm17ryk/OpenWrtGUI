@@ -11,8 +11,9 @@ not apply inside the page: it is LuCI as the router serves it.
 The app reads the router's LuCI menu and access files when it connects. The **LuCI pages** card on the router's
 overview lists every page with its LuCI package and where it sits in LuCI's menu ("Network › DHCP"). A page
 that has a screen here (Network › Wireless is the Wi-Fi screen) links to that screen. A page with **no screen
-here yet** has an **Open in LuCI** button. The same pages are in the **LuCI pages** list next to the router's
-section links on every router screen. Two pages with the same name in the same menu (Status › Firewall for
+here yet** has an **Open in LuCI** button. The same pages are in the folded **LuCI pages (N)** list next to the
+router's section links on every router screen, N being how many there are. The card's **Not on this router (N)**
+lists the pages LuCI hides on this router, each with what it needs. Two pages with the same name in the same menu (Status › Firewall for
 iptables and for nftables) carry their LuCI path name in brackets; LuCI shows only the one the router supports.
 A page that is one tab of a screen opens that tab (LED Configuration opens System › LEDs). On a DSA router, Network
 › Switch/VLAN config opens the Ports screen, where the VLANs card edits the bridge's VLANs.

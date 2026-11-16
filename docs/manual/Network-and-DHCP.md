@@ -49,7 +49,7 @@ options by code (3 router, 6 DNS servers, 15 domain, 42 NTP servers, or any code
 router advertisements: server, relay, hybrid or disabled).
 
 Before a server is turned on, the app checks every other router it knows: one that already serves DHCP on the
-same subnet is named in a warning. On the bench, AP1 is the only DHCP server. A change is saved and dnsmasq (and
+same subnet is named in a warning. Keep one DHCP server per subnet. A change is saved and dnsmasq (and
 odhcpd for IPv6) reloaded; the app then reads the settings back and checks dnsmasq is running.
 
 ## Fixed addresses
@@ -60,8 +60,10 @@ every subnet of the router. Several changes go in one Apply.
 
 ## Active leases
 
-The devices that have an address from this router now, with how long their lease still runs. **Make fixed** fills
-in a fixed address for one of them.
+The devices that have an address from this router now (IPv4 and IPv6), refreshed every 10 s: host name, MAC,
+address and how long the lease still runs. **Make fixed** fills in a fixed address for an IPv4 device; one that
+already has a fixed address shows **fixed**. A device with a static address of its own never asks for a lease, so
+it is not listed; with none at all the table says "No leases: nothing has an address from this router."
 
 ## Wi-Fi access by MAC
 

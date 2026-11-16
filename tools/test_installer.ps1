@@ -1,13 +1,16 @@
 <#
 .SYNOPSIS
-  Install, check and uninstall the built installer silently, in scratch folders under build\.
+  Install, update over the previous release, check and uninstall the built installer silently, in scratch
+  folders under build\.
 
 .NOTES
-  CI runs it after tools/build_windows.ps1. It writes HKCU\Software\OpenWrtGUI and the Apps entry
-  for a moment, so it refuses to run on a PC where OpenWrtGUI is installed.
+  CI runs it after tools/build_windows.ps1, with -Previous set to the latest stable release's installer. It
+  writes HKCU\Software\OpenWrtGUI and the Apps entry for a moment, so it refuses to run on a PC where
+  OpenWrtGUI is installed.
 #>
 param(
-    [string]$Installer = ""
+    [string]$Installer = "",
+    [string]$Previous = ""   # an older release's installer; CI passes the latest stable one
 )
 
 $ErrorActionPreference = "Stop"
@@ -21,11 +24,15 @@ $Work = Join-Path $Root "build\installer-test"
 if (Test-Path $Work) { Remove-Item $Work -Recurse -Force }
 New-Item -ItemType Directory $Work | Out-Null
 
-function Install([string]$AppDir, [string]$DataDir) {
-    $p = Start-Process -FilePath $Installer -Wait -PassThru -ArgumentList @(
+function Install-With([string]$Setup, [string]$AppDir, [string]$DataDir) {
+    $p = Start-Process -FilePath $Setup -Wait -PassThru -ArgumentList @(
         "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$AppDir", "/DATADIR=$DataDir", "/LOG=$AppDir.log"
     )
     return $p.ExitCode
+}
+
+function Install([string]$AppDir, [string]$DataDir) {
+    return Install-With $Installer $AppDir $DataDir
 }
 
 function Uninstall([string]$AppDir) {
@@ -73,4 +80,37 @@ try {
 Check (-not (Test-Path (Join-Path $App "OpenWrtGUI.exe"))) "uninstall removes the app"
 Check (-not (Test-Path "HKCU:\Software\OpenWrtGUI")) "uninstall removes the data-folder setting"
 Check (-not (Test-Path $Uninstall)) "uninstall removes the Apps entry"
+
+# 3. An update in place, the way the app runs it (no /DATADIR, no relaunch): the data folder and its setting
+#    survive, the Apps entry shows the new version, and the new app starts on the kept data folder.
+if ($Previous) {
+    $AppU = Join-Path $Work "app-update"
+    $DataU = Join-Path $Work "data-update"
+    try {
+        $code = Install-With $Previous $AppU $DataU
+        Check ($code -eq 0) "the previous release installs (exit $code)"
+        # What the app leaves there once used: routers.json marks the folder as the app's own data folder.
+        New-Item -ItemType Directory -Force $DataU | Out-Null
+        Set-Content (Join-Path $DataU "routers.json") "[]" -NoNewline
+        Set-Content (Join-Path $DataU "keep-me.txt") "user data"
+        $before = (Get-ChildItem $DataU -File | Get-FileHash | ForEach-Object Hash) -join ","
+        $p = Start-Process -FilePath $Installer -Wait -PassThru -ArgumentList @(
+            "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$AppU", "/RELAUNCH=0", "/LOG=$AppU-update.log"
+        )
+        Check ($p.ExitCode -eq 0) "the update installs over it (exit $($p.ExitCode))"
+        $after = (Get-ChildItem $DataU -File | Get-FileHash | ForEach-Object Hash) -join ","
+        Check ($after -eq $before) "the update keeps the data folder"
+        Check ((Get-ItemProperty "HKCU:\Software\OpenWrtGUI").DataDir -eq $DataU) "the data-folder setting is kept"
+        $want = [regex]::Match((Split-Path $Installer -Leaf), "OpenWrtGUI-Setup-(.+)\.exe").Groups[1].Value
+        Check ((Get-ItemProperty $Uninstall).DisplayVersion -eq $want) "the Apps entry shows $want"
+        $c = Start-Process -FilePath (Join-Path $AppU "OpenWrtGUI.exe") -Wait -PassThru -ArgumentList @(
+            "--self-check", "--simulator", (Join-Path $Root "tests\fixtures\sim"), "--data-dir", $DataU
+        )
+        Check ($c.ExitCode -eq 0) "the updated app passes its self-check on the kept data folder"
+    } finally {
+        Uninstall $AppU
+    }
+} else {
+    Write-Host "    update test skipped: no -Previous installer"
+}
 Write-Host "installer test passed"

@@ -16,7 +16,7 @@ PROTECTED: dict[str, str] = {
     "firewall": "Stopping the firewall drops the router's rules; restart applies them again",
     "log": "The Logs tab reads the system log from log (logd)",
 }
-# a restart of these reloads the router's network or Wi-Fi: the txctl session must be told (AGENTS.md)
+# a restart of these reloads the router's network or Wi-Fi (v1.0d D2: the warning names no bench session)
 NETWORK_RELOAD = frozenset({"network", "firewall", "wpad", "dnsmasq"})
 RESTART_ONLY: frozenset[s.ServiceAction] = frozenset({"stop", "disable"})
 SETTLE_S = 10.0  # procd starts and stops a service within this (D6 proof window)
@@ -25,8 +25,8 @@ RC_LOCAL_END = "The last line of rc.local is exit 0: the boot waits for it"
 
 def network_warning(router_name: str) -> str:
     return (
-        f"This restarts {router_name}'s network: devices and this app lose {router_name} for a few seconds; "
-        "the txctl session must be told"
+        f"This restarts {router_name}'s network: devices and this app lose {router_name} for a few seconds. "
+        f"If tests run on {router_name}, tell whoever runs them first."
     )
 
 

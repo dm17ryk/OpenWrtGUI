@@ -10,6 +10,8 @@ firewall rule on any zone can match this PC, so if the app cannot reach the rout
 restores its previous firewall by itself. While [Bench Guard](Bench-Guard) shows a run, changes are refused; the
 rules, the counters and the raw ruleset keep working.
 
+![Firewall: the filtering model, one row per zone](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/firewall.png)
+
 ## Filtering model
 
 One row per zone and one column per direction: **To this router** (input), **Through the router** (forward) and
@@ -55,12 +57,17 @@ outside port or range, the device's address and its port.
 
 ## NAT rules
 
-Source NAT for traffic leaving a zone: **SNAT** rewrites the sender to a given address (and port), **MASQUERADE**
-to the outgoing interface's address, **ACCEPT** exempts traffic from NAT.
+Source NAT for traffic leaving a zone (fw4 `nat` sections): **SNAT** rewrites the sender to a given address
+(**Rewrite to**, and **Rewrite port**), **MASQUERADE** to the outgoing interface's address, **ACCEPT** exempts
+traffic from NAT. Each rule names its **Zone** and can narrow by source, destination, port and protocol.
+Masquerading a whole zone is set on the zone itself. **+ NAT rule** adds one; changes apply with the rollback.
 
 ## IP sets
 
-Named lists of addresses, networks, ports or MAC addresses that rules can match, kept by fw4.
+Named lists of addresses, networks, ports or MAC addresses that rules can match in one go, kept by fw4 (`ipset`
+sections), for example all panel MACs. Each set has a **Name**, a **Family** (ipv4 or ipv6), what it **Match**es
+(such as `src_ip` or `src_mac`) and its **Entries**, one per line. **+ IP set** adds one; rules in the firewall
+config then use it by name. Changes apply with the rollback.
 
 ## Custom rules
 
@@ -80,7 +87,10 @@ there stay true.
 
 ## Raw ruleset
 
-The router's whole nftables ruleset (`nft -a list ruleset`), read-only, with each table's owner.
+The router's whole nftables ruleset (`nft -a list ruleset`), read-only and refreshed every 5 s: fw4's own table,
+every other table, and the handle number of each rule. **Copy** puts the text on the clipboard, for a search in an
+editor or a bug report. Nothing here changes the router: edit fw4's rules on the other tabs, and see who owns
+another tool's table on Other nftables tables.
 
 ## Legacy iptables
 

@@ -26,12 +26,15 @@ router's CPU, so it runs only when you press it and not while [Bench Guard](Benc
 
 ## Flash this image
 
+![The flash dialog: the image, the steps it will run, and the name to type](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/flash-dialog.png)
+
 **Flash an image…** opens the flash dialog. Pick one of the imported images for this router's board (the dialog
 offers one whose revision differs from the running one). The preview lists every step before anything is sent:
 the image goes to `/tmp/owg` on the router, its sha256 is checked, the router validates it
 (`validate_firmware_image` and `sysupgrade -T`), and `sysupgrade` is started by a timer on the router two seconds
 later. The router is off the network for about three minutes; once `sysupgrade` starts it cannot be stopped.
 **Flash** stays grey until you type the router's name (its short name, such as `AP2`, is enough).
+**Flash** stays grey while a run is live too: the dialog shows "Bench Guard: …" with the run.
 
 The dialog then shows the upload, **Checking the image on …**, **Starting sysupgrade**, **Waiting for … to come
 back** with the time so far, and **Checking the new firmware**. A reflash checklist is saved first, and the flash
@@ -42,15 +45,16 @@ example to flash the router back to the image it had.
 
 **Keep settings** (on by default) keeps `/etc/config`, the SSH host keys and the app's key, so the app reconnects
 by itself; the app also keeps its own saved firewall files (`/etc/owg`). Without it, the router comes back as
-192.168.1.1 with no password and no key, which clashes with AP1: confirm that the router is isolated from the
+192.168.1.1 with no password and no key, which clashes with any other router at 192.168.1.1: confirm that the
+router is isolated from the
 bench LAN first, then connect it alone to this PC and add it again; the wizard accepts its new host key only when
 the board and revision it reads match the image you flashed.
 
 The image must name this router's board, there must be room for it in the router's RAM, and nothing is flashed
 while Bench Guard shows a run.
 
-The app needs the image plus 4 MiB free in the router's memory. A router with less free memory (the bench's AP2
-has about 8 MB) cannot be flashed from the app: flash it with LuCI's **System › Backup / Flash Firmware** or
+The app needs the image plus 4 MiB free in the router's memory. A router with less free memory (a router with
+about 8 MB of RAM) cannot be flashed from the app: flash it with LuCI's **System › Backup / Flash Firmware** or
 from the terminal.
 
 ## Added after flashing

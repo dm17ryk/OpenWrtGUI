@@ -7,6 +7,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Manual: How changes work, Files and data, and a Glossary.
+
 ### Changed
 
 - LTE: the modem's model, firmware and mode order are read once per connection and the rest of the read runs
@@ -17,6 +21,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Faults: a refresh no longer asks the router the same thing twice (19 commands to 16).
 - Capture to Wireshark: a Wireshark that falls behind drops whole packets from its own view and says how many; the
   app never waits for it, also when the capture stops.
+- Screens and the manual no longer name open items or bench sessions; what is not in this version says so.
+- CI installs the latest release, updates it in place with the new build, and checks the data folder is kept.
 
 ### Fixed
 

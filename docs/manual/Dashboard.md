@@ -8,7 +8,10 @@ on this screen changes a router.
 ## Headline
 
 The title counts the bench: routers, radios on air, stations connected. For example
-"3 routers · 1 radio on air · 1 station".
+"3 routers · 1 radio on air · 1 station". It follows the same 5-second refresh as the cards below, so a radio
+that goes down or a station that leaves changes the count within seconds. With no routers yet it says "No routers
+yet. Use Add router to connect the first one."; if the app cannot list its routers, it says "Could not load the
+routers" with the reason.
 
 ## Air map
 
@@ -65,7 +68,10 @@ Below the cards, anything that needs you:
 
 ## Router list
 
-The left column (top on narrow windows) lists every router with its state, and **+ Add router**.
+The left column (top on narrow windows) lists every router, one row each: a dot for its state (green on air,
+amber parked, red unreachable, grey needs app key or connecting), its name, its address and, once read, its
+radio. Click a row to open that router's overview. **+ Add router** at the bottom opens the
+[wizard](First-router).
 
 ## Router overview
 
@@ -75,7 +81,13 @@ ubus services, the typed Wi-Fi option lists, feature flags and the LuCI menu. **
 internal switch port with its printed label and the label saved for this router. **Probe again** reads
 it all once more; **Open terminal** opens a shell on the router.
 
-The row of buttons under the title opens the router's other screens: [Wi-Fi](Wi-Fi), RF live,
-[Network & DHCP](Network-and-DHCP), [Ports & VLANs](Ports-and-VLANs), [Firewall](Firewall),
-[Faults & capture](Faults-and-capture) and the terminal, then every LuCI page
-that has no screen in the app yet.
+The row of links under the title opens the router's other screens:
+- [Discovery](Discovery), [Wi-Fi](Wi-Fi), [RF live](RF-live) and [Network & DHCP](Network-and-DHCP);
+- [LTE](LTE-modem), [Ports & VLANs](Ports-and-VLANs), [Firewall](Firewall) and [Faults & capture](Faults-and-capture);
+- [System](System) and the terminal;
+- then **LuCI pages (N)**, a folded list of the LuCI pages that have no screen here
+  ([LuCI pages](LuCI-pages)).
+
+**Remove from the app** at the bottom makes the app forget the router. It first asks "Remove … from OpenWrtGUI?
+The router itself is not changed." Then the router leaves the dashboard and the app drops its connection. The app
+key, the settings and the address stay on the router, so [adding it again](First-router) logs in with the key.
