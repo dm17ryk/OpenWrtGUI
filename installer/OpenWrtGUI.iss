@@ -123,7 +123,7 @@ begin
   end;
 end;
 
-{ Uninstall may delete the data folder's logs, keys, audit and updates subfolders, so the data
+{ Uninstall may delete the data folder's logs, keys, audit, updates and backups subfolders, so the data
   folder must be the app's own: new, empty, or an OpenWrtGUI data folder already. }
 function DataDirProblem(Dir: String): String;
 begin
@@ -205,6 +205,8 @@ begin
   DelTree(Dir + '\audit', True, True, True);
   DelTree(Dir + '\updates', True, True, True);
   DelTree(Dir + '\logs', True, True, True);
+  { Routers' configuration backups hold password hashes and Wi-Fi keys: Yes removes them too (2026-11-16). }
+  DelTree(Dir + '\backups', True, True, True);
   RemoveDir(Dir);
 end;
 
@@ -219,7 +221,7 @@ begin
   { Only a folder that holds the app's own files: never a shared folder chosen some other way. }
   if (CurUninstallStep = usPostUninstall) and not UninstallSilent and IsOwnDataDir(UninstallDataDir) then
   begin
-    if MsgBox('Also delete the data folder (routers, keys, audit log)?' + #13#10#13#10 + UninstallDataDir,
+    if MsgBox('Also delete the data folder (routers, keys, backups, audit log)?' + #13#10#13#10 + UninstallDataDir,
               mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
       DeleteAppData(UninstallDataDir);
   end;

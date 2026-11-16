@@ -423,6 +423,20 @@ def test_files_and_data_matches_security() -> None:
     assert security and security == files, sorted(security ^ files)
 
 
+_ISS_DELETES = re.compile(r"(?:DeleteFile|DelTree)\(Dir \+ '\\([^']+)'")
+
+
+def test_uninstall_deletes_backups_and_the_manual_says_what() -> None:
+    """2026-11-16 decision: uninstall's Yes also deletes backups\\ (password hashes, Wi-Fi keys). The manual's
+    "Yes deletes" list is the installer's DeleteAppData list, scratch files aside."""
+    iss = _read(ROOT / "installer" / "OpenWrtGUI.iss")
+    deleted = {n for n in _ISS_DELETES.findall(iss) if not n.endswith((".tmp", ".bad", ".lock"))}
+    assert "backups" in deleted
+    yes = _section("Files-and-data", "Moving or removing").split("**Yes** deletes", 1)[1].split(" - ", 1)[0]
+    documented = set(re.findall(r"`([a-z_.]+)\\?`", yes))
+    assert documented == deleted, sorted(documented ^ deleted)
+
+
 def test_bench_router_names_only_in_pictures_and_examples() -> None:
     """v1.0d D3: AP1/AP2 appear in screenshot alt text and `code` examples, not in sentences."""
     found = []

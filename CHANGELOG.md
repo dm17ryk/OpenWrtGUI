@@ -23,6 +23,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   app never waits for it, also when the capture stops.
 - Screens and the manual no longer name open items or bench sessions; what is not in this version says so.
 - CI installs the latest release, updates it in place with the new build, and checks the data folder is kept.
+- Uninstall: answering Yes to "Also delete the data folder?" now also deletes the routers' configuration backups,
+  which hold password hashes and Wi-Fi keys.
 
 ### Fixed
 
