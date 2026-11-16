@@ -57,6 +57,7 @@ export function ImagesSection() {
   const refresh = (): void => {
     void client.invalidateQueries({ queryKey: ['images'] })
     void client.invalidateQueries({ queryKey: ['discovery'] })
+    void client.invalidateQueries({ queryKey: ['library'] })
   }
   const remove = async (p: ProfileOut): Promise<void> => {
     if (!window.confirm(`Delete ${p.label}${p.image_name ? ` (${p.image_name})` : ''}?`)) return

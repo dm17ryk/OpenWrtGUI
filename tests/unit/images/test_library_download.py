@@ -222,6 +222,52 @@ async def test_an_unknown_image_raises_key_error(tmp_path: Path) -> None:
         await library.download("00" * 32)
 
 
+def _relabelled(github: Github, *, version_code: str | None = None, board: str | None = None) -> None:
+    """Make the release's profiles.json claim another revision or board than the image really is."""
+    doc = json.loads(github.profiles)
+    if version_code is not None:
+        doc["version_code"] = version_code
+    if board is not None:
+        doc["profiles"]["dlink_dwr-921-c3-uboot"]["supported_devices"] = [board]
+    github.profiles = json.dumps(doc).encode()
+
+
+async def test_an_image_of_another_revision_than_its_release_says_is_refused(tmp_path: Path) -> None:
+    github = Github()
+    _relabelled(github, version_code="r99999-0123456789")
+    library, store = _library(tmp_path, github)
+    with pytest.raises(ValueError) as err:
+        await library.download(SHA)
+    assert str(err.value) == (
+        f"{NAME} is for dlink,dwr-921-c3-uboot r35692-b8bffeefdf, "
+        "not dlink,dwr-921-c3-uboot r99999-0123456789 as its release says; nothing was imported."
+    )
+    assert store.list() == []
+
+
+async def test_an_image_of_another_board_than_its_release_says_is_refused(tmp_path: Path) -> None:
+    github = Github()
+    _relabelled(github, board="other,board")
+    library, store = _library(tmp_path, github)
+    with pytest.raises(ValueError) as err:
+        await library.download(SHA)
+    assert str(err.value) == (
+        f"{NAME} is for dlink,dwr-921-c3-uboot r35692-b8bffeefdf, "
+        "not other,board r35692-b8bffeefdf as its release says; nothing was imported."
+    )
+    assert store.list() == []
+
+
+async def test_an_unreachable_catalog_with_nothing_cached_gives_the_read_error(tmp_path: Path) -> None:
+    github = Github()
+    github.list_status = 502
+    library, store = _library(tmp_path, github)
+    with pytest.raises(ValueError) as err:
+        await library.download(SHA)
+    assert str(err.value) == "The image library on GitHub could not be reached: HTTP 502."
+    assert store.list() == []
+
+
 async def test_download_follows_a_redirect(tmp_path: Path) -> None:
     def redirect(request: httpx.Request) -> httpx.Response:
         if str(request.url) == IMAGE_URL:

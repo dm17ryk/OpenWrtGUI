@@ -291,8 +291,11 @@ class ImageLibrary:
 
     async def download(self, sha256: str) -> Profile:
         """Fetch one catalog image and import it. KeyError: not in the catalog; ValueError: anything else."""
-        entry = next((e for e in (await self.read()).entries if e.sha256 == sha256), None)
+        read = await self.read()
+        entry = next((e for e in read.entries if e.sha256 == sha256), None)
         if entry is None:
+            if read.error:
+                raise ValueError(read.error)
             raise KeyError(sha256)
         if sha256 in self._busy:
             raise ValueError(f"{entry.image_name} is already downloading.")

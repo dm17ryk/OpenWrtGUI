@@ -115,6 +115,12 @@ test('refreshes on demand and shows the read time', async () => {
   expect(screen.queryByRole('button', { name: 'Download' })).not.toBeInTheDocument()
 })
 
+test('shows five past midnight as 00:05, not 24:05', async () => {
+  library = { ...libraryFixture, read_at: '2026-11-16T00:05:00' }
+  renderSection()
+  expect(await screen.findByText('Read at 00:05')).toBeVisible()
+})
+
 test('shows the skipped count', async () => {
   library = { ...libraryFixture, skipped: 1 }
   renderSection()
