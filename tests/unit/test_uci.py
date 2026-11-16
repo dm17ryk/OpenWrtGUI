@@ -2,7 +2,15 @@
 
 from __future__ import annotations
 
-from openwrtgui.uci import UciOp, after, drop_unchanged, order_for_script, parse_uci_show, render_uci
+from openwrtgui.uci import (
+    UciOp,
+    after,
+    drop_unchanged,
+    order_for_script,
+    parse_uci_show,
+    parse_uci_show_raw,
+    render_uci,
+)
 
 
 def test_add_renders_a_shell_variable() -> None:
@@ -73,3 +81,12 @@ def test_after_applies_ops_and_ignores_new_sections() -> None:
         UciOp("set", "dhcp.$h1.name", "panel"),
     ]
     assert after(current, ops) == {"wireless.w.maclist": "b c"}
+
+
+def test_raw_show_keeps_values_as_printed() -> None:
+    text = "network.lan=interface\nnetwork.lan.ports='lan1' 'lan2'\nnetwork.lan.name='br lan'\nbad line\n"
+    assert parse_uci_show_raw(text) == {
+        "network.lan": "interface",
+        "network.lan.ports": "'lan1' 'lan2'",
+        "network.lan.name": "'br lan'",
+    }
