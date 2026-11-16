@@ -120,6 +120,6 @@ test('rates that are not available yet say so', async () => {
   renderRf('/routers/ap1/rf?station=f4:12:fa:f3:57:68')
   await screen.findByRole('heading', { name: 'RF live', level: 1 })
   FakeSocket.last?.emit({ type: 'rf', sample: sample(0) })
-  FakeSocket.last?.emit({ type: 'rates', mac: 'f4:12:fa:f3:57:68', error: 'Rates are read after the AP2 recording (O6)' })
-  expect(screen.getByText('Rates are read after the AP2 recording (O6)')).toBeInTheDocument()
+  FakeSocket.last?.emit({ type: 'rates', mac: 'f4:12:fa:f3:57:68', error: 'Rate statistics are not read in this version' })
+  expect(screen.getByText('Rate statistics are not read in this version')).toBeInTheDocument()
 })

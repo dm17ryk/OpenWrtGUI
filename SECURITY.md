@@ -76,9 +76,9 @@ installer runs. The installer is not Authenticode-signed yet.
 - **App key rotation:** the app's SSH key is not rotated; replacing it is planned after 1.0.
 - **LuCI over HTTPS:** the LuCI bridge supports a router that serves LuCI over HTTPS, but no bench router does,
   so it is untested on hardware.
-- **Flashing from the app:** refused on a router without enough free RAM for the image plus 4 MiB (the bench's
-  AP2 has about 8 MB); flash those with LuCI or the terminal.
+- **Flashing from the app:** refused on a router without enough free RAM for the image plus 4 MiB (a router
+  with about 8 MB of RAM); flash those with LuCI or the terminal.
 - **Bench Guard** knows the harness processes and lock files you list in Settings; a writer it does not know
   about is not seen.
-- **Bench routers:** the app key is installed only on the routers the bench owner chose (not yet on AP1), and no
-  Claude GitHub Action runs on this repository.
+- **Bench routers:** the app key is installed only on the routers the bench owner chose, and no Claude GitHub
+  Action runs on this repository.

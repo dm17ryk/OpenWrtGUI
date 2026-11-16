@@ -78,7 +78,7 @@ the audit log.
   the modem does not come back online the result says so; then use Connect again or power-cycle the router.
 
 Each shows its commands before it runs, one action at a time per router, and none runs during a harness run.
-Reset to factory defaults is not offered yet (open item O1).
+Reset to factory defaults is not in this version.
 
 ## AT console
 

@@ -13,6 +13,6 @@ in [GitHub milestones](https://github.com/dm17ryk/OpenWrtGUI/milestones).
 | v0.6 LTE and System | LTE screen (status, settings, actions, AT console), System screen (all LuCI System and Status pages) |
 | v0.7 Test helpers | Step-through runner, `mon0` frame analysis, channel analysis |
 | v1.0 | Native screens for every LuCI page on the bench image (the fallback stays for pages that later images bring), manual complete, hardening |
-| 1.x (phase 2) | Tool pages, SIM PIN / SMS / USSD, DSA backend and 5/6 GHz checked on real hardware |
+| 1.x (phase 2) | Tool pages, SIM PIN / SMS / USSD, LTE modem factory reset, RF rate statistics (minstrel), Wi-Fi mirror excluded MACs and iperf warning, the exact own-port lock, app key rotation, DSA backend and 5/6 GHz checked on real hardware |
 
 The full design is in [docs/superpowers/specs/2026-11-03-openwrt-gui-design.md](docs/superpowers/specs/2026-11-03-openwrt-gui-design.md).

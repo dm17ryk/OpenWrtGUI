@@ -33,7 +33,7 @@ def test_rf_ws_streams_samples_and_records(ctx: AppContext) -> None:
         assert msg == {
             "type": "rates",
             "mac": "f4:12:fa:f3:57:68",
-            "error": "Rates are read after the AP2 recording (O6)",
+            "error": "Rate statistics are not read in this version",
         }
 
 

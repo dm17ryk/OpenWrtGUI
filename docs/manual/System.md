@@ -132,8 +132,8 @@ Every init script the router has, with whether it starts at boot (enabled) and w
 **Start**, **Stop**, **Restart**, **Enable** and **Disable** are proven by reading the services again within 10
 seconds; a script that runs once at boot (no running process) is proven by its exit status. The services the
 app itself goes through (dropbear, rpcd, uhttpd, network, firewall, log) offer only Restart, with the reason.
-Restarting network, firewall, wpad or dnsmasq reloads the router's network: the preview says so, and on the
-bench the txctl session must be told first.
+Restarting network, firewall, wpad or dnsmasq reloads the router's network: the preview says so. If tests run on
+that router, tell whoever runs them first.
 
 ## Startup script (rc.local)
 
@@ -238,8 +238,7 @@ themselves. A router runs one job at a time: a reboot, a restore or a reset.
 
 **Preview reset** shows the exact command: the router arms a timer that runs `firstboot -r -y` 2 seconds
 later, which erases every setting. The router then comes back like a new one, at 192.168.1.1 with no password
-and a new host key, which clashes with any other router at that address (AP1 on the bench). So **Start reset**
+and a new host key, which clashes with any other router already at 192.168.1.1. So **Start reset**
 waits until you type the router's name and tick that it is alone on this PC's network. Done means the router
 stopped answering at its address (within 120 seconds); its entry then shows "Reset to defaults: add it again"
-under Needs attention, with **Add again**. Nothing more can be proven on the old address. On the bench this
-runs in the simulator only, never on AP2.
+under Needs attention, with **Add again**. Nothing more can be proven on the old address.

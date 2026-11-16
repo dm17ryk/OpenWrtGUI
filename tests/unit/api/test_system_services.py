@@ -11,8 +11,8 @@ from openwrtgui.simsystem import SimSystem
 from openwrtgui.transport.base import CommandResult
 
 WARNING = (
-    "This restarts AP2 · office's network: devices and this app lose AP2 · office for a few seconds; "
-    "the txctl session must be told"
+    "This restarts AP2 · office's network: devices and this app lose AP2 · office for a few seconds. "
+    "If tests run on AP2 · office, tell whoever runs them first."
 )
 
 

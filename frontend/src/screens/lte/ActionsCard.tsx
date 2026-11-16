@@ -54,7 +54,7 @@ export function ActionsCard({ routerId, routerName, onDone }: Props) {
           </button>
         ))}
       </div>
-      <span className="muted">Reset to factory defaults is not offered yet (open item O1).</span>
+      <span className="muted">Reset to factory defaults is not in this version.</span>
       <NetChange change={change} short={short} helpTopic={HELP.lteActions} show={action !== null} applyLabel={`Run: ${label}`} provenText="Applied and checked" />
       {waiting && <div className="note">No address yet: waiting for the carrier's DHCP. The session is up; the address follows.</div>}
     </section>

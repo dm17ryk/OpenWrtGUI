@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import re
 import subprocess
 import sys
@@ -164,3 +165,60 @@ def test_v1_0a3_vlan_editor_is_documented() -> None:
 
 def test_no_manual_page_answers_for_v0_1() -> None:
     assert "Not in v0.1" not in _read(MANUAL / "FAQ.md")
+
+
+_INTERNAL = re.compile(r"open item|\(O\d{1,2}\)|\bO\d{1,2}\b|txctl|AP2 recording|not built yet|not offered yet")
+_TS_COMMENT = re.compile(r"//[^\n]*|/\*.*?\*/", re.DOTALL)
+_CODE_SPAN = re.compile(r"`[^`\n]*`")
+_IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
+
+
+def _user_pages() -> dict[str, str]:
+    return {p.stem: _read(p) for p in MANUAL.glob("*.md")}
+
+
+def _python_strings(path: Path) -> list[str]:
+    """String constants in a module, docstrings left out (they are for developers)."""
+    tree = ast.parse(_read(path))
+    docs = {
+        id(n.body[0].value)
+        for n in ast.walk(tree)
+        if isinstance(n, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+        and n.body
+        and isinstance(n.body[0], ast.Expr)
+        and isinstance(n.body[0].value, ast.Constant)
+    }
+    return [
+        n.value
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Constant) and isinstance(n.value, str) and id(n) not in docs
+    ]
+
+
+def test_manual_names_no_open_items_or_bench_sessions() -> None:
+    """v1.0d D2: open-item numbers and the bench's own sessions mean nothing to a user."""
+    found = [(page, m.group(0)) for page, text in _user_pages().items() for m in _INTERNAL.finditer(text)]
+    assert found == []
+
+
+def test_the_app_shows_no_open_items_or_bench_sessions() -> None:
+    found = [
+        (p.name, s)
+        for p in (ROOT / "src" / "openwrtgui").rglob("*.py")
+        for s in _python_strings(p)
+        if _INTERNAL.search(s)
+    ]
+    for p in (ROOT / "frontend" / "src").rglob("*.ts*"):
+        if ".test." in p.name or p.parent.name == "testing" or p.name == "schema.ts":
+            continue
+        found += [(p.name, m.group(0)) for m in _INTERNAL.finditer(_TS_COMMENT.sub("", _read(p)))]
+    assert found == []
+
+
+def test_bench_router_names_only_in_pictures_and_examples() -> None:
+    """v1.0d D3: AP1/AP2 appear in screenshot alt text and `code` examples, not in sentences."""
+    found = []
+    for page, text in _user_pages().items():
+        prose = _CODE_SPAN.sub("", _IMAGE.sub("", text))
+        found += [(page, m.group(0)) for m in re.finditer(r"\bAP\d\b", prose)]
+    assert found == []

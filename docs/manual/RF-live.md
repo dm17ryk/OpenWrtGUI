@@ -36,8 +36,8 @@ station that leaves is marked "left" and its lines stop.
 ## Which rates reach the station
 
 From the router's rate control (minstrel): for each rate, how often the AP tried it, how many frames the
-station acknowledged, and which rate is in use now. It needs a station on the radio and the router's debug
-file system; until the bench check of this file (open item O6) is done, the table says it is not available yet.
+station acknowledged, and which rate is in use now. It needs a station on the radio. Rate statistics are not read
+in this version; the table says so.
 
 ## Record to CSV
 

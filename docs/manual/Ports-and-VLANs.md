@@ -81,7 +81,7 @@ way:
 
 The app cannot yet tell which port is your PC's, because standard images cannot list the bridge's address table.
 So with two linked ports in its VLAN, it lets you move either one, and if you move your own, the rollback brings
-the router back. The exact **own-port lock** comes later.
+the router back. There is no exact **own-port lock** in this version.
 
 ## Switch port mirror
 
@@ -94,4 +94,3 @@ with the rollback; choose **off** to stop it.
 
 Whether the router has the `wifi-mirror` service, and whether it runs: **present · running**, **stopped**, or
 **not on this router**. Start, stop and restart it in [Discovery › Custom services](Discovery#custom-services).
-Excluded MACs and the iperf warning are not built yet.

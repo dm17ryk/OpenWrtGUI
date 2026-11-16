@@ -42,15 +42,16 @@ example to flash the router back to the image it had.
 
 **Keep settings** (on by default) keeps `/etc/config`, the SSH host keys and the app's key, so the app reconnects
 by itself; the app also keeps its own saved firewall files (`/etc/owg`). Without it, the router comes back as
-192.168.1.1 with no password and no key, which clashes with AP1: confirm that the router is isolated from the
+192.168.1.1 with no password and no key, which clashes with any other router at 192.168.1.1: confirm that the
+router is isolated from the
 bench LAN first, then connect it alone to this PC and add it again; the wizard accepts its new host key only when
 the board and revision it reads match the image you flashed.
 
 The image must name this router's board, there must be room for it in the router's RAM, and nothing is flashed
 while Bench Guard shows a run.
 
-The app needs the image plus 4 MiB free in the router's memory. A router with less free memory (the bench's AP2
-has about 8 MB) cannot be flashed from the app: flash it with LuCI's **System › Backup / Flash Firmware** or
+The app needs the image plus 4 MiB free in the router's memory. A router with less free memory (a router with
+about 8 MB of RAM) cannot be flashed from the app: flash it with LuCI's **System › Backup / Flash Firmware** or
 from the terminal.
 
 ## Added after flashing

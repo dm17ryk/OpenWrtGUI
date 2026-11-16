@@ -99,5 +99,5 @@ saved copy; it waits while Bench Guard sees a run.
 ## Flash refused: not enough free memory
 
 The app uploads the image into the router's memory first and needs the image plus 4 MiB free. On a router with
-less (the bench's AP2 has about 8 MB), flash with LuCI's **System › Backup / Flash Firmware** or from the terminal
+less (a router with about 8 MB of RAM), flash with LuCI's **System › Backup / Flash Firmware** or from the terminal
 (`sysupgrade`).

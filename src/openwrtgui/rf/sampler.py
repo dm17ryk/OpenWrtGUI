@@ -29,7 +29,7 @@ log = logging.getLogger(__name__)
 QUEUE_SIZE = 30
 STATUS_EVERY_TICKS = 10  # re-read which interface and phy the radio uses every 10 s
 NAMES_EVERY = timedelta(minutes=1)
-RATES_NOT_YET = "Rates are read after the AP2 recording (O6)"
+RATES_NOT_YET = "Rate statistics are not read in this version"
 
 Message = dict[str, Any]
 

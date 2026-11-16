@@ -49,7 +49,7 @@ options by code (3 router, 6 DNS servers, 15 domain, 42 NTP servers, or any code
 router advertisements: server, relay, hybrid or disabled).
 
 Before a server is turned on, the app checks every other router it knows: one that already serves DHCP on the
-same subnet is named in a warning. On the bench, AP1 is the only DHCP server. A change is saved and dnsmasq (and
+same subnet is named in a warning. Keep one DHCP server per subnet. A change is saved and dnsmasq (and
 odhcpd for IPv6) reloaded; the app then reads the settings back and checks dnsmasq is running.
 
 ## Fixed addresses
