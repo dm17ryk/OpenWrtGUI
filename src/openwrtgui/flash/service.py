@@ -205,7 +205,7 @@ class FlashService:
         got = (await self._step(t, rec, f"sha256sum {path}")).stdout.split()[:1]
         if got != [req.sha256]:
             raise _Failed(f"{rec.name} received a different file (sha256 {(got or ['nothing'])[0][:12]})")
-        answer = await self._step(t, rec, plan.lines[3])
+        answer = await self._step(t, rec, plan.validate_command)
         try:
             validated = json.loads(answer.stdout)
         except ValueError as exc:
@@ -215,7 +215,7 @@ class FlashService:
             raise _Failed(f"{rec.name} refused the image: {', '.join(failed) or 'invalid image'}")
         tested = await run_audited(
             t,
-            plan.lines[4],
+            plan.test_command,
             router_id=rec.id,
             screen=SCREEN,
             guard=self._guard,
@@ -233,7 +233,7 @@ class FlashService:
             t,
             plan.upload_command,
             image,
-            name=plan.lines[1].split("# stdin: ", 1)[1].split(" (", 1)[0],
+            name=plan.image_name,
             router_id=rec.id,
             screen=SCREEN,
             guard=self._guard,
@@ -289,7 +289,7 @@ class FlashService:
                     await self._step(t, rec, KEEP_LINE)
                 self._update(rec.id, phase="arm")
                 self._guard.require_clear()
-                await self._step(t, rec, plan.lines[-1])
+                await self._step(t, rec, plan.sysupgrade_command)
                 return self._monotonic()
             except Exception as exc:  # whatever stopped it before sysupgrade, the image does not stay behind
                 remover: Transport | None = t

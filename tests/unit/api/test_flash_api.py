@@ -226,3 +226,13 @@ async def test_flash_endpoints(authed: httpx.AsyncClient, ctx: AppContext) -> No
     job = await wait_job(ctx, "ap2")
     assert job.phase == "done"
     assert (await authed.get("/api/routers/ap2/flash")).json()["phase"] == "done"
+
+
+async def test_the_upload_line_names_the_whole_file(ctx: AppContext) -> None:
+    """v0.5 minor (#14): Windows saves a second download as `name (1).bin`; the audit names all of it."""
+    ctx.profiles.import_image(MINI, "mini-r35692.bin", NOW)
+    ctx.profiles.import_image(NEWER, "mini-r35700 (1).bin", NOW)
+    ctx.flash.every_s = 0.2
+    job = await _flash(ctx)
+    assert job.phase == "done", job
+    assert any("# stdin: mini-r35700 (1).bin (" in c for c in _calls(ctx)), _calls(ctx)

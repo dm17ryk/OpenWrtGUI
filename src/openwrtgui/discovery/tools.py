@@ -3,16 +3,20 @@ into named commands with checked parameters. Cards are kept per board in <data>/
 
 from __future__ import annotations
 
+import logging
 import posixpath
 import re
 import shlex
 from collections.abc import Mapping
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 
 from openwrtgui.store import write_atomic
+
+log = logging.getLogger(__name__)
 
 PROGRAM = re.compile(r"/[A-Za-z0-9._/+-]{1,200}")
 LITERAL = re.compile(r"[A-Za-z0-9._:=,/@+-]{1,64}")
@@ -189,13 +193,31 @@ class ToolStore:
     def _file(self, board: str) -> Path:
         return self._root / f"{_BOARD.sub('_', board)}.json"
 
+    def _read(self, path: Path, board: str) -> list[ToolCard]:
+        return [c for c in _CARDS.validate_json(path.read_text(encoding="utf-8")) if c.board == board]
+
     def cards(self, board: str) -> list[ToolCard]:
         path = self._file(board)
         if not path.is_file():
             return []
         try:
-            return [c for c in _CARDS.validate_json(path.read_text(encoding="utf-8")) if c.board == board]
+            return self._read(path, board)
         except (OSError, ValueError, ValidationError):
+            log.warning("the tool cards in %s cannot be read", path.name)
+            return []
+
+    def _kept(self, board: str) -> list[ToolCard]:
+        """The cards a save or delete starts from. A file that cannot be read is moved aside first, so a write
+        never replaces cards it could not read (v1.0b2 D10)."""
+        path = self._file(board)
+        if not path.is_file():
+            return []
+        try:
+            return self._read(path, board)
+        except (OSError, ValueError, ValidationError):
+            aside = path.with_name(f"{path.name}.damaged-{datetime.now():%Y%m%d-%H%M%S}")
+            path.replace(aside)
+            log.warning("moved the unreadable %s aside as %s", path.name, aside.name)
             return []
 
     def _write(self, board: str, cards: list[ToolCard]) -> None:
@@ -204,7 +226,7 @@ class ToolStore:
 
     def save(self, card: ToolCard) -> None:
         check_card(card)
-        self._write(card.board, [*(c for c in self.cards(card.board) if c.path != card.path), card])
+        self._write(card.board, [*(c for c in self._kept(card.board) if c.path != card.path), card])
 
     def delete(self, board: str, path: str) -> None:
-        self._write(board, [c for c in self.cards(board) if c.path != path])
+        self._write(board, [c for c in self._kept(board) if c.path != path])

@@ -33,6 +33,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - System: the app's SSH instance is still recognised when the interface list cannot be read (an SSH change is
   refused when it cannot be told apart); a reset counts the router as gone only after three failed logins in a
   row; the password policy is checked under the write lock.
+- Flash: the audit's upload line names the whole image file, "openwrt (1).bin" included; the flash steps are read
+  by name. Tool cards: a file that cannot be read is moved aside before a save, not overwritten.
 
 ### Security
 

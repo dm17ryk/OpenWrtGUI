@@ -127,3 +127,12 @@ def test_dhcp_warning() -> None:
         "AP1 · bench hands out addresses on lan. "
         "Devices there get no new address while it flashes (about 3 minutes)." in p.warnings
     )
+
+
+def test_the_plan_names_its_steps() -> None:
+    """v0.5 minor (#15): the service reads the steps by name, not by their place in the preview."""
+    p = flash_plan("AP2 · dev", PROFILE, MINI_BYTES, REQ, FACTS)
+    assert p.image_name == "mini-r35692.bin"
+    assert p.validate_command in p.lines and "validate_firmware_image" in p.validate_command
+    assert p.test_command == f"sysupgrade -T {PATH}"
+    assert p.sysupgrade_command == p.lines[-1]
