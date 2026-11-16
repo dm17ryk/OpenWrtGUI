@@ -70,8 +70,13 @@ class Github:
         self.calls["image"] += 1
         return self.image(request)
 
+    async def _ahandle(self, request: httpx.Request) -> httpx.Response:
+        # a real network suspends here; without it one read finishes before a second one starts
+        await asyncio.sleep(0)
+        return self._handle(request)
+
     def factory(self) -> httpx.AsyncClient:
-        return httpx.AsyncClient(transport=httpx.MockTransport(self._handle))
+        return httpx.AsyncClient(transport=httpx.MockTransport(self._ahandle))
 
 
 class Clock:
