@@ -38,7 +38,7 @@ def _captures(env: FwEnv, tmp_path: Path, **kw: object) -> CaptureService:
 
 
 async def _done(service: CaptureService, capture_id: str) -> None:
-    """Up to 5 s: the end closes its sink on a worker thread (the final review), more than a few loop turns."""
+    """Up to 5 s: the end closes its sink on a worker thread, which can take more than a few loop turns."""
     for _ in range(500):
         if not next(v for v in service.list_all() if v.id == capture_id).running:
             return
