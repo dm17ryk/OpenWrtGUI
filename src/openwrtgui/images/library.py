@@ -6,10 +6,15 @@ import json
 from datetime import datetime
 from typing import Any
 
+import httpx
 from pydantic import BaseModel, ConfigDict
 
+from openwrtgui.version import APP_VERSION
+
+RELEASES_URL = "https://api.github.com/repos/dm17ryk/openwrt/releases"
 MAX_PROFILES = 2**20
 PROFILES_NAME = "profiles.json"
+_HEADERS = {"Accept": "application/vnd.github+json", "User-Agent": f"OpenWrtGUI/{APP_VERSION}"}
 
 
 class LibraryError(ValueError):
@@ -118,14 +123,101 @@ def parse_profiles(raw: bytes, release: dict[str, Any]) -> list[LibraryEntry]:
         doc = json.loads(raw)
     except ValueError as exc:  # JSONDecodeError and UnicodeDecodeError
         raise LibraryError(f"{PROFILES_NAME} is not valid JSON: {exc}") from exc
+    except RecursionError as exc:  # deeply nested input well under MAX_PROFILES
+        raise LibraryError(f"{PROFILES_NAME} is nested too deeply") from exc
     if not isinstance(doc, dict):
         raise LibraryError(f"{PROFILES_NAME} is not a JSON object")
     profiles = doc.get("profiles")
     if not isinstance(profiles, dict):
         return []
     revision, target = str(doc.get("version_code", "")), str(doc.get("target", ""))
-    assets = {str(a["name"]): a for a in release.get("assets", []) if isinstance(a, dict) and a.get("name")}
+    assets = _assets(release)
     entries = (
         _entry(p, revision=revision, target=target, release=release, assets=assets) for p in profiles.values()
     )
     return [e for e in entries if e is not None]
+
+
+def _assets(release: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    raw = release.get("assets")
+    if not isinstance(raw, list):
+        return {}
+    return {str(a["name"]): a for a in raw if isinstance(a, dict) and a.get("name")}
+
+
+async def _profiles_bytes(client: httpx.AsyncClient, url: str) -> bytes | None:
+    """The body of profiles.json, or None when it cannot be downloaded or is over MAX_PROFILES."""
+    try:
+        async with client.stream(
+            "GET", url, headers=_HEADERS, timeout=20.0, follow_redirects=True
+        ) as response:
+            if response.status_code // 100 != 2:
+                return None
+            body = bytearray()
+            async for chunk in response.aiter_bytes():
+                body += chunk
+                if len(body) > MAX_PROFILES:
+                    return None
+            return bytes(body)
+    except httpx.HTTPError:
+        return None
+
+
+def _unreachable(reason: str) -> LibraryError:
+    return LibraryError(f"The image library on GitHub could not be reached: {reason}.")
+
+
+def _list_error(response: httpx.Response) -> LibraryError:
+    if response.status_code in (403, 429) and response.headers.get("X-RateLimit-Remaining") == "0":
+        try:
+            reset = datetime.fromtimestamp(int(response.headers["X-RateLimit-Reset"]))
+        except (KeyError, ValueError, OverflowError, OSError):
+            pass
+        else:
+            return LibraryError(
+                f"GitHub's limit for anonymous reads is reached; try again after {reset.strftime('%H:%M')}."
+            )
+    return _unreachable(f"HTTP {response.status_code}")
+
+
+def _newest_first(release: dict[str, Any]) -> tuple[bool, float]:
+    published = _published(release)
+    return (published is None, -published.timestamp() if published else 0.0)
+
+
+async def fetch_catalog(client: httpx.AsyncClient) -> tuple[list[LibraryEntry], int]:
+    """Entries of every published release, newest first, and the number of unreadable profiles.json files."""
+    try:
+        response = await client.get(RELEASES_URL, params={"per_page": 100}, headers=_HEADERS, timeout=20.0)
+    except httpx.HTTPError as exc:
+        raise _unreachable(str(exc) or type(exc).__name__) from exc
+    if response.status_code // 100 != 2:
+        raise _list_error(response)
+    try:
+        releases = response.json()
+    except ValueError as exc:
+        raise _unreachable("the answer is not JSON") from exc
+    if not isinstance(releases, list):
+        raise _unreachable("the answer is not a list of releases")
+
+    published = [r for r in releases if isinstance(r, dict) and not r.get("draft")]
+    entries: list[LibraryEntry] = []
+    seen: set[str] = set()
+    skipped = 0
+    for release in sorted(published, key=_newest_first):
+        asset = _assets(release).get(PROFILES_NAME)
+        if asset is None or not asset.get("browser_download_url"):
+            continue
+        raw = await _profiles_bytes(client, str(asset["browser_download_url"]))
+        try:
+            if raw is None:
+                raise LibraryError("profiles.json could not be downloaded")
+            found = parse_profiles(raw, release)
+        except LibraryError:
+            skipped += 1
+            continue
+        for entry in found:
+            if entry.sha256 not in seen:
+                seen.add(entry.sha256)
+                entries.append(entry)
+    return entries, skipped
