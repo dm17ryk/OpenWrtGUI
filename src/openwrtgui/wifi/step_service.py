@@ -36,6 +36,7 @@ from openwrtgui.wifi.service import NOTHING, ApplyResult, Check, PreviewChanged,
 from openwrtgui.wifi.state import RadioState
 from openwrtgui.wifi.step_csv import StepCsv
 from openwrtgui.wifi.steps import (
+    SAVED_OPTIONS,
     STEP_OVERHEAD_S,
     Advance,
     SavedValue,
@@ -637,6 +638,12 @@ class StepService:
             raise ValueError(
                 f"Nothing to restore: no step-through left {radio} on {rec.name} at a step"
             ) from None
+        missing = [name for name in SAVED_OPTIONS if name not in saved.options]
+        if missing:  # it cannot be restored and it blocks Start: say which file to remove (final review)
+            raise ValueError(
+                f"{path} lacks {', '.join(missing)}: nothing is restored. Remove that file to start a "
+                f"step-through on {radio} again"
+            )
         token = self._wifi.hold_radio(rec.id, radio, WHAT)
         try:
             result, why = await self._apply_saved(rec, radio, saved.options, token)

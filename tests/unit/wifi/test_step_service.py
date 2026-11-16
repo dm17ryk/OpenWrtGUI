@@ -543,7 +543,7 @@ async def test_restore_waits_for_a_system_job_as_start_does(env: WifiEnv, tmp_pa
 async def test_a_saved_file_without_every_option_restores_nothing(env: WifiEnv, tmp_path: Path) -> None:
     steps = _service(env, tmp_path, _Clock())
     path = _left_at_a_step(tmp_path, {"channel": "6"})
-    with pytest.raises(ValueError, match="lack htmode"):
+    with pytest.raises(ValueError, match=r"ap2-radio0.json lacks htmode.*Remove that file"):
         await steps.restore("ap2", "radio0")
     assert path.exists()
 

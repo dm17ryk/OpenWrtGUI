@@ -231,3 +231,11 @@ test('records the app cannot read are counted on the screen', async () => {
   renderFaults()
   expect(await screen.findByText(/^2 fault records on the router could not be read/)).toBeInTheDocument()
 })
+
+test('Clear everything stays open when only unreadable records are left', async () => {
+  // final review (Important): the fault may still be in effect while its record cannot be read
+  faults = { ...AP1_FAULTS, armed: [], unreadable: 1 }
+  renderFaults()
+  expect(await screen.findByText('nothing armed')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Clear everything' })).toBeEnabled()
+})

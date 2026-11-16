@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import cast
 
 import pytest
 from fwenv import FwEnv
 
 from openwrtgui.faults.model import FaultRequest, FaultTarget, NetemParams, TargetRef
-from openwrtgui.faults.service import FaultsService, caps_from
+from openwrtgui.faults.service import FaultsService, _armed_fault, caps_from
 from openwrtgui.fw.nft import parse_ruleset_json
 from openwrtgui.guard.bench_guard import GuardLocked
 from openwrtgui.net.apply import NetCheck
@@ -282,3 +282,13 @@ async def test_an_unreadable_record_is_skipped_and_counted(
     assert len(state.armed) == 1 and state.unreadable == 4
     result = await faults.apply_clear("ap1", None, (await faults.plan_clear("ap1", None)).digest)
     assert result.applied, result
+
+
+def test_records_of_a_wrong_type_or_size_are_skipped() -> None:
+    """Final review: an overflowing time, a device that is not text, a clear that is not a list."""
+    now = datetime(2026, 11, 16, 9, 0)
+    good = {"id": "f1", "kind": "block", "armed_at": 100, "clear": ["nft delete table netdev benchfault"]}
+    assert _armed_fault(json.dumps(good), now, 100) is not None
+    bad = [{"armed_at": 1e400}, {"hold_s": 1e30}, {"device": 5}, {"clear": "abc"}]
+    for change in bad:
+        assert _armed_fault(json.dumps(good | change), now, 100) is None, change

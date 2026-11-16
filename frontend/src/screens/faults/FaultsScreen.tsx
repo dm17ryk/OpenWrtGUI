@@ -76,7 +76,7 @@ export function FaultsScreen() {
         <span className="spacer" />
         {state && <span className={armed.length ? 'b park' : 'b air'}>{armed.length ? `${armed.length} armed` : 'nothing armed'}</span>}
         <HelpTip topic={HELP.faultClear}>
-          <button className="btn" type="button" disabled={armed.length === 0} onClick={() => startClear(null)}>
+          <button className="btn" type="button" disabled={armed.length === 0 && !faults.data?.unreadable} onClick={() => startClear(null)}>
             Clear everything
           </button>
         </HelpTip>

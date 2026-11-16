@@ -75,6 +75,9 @@ def _armed_fault(line: str, now: datetime, now_router: int) -> ArmedFault | None
         r = json.loads(line)
         if r["kind"] not in get_args(FaultKind):
             raise ValueError(f"unknown fault kind {r['kind']!r}")
+        device, clear = r.get("device"), r.get("clear", [])
+        if not (device is None or isinstance(device, str)) or not isinstance(clear, list):
+            raise TypeError("device is not text or clear is not a list")  # final review: "abc" ran as a, b, c
         armed_at = now - timedelta(seconds=now_router - int(r.get("armed_at", now_router)))
         hold = r.get("hold_s")
         target = r.get("target", {})
@@ -83,12 +86,12 @@ def _armed_fault(line: str, now: datetime, now_router: int) -> ArmedFault | None
             r["kind"],
             str(r.get("summary", "")),
             FaultTarget(**{k: target.get(k) for k in ("name", "mac", "ip", "via", "device")}),
-            r.get("device"),
-            tuple(str(c) for c in r.get("clear", [])),
+            device,
+            tuple(str(c) for c in clear),
             armed_at,
             armed_at + timedelta(seconds=int(hold)) if hold else None,
         )
-    except (ValueError, KeyError, TypeError, AttributeError) as exc:
+    except (ValueError, KeyError, TypeError, AttributeError, OverflowError) as exc:
         log.warning("skipped an unreadable fault record: %s", exc)
         return None
 
