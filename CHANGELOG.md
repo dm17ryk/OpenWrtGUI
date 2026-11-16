@@ -30,6 +30,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - RF and the monitor: owgmon0 serves one radio at a time, so a beacon check on another radio says "not checked"
   instead of reporting beacons from the wrong one; owgscan0 is removed after a dropped connection; an SSID such as
   "MCS 7" no longer counts as a rate.
+- System: the app's SSH instance is still recognised when the interface list cannot be read (an SSH change is
+  refused when it cannot be told apart); a reset counts the router as gone only after three failed logins in a
+  row; the password policy is checked under the write lock.
 
 ### Security
 

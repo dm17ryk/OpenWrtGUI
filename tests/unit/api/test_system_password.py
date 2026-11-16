@@ -10,7 +10,9 @@ import pytest
 
 from openwrtgui.context import AppContext
 from openwrtgui.guard.bench_guard import GuardLocked
+from openwrtgui.system import commands as s
 from openwrtgui.system.access import PasswordPolicy
+from openwrtgui.transport.base import CommandResult
 
 SECRET = "Zq7-Secret-77"
 
@@ -102,3 +104,24 @@ async def test_password_waits_for_the_run(ctx_guard_live: AppContext) -> None:
     plan = await ctx_guard_live.access.plan_password("ap2")
     with pytest.raises(GuardLocked):
         await ctx_guard_live.access.apply_password("ap2", "N3w-Passw0rd", plan.digest)
+
+
+async def test_the_policy_is_read_under_the_write_lock(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """v0.6c minor (#38), v1.0b2 D9: a policy apply cannot slip in between the check and the change."""
+    rec = ctx.routers.get("ap2")
+    assert rec is not None
+    t = await ctx.pool.get(rec)
+    original = t.run
+    locked: list[bool] = []
+
+    async def watched(command: str, *, timeout: float = 15.0) -> CommandResult:
+        if command == s.UCI_RPCD:
+            locked.append(ctx.pool.write_lock("ap2").locked())
+        return await original(command, timeout=timeout)
+
+    monkeypatch.setattr(t, "run", watched)
+    digest = (await ctx.access.plan_password("ap2")).digest
+    result = await ctx.access.apply_password("ap2", "Zq7-Secret-77", digest)
+    assert result.applied and locked and all(locked), locked
