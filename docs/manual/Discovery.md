@@ -18,6 +18,23 @@ The image this router matches, by board and revision. With no match, **Import im
 router's /rom** are offered. A profile built from `/rom` has no image file, so it cannot check the firmware or
 flash.
 
+With no match, or only a profile built from `/rom`, the app also looks in the image library: the releases of
+`dm17ryk/openwrt` on GitHub. While it looks the card says "Looking in the image library…". If the library has the
+router's exact build, the card shows a line such as "Image library: D-Link DWR-921 C3 (U-Boot),
+r35692-b8bffeefdf, 10.8 MB, release DWR_921-c3-uboot-qmifix3" with **Download and import**. If it has none, the card
+says, for example, "The image library has no build for dlink,dwr-921-c3-uboot r35692-b8bffeefdf."; if GitHub cannot be read, it shows GitHub's error
+text. The other buttons work in every case.
+
+Nothing is downloaded until you click **Download and import**. The app checks the download against its release and
+imports it like **Import image…**; the card then shows "Matches …", with **Check firmware** and **Flash**.
+
+A rebuild of the same source can keep the revision and change the image. When the library has several builds of
+your router's revision, the card offers the newest and says the others are listed in
+[Settings › Images](Settings#image-library). **Check firmware** tells whether the router runs the one you
+downloaded.
+
+The library is read again at most every ten minutes; **Refresh** in Settings › Images reads it at once.
+
 ## Firmware check
 
 **Check firmware** hashes the router's firmware partition and compares it with the same bytes of the image: equal

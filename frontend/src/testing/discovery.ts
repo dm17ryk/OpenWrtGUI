@@ -22,7 +22,8 @@ export const MINI_PROFILE: ProfileOut = {
     "dwr921-internet-led",
     "dwr921-portctl"
   ],
-  "built_at": "2026-11-08T12:00:00"
+  "built_at": "2026-11-08T12:00:00",
+  "origin": null
 }
 export const NEWER_PROFILE: ProfileOut = {
   "key": {
@@ -45,7 +46,8 @@ export const NEWER_PROFILE: ProfileOut = {
     "dwr921-internet-led",
     "dwr921-portctl"
   ],
-  "built_at": "2026-11-08T12:00:00"
+  "built_at": "2026-11-08T12:00:00",
+  "origin": null
 }
 export const AP1_DISCOVERY: DiscoveryState = {
   "router_id": "ap1",

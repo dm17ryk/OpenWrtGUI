@@ -7,11 +7,14 @@ import { ApiError } from '../../api/client'
 import type { DiscoveryState } from '../../api/types'
 import { AP1_DISCOVERY, AP2_FIRMWARE, FLASH_PLAN, MINI_PROFILE, NEWER_PROFILE } from '../../testing/discovery'
 import { AP1, ROUTERS } from '../../testing/fixtures'
+import { libraryEntry, libraryFixture } from '../../testing/library'
 import { DiscoveryScreen } from './DiscoveryScreen'
 
 const calls: Array<{ path: string; body?: unknown }> = []
 let discovery: DiscoveryState = AP1_DISCOVERY
 let firmwareError: ApiError | null = null
+let holdDownload = false
+let releaseDownload: (() => void) | null = null
 
 vi.mock('../../api/client', async (orig) => {
   const actual = await orig<typeof import('../../api/client')>()
@@ -29,6 +32,11 @@ vi.mock('../../api/client', async (orig) => {
     }
     if (path === '/api/routers/ap1/images/rom') return {}
     if (path === '/api/images') return [MINI_PROFILE, NEWER_PROFILE]
+    if (path.startsWith('/api/images/library?')) return libraryFixture
+    if (path === `/api/images/library/${libraryEntry.sha256}`) {
+      if (holdDownload) await new Promise<void>((resolve) => (releaseDownload = resolve))
+      return MINI_PROFILE
+    }
     if (path === '/api/routers/ap1/flash') return null
     if (path === '/api/routers/ap1/flash/preview') return FLASH_PLAN
     throw new Error(`unexpected ${path}`)
@@ -44,6 +52,8 @@ beforeEach(() => {
   calls.length = 0
   discovery = AP1_DISCOVERY
   firmwareError = null
+  holdDownload = false
+  releaseDownload = null
 })
 
 function renderDiscovery() {
@@ -81,6 +91,40 @@ test('shows the no-match note with both ways out', async () => {
   expect(screen.getByLabelText('Import image…')).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Build from this router’s /rom' }))
   expect(calls.some((c) => c.path === '/api/routers/ap1/images/rom')).toBe(true)
+})
+
+const OFFER = /^Image library: D-Link DWR-921 C3 \(U-Boot\), r35692-b8bffeefdf, 10\.8 MB/
+
+test('offers the library image when no image matches', async () => {
+  discovery = { ...AP1_DISCOVERY, profile: null, match_note: 'No imported image for dlink,dwr-921-c3-uboot r35692-b8bffeefdf.' }
+  renderDiscovery()
+  expect(await screen.findByText(OFFER)).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Download and import' })).toBeEnabled()
+})
+
+test('offers the library image next to a /rom match', async () => {
+  discovery = { ...AP1_DISCOVERY, profile: { ...AP1_DISCOVERY.profile!, sha256: 'rom' } }
+  renderDiscovery()
+  expect(await screen.findByText(OFFER)).toBeVisible()
+})
+
+test('does not look in the library when an image matches', async () => {
+  renderDiscovery()
+  expect(await screen.findByText('dlink,dwr-921-c3-uboot r35692-b8bffeefdf')).toBeVisible()
+  expect(screen.queryByText(OFFER)).not.toBeInTheDocument()
+  expect(calls.some((c) => c.path.startsWith('/api/images/library'))).toBe(false)
+})
+
+test('keeps the other buttons off while the library image downloads', async () => {
+  holdDownload = true
+  discovery = { ...AP1_DISCOVERY, profile: null, match_note: 'No imported image for dlink,dwr-921-c3-uboot r35692-b8bffeefdf.' }
+  const user = renderDiscovery()
+  await user.click(await screen.findByRole('button', { name: 'Download and import' }))
+  expect(await screen.findByRole('button', { name: 'Downloading 10.8 MB…' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Build from this router’s /rom' })).toBeDisabled()
+  expect(screen.getByLabelText('Import image…')).toBeDisabled()
+  releaseDownload?.()
+  expect(await screen.findByRole('button', { name: 'Build from this router’s /rom' })).toBeEnabled()
 })
 
 test('lists what changed since flashing once an image matches', async () => {

@@ -23,8 +23,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   app never waits for it, also when the capture stops.
 - Screens and the manual no longer name open items or bench sessions; what is not in this version says so.
 - CI installs the latest release, updates it in place with the new build, and checks the data folder is kept.
-- Uninstall: answering Yes to "Also delete the data folder?" now also deletes the routers' configuration backups,
-  which hold password hashes and Wi-Fi keys.
 
 ### Fixed
 
@@ -90,6 +88,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   than 50,000 entries or unpacks to more than 512 MiB.
 - Plugin headers are read only from the plugin's declaration; Mount points refuse a negative root delay.
 - CI runs ruff's bandit rules, pip-audit and npm audit.
+
+## [0.8.2] - 2026-11-16
+
+The image library, and uninstall also deletes the routers' backups.
+
+### Added
+
+- Discovery finds a router's exact firmware build in the releases of dm17ryk/openwrt and downloads and imports it
+  on one click; Settings › Images lists every image the library offers. Nothing is downloaded without a click,
+  and a download that does not match its release's profiles.json is not kept.
+
+### Fixed
+
+- Uninstall: answering Yes to "Also delete the data folder?" now also deletes the routers' configuration backups,
+  which hold password hashes and Wi-Fi keys.
 
 ## [0.8.1] - 2026-11-16
 
@@ -415,7 +428,8 @@ The foundation: install, update, add routers, see them, and stay out of a runnin
 - Router simulator built from recorded router output, used for e2e tests, screenshots and demos.
 - CI, pre-release and release workflows, wiki sync, CodeQL and Dependabot.
 
-[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.8.2
 [0.8.1]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.8.1
 [0.8.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.8.0
 [0.7.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.7.0

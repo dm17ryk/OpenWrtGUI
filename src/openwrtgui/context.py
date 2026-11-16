@@ -22,6 +22,7 @@ from openwrtgui.fw.iptables_service import IptablesService
 from openwrtgui.fw.service import FirewallService
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard, psutil_lister
+from openwrtgui.images.library import ImageLibrary
 from openwrtgui.images.store import ProfileStore
 from openwrtgui.live import LiveHub
 from openwrtgui.lte.sampler import LteHub
@@ -87,6 +88,7 @@ class AppContext:
     faults: FaultsService
     captures: CaptureService
     profiles: ProfileStore
+    library: ImageLibrary  # v0.8.2: the firmware releases on GitHub
     discovery: DiscoveryService
     flash: FlashService
     lte: LteService
@@ -375,6 +377,7 @@ def build_context(
         faults=faults,
         captures=captures,
         profiles=profiles,
+        library=ImageLibrary(profiles, client_factory),
         discovery=discovery,
         flash=flash,
         lte=lte,

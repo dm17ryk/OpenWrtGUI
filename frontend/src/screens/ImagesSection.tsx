@@ -2,22 +2,19 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { ApiError, apiFetch, postBytes } from '../api/client'
 import type { ProfileOut } from '../api/types'
+import { megabytes } from '../format'
 import { Help, HelpTip } from '../help/Help'
 import { HELP } from '../help/topics'
-
-function megabytes(size: number | null): string {
-  return size === null ? '' : `${(size / 2 ** 20).toFixed(1)} MB`
-}
 
 /** Send a sysupgrade file to the app; it is read on this PC, nothing goes to a router. */
 async function importImage(file: File): Promise<ProfileOut> {
   return postBytes<ProfileOut>('/api/images', await file.arrayBuffer(), file.name)
 }
 
-type ImportProps = { onImported: (profile: ProfileOut) => void }
+type ImportProps = { onImported: (profile: ProfileOut) => void; disabled?: boolean }
 
 /** The file picker with its busy and error states (Settings › Images and Discovery's no-match note). */
-export function ImportImage({ onImported }: ImportProps) {
+export function ImportImage({ onImported, disabled = false }: ImportProps) {
   const [isBusy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const pick = async (file: File | undefined): Promise<void> => {
@@ -42,7 +39,7 @@ export function ImportImage({ onImported }: ImportProps) {
             accept=".bin"
             aria-label="Import image…"
             hidden
-            disabled={isBusy}
+            disabled={isBusy || disabled}
             onChange={(e) => void pick(e.target.files?.[0])}
           />
         </label>
@@ -60,6 +57,7 @@ export function ImagesSection() {
   const refresh = (): void => {
     void client.invalidateQueries({ queryKey: ['images'] })
     void client.invalidateQueries({ queryKey: ['discovery'] })
+    void client.invalidateQueries({ queryKey: ['library'] })
   }
   const remove = async (p: ProfileOut): Promise<void> => {
     if (!window.confirm(`Delete ${p.label}${p.image_name ? ` (${p.image_name})` : ''}?`)) return
@@ -90,6 +88,11 @@ export function ImagesSection() {
               {p.source === 'rom' ? 'from a router’s /rom' : `${p.image_name} · ${megabytes(p.image_size)}`}
               {p.custom.length > 0 ? ` · custom: ${p.custom.join(', ')}` : ''}
             </span>
+            {p.origin && (
+              <a href={p.origin} target="_blank" rel="noopener noreferrer">
+                from the image library
+              </a>
+            )}
           </div>
           <span className="spacer" />
           <button className="btn" type="button" onClick={() => void remove(p)}>

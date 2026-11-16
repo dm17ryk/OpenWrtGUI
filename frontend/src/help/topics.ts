@@ -137,6 +137,7 @@ export const HELP = {
   customServices: 'Discovery#custom-services',
   routerFamily: 'Adding-a-router-family',
   images: 'Settings#images',
+  imageLibrary: 'Settings#image-library',
   // LuCI pages
   luci: 'LuCI-pages',
   luciWhich: 'LuCI-pages#which-pages-open-here',

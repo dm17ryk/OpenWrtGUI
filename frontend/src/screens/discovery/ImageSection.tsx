@@ -5,6 +5,7 @@ import type { DiscoveryState, FirmwareCheck, ProfileOut } from '../../api/types'
 import { Help, HelpTip } from '../../help/Help'
 import { HELP } from '../../help/topics'
 import { ImportImage } from '../ImagesSection'
+import { LibraryOffer } from './LibraryOffer'
 
 type Props = { routerId: string; state: DiscoveryState; onFlash: () => void }
 
@@ -17,6 +18,7 @@ export function ImageSection({ routerId, state, onFlash }: Props) {
   const refresh = (): void => {
     void client.invalidateQueries({ queryKey: ['discovery', routerId] })
     void client.invalidateQueries({ queryKey: ['images'] })
+    void client.invalidateQueries({ queryKey: ['library'] })
   }
   const run = async (action: () => Promise<void>): Promise<void> => {
     setBusy(true)
@@ -38,6 +40,9 @@ export function ImageSection({ routerId, state, onFlash }: Props) {
     })
   const profile = state.profile
   const fromImage = profile !== null && profile.sha256 !== 'rom'
+  const offer = (
+    <LibraryOffer board={state.board} revision={state.revision} disabled={isBusy} onBusyChange={setBusy} onImported={refresh} />
+  )
   return (
     <section className="card stack" aria-labelledby="dimg-h">
       <div className="hrow">
@@ -45,28 +50,32 @@ export function ImageSection({ routerId, state, onFlash }: Props) {
         <Help topic={HELP.discoveryImage} />
       </div>
       {profile ? (
-        <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-          <span>
-            Matches <strong>{profile.board} {profile.revision}</strong>
-            {fromImage ? '' : ' (built from this router’s /rom)'}
-          </span>
-          <span className="spacer" />
-          <HelpTip topic={HELP.firmwareCheck}>
-            <button className="btn" type="button" disabled={isBusy || !fromImage} onClick={() => void checkFirmware()}>
-              Check firmware
-            </button>
-          </HelpTip>
-          <HelpTip topic={HELP.flash}>
-            <button className="btn" type="button" disabled={isBusy} onClick={onFlash}>
-              Flash an image…
-            </button>
-          </HelpTip>
-        </div>
+        <>
+          <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
+            <span>
+              Matches <strong>{profile.board} {profile.revision}</strong>
+              {fromImage ? '' : ' (built from this router’s /rom)'}
+            </span>
+            <span className="spacer" />
+            <HelpTip topic={HELP.firmwareCheck}>
+              <button className="btn" type="button" disabled={isBusy || !fromImage} onClick={() => void checkFirmware()}>
+                Check firmware
+              </button>
+            </HelpTip>
+            <HelpTip topic={HELP.flash}>
+              <button className="btn" type="button" disabled={isBusy} onClick={onFlash}>
+                Flash an image…
+              </button>
+            </HelpTip>
+          </div>
+          {!fromImage && offer}
+        </>
       ) : (
         <>
           <div className="note">{state.match_note}</div>
+          {offer}
           <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-            <ImportImage onImported={refresh} />
+            <ImportImage onImported={refresh} disabled={isBusy} />
             <HelpTip topic={HELP.routerFamily}>
               <button className="btn" type="button" disabled={isBusy} onClick={() => void buildFromRom()}>
                 Build from this router’s /rom
