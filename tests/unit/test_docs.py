@@ -164,3 +164,18 @@ def test_v1_0a3_vlan_editor_is_documented() -> None:
 
 def test_no_manual_page_answers_for_v0_1() -> None:
     assert "Not in v0.1" not in _read(MANUAL / "FAQ.md")
+
+
+_ISS_DELETES = re.compile(r"(?:DeleteFile|DelTree)\(Dir \+ '\\([^']+)'")
+
+
+def test_uninstall_deletes_backups_and_the_manual_says_what() -> None:
+    """2026-11-16 decision: uninstall's Yes also deletes backups\\ (password hashes, Wi-Fi keys). The manual's
+    "Yes deletes" list is the installer's DeleteAppData list, scratch files aside."""
+    iss = _read(ROOT / "installer" / "OpenWrtGUI.iss")
+    deleted = {n for n in _ISS_DELETES.findall(iss) if not n.endswith((".tmp", ".bad", ".lock"))}
+    assert "backups" in deleted
+    uninstall = _read(MANUAL / "Install.md").split("## Uninstall", 1)[1].split("\n## ", 1)[0]
+    yes = uninstall.split("**Yes** deletes", 1)[1].split("\n- ", 1)[0]
+    documented = set(re.findall(r"`([a-z_.]+)\\?`", yes))
+    assert documented == deleted, sorted(documented ^ deleted)

@@ -45,8 +45,14 @@ OpenWrtGUI-Setup-0.1.0.exe /VERYSILENT /DIR="C:\Essence_SC\apps\OpenWrtGUI" /DAT
 ## Uninstall
 
 Windows Settings → Apps → OpenWrtGUI → Uninstall. You are asked whether to delete the data folder too;
-the default is to keep it. When you say yes, only the app's own files and folders in it are deleted,
-then the folder itself if nothing else is left. A silent uninstall never deletes the data folder.
+the default is to keep it. When you say yes, the app's routers, settings, keys, backups, audit log, downloaded
+updates and log are deleted, then the folder itself if nothing else is left. A silent uninstall never deletes the
+data folder.
+
+- **Yes** deletes `routers.json`, `settings.json`, `known_hosts`, `keys\`, `audit\`, `updates\`, `logs\` and
+  `backups\` (the routers' backups hold password hashes and Wi-Fi keys).
+- `exports\`, `profiles\`, `reflash\`, `tools\` and `steps\` stay, and so does the folder while they are in it:
+  delete them by hand if you no longer need them.
 
 ## Running more than once
 

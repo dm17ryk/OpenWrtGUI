@@ -9,13 +9,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [0.8.2] - 2026-11-16
 
-The image library.
+The image library, and uninstall also deletes the routers' backups.
 
 ### Added
 
 - Discovery finds a router's exact firmware build in the releases of dm17ryk/openwrt and downloads and imports it
   on one click; Settings › Images lists every image the library offers. Nothing is downloaded without a click,
   and a download that does not match its release's profiles.json is not kept.
+
+### Fixed
+
+- Uninstall: answering Yes to "Also delete the data folder?" now also deletes the routers' configuration backups,
+  which hold password hashes and Wi-Fi keys.
 
 ## [0.8.1] - 2026-11-16
 
