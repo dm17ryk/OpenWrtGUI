@@ -5462,6 +5462,11 @@ export interface components {
              * @enum {string}
              */
             program: "iptables" | "ip6tables";
+            /**
+             * Skipped
+             * @default 0
+             */
+            skipped: number;
             /** Table */
             table: string;
         };

@@ -92,7 +92,10 @@ chain by chain, with the policy or the references, each rule's counters, target,
 addresses and options, and its comment. **Hide empty chains** keeps only chains with rules.
 
 - **Reset counters** clears the filter table's counters (iptables and ip6tables), as LuCI's button does; nat,
-  mangle and raw keep theirs. The proof is the filter table counting less than before.
+  mangle and raw keep theirs. The proof is given for iptables and, when the router has it, ip6tables: some
+  counter that had counted is lower afterwards, which only a reset makes happen.
 - **Restart firewall** restarts the firewall service; the proof is the filter table's rules back.
+
+A line of a listing the app cannot read is not shown; the tab says how many there are.
 
 On the bench image (fw4, no iptables) the tab says so: fw4's rules are under Raw ruleset.

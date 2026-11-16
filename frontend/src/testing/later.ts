@@ -25,6 +25,7 @@ export const AP4_IPTABLES: IptablesState = {
       program: 'iptables',
       table: 'filter',
       error: null,
+      skipped: 0,
       chains: [
         {
           name: 'INPUT',
@@ -39,7 +40,7 @@ export const AP4_IPTABLES: IptablesState = {
         { name: 'lab_user', policy: null, packets: null, bytes: null, references: 0, rules: [] },
       ],
     },
-    { program: 'iptables', table: 'nat', error: null, chains: [] },
+    { program: 'iptables', table: 'nat', error: null, skipped: 0, chains: [] },
   ],
 }
 

@@ -15,6 +15,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - LuCI pages are listed as LuCI itself decides: an unknown depends rule hides nothing, a one-word option no longer
   matches a value that merely contains it, any regular file counts as executable, and an access group with an
   empty read or write part counts.
+- Legacy iptables: Reset counters is proven for ip6tables too, and stays proven after an earlier reset with
+  traffic since; lines the app cannot read are counted on the tab, not dropped silently.
 
 ### Security
 

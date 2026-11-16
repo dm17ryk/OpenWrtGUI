@@ -51,6 +51,7 @@ async def test_counters_reset_and_proven(ctx: AppContext) -> None:
     assert plan.lines == ("iptables -Z", "ip6tables -Z") and plan.warnings == (RESET_NOTE,)
     result = await ctx.iptables.apply_reset("ap4", plan.digest)
     assert (result.applied, result.verified) == (True, True)
+    assert [c.name for c in result.checks] == ["Counters reset", "IPv6 counters reset"]  # v1.0b2 D4
 
 
 async def test_the_firewall_restarted(ctx: AppContext, authed: httpx.AsyncClient) -> None:

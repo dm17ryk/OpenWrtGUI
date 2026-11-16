@@ -56,6 +56,7 @@ export function IptablesTab({ routerId, short }: Props) {
         })}
       </div>
       {table?.error && <div className="note x">{table.error}</div>}
+      {table && table.skipped > 0 && <div className="muted">{`${table.skipped} lines not shown: the app cannot read them`}</div>}
       {chains.map((c) => (
         <div key={c.name} className="stack">
           <h3 className="mono">Chain {c.name}</h3>

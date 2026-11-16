@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expect, test, vi } from 'vitest'
+import { apiFetch } from '../../api/client'
 import { AP4_IPTABLES, AP4_RESET_PLAN } from '../../testing/later'
 import { IptablesTab } from './IptablesTab'
 
@@ -45,4 +46,13 @@ test('empty chains hide on request, and a reset says what it covers', async () =
   expect(screen.queryByText('Chain lab_user')).not.toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Reset counters' }))
   expect(await screen.findByText(/filter table's counters only/)).toBeInTheDocument()
+})
+
+test('lines the app cannot read are counted, not dropped silently', async () => {
+  vi.mocked(apiFetch).mockResolvedValueOnce({
+    ...AP4_IPTABLES,
+    tables: AP4_IPTABLES.tables.map((t, i) => (i === 0 ? { ...t, skipped: 3 } : t)),
+  })
+  renderTab()
+  expect(await screen.findByText('3 lines not shown: the app cannot read them')).toBeInTheDocument()
 })
