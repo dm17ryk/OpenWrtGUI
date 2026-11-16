@@ -377,6 +377,26 @@ async def test_guard_live_stops_without_restore(env: WifiEnv, tmp_path: Path) ->
     assert not await _parked(env)  # left at the step until Restore
 
 
+async def test_the_guard_stop_names_the_step_the_radio_is_at(
+    env: WifiEnv, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """v0.7 minor (#43), v1.0c Task 12: the run went live as step 2 began, so step 2 never changed the radio;
+    the message names step 1, not the step that was about to start."""
+    steps = _service(env, tmp_path, _Clock())
+    update = steps._update
+
+    def going_live(router_id: str, **kw: object) -> None:
+        update(router_id, **kw)  # type: ignore[arg-type]
+        if kw.get("phase") == "applying" and kw.get("index") == 2:
+            env.go_live()  # a harness run starts just as step 2 begins
+
+    monkeypatch.setattr(steps, "_update", going_live)
+    await _run(steps, "ap2", TWO_BY_TWO)
+    await _until(lambda: _job(steps).phase in DONE)
+    job = _job(steps)
+    assert job.error is not None and "radio0 is left at step 1;" in job.error
+
+
 async def test_restore_pending_after_guard_clears(env: WifiEnv, tmp_path: Path) -> None:
     steps = _service(env, tmp_path, _Clock())
     await _run(steps, "ap2", TWO_BY_TWO)

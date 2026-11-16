@@ -16,7 +16,7 @@ from openwrtgui.faults import commands as fc
 from openwrtgui.faults.compile import TABLE, CompiledFault, compile_fault, fault_id
 from openwrtgui.faults.model import ArmedFault, FaultCaps, FaultKind, FaultRequest, FaultTarget
 from openwrtgui.faults.parse import parse_conntrack, rtp_ports
-from openwrtgui.faults.targets import read_targets, resolve, router_macs
+from openwrtgui.faults.targets import read_targets, resolve, router_macs, without_pc
 from openwrtgui.fw.nft import parse_ruleset_json
 from openwrtgui.fw.owners import APP_IFB, APP_ROOT
 from openwrtgui.fw.tables import heredoc
@@ -228,7 +228,9 @@ class FaultsService:
 
     async def _read_on(
         self, rec: RouterRecord, t: Transport
-    ) -> tuple[FaultsState, NetworkState, list[Qdisc]]:
+    ) -> tuple[FaultsState, NetworkState, list[Qdisc], list[FaultTarget]]:
+        """The state shown (targets without this PC), the network, the qdiscs, and every target the router
+        knows, which the arming check needs to refuse the PC by its MAC too (v1.0c Task 12)."""
         t = once_reads(t)  # the ports, targets and wireless reads ask some things alike (v1.0c Task 6)
         desc = self._descriptions.get(rec.id)
         if desc is None:
@@ -253,7 +255,7 @@ class FaultsService:
         armed, unreadable = await self._armed(t)
         state = FaultsState(
             rec.id,
-            tuple(targets),
+            tuple(without_pc(targets, net)),
             tuple(armed),
             caps,
             unavailable,
@@ -261,7 +263,7 @@ class FaultsService:
             ports if ports.managed else None,
             unreadable=unreadable,
         )
-        return state, net, qdiscs
+        return state, net, qdiscs, targets
 
     async def state(self, router_id: str) -> FaultsState:
         rec = self._record(router_id)
@@ -271,11 +273,13 @@ class FaultsService:
     async def _compile(
         self, rec: RouterRecord, t: Transport, req: FaultRequest
     ) -> tuple[NetPlan, CompiledFault, str, FaultTarget, FaultsState]:
-        state, net, qdiscs = await self._read_on(rec, t)
+        state, net, qdiscs, every = await self._read_on(rec, t)
         if req.kind in state.unavailable:
             raise ValueError(state.unavailable[req.kind])
+        if req.kind == "block" and req.flow in ("rtp_in", "rtp_out") and not state.caps.conntrack:
+            raise ValueError(f"{rec.name} has no conntrack: RTP ports cannot be found; use all_in or all_out")
         needs = "mac" if req.kind in ("isolate", "link_down", "deauth", "ban", "ap_down") else "ip"
-        target = resolve(req.target, state.targets, net, rec.name, needs, await router_macs(t))  # type: ignore[arg-type]
+        target = resolve(req.target, every, net, rec.name, needs, await router_macs(t))  # type: ignore[arg-type]
         if req.kind == "link_down" and req.port is None and state.ports and state.ports.switch and target.mac:
             arl = parse_arl((await t.run(pc.swconfig_arl(state.ports.switch))).stdout)
             if target.mac in arl:
@@ -497,7 +501,7 @@ class FaultsService:
     async def _clear_plan(
         self, rec: RouterRecord, t: Transport, ids: Sequence[str] | None
     ) -> tuple[NetPlan, list[ArmedFault], FaultsState]:
-        state, _, qdiscs = await self._read_on(rec, t)
+        state, _, qdiscs, _ = await self._read_on(rec, t)
         chosen = [a for a in state.armed if ids is None or a.id in ids]
         if ids is not None and len(chosen) != len(set(ids)):
             raise ValueError("A fault to clear is no longer armed")

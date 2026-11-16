@@ -7,7 +7,7 @@ import pytest
 from fwenv import FwEnv
 
 from openwrtgui.faults.model import TargetRef
-from openwrtgui.faults.targets import lan_wired_device, read_targets, resolve, router_macs
+from openwrtgui.faults.targets import lan_wired_device, read_targets, resolve, router_macs, without_pc
 from openwrtgui.store.settings import KnownDevice
 
 PANEL_WIFI = "f4:12:fa:f3:57:68"
@@ -57,6 +57,14 @@ async def test_ip_and_mac_of_two_devices_refused(env: FwEnv) -> None:
         resolve(TargetRef(PANEL_ETH, "192.168.1.30"), targets, net, "AP1 · bench", "both")
     same = resolve(TargetRef(PANEL_WIFI.upper(), "192.168.1.30"), targets, net, "AP1 · bench", "both")
     assert (same.mac, same.via) == (PANEL_WIFI, "phy0-ap0")
+
+
+async def test_this_pc_is_not_offered_as_a_target(env: FwEnv) -> None:
+    """v0.4 minor (#13), v1.0c Task 12: a fault on the app's own PC cuts the app off; it is not offered."""
+    targets, net = await _targets(env, "ap1")
+    shown = without_pc(targets, net)
+    assert PC_MAC not in {x.mac for x in shown} and "192.168.1.10" not in {x.ip for x in shown}
+    assert len(shown) == len(targets) - 1
 
 
 async def test_target_is_pc_refused(env: FwEnv) -> None:

@@ -32,6 +32,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   between cannot leave the firewall an include it cannot read.
 - Clearer message when Bench Guard stops an fw4 include from being saved; "1 fault record" on the Faults screen.
 - igmp_snooping, ping, mapping, passive and key_type are no longer hidden as secrets.
+- Faults: an RTP block on a router without conntrack is refused before anything runs; this PC is no longer offered
+  as a fault target.
+- System: a reboot asked during a restore or a reset says which job is running.
+- Wi-Fi step-through: a run that Bench Guard stops names the step the radio is really at.
 - A restore's proof no longer reports a setup script the router's first boot removed.
 - LuCI's page list is read again after every change the app makes, not only after the apply runner's (Wi-Fi,
   System › Access, LTE, faults and the rest).

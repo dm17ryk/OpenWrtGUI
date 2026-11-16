@@ -609,6 +609,8 @@ class StepService:
 
     def _guard_stopped(self, rec: RouterRecord, req: StepRequest) -> None:
         job = self._jobs[rec.id]
+        # the last step whose change went through, not the one about to start (v0.7 minor #43, v1.0c T12)
+        at = f"is left at step {job.results[-1].index}" if job.results else "is left as it was before step 1"
         self._update(
             rec.id,
             phase="stopped",
@@ -616,8 +618,8 @@ class StepService:
             phase_ends_at=None,
             ended_at=self._clock(),
             error=(
-                f"Stopped by Bench Guard ({self._live() or 'a harness run'}): {req.radio} is left at step "
-                f"{job.index}; restore it once the run is over"
+                f"Stopped by Bench Guard ({self._live() or 'a harness run'}): {req.radio} {at}; "
+                "restore it once the run is over"
             ),
         )
 

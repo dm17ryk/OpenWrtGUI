@@ -96,6 +96,13 @@ async def read_targets(t: Transport, net: NetworkState, known: Sequence[KnownDev
     return sorted(out, key=lambda x: (x.via is None or x.via == "wired", x.name or "~", x.mac or ""))
 
 
+def without_pc(targets: Sequence[FaultTarget], net: NetworkState) -> list[FaultTarget]:
+    """The targets a person is offered: not this PC, whose fault would cut the app off (v0.4 minor #13). The
+    arming check still refuses the PC by its address or MAC, so `resolve` gets the whole list."""
+    pc_macs = {x.mac for x in targets if net.pc_ip and x.ip == net.pc_ip and x.mac}
+    return [x for x in targets if not ((net.pc_ip and x.ip == net.pc_ip) or (x.mac and x.mac in pc_macs))]
+
+
 async def router_macs(t: Transport) -> frozenset[str]:
     """The router's own MAC addresses (`network.device status`), so a fault never targets the router."""
     status = await ubus_call(t, "network.device", "status") or {}
