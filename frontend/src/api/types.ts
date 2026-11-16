@@ -136,6 +136,8 @@ export type KnownTable = S['KnownTable']
 // Discovery and images (v0.5)
 export type ProfileOut = S['ProfileOut']
 export type ProfileKey = S['ProfileKey']
+export type LibraryOut = S['LibraryOut']
+export type LibraryEntryOut = S['LibraryEntryOut']
 export type DiscoveryState = S['DiscoveryState']
 export type DiscoverySummary = S['DiscoverySummary']
 export type FirmwareCheck = S['FirmwareCheck']
