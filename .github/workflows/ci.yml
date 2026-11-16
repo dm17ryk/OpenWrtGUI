@@ -133,8 +133,14 @@ jobs:
           "base=$base" >> $env:GITHUB_OUTPUT
       - name: Build
         run: ./tools/build_windows.ps1 -Version "${{ steps.base.outputs.base }}-ci.${{ github.run_number }}"
-      - name: Install, check and uninstall
-        run: ./tools/test_installer.ps1
+      - name: The latest release, for the update test
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download --repo "${{ github.repository }}" --pattern "OpenWrtGUI-Setup-*.exe" --dir build/previous
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Install, update, check and uninstall
+        run: ./tools/test_installer.ps1 -Previous (Get-ChildItem build/previous/OpenWrtGUI-Setup-*.exe).FullName
       - uses: actions/upload-artifact@v7
         with:
           name: installer

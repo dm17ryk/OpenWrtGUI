@@ -133,6 +133,15 @@ def test_agents_file_carries_the_bench_rules() -> None:
     assert _read(ROOT / "CLAUDE.md").strip() == "See AGENTS.md."
 
 
+def test_installer_test_covers_update_in_place() -> None:
+    """v1.0d D7: an update over the latest release keeps the data folder and runs."""
+    script = _read(ROOT / "tools" / "test_installer.ps1")
+    for words in ("[string]$Previous", "/RELAUNCH=0", "the update keeps the data folder", "DisplayVersion"):
+        assert words in script, words
+    ci = _read(ROOT / ".github" / "workflows" / "ci.yml")
+    assert "gh release download" in ci and "-Previous" in ci
+
+
 def test_repo_files_exist() -> None:
     for name in ("SECURITY.md", "CODE_OF_CONDUCT.md", ".github/PULL_REQUEST_TEMPLATE.md"):
         assert (ROOT / name).is_file(), name
