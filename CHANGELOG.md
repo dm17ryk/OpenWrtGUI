@@ -20,6 +20,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Firewall: a run that starts after a confirmed table change is reported ("not saved as an fw4 include"), not
   answered 423; table-level lines such as flags and comment survive an edit; an IP set entry takes one field per
   match; a rule or set of one family refuses an address of the other.
+- Faults: a record in /tmp/owg the app cannot read no longer takes the screen and Clear everything down; the
+  screen says how many there are.
 
 ### Security
 

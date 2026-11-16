@@ -225,3 +225,9 @@ test('a capture saves a .pcap and shows its path after Stop', async () => {
   await user.click(await within(cap).findByRole('button', { name: 'Stop' }))
   expect(await within(cap).findByText(CAPTURED.path as string)).toBeInTheDocument()
 })
+
+test('records the app cannot read are counted on the screen', async () => {
+  faults = { ...AP1_FAULTS, unreadable: 2 }
+  renderFaults()
+  expect(await screen.findByText(/^2 fault records on the router could not be read/)).toBeInTheDocument()
+})

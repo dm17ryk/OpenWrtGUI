@@ -5,15 +5,16 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 from collections.abc import Awaitable, Callable, MutableMapping, Sequence
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timedelta
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from openwrtgui.faults import commands as fc
 from openwrtgui.faults.compile import TABLE, CompiledFault, compile_fault, fault_id
-from openwrtgui.faults.model import ArmedFault, FaultCaps, FaultRequest, FaultTarget
+from openwrtgui.faults.model import ArmedFault, FaultCaps, FaultKind, FaultRequest, FaultTarget
 from openwrtgui.faults.parse import parse_conntrack, rtp_ports
 from openwrtgui.faults.targets import read_targets, resolve, router_macs
 from openwrtgui.fw.nft import parse_ruleset_json
@@ -35,6 +36,8 @@ from openwrtgui.timer import alive_command, arm_command, cancel_command
 from openwrtgui.transport.base import Transport, ubus_call
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.uci import shell_quote
+
+log = logging.getLogger(__name__)
 
 SCREEN = "Faults"
 SETTLE_S = 20.0  # "Link up: polled for up to 20 s"
@@ -62,6 +65,32 @@ class FaultsState:
     unavailable: dict[str, str]
     wifi: tuple[WifiIf, ...]
     ports: PortsState | None
+    unreadable: int = 0  # records in /tmp/owg that could not be read (v1.0b2 D6)
+
+
+def _armed_fault(line: str, now: datetime, now_router: int) -> ArmedFault | None:
+    """One record line; None when it cannot be read (bad JSON, no id or kind, a wrong type): one such record
+    must not take the screen or Clear everything down (v1.0b2 D6)."""
+    try:
+        r = json.loads(line)
+        if r["kind"] not in get_args(FaultKind):
+            raise ValueError(f"unknown fault kind {r['kind']!r}")
+        armed_at = now - timedelta(seconds=now_router - int(r.get("armed_at", now_router)))
+        hold = r.get("hold_s")
+        target = r.get("target", {})
+        return ArmedFault(
+            str(r["id"]),
+            r["kind"],
+            str(r.get("summary", "")),
+            FaultTarget(**{k: target.get(k) for k in ("name", "mac", "ip", "via", "device")}),
+            r.get("device"),
+            tuple(str(c) for c in r.get("clear", [])),
+            armed_at,
+            armed_at + timedelta(seconds=int(hold)) if hold else None,
+        )
+    except (ValueError, KeyError, TypeError, AttributeError) as exc:
+        log.warning("skipped an unreadable fault record: %s", exc)
+        return None
 
 
 def record_command(fid: str, req: FaultRequest, c: CompiledFault, target: FaultTarget) -> str:
@@ -179,37 +208,19 @@ class FaultsService:
             self._caps[rec.id] = caps_from(family, tables.stdout if tables.ok else "", modules, tools)
         return self._caps[rec.id]
 
-    async def _armed(self, t: Transport) -> list[ArmedFault]:
+    async def _armed(self, t: Transport) -> tuple[list[ArmedFault], int]:
+        """The faults armed, and how many records could not be read."""
         records = await t.run(FAULT_RECORDS)
         if not records.ok or not records.stdout.strip():
-            return []
-        now_router = int((await t.run("date +%s")).stdout.strip() or 0)
+            return [], 0
+        try:
+            now_router = int((await t.run("date +%s")).stdout.strip() or 0)
+        except ValueError:
+            now_router = 0
         now = self._clock()
-        out = []
-        for line in records.stdout.splitlines():
-            try:
-                r = json.loads(line)
-            except ValueError:
-                continue
-            armed_at = now - timedelta(seconds=now_router - int(r.get("armed_at", now_router)))
-            hold = r.get("hold_s")
-            until = armed_at + timedelta(seconds=int(hold)) if hold else None
-            target = FaultTarget(
-                **{k: r.get("target", {}).get(k) for k in ("name", "mac", "ip", "via", "device")}
-            )
-            out.append(
-                ArmedFault(
-                    r["id"],
-                    r["kind"],
-                    r.get("summary", ""),
-                    target,
-                    r.get("device"),
-                    tuple(r.get("clear", [])),
-                    armed_at,
-                    until,
-                )
-            )
-        return sorted(out, key=lambda a: a.armed_at)
+        found = [_armed_fault(line, now, now_router) for line in records.stdout.splitlines() if line.strip()]
+        armed = sorted((a for a in found if a is not None), key=lambda a: a.armed_at)
+        return armed, sum(1 for a in found if a is None)
 
     async def _read_on(
         self, rec: RouterRecord, t: Transport
@@ -234,14 +245,16 @@ class FaultsService:
         if not any(w.up for w in wifi):
             text = NOT_ON_AIR.format(router=rec.name)
             unavailable |= {"deauth": text, "ban": text, "ap_down": text}
+        armed, unreadable = await self._armed(t)
         state = FaultsState(
             rec.id,
             tuple(targets),
-            tuple(await self._armed(t)),
+            tuple(armed),
             caps,
             unavailable,
             tuple(wifi),
             ports if ports.managed else None,
+            unreadable=unreadable,
         )
         return state, net, qdiscs
 

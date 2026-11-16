@@ -4580,6 +4580,11 @@ export interface components {
             unavailable: {
                 [key: string]: string;
             };
+            /**
+             * Unreadable
+             * @default 0
+             */
+            unreadable: number;
             /** Wifi */
             wifi: components["schemas"]["WifiIf"][];
         };
