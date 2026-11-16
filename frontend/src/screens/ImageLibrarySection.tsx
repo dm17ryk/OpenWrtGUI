@@ -86,7 +86,7 @@ export function ImageLibrarySection() {
                 <span>Imported</span>
               ) : (
                 <button className="btn" type="button" disabled={downloading !== null || isRefreshing} onClick={() => void download(e)}>
-                  {downloading === e.sha256 ? 'Downloading…' : 'Download'}
+                  {downloading === e.sha256 ? `Downloading ${megabytes(e.size)}…` : 'Download'}
                 </button>
               )}
             </li>

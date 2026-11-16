@@ -85,7 +85,7 @@ test('downloads one image', async () => {
   hold = true
   const user = renderSection()
   await user.click(await screen.findByRole('button', { name: 'Download' }))
-  expect(await screen.findByRole('button', { name: 'Downloading…' })).toBeDisabled()
+  expect(await screen.findByRole('button', { name: 'Downloading 10.8 MB…'})).toBeDisabled()
   expect(calls).toContain(`POST /api/images/library/${libraryEntry.sha256}`)
   release?.()
   expect(await screen.findByText('Imported')).toBeVisible()
