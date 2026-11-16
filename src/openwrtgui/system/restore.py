@@ -194,6 +194,23 @@ def not_reset(router_name: str, limit_s: float) -> str:
     return f"{router_name} still answers after {limit_s:g} s: it did not reset. Check it, then try again"
 
 
+GONE_AFTER = 3  # failed logins in a row: one alone may be a lost packet, not firstboot (v1.0b2 D9)
+
+
+async def _logs_in(pool: ConnectionPool, rec: RouterRecord) -> bool:
+    try:
+        t = await pool.fresh(rec)
+    except TransportError:
+        return False
+    try:
+        return (await t.run("true")).ok
+    except TransportError:
+        return False
+    finally:
+        with contextlib.suppress(TransportError):
+            await t.close()
+
+
 async def wait_until_gone(
     pool: ConnectionPool,
     rec: RouterRecord,
@@ -204,20 +221,13 @@ async def wait_until_gone(
     every_s: float,
     limit_s: float = RESET_LIMIT_S,
 ) -> bool:
-    """True once a new login at the router's address fails (firstboot took it away), False after limit_s."""
+    """True once new logins at the router's address fail GONE_AFTER times in a row (firstboot took it
+    away), False after limit_s."""
     await pool.drop(rec.id)
+    failed = 0
     while clock() - armed_at < limit_s:
         await sleep(every_s)
-        try:
-            t = await pool.fresh(rec)
-        except TransportError:
+        failed = 0 if await _logs_in(pool, rec) else failed + 1
+        if failed >= GONE_AFTER:
             return True
-        try:
-            if not (await t.run("true")).ok:
-                return True
-        except TransportError:
-            return True
-        finally:
-            with contextlib.suppress(TransportError):
-                await t.close()
     return False

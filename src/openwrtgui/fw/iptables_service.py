@@ -15,6 +15,8 @@ from openwrtgui.fw.iptables import (
     Program,
     listing,
     parse_listing,
+    reset_proven,
+    skipped_lines,
 )
 from openwrtgui.luci_bridge.depends import files_command, parse_ls
 from openwrtgui.net.apply import ApplyRunner, NetApplyResult, NetCheck, NetPlan, Planned, net_plan
@@ -30,6 +32,12 @@ def _filter_totals(text: str) -> tuple[int, int]:
     chains = parse_listing(text)
     counted = sum((c.bytes or 0) + sum(r.bytes for r in c.rules) for c in chains)
     return counted, sum(len(c.rules) for c in chains)
+
+
+def _reset_check(program: Program, before: str, after: str) -> NetCheck:
+    name = "Counters reset" if program == "iptables" else "IPv6 counters reset"
+    was, now = _filter_totals(before)[0], _filter_totals(after)[0]
+    return NetCheck(name, reset_proven(before, after), f"filter: {was} → {now} bytes")
 
 
 class IptablesService:
@@ -72,11 +80,16 @@ class IptablesService:
                 r = await t.run(listing(program, table))
                 error = None if r.ok else ((r.stderr or r.stdout).strip() or f"exit {r.exit_status}")
                 chains = parse_listing(r.stdout) if r.ok else []
-                tables.append(IptTable(program=program, table=table, chains=chains, error=error))
+                skipped = skipped_lines(r.stdout) if r.ok else 0
+                tables.append(
+                    IptTable(program=program, table=table, chains=chains, error=error, skipped=skipped)
+                )
         return IptablesState(iptables=p.iptables, ip6tables=p.ip6tables, tables=tables)
 
-    async def _plan(self, rec: RouterRecord, t: Transport, which: str) -> NetPlan:
-        p = await self._presence(t)
+    async def _plan(
+        self, rec: RouterRecord, t: Transport, which: str, p: IptablesPresence | None = None
+    ) -> NetPlan:
+        p = p or await self._presence(t)
         if not p.iptables:
             raise ValueError(f"{rec.name} has no iptables: fw4's rules are under Raw ruleset")
         reset = which == "reset"
@@ -100,18 +113,20 @@ class IptablesService:
 
     async def _apply(self, router_id: str, which: str, digest: str | None) -> NetApplyResult:
         rec = self._record(router_id)
-        filter_list = listing("iptables", "filter")
 
         async def make(t: Transport) -> Planned:
-            plan = await self._plan(rec, t, which)
-            before = _filter_totals((await t.run(filter_list)).stdout)
+            p = await self._presence(t)
+            plan = await self._plan(rec, t, which, p)
+            programs = self._programs(p)
+            before = {prog: (await t.run(listing(prog, "filter"))).stdout for prog in programs}
 
             async def verify(t2: Transport) -> list[NetCheck]:
-                after = _filter_totals((await t2.run(filter_list)).stdout)
-                if which == "reset":
-                    ok = before[0] == 0 or after[0] < before[0]
-                    return [NetCheck("Counters reset", ok, f"filter: {before[0]} → {after[0]} bytes")]
-                return [NetCheck("Rules back", after[1] == before[1], f"filter: {after[1]} rules")]
+                after = {prog: (await t2.run(listing(prog, "filter"))).stdout for prog in programs}
+                if which == "reset":  # proven per program: ip6tables too (v1.0b2 D4)
+                    return [_reset_check(prog, before[prog], after[prog]) for prog in programs]
+                rules = _filter_totals(after["iptables"])[1]
+                ok = rules == _filter_totals(before["iptables"])[1]
+                return [NetCheck("Rules back", ok, f"filter: {rules} rules")]
 
             return Planned(plan, verify)
 

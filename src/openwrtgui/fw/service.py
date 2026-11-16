@@ -31,7 +31,7 @@ from openwrtgui.fw.sections import Kind, SectionRequest, compile_sections, expec
 from openwrtgui.fw.state import PIN_DHCP, PIN_SSH, FirewallState, read_firewall
 from openwrtgui.fw.tables import TableChange, TableRequest, heredoc, owner_text, table_change
 from openwrtgui.guard.audit import AuditLog
-from openwrtgui.guard.bench_guard import BenchGuard
+from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked
 from openwrtgui.net.apply import (
     ApplyRunner,
     NetApplyResult,
@@ -412,7 +412,11 @@ class FirewallService:
 
             return Planned(plan, verify)
 
-        second = await self._runner.run_planned(rec, make_include, None)
+        try:
+            second = await self._runner.run_planned(rec, make_include, None)
+        except GuardLocked as exc:  # a run started after the confirm: the change stays at runtime (v1.0b2 D5)
+            unsaved = f"Applied at runtime; not saved as an fw4 include: Bench Guard went live ({exc})"
+            return NetApplyResult(rec.id, True, False, first.checks, unsaved, first.host)
         error = first.error
         if not second.applied or second.error:  # the uci part may be saved while the file is not
             error = f"Applied at runtime; saving it as an fw4 include failed: {second.error}"

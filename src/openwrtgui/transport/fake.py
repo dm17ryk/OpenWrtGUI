@@ -176,10 +176,10 @@ class ReplayTransport:
 
     def _dispatch(self, command: str) -> CommandResult | None:
         assert self.state is not None
-        # The image side first: it answers only exact commands it owns. Then the network: it answers only
-        # commands it knows whole (the Wi-Fi one echoes any `echo`); the firewall last, since it splits
-        # compound commands and hands their parts back here.
-        # a later image (v1.0a2) first: it overrides the bench image's reads it extends (menu, mounts)
+        # A later image (v1.0a2) first: it overrides the bench image's reads it extends (menu, mounts).
+        # Then the files, the image and the modem, which answer only exact commands they own; access before
+        # system; then the network, the air and the Wi-Fi, which answer only commands they know whole; the
+        # firewall last, since it splits compound commands and hands their parts back here.
         if self.state.later is not None and (answered := self.state.later.answer(command)) is not None:
             return answered
         if self.state.files is not None and (answered := self.state.files.answer(command)) is not None:

@@ -93,3 +93,12 @@ async def test_settings_options_lock_dhcp_and_autoconnect(authed: httpx.AsyncCli
     assert rows["password"]["editor"] == "secret" and rows["password"]["value"] is None
     bad = await authed.post("/api/routers/ap2/lte/settings/preview", json={"auth": "kerberos"})
     assert bad.status_code == 422
+
+
+async def test_the_metric_is_netifds_unsigned_range(authed: httpx.AsyncClient) -> None:
+    """v0.6a minor (#28): a negative or 33-bit metric is refused before the preview."""
+    for metric in (-1, 4_294_967_296):
+        r = await authed.post("/api/routers/ap2/lte/settings/preview", json={"metric": metric})
+        assert r.status_code == 422, (metric, r.text)
+    ok = await authed.post("/api/routers/ap2/lte/settings/preview", json={"metric": 10})
+    assert ok.status_code == 200, ok.text

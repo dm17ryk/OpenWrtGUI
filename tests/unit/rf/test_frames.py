@@ -109,3 +109,16 @@ def test_combine_adds() -> None:
         tx=Direction(frames=1, retries=0, rates={"MCS 7": 1}, signal_hist={}),
         dropped=3,
     )
+
+
+def test_an_ssid_that_looks_like_a_rate_is_not_one() -> None:
+    """v0.7 minor (#51), v1.0b2 D8: rate, MCS and signal come from the radio's fields, before the
+    addresses."""
+    line = (
+        "12:00:00.000000 1.0 Mb/s 2437 MHz 11b -61dBm signal antenna 0 BSSID:02:00:00:00:00:01 "
+        "DA:ff:ff:ff:ff:ff:ff SA:02:00:00:00:00:01 Beacon (MCS 7 -20dBm signal 54.0 Mb/s) "
+        "[1.0* 2.0* 5.5* 11.0* Mbit] ESS CH: 6"
+    )
+    frame = parse_frame(line)
+    assert frame is not None
+    assert (frame.rate, frame.signal_dbm, frame.bssid) == ("1.0", -61, "02:00:00:00:00:01")

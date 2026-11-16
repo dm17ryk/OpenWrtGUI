@@ -101,6 +101,7 @@ class LteService:
         # router → (connection, AT port that answered on it); only a found port is kept
         self._ports: dict[str, tuple[weakref.ref[Transport], str]] = {}
         self._busy: dict[str, asyncio.Lock] = {}
+        self._at: dict[str, asyncio.Lock] = {}  # one AT exchange at a time per router (v1.0b2 D11)
         self.poll_s = POLL_S
         self.readback_s = 1.0
 
@@ -132,6 +133,9 @@ class LteService:
             self._ports[rec.id] = (weakref.ref(t), port)
         return port
 
+    def _at_lock(self, router_id: str) -> asyncio.Lock:
+        return self._at.setdefault(router_id, asyncio.Lock())
+
     def forget_port(self, router_id: str) -> None:
         """The kept AT port gave no answer (the modem re-enumerated): probe again on the next use."""
         self._ports.pop(router_id, None)
@@ -140,8 +144,9 @@ class LteService:
         rec = self._record(router_id)
         qmi = await self._qmi(router_id)
         t = await self._pool.get(rec)
-        port = await self.at_port(rec, t) if qmi is not None else None
-        state = await read_lte(t, router_id=rec.id, qmi=qmi, at_port=port, now=self._clock())
+        async with self._at_lock(rec.id):  # one microcom on the modem's port at a time (v1.0b2 D11)
+            port = await self.at_port(rec, t) if qmi is not None else None
+            state = await read_lte(t, router_id=rec.id, qmi=qmi, at_port=port, now=self._clock())
         if "AT" in state.missing:
             self.forget_port(rec.id)
         return state
@@ -304,36 +309,48 @@ class LteService:
             if not confirmed:
                 raise AtNeedsConfirm(NEEDS_CONFIRM)
         t = await self._pool.get(rec)
-        port = await self.at_port(rec, t)
-        if port is None:
-            return AtResult(
-                command=shown, lines=(), status="no answer", error=f"No AT port answered on {rec.name}"
-            )
-        line = c.at(port, command)
         if query:
-            done = await run_audited(
-                t,
-                line,
-                router_id=rec.id,
-                screen=SCREEN,
-                guard=self._guard,
-                audit=self._audit,
-                require_guard=False,
-            )
+            async with self._at_lock(rec.id):
+                port, done = await self._exchange(rec, t, command, write=False)
         else:
             # one LTE write at a time, as the actions: a command that may change the modem never waits behind
             # a connect or reboot to run later; it is refused (409)
             busy = self._busy.setdefault(rec.id, asyncio.Lock())
             if busy.locked():
                 raise LteBusy(f"An LTE action is already running on {rec.name}")
-            async with busy, self._pool.write_lock(rec.id):
-                done = await self._cmd(rec, t, line)
+            async with busy, self._pool.write_lock(rec.id), self._at_lock(rec.id):
+                port, done = await self._exchange(rec, t, command, write=True)
+        if port is None or done is None:
+            return AtResult(
+                command=shown, lines=(), status="no answer", error=f"No AT port answered on {rec.name}"
+            )
         answer = parse_at(done.stdout, command)
         if answer is None:
             self.forget_port(rec.id)  # the next command probes again: the modem may have re-enumerated
             return AtResult(command=shown, lines=(), status="no answer", error=NO_MODEM_ANSWER)
         lines = shown_answer(answer.lines)
         return AtResult(command=shown, lines=lines, status=answer.status, error=answer.error)
+
+    async def _exchange(
+        self, rec: RouterRecord, t: Transport, command: str, *, write: bool
+    ) -> tuple[str | None, CommandResult | None]:
+        """The AT port, then the command on it. The caller holds the AT lock (v1.0b2 D11)."""
+        port = await self.at_port(rec, t)
+        if port is None:
+            return None, None
+        line = c.at(port, command)
+        if write:
+            return port, await self._cmd(rec, t, line)
+        done = await run_audited(
+            t,
+            line,
+            router_id=rec.id,
+            screen=SCREEN,
+            guard=self._guard,
+            audit=self._audit,
+            require_guard=False,
+        )
+        return port, done
 
     async def imei(self, router_id: str) -> str:
         """D3: read only when the person asks; never stored, logged or audited."""

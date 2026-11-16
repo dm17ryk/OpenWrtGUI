@@ -43,7 +43,7 @@ from openwrtgui.probe.luci_menu import LuciPage
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import Transport, TransportError
 from openwrtgui.transport.pool import ConnectionPool
-from openwrtgui.uci import parse_uci_show
+from openwrtgui.uci import parse_uci_show, parse_uci_show_raw
 
 log = logging.getLogger(__name__)
 
@@ -160,7 +160,7 @@ class LuciBridgeService:
             for config in uci_configs(pages):
                 done = await t.run(uci_command(config))
                 if done.ok:  # `uci -q show` of a config that does not exist fails: it is absent
-                    uci[config] = parse_uci_show(done.stdout)
+                    uci[config] = parse_uci_show_raw(done.stdout)  # values as printed (v1.0b2 D3c)
         except TransportError:
             return UNCHECKED
         acl = self._acl(rec.id)  # empty: the router's acl.d could not be read, so access is not checked

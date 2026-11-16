@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
+from conftest import WifiEnv
 from openwrtgui.transport.base import CommandResult
-from openwrtgui.wifi.monitor import DEL, INFO, MONITOR, MonitorLeases, add_command
+from openwrtgui.wifi.monitor import DEL, INFO, MONITOR, MonitorBusy, MonitorLeases, add_command
 
 PHY = "phy0"
 
@@ -117,3 +120,31 @@ def test_add_command_refuses_a_phy_that_is_not_a_name() -> None:
     """v1.0b1 D5: the phy comes from the router (iwinfo phyname)."""
     with pytest.raises(ValueError, match="is not an interface name"):
         add_command("phy0; reboot", clear_leftover=True)
+
+
+async def test_a_second_radio_is_refused_while_the_monitor_is_held() -> None:
+    """v0.7 minor (#39), v1.0b2 D8: owgmon0 on phy0 must never answer for phy1."""
+    router, leases = _Router(), MonitorLeases()
+    async with leases.hold("ap2", "capture 3", PHY, router, router.audited):  # type: ignore[arg-type]
+        with pytest.raises(MonitorBusy, match="^owgmon0 is on phy0 for capture 3; beacon check needs phy1$"):
+            await leases.acquire("ap2", "beacon check", "phy1", router, router.audited)  # type: ignore[arg-type]
+        assert leases.holders("ap2") == ("capture 3",)
+    async with leases.hold("ap2", "frames", "phy1", router, router.audited):  # type: ignore[arg-type]
+        assert leases.holders("ap2") == ("frames",)  # released: phy1 may have it now
+
+
+async def test_the_beacon_check_is_not_checked_while_another_radio_holds_the_monitor(env: WifiEnv) -> None:
+    """Review Focus 4: beacons heard on phy0 must not prove a change on phy1."""
+    rec = env.routers.get("ap2")
+    assert rec is not None
+    t = await env.pool.get(rec)
+
+    async def run(command: str, require_guard: bool) -> CommandResult:
+        return await t.run(command)
+
+    await env.service._monitors.acquire("ap2", "capture 3", "phy0", t, run)
+    info = SimpleNamespace(addr="02:00:00:00:00:01")
+    expect = SimpleNamespace(beacon_mbps=1.0)
+    check = await env.service._beacon_check(rec, t, "phy1", info, expect)  # type: ignore[arg-type]
+    assert check.ok is None
+    assert check.detail == "not checked: owgmon0 is on phy0 for capture 3; beacon check ap2 phy1 needs phy1"

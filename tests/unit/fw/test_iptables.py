@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from openwrtgui.fw.iptables import listing, parse_listing
+from openwrtgui.fw.iptables import listing, parse_listing, reset_proven, skipped_lines
 
 LATER = json.loads(
     (Path(__file__).resolve().parents[2] / "fixtures" / "sim" / "later" / "ap4.json").read_text("utf-8")
@@ -49,3 +49,28 @@ def test_a_rule_without_options_or_trailing_spaces_is_kept() -> None:
         "1 0 0 ACCEPT all -- * * 0.0.0.0/0 0.0.0.0/0"
     )
     assert len(parse_listing(text)[0].rules) == 1
+
+
+HEAD = "num      pkts      bytes target     prot opt in     out     source               destination"
+
+
+def _listing(policy_bytes: int, rule_bytes: int) -> str:
+    return (
+        f"Chain INPUT (policy ACCEPT 1 packets, {policy_bytes} bytes)\n{HEAD}\n"
+        f"1        3 {rule_bytes:>10} DROP       tcp  --  *      *       0.0.0.0/0            0.0.0.0/0"
+        "            tcp dpt:22\n"
+    )
+
+
+def test_a_second_reset_with_traffic_between_is_still_proven() -> None:
+    """v1.0a2 minor, v1.0b2 D4: counters only grow between resets, so one that went down proves the reset."""
+    before = _listing(policy_bytes=120, rule_bytes=60)
+    assert reset_proven(before, _listing(policy_bytes=900, rule_bytes=0))  # more traffic since, one lower
+    assert not reset_proven(before, _listing(policy_bytes=130, rule_bytes=70))  # every counter grew: no reset
+    assert reset_proven(_listing(0, 0), _listing(5, 5))  # nothing counted before: nothing to prove
+
+
+def test_lines_the_parser_cannot_read_are_counted() -> None:
+    text = _listing(10, 10) + "1  2  3  something iptables printed that the app does not know\n\n"
+    assert skipped_lines(text) == 1
+    assert skipped_lines(_listing(10, 10)) == 0

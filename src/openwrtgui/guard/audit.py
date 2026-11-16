@@ -6,7 +6,7 @@ import json
 import logging
 import re
 import zipfile
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -67,6 +67,9 @@ class AuditLog:
     def __init__(self, audit_dir: Path) -> None:
         self.dir = audit_dir
         self.dir.mkdir(parents=True, exist_ok=True)
+        # called with the router id after each line about a router: every change the app makes is audited, so
+        # a listener hears about all of them (v1.0b2 D2: the LuCI menu facts go stale)
+        self.on_record: list[Callable[[str], None]] = []
 
     def record(
         self,
@@ -90,6 +93,9 @@ class AuditLog:
         )
         with (self.dir / f"{entry.ts.date().isoformat()}.jsonl").open("a", encoding="utf-8") as f:
             f.write(_line(entry))
+        if router is not None:
+            for listener in self.on_record:
+                listener(router)
         return entry
 
     def _read(self, day: Path) -> list[AuditEntry]:

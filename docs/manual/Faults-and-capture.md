@@ -64,6 +64,9 @@ cleared again. The last fault to go also removes the `benchfault` table. Clearin
 because a fault left in place disturbs the run more; it then says "Cleared although Bench Guard is live". It never
 touches anything the app did not arm.
 
+A fault record in `/tmp/owg` that the app cannot read is not listed; the screen says how many there are. Clear
+everything still removes the app's table and filters; it leaves such a record in place.
+
 ## Capture
 
 Captures on a router interface: `br-lan` (wired and Wi-Fi), a Wi-Fi interface, `mon0` (raw 802.11, created on the

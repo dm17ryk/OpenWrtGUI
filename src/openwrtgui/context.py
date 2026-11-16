@@ -239,7 +239,7 @@ def build_context(
         upstream_factory=_sim_upstream(descriptions) if simulator is not None else _ssh_upstream,
     )
     runner = ApplyRunner(pool=pool, routers=routers, guard=guard, audit=audit, host_keys=host_keys)
-    runner.on_applied.append(luci.forget_facts)
+    audit.on_record.append(luci.forget_facts)  # v1.0b2 D2: every audited write drops the menu facts
     net = NetworkService(
         pool=pool,
         routers=routers,

@@ -4580,6 +4580,11 @@ export interface components {
             unavailable: {
                 [key: string]: string;
             };
+            /**
+             * Unreadable
+             * @default 0
+             */
+            unreadable: number;
             /** Wifi */
             wifi: components["schemas"]["WifiIf"][];
         };
@@ -5462,6 +5467,11 @@ export interface components {
              * @enum {string}
              */
             program: "iptables" | "ip6tables";
+            /**
+             * Skipped
+             * @default 0
+             */
+            skipped: number;
             /** Table */
             table: string;
         };

@@ -132,6 +132,9 @@ def saved_ops(
     the rest bring a list back in its place in `uci show`. A one-item list cannot be made that way (a `set`
     is an option): it is deleted and added again, at the end of its section. With `now` (the section as it
     reads now), what already reads as saved, list or option alike, is left alone."""
+    missing = [name for name in SAVED_OPTIONS if name not in saved]
+    if missing:  # read as absent, each would be deleted from the radio (v1.0b2 D7)
+        raise ValueError(f"The saved options lack {', '.join(missing)}: nothing is restored")
     p = f"wireless.{radio}"
     ops: list[UciOp] = []
     for name in SAVED_OPTIONS:

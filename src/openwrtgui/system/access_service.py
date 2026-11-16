@@ -154,11 +154,36 @@ def https_ports(http: HttpState) -> set[int]:
     return ports
 
 
-def app_instance(instances: list[SshInstance], port: int, interface: str | None) -> SshInstance | None:
-    """The enabled instance on the router's port that listens on every interface or on the app's one."""
-    return next(
-        (i for i in instances if i.enable and i.port == port and i.interface in ("", interface)), None
-    )
+def app_instance(
+    instances: list[SshInstance], port: int, interface: str | None, *, listed: bool = True
+) -> SshInstance | None:
+    """The enabled instance on the router's port that listens on every interface or on the app's one.
+    `listed=False`: the interface dump failed, so the app's interface is unknown; then the only enabled
+    instance on that port is the one the app came in through, and with several none is named (v1.0b2 D9).
+    A dump that was read but holds no interface with the app's address keeps the first rule (final review)."""
+    on_port = [i for i in instances if i.enable and i.port == port]
+    if not listed:
+        return on_port[0] if len(on_port) == 1 else None
+    return next((i for i in on_port if i.interface in ("", interface)), None)
+
+
+def app_instance_for_change(
+    instances: list[SshInstance],
+    port: int,
+    interface: str | None,
+    router_name: str,
+    *,
+    listed: bool = True,
+) -> SshInstance | None:
+    """`app_instance` for an SSH change, which must not run unprotected when the interface dump failed and
+    the app's own instance cannot be told apart (v1.0b2 D9)."""
+    mine = app_instance(instances, port, interface, listed=listed)
+    if mine is None and not listed and sum(1 for i in instances if i.enable and i.port == port) > 1:
+        raise ValueError(
+            f"Cannot tell which SSH instance this app uses on {router_name}: the interface list could not "
+            "be read. Try again."
+        )
+    return mine
 
 
 class AccessService:
@@ -261,7 +286,7 @@ class AccessService:
         if not found_dir:
             missing.append("repository keys")
         served = https_ports(http) & {port for _, port in listening}
-        mine = app_instance(dropbear, rec.port, interface)
+        mine = app_instance(dropbear, rec.port, interface, listed="interfaces" not in missing)
         return SystemAccessState(
             password=state if state in ("set", "none") else None,  # type: ignore[arg-type]
             policy=policy,
@@ -303,14 +328,15 @@ class AccessService:
     async def apply_password(self, router_id: str, password: str, digest: str | None) -> NetApplyResult:
         """`passwd root` with the password twice on stdin; proof: root's hash changed. The password is in no
         command line, plan, audit line, result or error."""
-        rec, t = await self._transport(router_id)
-        check_password(password, parse_policy(await self._stdout(t, s.UCI_RPCD)))
+        rec = self._record(router_id)
         plan = self._password_plan(rec)
         self._guard.require_clear()
         if digest != plan.digest:
             raise PreviewChanged(rec.name)
         async with self._pool.write_lock(rec.id):
             t = await self._pool.get(rec)
+            # read under the write lock: a policy apply cannot change the rules in between (v1.0b2 D9)
+            check_password(password, parse_policy(await self._stdout(t, s.UCI_RPCD)))
             before = await self._digest(t)
             result = await run_audited(
                 t,
@@ -601,8 +627,9 @@ class AccessService:
     ) -> tuple[NetPlan, dict[str, str], list[int]]:
         current = parse_uci_show(await self._stdout(t, s.UCI_DROPBEAR))
         existing = dropbear_instances(current)
-        interface, names = await self._interfaces(t, rec.host, [])
-        mine = app_instance(existing, rec.port, interface)
+        unread: list[str] = []
+        interface, names = await self._interfaces(t, rec.host, unread)
+        mine = app_instance_for_change(existing, rec.port, interface, rec.name, listed=not unread)
         ops, ports = ssh_ops(
             current,
             change,

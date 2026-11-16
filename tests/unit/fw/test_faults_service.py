@@ -3,17 +3,18 @@
 from __future__ import annotations
 
 import json
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import cast
 
 import pytest
 from fwenv import FwEnv
 
 from openwrtgui.faults.model import FaultRequest, FaultTarget, NetemParams, TargetRef
-from openwrtgui.faults.service import FaultsService, caps_from
+from openwrtgui.faults.service import FaultsService, _armed_fault, caps_from
 from openwrtgui.fw.nft import parse_ruleset_json
 from openwrtgui.guard.bench_guard import GuardLocked
 from openwrtgui.net.apply import NetCheck
+from openwrtgui.probe.commands import FAULT_RECORDS
 from openwrtgui.probe.status import read_status
 from openwrtgui.simfw import SimFirewall
 from openwrtgui.transport.base import CommandResult, Transport
@@ -257,3 +258,37 @@ async def test_a_failed_arm_removes_what_had_run(env: FwEnv, monkeypatch: pytest
     t = await env.sim("ap2")
     assert "1ee7:" not in (await t.run("tc qdisc show")).stdout
     assert (await faults.state("ap2")).armed == ()
+
+
+async def test_an_unreadable_record_is_skipped_and_counted(
+    env: FwEnv, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """v0.4 minor, v1.0b2 D6: the screen and Clear everything keep working, and the screen says how many."""
+    faults = _faults(env)
+    await _arm(env, faults, "ap1", FaultRequest("block", PANEL, flow="rtp_in", loss=30))
+    t = await env.pool.get(env.rec("ap1"))
+    original = t.run
+    junk = 'not json\n{"id": "x1"}\n{"id": "x2", "kind": "block", "armed_at": "soon"}\n[1, 2]\n'
+
+    async def with_junk(command: str, *, timeout: float = 15.0) -> CommandResult:
+        done = await original(command, timeout=timeout)
+        if command == FAULT_RECORDS:  # the real record first, on its own line, then the junk
+            text = done.stdout.rstrip("\n") + "\n" + junk
+            return CommandResult(command, text, done.stderr, done.exit_status)
+        return done
+
+    monkeypatch.setattr(t, "run", with_junk)
+    state = await faults.state("ap1")
+    assert len(state.armed) == 1 and state.unreadable == 4
+    result = await faults.apply_clear("ap1", None, (await faults.plan_clear("ap1", None)).digest)
+    assert result.applied, result
+
+
+def test_records_of_a_wrong_type_or_size_are_skipped() -> None:
+    """Final review: an overflowing time, a device that is not text, a clear that is not a list."""
+    now = datetime(2026, 11, 16, 9, 0)
+    good = {"id": "f1", "kind": "block", "armed_at": 100, "clear": ["nft delete table netdev benchfault"]}
+    assert _armed_fault(json.dumps(good), now, 100) is not None
+    bad = [{"armed_at": 1e400}, {"hold_s": 1e30}, {"device": 5}, {"clear": "abc"}]
+    for change in bad:
+        assert _armed_fault(json.dumps(good | change), now, 100) is None, change

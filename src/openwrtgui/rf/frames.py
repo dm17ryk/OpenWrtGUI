@@ -19,7 +19,15 @@ _MCS = re.compile(r"\bMCS (\d+)\b")
 _SIGNAL = re.compile(r"(-\d+)dBm signal")
 _ADDR = re.compile(r"\b(SA|TA|DA|RA|BSSID):([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})(?![:0-9a-fA-F])")
 _DROPPED = re.compile(r"(\d+) packets? dropped by kernel")
+_FIRST_ADDR = re.compile(r"\b(?:SA|TA|DA|RA|BSSID):")
 SIGNAL_BIN_DB = 5
+
+
+def _radiotap(line: str) -> str:
+    """The radio's own fields (rate, MCS, signal, FCS) come before the 802.11 addresses; what follows, an
+    SSID for one, is the network's text (v1.0b2 D8)."""
+    m = _FIRST_ADDR.search(line)
+    return line[: m.start()] if m else line
 
 
 @dataclass(frozen=True)
@@ -53,9 +61,10 @@ class FrameWindow:
 
 def parse_frame(line: str) -> Frame | None:
     """One tcpdump line; None for the lines tcpdump writes for itself and blank lines."""
-    mcs = _MCS.search(line)
-    rate = _RATE.search(line)
-    signal = _SIGNAL.search(line)
+    head = _radiotap(line)
+    mcs = _MCS.search(head)
+    rate = _RATE.search(head)
+    signal = _SIGNAL.search(head)
     addrs: dict[str, str] = {}
     order: list[str] = []
     for label, mac in _ADDR.findall(line):
@@ -67,7 +76,7 @@ def parse_frame(line: str) -> Frame | None:
     return Frame(
         rate=f"MCS {mcs.group(1)}" if mcs else rate.group(1) if rate else None,
         signal_dbm=int(signal.group(1)) if signal else None,
-        bad_fcs="bad-fcs" in line,
+        bad_fcs="bad-fcs" in head,
         retry=re.search(r"\bRetry\b", line) is not None,
         src=_transmitter(addrs, order),
         bssid=addrs.get("BSSID"),

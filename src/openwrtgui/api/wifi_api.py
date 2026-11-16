@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from openwrtgui.api.deps import get_ctx, require_token
 from openwrtgui.api.models import Ok
 from openwrtgui.context import AppContext
+from openwrtgui.ifname import RADIO
 from openwrtgui.wifi.model import (
     ChannelSelection,
     Mode,
@@ -237,7 +238,7 @@ class StepPlanOut(BaseModel):
 
 
 class RadioIn(BaseModel):
-    radio: str = Field(pattern=r"^[A-Za-z0-9_]{1,15}$")  # openwrtgui.ifname.RADIO (v1.0b1 D5)
+    radio: str = Field(pattern=rf"^{RADIO.pattern}$")  # the one radio rule (v1.0b1 D5, v1.0b2 D7)
 
 
 @router.get("/step-through")

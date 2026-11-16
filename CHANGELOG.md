@@ -10,6 +10,34 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Fixed
 
 - A restore's proof no longer reports a setup script the router's first boot removed.
+- LuCI's page list is read again after every change the app makes, not only after the apply runner's (Wi-Fi,
+  System › Access, LTE, faults and the rest).
+- LuCI pages are listed as LuCI itself decides: an unknown depends rule hides nothing, a one-word option no longer
+  matches a value that merely contains it, any regular file counts as executable, and an access group with an
+  empty read or write part counts.
+- Legacy iptables: Reset counters is proven for ip6tables too, and stays proven after an earlier reset with
+  traffic since; lines the app cannot read are counted on the tab, not dropped silently.
+- Firewall: a run that starts after a confirmed table change is reported ("not saved as an fw4 include"), not
+  answered 423; table-level lines such as flags and comment survive an edit; an IP set entry takes one field per
+  match; a rule or set of one family refuses an address of the other.
+- Faults: a record in /tmp/owg the app cannot read no longer takes the screen and Clear everything down; the
+  screen says how many there are.
+- Step-through: an error during the restore or a cancelled run ends it as failed with Restore offered, instead of
+  leaving the router "restoring"; a proven step is kept when its wait loses the router; Next acts only on the wait
+  on screen.
+- Step-through: Restore waits for a System job or a flash as Start does; a saved file that lacks options restores
+  nothing instead of deleting them; Start checks the radio name before anything else.
+- RF and the monitor: owgmon0 serves one radio at a time, so a beacon check on another radio says "not checked"
+  instead of reporting beacons from the wrong one; owgscan0 is removed after a dropped connection; an SSID such as
+  "MCS 7" no longer counts as a rate.
+- System: the app's SSH instance is still recognised when the interface list cannot be read (an SSH change is
+  refused when it cannot be told apart); a reset counts the router as gone only after three failed logins in a
+  row; the password policy is checked under the write lock.
+- Flash: the audit's upload line names the whole image file, "openwrt (1).bin" included; the flash steps are read
+  by name. Tool cards: a file that cannot be read is moved aside before a save, not overwritten.
+- LTE: the modem's AT port is used by one exchange at a time per router (the state read and the console no longer
+  run two microcom at once); the metric is a whole number from 0 to 4294967295.
+- VLAN editor: a section deleted and changed, or changed twice, in one apply is refused before the preview.
 
 ### Security
 

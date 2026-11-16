@@ -11,6 +11,7 @@ export const AP1_FAULTS: FaultsState = {
   armed: [],
   caps: { family: 'netdev', distributions: ['paretonormal', 'pareto', 'normal'], ifb: true, conntrack: true, band: 'prio', netem: true },
   unavailable: {},
+  unreadable: 0,
   wifi: [{ ifname: 'phy0-ap0', ssid: 'OpenWrt', up: true }],
   ports: { ...AP2_PORTS, router_id: 'ap1' },
 }

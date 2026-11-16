@@ -118,3 +118,14 @@ def parse_uci_show(text: str) -> dict[str, str]:
         except ValueError:
             out[path] = raw
     return out
+
+
+def parse_uci_show_raw(text: str) -> dict[str, str]:
+    """`uci show` lines to {path: value as printed}: a list stays `'a' 'b'` and one value with a space stays
+    `'a b'`, which `parse_uci_show` makes the same."""
+    out: dict[str, str] = {}
+    for line in text.splitlines():
+        path, sep, raw = line.partition("=")
+        if sep and path:
+            out[path] = raw
+    return out

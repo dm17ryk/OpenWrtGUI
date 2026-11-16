@@ -76,13 +76,14 @@ export function FaultsScreen() {
         <span className="spacer" />
         {state && <span className={armed.length ? 'b park' : 'b air'}>{armed.length ? `${armed.length} armed` : 'nothing armed'}</span>}
         <HelpTip topic={HELP.faultClear}>
-          <button className="btn" type="button" disabled={armed.length === 0} onClick={() => startClear(null)}>
+          <button className="btn" type="button" disabled={armed.length === 0 && !faults.data?.unreadable} onClick={() => startClear(null)}>
             Clear everything
           </button>
         </HelpTip>
       </div>
       <RouterSections routerId={id} name={name} current="faults" />
       {faults.isError && <div className="note x">{faults.error instanceof ApiError ? faults.error.detail : String(faults.error)}</div>}
+      {faults.data && faults.data.unreadable > 0 && <div className="note">{`${faults.data.unreadable} fault records on the router could not be read; Clear everything removes the app's table and filters but leaves those records in /tmp/owg`}</div>}
       <ArmedList armed={armed} now={now} onClear={startClear} />
       {(clearing !== undefined || clear.result) && (
         <div className="card stack" role="group" aria-label="Clear faults">

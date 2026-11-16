@@ -36,6 +36,7 @@ from openwrtgui.wifi.service import NOTHING, ApplyResult, Check, PreviewChanged,
 from openwrtgui.wifi.state import RadioState
 from openwrtgui.wifi.step_csv import StepCsv
 from openwrtgui.wifi.steps import (
+    SAVED_OPTIONS,
     STEP_OVERHEAD_S,
     Advance,
     SavedValue,
@@ -285,6 +286,8 @@ class StepService:
 
     # ---------------------------------------------------------------- start, next, stop
     async def start(self, router_id: str, req: StepRequest, digest: str) -> StepJob:
+        # it names the saved file: checked before the file is looked for (v1.0b1 final review, v1.0b2 D7)
+        checked_radio(req.radio)
         self._guard.require_clear()
         rec = self._record_of(router_id)
         req = self._normal(req)
@@ -411,8 +414,25 @@ class StepService:
             log.exception("step-through on %s failed", rec.id)
             await self._restore_after(rec, req, ctl, f"The step-through failed: {exc}")
         finally:
+            self._ended(rec, req)
             self._wifi.release_radio(ctl.token)
             ctl.csv.close()
+
+    def _ended(self, rec: RouterRecord, req: StepRequest) -> None:
+        """Whatever stopped the runner (an error in the restore, a cancelled task), the job ends in a phase
+        the screen shows and the router is free; the saved file stays for Restore (v1.0b2 D7)."""
+        job = self._jobs.get(rec.id)
+        if job is None or job.phase in ENDED:
+            return
+        text = f"{job.error}; " if job.error else ""
+        self._update(
+            rec.id,
+            phase="failed",
+            restore_pending=True,
+            phase_ends_at=None,
+            ended_at=self._clock(),
+            error=f"{text}{req.radio} was not restored: Restore it",
+        )
 
     async def _step(
         self, rec: RouterRecord, req: StepRequest, step: Step, changes: tuple[str, ...], ctl: _Control
@@ -457,23 +477,36 @@ class StepService:
         if not result.verified:  # plan D4: recorded, no dwell, the run goes on
             self._keep(rec.id, ctl, base.model_copy(update={"ended_at": self._clock()}))
             return ("stop", None) if ctl.stop.is_set() else ("next", None)
-        waited: Outcome = "next"
+        waited: Outcome = "error"
+        error: str | None = None
+        try:
+            waited, base = await self._after_proof(rec, req, ctl, started, base)
+        except TransportError as exc:
+            error = f"Lost the connection to {rec.name}: {exc}"
+        except ValueError as exc:
+            error = str(exc)
+        finally:  # the proven step is kept, whatever ended its wait (v1.0b2 D7)
+            self._keep(rec.id, ctl, base.model_copy(update={"ended_at": self._clock()}))
+        return waited, error
+
+    async def _after_proof(
+        self, rec: RouterRecord, req: StepRequest, ctl: _Control, started: datetime, base: StepResult
+    ) -> tuple[Outcome, StepResult]:
+        """The wait after a proven step: for the station, then the dwell; or the dwell or Next alone."""
         if req.advance == "rejoin":
             waited, rejoin_s = await self._rejoin(rec, req, ctl, started)
             base = base.model_copy(update={"rejoin_s": rejoin_s, "rejoined": rejoin_s is not None})
             if waited == "next" and rejoin_s is not None:
                 waited = await self._wait(rec.id, ctl, req.dwell_s, "dwell")
-        else:
-            seconds = None if req.advance == "manual" else req.dwell_s
-            waited = await self._wait(
-                rec.id, ctl, seconds, "waiting for Next" if seconds is None else "dwell"
-            )
-        self._keep(rec.id, ctl, base.model_copy(update={"ended_at": self._clock()}))
-        return waited, None
+            return waited, base
+        seconds = None if req.advance == "manual" else req.dwell_s
+        phase: StepPhase = "waiting for Next" if seconds is None else "dwell"
+        return await self._wait(rec.id, ctl, seconds, phase), base
 
     async def _wait(self, router_id: str, ctl: _Control, seconds: float | None, phase: StepPhase) -> Outcome:
         ends = self._clock() + timedelta(seconds=seconds) if seconds is not None else None
         self._update(router_id, phase=phase, phase_ends_at=ends)
+        ctl.next.clear()  # Next acts on the phase on screen only (v1.0b2 D7)
         waited = 0.0
         while True:
             if ctl.stop.is_set():
@@ -511,6 +544,7 @@ class StepService:
         self._update(
             rec.id, phase="waiting for station", phase_ends_at=self._clock() + timedelta(seconds=limit)
         )
+        ctl.next.clear()  # Next acts on the phase on screen only (v1.0b2 D7)
         ifnames = await self._ap_ifnames(rec, req.radio)
         t = await self._pool.get(rec)
         waited = 0.0
@@ -553,7 +587,11 @@ class StepService:
         self, rec: RouterRecord, req: StepRequest, ctl: _Control, error: str | None
     ) -> None:
         self._update(rec.id, phase="restoring", current=None, phase_ends_at=None, error=error)
-        _result, why = await self._apply_saved(rec, req.radio, ctl.saved, ctl.token)
+        try:
+            _result, why = await self._apply_saved(rec, req.radio, ctl.saved, ctl.token)
+        except Exception as exc:  # never left "restoring" (v1.0b2 D7)
+            log.exception("the restore after the step-through on %s failed", rec.id)
+            why = str(exc) or type(exc).__name__
         now = self._clock()
         if why is None:
             self._saved_path(rec.id, req.radio).unlink(missing_ok=True)
@@ -590,6 +628,9 @@ class StepService:
         rec = self._record_of(router_id)
         if (why := self.busy(rec.id)) is not None:
             raise StepBusy(why)
+        for check in self._busy:  # a System job or a flash holds the router, as for Start (v1.0b2 D7)
+            if (why := check(rec.id)) is not None:
+                raise StepBusy(why)
         path = self._saved_path(rec.id, radio)
         try:
             saved = PendingRestore.model_validate_json(path.read_text(encoding="utf-8"))
@@ -597,6 +638,12 @@ class StepService:
             raise ValueError(
                 f"Nothing to restore: no step-through left {radio} on {rec.name} at a step"
             ) from None
+        missing = [name for name in SAVED_OPTIONS if name not in saved.options]
+        if missing:  # it cannot be restored and it blocks Start: say which file to remove (final review)
+            raise ValueError(
+                f"{path} lacks {', '.join(missing)}: nothing is restored. Remove that file to start a "
+                f"step-through on {radio} again"
+            )
         token = self._wifi.hold_radio(rec.id, radio, WHAT)
         try:
             result, why = await self._apply_saved(rec, radio, saved.options, token)

@@ -17,6 +17,7 @@ from openwrtgui.luci_bridge.depends import (
     parse_ls,
     uci_command,
     uci_configs,
+    usable_groups,
     why_hidden,
 )
 from openwrtgui.probe import commands as c
@@ -37,7 +38,9 @@ def _page(*requires: dict[str, object]) -> LuciPage:
 def test_fs_kinds() -> None:
     facts = Facts({"/sbin/block": "executable", "/etc/x": "file", "/sys/class/leds": "directory"}, {}, ACL)
     assert why_hidden(_page({"fs": {"/sbin/block": "executable"}}), facts) is None
-    assert why_hidden(_page({"fs": {"/etc/x": "executable"}}), facts) == "needs /etc/x"
+    assert (
+        why_hidden(_page({"fs": {"/etc/x": "executable"}}), facts) is None
+    )  # v1.0b2 D3d: LuCI passes any file
     assert why_hidden(_page({"fs": {"/sbin/block": "file"}}), facts) is None  # an executable is a file too
     assert why_hidden(_page({"fs": {"/sys/class/leds": "directory"}}), facts) is None
     assert why_hidden(_page({"fs": {"/usr/sbin/nft": "absent"}}), facts) is None
@@ -87,7 +90,7 @@ def test_uci_rules() -> None:
 
 
 def test_a_list_option_need_only_contain_the_value() -> None:
-    network = {"network.@device[0]": "device", "network.@device[0].ports": "lan1 lan2"}
+    network = {"network.@device[0]": "device", "network.@device[0].ports": "'lan1' 'lan2'"}
     facts = Facts({}, {"network": network}, ACL)
     assert why_hidden(_page({"uci": {"network": {"@device": {"ports": "lan2"}}}}), facts) is None
 
@@ -191,3 +194,41 @@ def test_only_absolute_paths_are_asked() -> None:
         files_command(["-rf"])
     with pytest.raises(ValueError, match="not an absolute path"):
         listing_command("-x")
+
+
+def test_unknown_specs_hide_nothing_as_in_dispatcher_uc() -> None:
+    """v1.0a1 minor (b), v1.0b2 D3: LuCI skips a uci spec that is neither true nor an object, an option spec
+    that is neither a string, true nor an object, and an fs kind it does not know."""
+    facts = Facts({}, {"network": {"network.lan": "interface"}}, ACL)
+    assert why_hidden(_page({"uci": {"network": 5}}), facts) is None
+    assert why_hidden(_page({"uci": {"dhcp": "x"}}), facts) is None
+    assert why_hidden(_page({"uci": {"network": {"lan": 7}}}), facts) is None
+    assert why_hidden(_page({"fs": {"/etc/x": "socket"}}), facts) is None
+
+
+def test_a_single_value_matches_whole_and_a_list_by_item() -> None:
+    """(c): `uci show` prints a list as 'a' 'b'; LuCI tests membership for a list, equality for one value."""
+    network = {
+        "network.@device[0]": "device",
+        "network.@device[0].ports": "'lan1' 'lan2'",
+        "network.@device[0].name": "'br lan'",
+    }
+    facts = Facts({}, {"network": network}, ACL)
+    assert why_hidden(_page({"uci": {"network": {"@device": {"ports": "lan2"}}}}), facts) is None
+    assert why_hidden(_page({"uci": {"network": {"@device": {"name": "br lan"}}}}), facts) is None
+    assert why_hidden(_page({"uci": {"network": {"@device": {"name": "lan"}}}}), facts) is not None
+
+
+def test_a_section_spec_true_needs_an_option_as_in_dispatcher_uc() -> None:
+    """(a) is not a deviation: check_uci_depends_options with `true` wants a key not starting with '.'."""
+    facts = Facts({}, {"network": {"network.@switch[0]": "switch"}}, ACL)
+    assert (
+        why_hidden(_page({"uci": {"network": {"@switch": True}}}), facts)
+        == "needs a switch section in network"
+    )
+
+
+def test_an_empty_read_or_write_table_still_grants_the_group() -> None:
+    """(e): LuCI tests `'read' in group`, so `read: {}` counts."""
+    acl = {"a": {"read": {}}, "b": {"write": {}}, "c": {"description": "x"}, "d": {"read": {"uci": ["x"]}}}
+    assert usable_groups(acl) == frozenset({"a", "b", "d"})

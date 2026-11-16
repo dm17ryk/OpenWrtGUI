@@ -51,6 +51,11 @@ class FlashPlan:
     warnings: tuple[str, ...]
     upload_command: str
     digest: str
+    # the steps the service runs, by name (v1.0b2 D10): never read back out of `lines` by position
+    image_name: str
+    validate_command: str
+    test_command: str
+    sysupgrade_command: str
 
 
 def fw_path(sha256: str) -> str:
@@ -109,16 +114,14 @@ def flash_plan(
         )
     path = fw_path(profile.key.sha256)
     upload = f"cat > {path}"
-    lines = [
-        "mkdir -p /tmp/owg",
-        upload_line(upload, profile.image_name or "image.bin", image),
-        f"sha256sum {path}",
-        ubus_command("system", "validate_firmware_image", {"path": path}),
-        f"sysupgrade -T {path}",
-    ]
+    name = profile.image_name or "image.bin"
+    validate = ubus_command("system", "validate_firmware_image", {"path": path})
+    test = f"sysupgrade -T {path}"
+    armed = arm_command(TIMER, 2, [f"sysupgrade {'' if req.keep_settings else '-n '}{path}"])
+    lines = ["mkdir -p /tmp/owg", upload_line(upload, name, image), f"sha256sum {path}", validate, test]
     if req.keep_settings and facts.owg_dir:
         lines.append(KEEP_LINE)
-    lines.append(arm_command(TIMER, 2, [f"sysupgrade {'' if req.keep_settings else '-n '}{path}"]))
+    lines.append(armed)
     warnings = [
         f"{router_name} reboots and is off the network for about 3 minutes. "
         "Once sysupgrade starts it cannot be stopped."
@@ -134,4 +137,4 @@ def flash_plan(
             "Connect it alone to this PC, then add it again."
         )
     digest = hashlib.sha256("\n".join(lines).encode()).hexdigest()[:16]
-    return FlashPlan(tuple(lines), tuple(warnings), upload, digest)
+    return FlashPlan(tuple(lines), tuple(warnings), upload, digest, name, validate, test, armed)

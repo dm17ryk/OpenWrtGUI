@@ -7,6 +7,7 @@ managed interface that is removed again, also when the scan fails.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import time
 from collections.abc import Callable
@@ -169,7 +170,12 @@ class ScanService:
         iface = self._ap(found) or SCAN_IF
         async with self._pool.write_lock(rec.id):
             if plan.via == "temporary":
-                added = await self._run(t, rec, plan.lines[0])
+                try:
+                    added = await self._run(t, rec, plan.lines[0])
+                except TransportError:  # made before the connection dropped? remove it (v1.0b2 D8)
+                    with contextlib.suppress(TransportError, ValueError):
+                        await self._cleanup(t, rec)
+                    raise
                 if not added.ok:
                     await self._cleanup(t, rec)
                     raise ValueError(f"{rec.name} refused the scan interface: {_reason(added)}")

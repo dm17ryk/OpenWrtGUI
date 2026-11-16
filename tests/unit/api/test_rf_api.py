@@ -8,7 +8,7 @@ import pytest
 from openwrtgui.context import AppContext
 from openwrtgui.rf.air import SCAN_DEL, scan_add, scan_command
 from openwrtgui.simair import BUSY, SimAir
-from openwrtgui.transport.base import CommandResult
+from openwrtgui.transport.base import CommandResult, TransportError
 from openwrtgui.wifi.model import ChannelSelection, ModeSelection, RadioRequest
 
 AP2 = "/api/routers/ap2/rf/radio0"
@@ -140,3 +140,26 @@ async def test_bad_radio_name_422(authed: httpx.AsyncClient) -> None:
     for radio in ("radio9", "radio0;reboot", "x" * 16):
         r = await authed.post(f"/api/routers/ap2/rf/{radio}/scan/preview")
         assert r.status_code == 422, (radio, r.text)
+
+
+async def test_a_scan_whose_add_drops_the_connection_removes_owgscan0(
+    authed: httpx.AsyncClient, ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """v0.7 minor (#49): the router may have made the interface before the connection dropped."""
+    digest = (await authed.post(f"{AP2}/scan/preview")).json()["digest"]
+    rec = ctx.routers.get("ap2")
+    assert rec is not None
+    t = await ctx.pool.get(rec)
+    original = t.run
+
+    async def dropped(command: str, *, timeout: float = 15.0) -> CommandResult:
+        done = await original(command, timeout=timeout)
+        if command == scan_add("phy0"):
+            raise TransportError("connection lost")  # after the router made owgscan0
+        return done
+
+    monkeypatch.setattr(t, "run", dropped)
+    with pytest.raises(TransportError):
+        await ctx.scans.scan("ap2", "radio0", digest)
+    assert _audit(ctx)[-1][0] == SCAN_DEL
+    assert "Interface owgscan0" not in await _iw_info(ctx)

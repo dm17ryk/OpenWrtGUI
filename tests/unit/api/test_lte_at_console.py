@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import re
 
 import httpx
@@ -11,6 +12,7 @@ from openwrtgui.context import AppContext
 from openwrtgui.guard.bench_guard import GuardLocked
 from openwrtgui.lte.commands import AT_MESSAGE
 from openwrtgui.lte.service import AtNeedsConfirm
+from openwrtgui.transport.base import CommandResult
 from openwrtgui.transport.fake import ReplayTransport
 
 PORT = "/dev/ttyUSB2"
@@ -162,3 +164,29 @@ async def test_queries_of_the_hidden_commands_stay_readable(ctx: AppContext, tex
     result = await ctx.lte.at_command("ap2", text, confirmed=False)
     assert result.command == text
     assert any(text in command for command in _commands(ctx))
+
+
+async def test_at_exchanges_never_overlap_on_one_router(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """v0.6a minor (#23), v1.0b2 D11: two microcom sessions on one tty garble both answers."""
+    rec = ctx.routers.get("ap2")
+    assert rec is not None
+    t = await ctx.pool.get(rec)
+    original = t.run
+    active, most = [0], [0]
+
+    async def tracked(command: str, *, timeout: float = 15.0) -> CommandResult:
+        if "/dev/ttyUSB" not in command:
+            return await original(command, timeout=timeout)
+        active[0] += 1
+        most[0] = max(most[0], active[0])
+        try:
+            await asyncio.sleep(0)  # an SSH round trip: other tasks run meanwhile
+            return await original(command, timeout=timeout)
+        finally:
+            active[0] -= 1
+
+    monkeypatch.setattr(t, "run", tracked)
+    await asyncio.gather(ctx.lte.state("ap2"), ctx.lte.at_command("ap2", "AT+CSQ", False))
+    assert most[0] == 1

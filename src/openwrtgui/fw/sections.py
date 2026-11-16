@@ -103,13 +103,17 @@ def check_ports(text: str) -> str:
     return text
 
 
-def check_address(text: str) -> str:
+def check_address(text: str, family: str | None = None) -> str:
+    """An IPv4 or IPv6 address or network, as fw4 takes; with family "ipv4" or "ipv6", that family only
+    (v1.0b2 D5)."""
     try:
-        ipaddress.ip_network(text, strict=False)
+        net = ipaddress.ip_network(text, strict=False)
     except ValueError:
-        raise ValueError(f"{text} is not an IPv4 address or network") from None
+        raise ValueError(f"{text} is not an IP address or network") from None
     if "\n" in text:
-        raise ValueError(f"{text} is not an IPv4 address or network")
+        raise ValueError(f"{text} is not an IP address or network")
+    if family in ("ipv4", "ipv6") and family != f"ipv{net.version}":
+        raise ValueError(f"{text} is an IPv{net.version} address, not IPv{family[-1]}")
     return text
 
 
@@ -133,12 +137,21 @@ def _zone(name: str | None, zones: set[str]) -> str | None:
     return name
 
 
-def _entry(match: str, text: str) -> str:
+def _field(match: str, text: str, family: str) -> str:
     if match.endswith("_mac"):
         return check_mac(text)
     if match.endswith("_port"):
         return check_ports(text)
-    return check_address(text)
+    return check_address(text, family)
+
+
+def _entry(matches: tuple[str, ...], text: str, family: str) -> str:
+    """One field per match, separated by spaces, as fw4 reads an IP set entry (v1.0b2 D5)."""
+    fields = text.split()
+    if len(fields) != len(matches):
+        noun = "field" if len(matches) == 1 else "fields"
+        raise ValueError(f"{text!r} needs {len(matches)} {noun}: {' '.join(matches)}")
+    return " ".join(_field(m, f, family) for m, f in zip(matches, fields, strict=True))
 
 
 # ------------------------------------------------------------------ options per kind
@@ -155,8 +168,8 @@ def _rule(r: RuleRequest, zones: set[str]) -> tuple[dict[str, str | None], dict[
         "target": r.target,
     }
     lists = {
-        "src_ip": tuple(check_address(a) for a in r.src_ip),
-        "dest_ip": tuple(check_address(a) for a in r.dest_ip),
+        "src_ip": tuple(check_address(a, r.family) for a in r.src_ip),
+        "dest_ip": tuple(check_address(a, r.family) for a in r.dest_ip),
         "icmp_type": r.icmp_type,
     }
     return scalars, lists
@@ -194,7 +207,7 @@ def _ipset(r: IpsetRequest) -> tuple[dict[str, str | None], dict[str, tuple[str,
         raise ValueError(f"Match is one or more of {', '.join(sorted(MATCHES))}")
     return {"family": r.family}, {
         "match": r.match,
-        "entry": tuple(_entry(r.match[0], e) for e in r.entries),
+        "entry": tuple(_entry(r.match, e, r.family) for e in r.entries),
     }
 
 

@@ -1,5 +1,5 @@
 """Which LuCI pages LuCI itself shows on a router (v1.0a1 D2): its menu's `depends`, checked the way LuCI's
-dispatcher.uc does, against facts the app reads from the router (D3)."""
+dispatcher.uc does (v1.0b2 D3), against facts the app reads from the router (D3)."""
 
 from __future__ import annotations
 
@@ -18,7 +18,8 @@ _CONFIG = re.compile(r"[A-Za-z0-9_-]+")
 class Facts:
     # present paths -> "file", "executable", "directory", "empty directory" or "other"
     files: Mapping[str, str]
-    # config -> parse_uci_show of `uci -q show <config>`; a config missing here is absent
+    # config -> parse_uci_show_raw of `uci -q show <config>` (values as printed, quotes and all); a config
+    # missing here is absent
     uci: Mapping[str, Mapping[str, str]]
     # the router's LuCI access groups that grant read or write; None: they were not read, so a page's acl
     # depends are not checked (D3: facts the router cannot give hide nothing)
@@ -108,17 +109,23 @@ def missing_paths(stderr: str, paths: Iterable[str]) -> set[str]:
     return {p for p in paths if f"ls: {p}: No such file or directory" in lines}
 
 
+def _items(raw: str) -> list[str]:
+    """A value as `uci show` prints it, as LuCI holds it: a list's items, or the one value, unquoted."""
+    try:
+        return shlex.split(raw) or [""]
+    except ValueError:
+        return [raw]
+
+
 def _fs_ok(path: str, kind: str, files: Mapping[str, str]) -> bool:
     have = files.get(path)
     if kind == "absent":
         return have is None
-    if kind == "executable":
-        return have == "executable"
-    if kind == "file":
-        return have in ("file", "executable")
+    if kind in ("file", "executable"):  # dispatcher.uc reads stat().user_exec, which ucode keeps under .perm:
+        return have in ("file", "executable")  # any regular file passes (v1.0b2 D3d)
     if kind == "directory":
         return have == "directory"
-    return False
+    return True  # a kind dispatcher.uc does not know is not checked
 
 
 def _fs_reason(alts: Sequence[Mapping[str, str]], files: Mapping[str, str]) -> str:
@@ -141,7 +148,7 @@ def _sections(config: str, values: Mapping[str, str]) -> dict[str, tuple[str, di
             continue
         kind, options = out.get(parts[1], ("", {}))
         if len(parts) == 2:
-            out[parts[1]] = (value, options)
+            out[parts[1]] = (_items(value)[0], options)
         else:
             options[parts[2]] = value
             out[parts[1]] = (kind, options)
@@ -153,15 +160,15 @@ def _section_ok(kind: str, options: Mapping[str, str], spec: Any) -> bool:
         return bool(options)
     if isinstance(spec, str):
         return kind == spec
-    if isinstance(spec, dict):
-        for name, want in spec.items():
-            have = options.get(name)
-            if have is None:
-                return False
-            if want is not True and str(want) != have and str(want) not in have.split():
-                return False
-        return True
-    return False
+    if not isinstance(spec, dict):
+        return True  # dispatcher.uc skips an option spec it does not know (v1.0b2 D3b)
+    for name, want in spec.items():
+        have = options.get(name)
+        if have is None:
+            return False
+        if want is not True and str(want) not in _items(have):  # a list by item, one value whole (D3c)
+            return False
+    return True
 
 
 def _section_reason(config: str, kind: str, spec: Any) -> str:
@@ -180,7 +187,7 @@ def _uci_failure(alt: Mapping[str, Any], uci: Mapping[str, Mapping[str, str]]) -
                 return f"needs the {config} configuration"
             continue
         if not isinstance(spec, dict):
-            return f"needs the {config} configuration"
+            continue  # dispatcher.uc skips a config spec that is neither true nor an object (v1.0b2 D3b)
         for name, section_spec in spec.items():
             if name.startswith("@"):
                 if not any(k == name[1:] and _section_ok(k, o, section_spec) for k, o in sections.values()):
@@ -216,5 +223,6 @@ def why_hidden(page: LuciPage, facts: Facts) -> str | None:
 
 
 def usable_groups(acl: Mapping[str, Mapping[str, Any]]) -> frozenset[str]:
-    """Access groups LuCI counts: defined with a read or a write part (check_acl_depends)."""
-    return frozenset(name for name, d in acl.items() if d.get("read") or d.get("write"))
+    """Access groups LuCI counts: defined with a read or a write part, even an empty one (check_acl_depends
+    tests `'read' in group`, v1.0b2 D3e)."""
+    return frozenset(name for name, d in acl.items() if "read" in d or "write" in d)

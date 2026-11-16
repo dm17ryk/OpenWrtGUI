@@ -22,6 +22,7 @@ _RULE = re.compile(
     rf"(\d+) +(\d+) +(\d+) +(.*?) +(\S+) +(\S*) +(\S+) +(\S+) +({_ADDR}) +({_ADDR})(?: +(.*))?"
 )
 _COMMENT = re.compile(r"/\* (.*?) \*/")
+_HEADER = re.compile(r"num\s+pkts\s+bytes\s+target\b.*")
 
 
 class IptRule(BaseModel):
@@ -59,6 +60,7 @@ class IptTable(BaseModel):
     table: str
     chains: list[IptChain]
     error: str | None = None
+    skipped: int = 0  # lines of the listing the parser could not read (v1.0b2 D4)
 
 
 class IptablesPresence(BaseModel):
@@ -120,3 +122,34 @@ def parse_listing(text: str) -> list[IptChain]:
         elif heads and (m := _RULE.fullmatch(line.rstrip())):
             rules[-1].append(_rule(m))
     return [h.model_copy(update={"rules": r}) for h, r in zip(heads, rules, strict=True)]
+
+
+def skipped_lines(text: str) -> int:
+    """Lines `parse_listing` shows nothing for: not a chain head, the column header, a rule or blank."""
+    return sum(
+        1
+        for line in text.splitlines()
+        if line.strip()
+        and not _POLICY.fullmatch(line.strip())
+        and not _REFS.fullmatch(line.strip())
+        and not _HEADER.fullmatch(line.strip())
+        and not _RULE.fullmatch(line.rstrip())
+    )
+
+
+def _counters(text: str) -> dict[tuple[str, int], int]:
+    """Every byte counter in a listing: (chain, 0) for a built-in chain's policy, (chain, n) for rule n."""
+    out: dict[tuple[str, int], int] = {}
+    for chain in parse_listing(text):
+        if chain.bytes is not None:
+            out[(chain.name, 0)] = chain.bytes
+        out |= {(chain.name, r.num): r.bytes for r in chain.rules}
+    return out
+
+
+def reset_proven(before: str, after: str) -> bool:
+    """Counters only grow between resets: one that counted before and is lower now proves the reset, also
+    after an earlier reset with traffic since (v1.0b2 D4). Nothing counted before: nothing to prove."""
+    was, now = _counters(before), _counters(after)
+    counted = {key: n for key, n in was.items() if n > 0}
+    return not counted or any(now.get(key, 0) < n for key, n in counted.items())

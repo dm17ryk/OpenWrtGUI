@@ -138,3 +138,14 @@ def test_store_per_board(tmp_path: Path) -> None:
     store.delete(BOARD, CARD.path)
     assert store.cards(BOARD) == []
     assert store.cards("other,board") == []
+
+
+def test_a_damaged_file_is_moved_aside_not_overwritten(tmp_path: Path) -> None:
+    """v0.5 minor (#20), v1.0b2 D10: a save must not drop the cards it could not read."""
+    (tmp_path / f"{BOARD}.json").write_text("[{not json", encoding="utf-8")
+    store = ToolStore(tmp_path)
+    assert store.cards(BOARD) == []
+    store.save(CARD)
+    assert store.cards(BOARD) == [CARD]
+    (aside,) = tmp_path.glob(f"{BOARD}.json.damaged-*")
+    assert aside.read_text(encoding="utf-8") == "[{not json"
