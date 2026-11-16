@@ -84,6 +84,80 @@ after a network change.
 If the app says instead that the router answers but its saved settings differ from before the change, do not
 reboot it: a reboot loads those settings. Check them on the Network screen or in LuCI first.
 
+## The router is busy
+
+A router runs one job at a time. When a router is busy, a second job is refused with the job that holds it, and
+nothing is sent for the refused one. You see, for example:
+- "… is already rebooting", "… is restoring a backup" or "… is resetting to defaults" (System);
+- "A flash runs on this router already" (Discovery);
+- "An LTE action is already running on …" (LTE).
+
+Wait for the first job to finish, then try again. A reboot or a flash that takes longer than 5 minutes may not
+have come back: see the next entry. A step-through that left its radio at a step says "Restore … first";
+see [A radio was left at a step-through step](#a-radio-was-left-at-a-step-through-step).
+
+## A reboot or a flash does not come back
+
+- **A reboot.** A router that is not back 5 minutes after a reboot is reported "not back". A flash keeps the
+  router off the network for about three minutes; the dialog shows **Waiting for … to come back** with the time so
+  far.
+- **First check its power and LEDs**, and the cable to this PC.
+- **A flash that kept settings** comes back at its old address with the same host key, and the app reconnects.
+- **A flash without settings** comes back at 192.168.1.1 with no password. **Needs attention** then shows
+  "Reflashed without settings: add it again".
+- **Do not cut the power while `sysupgrade` writes the flash** (the first minutes after **Starting sysupgrade**).
+  Once 5 minutes have passed with no answer, power-cycle the router.
+- **If it still does not answer**, use OpenWrt's failsafe mode, as in
+  [A router that does not come back after a rollback](#a-router-that-does-not-come-back-after-a-rollback).
+
+## An update does not download or install
+
+- **"Couldn't download the update: …"** with the reason. Either this PC could not reach GitHub, or the download
+  broke off. Check the PC's internet connection (a proxy or a firewall may block `github.com` downloads), then
+  **Check now** again.
+- **The same message ending "does not match … SHA256SUMS.txt".** The downloaded installer is not the file the
+  release lists, so the app did not run it. Try again. If it repeats, download the installer from the
+  [releases page](https://github.com/dm17ryk/OpenWrtGUI/releases) and compare its SHA-256 with the release's
+  `SHA256SUMS.txt` yourself.
+- **"Updates install only in the installed app."** You are running a build from source.
+- **The installer starts but nothing changes** (Essence bench PCs). See
+  [The installer or the app does nothing](#the-installer-or-the-app-does-nothing-essence-bench-pcs).
+- **To go back** to the version you had, use **Reinstall previous version** ([Updating](Updating#going-back)).
+
+## A LuCI page does not open
+
+- **"LuCI does not show … on …: …"** The router lacks what that page needs, such as a program or a setting. The
+  page list shows the page under **Not on this router**, with what it needs.
+- **"No LuCI page … on …"** The router's LuCI has no such page; a different image has other pages.
+- **A page that opened and then closed by itself.** Nobody used it for 5 minutes, or a harness run started and the
+  app could not switch it to read-only. Open it again.
+- **LuCI itself does not answer.** Check that uhttpd runs on [System › Services](System#services); LuCI pages
+  open through it.
+
+## Wireshark does not start
+
+"Wireshark is not installed on this PC": a capture **to Wireshark** needs Wireshark. The app looks for
+`Wireshark\Wireshark.exe` in Program Files, then for `Wireshark` on the PATH. Install Wireshark, or capture **to a
+file** instead: the file goes to `Documents\OpenWrtGUI\captures` and opens in Wireshark later. See
+[Faults and capture](Faults-and-capture#capture).
+
+## The LTE modem has no address
+
+The LTE screen shows "no address yet: waiting for the carrier's DHCP". The modem is registered, but the carrier has
+not given the router an address yet. Give it a minute. If it stays:
+- check the APN in **Settings** on the [LTE screen](LTE-modem#settings), since a wrong APN is the usual cause;
+- check the operator and signal under [Status](LTE-modem#status);
+- try **Connect** again, or **Reboot modem**.
+
+## "This screen hit an error"
+
+One screen shows "This screen hit an error: …. The other screens still work." Or a message says
+"Unexpected error in OpenWrtGUI (…). The details are in the app log." Either way, something the app did not plan
+for went wrong there. Other screens and the routers are not affected.
+
+Open the screen again from the menu. If it repeats, attach the end of the app log to a
+[bug report](https://github.com/dm17ryk/OpenWrtGUI/issues/new/choose) (see [Where are the logs?](#where-are-the-logs)).
+
 ## Where are the logs?
 
 `logs\app.log` in the data folder (Settings → **Open data folder**). Attach its end, with the audit-log

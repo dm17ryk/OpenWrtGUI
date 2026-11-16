@@ -215,6 +215,34 @@ def test_the_app_shows_no_open_items_or_bench_sessions() -> None:
     assert found == []
 
 
+def _sections(text: str) -> dict[str, str]:
+    """`## Heading` -> its body, for checks that must look in the right place."""
+    parts = re.split(r"^## (.+)$", text, flags=re.MULTILINE)
+    return {parts[i].strip(): parts[i + 1] for i in range(1, len(parts) - 1, 2)}
+
+
+def test_troubleshooting_covers_the_common_failures() -> None:
+    sections = _sections(_read(MANUAL / "Troubleshooting.md"))
+    wanted = {
+        "The router is busy": "is busy",
+        "An update does not download or install": "SHA256SUMS",
+        "A reboot or a flash does not come back": "power",
+        "A LuCI page does not open": "LuCI",
+        "Wireshark does not start": "Wireshark is not installed on this PC",
+        "The LTE modem has no address": "no address yet: waiting for the carrier's DHCP",
+        '"This screen hit an error"': "Unexpected error in OpenWrtGUI",
+    }
+    missing = [h for h, words in wanted.items() if words not in sections.get(h, "")]
+    assert missing == []
+
+
+def test_faq_answers_the_common_questions() -> None:
+    """The FAQ asks each question as a bold line (v1.0d)."""
+    faq = _read(MANUAL / "FAQ.md")
+    for question in ("rollback", "busy", "LTE", "LuCI", "Wireshark"):
+        assert re.search(rf"^\*\*[^*\n]*{question}[^*\n]*\*\*$", faq, re.MULTILINE | re.IGNORECASE), question
+
+
 _ROW = re.compile(r"^\| `([^`]+)` \|", re.MULTILINE)
 
 

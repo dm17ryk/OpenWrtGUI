@@ -44,6 +44,28 @@ The line in `/etc/dropbear/authorized_keys` that lets it log in, plus a few thin
 No. While [Bench Guard](Bench-Guard) sees a run, every router is read-only in the app. The dashboard's
 reads are light (a few commands every 5 seconds per router).
 
+**What does the 60 s rollback do if a change cuts the app off?**
+The router keeps a copy of its settings and puts it back by itself 60 s after the change, unless the app reached
+the router again and confirmed. So a wrong address or firewall rule cannot lock you out for long. See
+[How changes work](How-changes-work#apply-with-rollback).
+
+**Why does a screen say the router is busy?**
+A router runs one job at a time (a reboot, a restore, a reset, a flash, an LTE action), and a second one is
+refused until the first ends. Nothing was sent for the refused one. See
+[Troubleshooting](Troubleshooting#the-router-is-busy).
+
+**Why does the LTE screen say "no address yet"?**
+The modem is registered, but the carrier has not given the router an address yet; a wrong APN is the usual
+cause when it stays. See [Troubleshooting](Troubleshooting#the-lte-modem-has-no-address).
+
+**When would I still use a LuCI page?**
+Every LuCI page on the bench image has a screen here. A LuCI page opens inside the app for what a newer image adds.
+Changes saved in LuCI skip this app's preview and use LuCI's own rollback. See [LuCI pages](LuCI-pages).
+
+**Do I need Wireshark?**
+Only to watch a capture live. A capture to a file needs nothing extra: it goes to `Documents\OpenWrtGUI\captures`
+and opens in Wireshark later. See [Faults and capture](Faults-and-capture#capture).
+
 **Is there a demo without routers?**
 Yes, for developers: run it with `--simulator tests/fixtures/sim` from a source checkout (see
 [CONTRIBUTING](https://github.com/dm17ryk/OpenWrtGUI/blob/master/CONTRIBUTING.md)). Unless you pass
