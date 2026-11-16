@@ -21,8 +21,8 @@ flash.
 With no match, or only a profile built from `/rom`, the app also looks in the image library: the releases of
 `dm17ryk/openwrt` on GitHub. While it looks the card says "Looking in the image library…". If the library has the
 router's exact build, the card shows a line such as "Image library: D-Link DWR-921 C3 (U-Boot),
-r35692-b8bffeefdf, 11.3 MB, release DWR_921-c3-uboot-qmifix3" with **Download and import**. If it has none, the card
-says "The image library has no build for <board> <revision>."; if GitHub cannot be read, it shows GitHub's error
+r35692-b8bffeefdf, 10.8 MB, release DWR_921-c3-uboot-qmifix3" with **Download and import**. If it has none, the card
+says, for example, "The image library has no build for dlink,dwr-921-c3-uboot r35692-b8bffeefdf."; if GitHub cannot be read, it shows GitHub's error
 text. The other buttons work in every case.
 
 Nothing is downloaded until you click **Download and import**. The app checks the download against its release and
