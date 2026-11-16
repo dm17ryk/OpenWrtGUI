@@ -84,7 +84,12 @@ test.describe('action screenshots', () => {
     await open(page, '/routers/ap2/discovery')
     await page.getByRole('button', { name: 'Flash an image…' }).click()
     const dialog = page.getByRole('region', { name: 'Flash AP2 · office' })
-    await expect(dialog.getByRole('region', { name: 'Command preview' })).toContainText('sysupgrade -T')
+    const preview = dialog.getByRole('region', { name: 'Command preview' })
+    // discovery.spec flashes AP2 earlier in a full run: the dialog then opens on that finished flash
+    const again = dialog.getByRole('button', { name: 'Flash again', exact: true })
+    await expect(preview.or(again)).toBeVisible()
+    if (await again.isVisible()) await again.click()
+    await expect(preview).toContainText('sysupgrade -T')
     await dialog.scrollIntoViewIfNeeded()
     await shot(page, info.project.name, 'flash-dialog')
   })
