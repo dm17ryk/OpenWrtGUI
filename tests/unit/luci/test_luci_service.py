@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import replace
 from datetime import datetime, timedelta
@@ -370,3 +371,85 @@ async def test_an_unread_acl_hides_nothing(env: Env) -> None:
     pages = {p.path: p for p in await env.service.pages("ap1")}
     assert pages["admin/system/plugins"].available is True
     assert pages["admin/system/mounts"].missing == "needs /sbin/block"
+
+
+class Held:
+    """Holds the facts' first read (`ls -ldL …`) until released, as a router's latency would; may fail it."""
+
+    def __init__(self) -> None:
+        self.reached = asyncio.Event()
+        self.release = asyncio.Event()
+        self.failing = False
+
+
+async def _held(env: Env, monkeypatch: pytest.MonkeyPatch) -> Held:
+    await _described(env, "ap1")
+    env.service.forget_facts("ap1")  # cold facts, the description known
+    rec = env.routers.get("ap1")
+    assert rec is not None
+    t = await env.pool.get(rec)
+    original = t.run
+    held = Held()
+
+    async def run(command: str, *, timeout: float = 15.0) -> CommandResult:
+        if command.startswith("ls -ldL "):
+            held.reached.set()
+            await held.release.wait()
+            if held.failing:
+                t.calls.append(command)
+                raise TransportError("connection lost")
+        return await original(command, timeout=timeout)
+
+    monkeypatch.setattr(t, "run", run)
+    return held
+
+
+def _ls(env: Env) -> int:
+    return sum(1 for c in env.calls() if c.startswith("ls -ldL "))
+
+
+async def _let_others_arrive() -> None:
+    for _ in range(5):
+        await asyncio.sleep(0)
+
+
+async def test_two_cold_reads_at_once_ask_the_router_once(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    """v1.0c Task 4 (#54): the menu and a bridge asking at once share one facts read."""
+    held = await _held(env, monkeypatch)
+    before = _ls(env)
+    both = asyncio.gather(env.service.pages("ap1"), env.service.pages("ap1"))
+    await held.reached.wait()
+    await _let_others_arrive()
+    held.release.set()
+    a, b = await both
+    assert a == b
+    assert _ls(env) - before == 1
+
+
+async def test_a_write_during_a_read_is_not_kept(env: Env, monkeypatch: pytest.MonkeyPatch) -> None:
+    """v1.0b2 deferred minor: facts read before a change must not be kept for the next minute."""
+    held = await _held(env, monkeypatch)
+    first = asyncio.create_task(env.service.pages("ap1"))
+    await held.reached.wait()
+    env.service.forget_facts("ap1")  # the audit log saw a write meanwhile
+    held.release.set()
+    await first
+    before = _ls(env)
+    await env.service.pages("ap1")
+    assert _ls(env) - before == 1  # read again: the overtaken read was not kept
+
+
+async def test_a_failed_shared_read_reaches_both_callers_and_is_tried_again(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    held = await _held(env, monkeypatch)
+    held.failing = True
+    both = asyncio.gather(env.service.pages("ap1"), env.service.pages("ap1"))
+    await held.reached.wait()
+    await _let_others_arrive()
+    held.release.set()
+    a, b = await asyncio.wait_for(both, 2.0)  # nobody hangs on a failed shared read
+    assert a == b and all(p.available for p in a) and not any(p.checked for p in a)
+    held.failing = False
+    pages = await env.service.pages("ap1")
+    assert any(p.checked for p in pages)  # unread facts were not kept: asked again

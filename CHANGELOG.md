@@ -12,6 +12,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - LTE: the modem's model, firmware and mode order are read once per connection and the rest of the read runs
   alongside the operator query: about 2 s instead of 10-12 s per refresh.
 - Firewall › Legacy iptables reads every table in one command instead of nine, every 10 s.
+- LuCI pages: two lists asked at the same time read the router once, and a list read during a change is not kept.
 
 ### Fixed
 
