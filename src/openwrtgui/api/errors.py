@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 
 from fastapi import FastAPI, Request
@@ -21,12 +22,22 @@ UNEXPECTED = "Unexpected error in OpenWrtGUI ({kind}). The details are in the ap
 log = logging.getLogger(__name__)
 
 
+# set on an exception the catch-all handler has logged: uvicorn's second record of it is dropped
+# (built-in exceptions take no weak reference, so a set of them would keep them alive)
+_LOGGED = "_owg_logged"
+
+
 class _NoSecondTraceback(logging.Filter):
     """Starlette re-raises after the catch-all handler, and uvicorn then logs the same traceback again; the
-    handler's record names the request, so uvicorn's is dropped (#77 minor 13, R5)."""
+    handler's record names the request, so uvicorn's is dropped (#77 minor 13, R5). Only for an exception the
+    handler logged: a WebSocket's crash never reaches it, and uvicorn's record is its only one (the final
+    review)."""
 
     def filter(self, record: logging.LogRecord) -> bool:
-        return not record.getMessage().startswith("Exception in ASGI application")
+        if not record.getMessage().startswith("Exception in ASGI application"):
+            return True
+        exc = record.exc_info[1] if record.exc_info else None
+        return not getattr(exc, _LOGGED, False)
 
 
 def _quiet_uvicorn() -> None:
@@ -42,6 +53,8 @@ def install(app: FastAPI) -> None:
     async def unexpected(request: Request, exc: Exception) -> JSONResponse:
         """An error nobody planned for (v1.0c D8): a plain answer; the traceback goes to the app log only."""
         log.error("unexpected error in %s %s", request.method, request.url.path, exc_info=exc)
+        with contextlib.suppress(AttributeError):  # an exception class with __slots__ keeps uvicorn's record
+            setattr(exc, _LOGGED, True)
         return JSONResponse(status_code=500, content={"detail": UNEXPECTED.format(kind=type(exc).__name__)})
 
     @app.exception_handler(GuardLocked)
