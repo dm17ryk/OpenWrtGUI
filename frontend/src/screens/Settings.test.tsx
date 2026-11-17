@@ -42,7 +42,15 @@ const SETTINGS: Settings = {
 const UPDATE: UpdateOut = {
   current: '0.1.0-dev',
   channel: 'stable',
-  latest: { version: '0.1.0', name: 'OpenWrtGUI 0.1.0', notes: 'First release.', prerelease: false, published_at: null, size: 48200000 },
+  latest: {
+    version: '0.1.0',
+    name: 'OpenWrtGUI 0.1.0',
+    notes: 'First release.',
+    prerelease: false,
+    published_at: null,
+    size: 48200000,
+    url: 'https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.1.0',
+  },
   available: true,
   last_check: null,
   error: null,
@@ -56,9 +64,9 @@ beforeEach(() => {
   puts.length = 0
 })
 
-function renderSettings(update: UpdateOut = UPDATE) {
+function renderSettings(update: UpdateOut = UPDATE, settings: Settings = SETTINGS) {
   const client = new QueryClient()
-  client.setQueryData(['settings'], SETTINGS)
+  client.setQueryData(['settings'], settings)
   client.setQueryData(['update'], update)
   client.setQueryData(['app-info'], INFO)
   client.setQueryData(['app-key'], { public_line: 'ssh-ed25519 AAAA openwrtgui@PC', fingerprint: 'SHA256:appkey' })
@@ -146,6 +154,27 @@ test('every settings section offers help, and the update buttons explain themsel
   }
   await userEvent.setup().hover(screen.getByRole('button', { name: 'Check now' }))
   expect(await screen.findByRole('tooltip')).toHaveTextContent('At start-up and once a day')
+})
+
+test('Updates links to the latest release on GitHub, to download it by hand', () => {
+  renderSettings()
+  const link = within(screen.getByRole('region', { name: 'Updates' })).getByRole('link', { name: 'Download from GitHub' })
+  expect(link).toHaveAttribute('href', 'https://github.com/dm17ryk/OpenWrtGUI/releases/latest')
+  expect(link).toHaveAttribute('target', '_blank')
+})
+
+test('on the pre-release channel the link lists every release', () => {
+  renderSettings(UPDATE, { ...SETTINGS, update_channel: 'prerelease' })
+  const link = within(screen.getByRole('region', { name: 'Updates' })).getByRole('link', { name: 'Download from GitHub' })
+  expect(link).toHaveAttribute('href', 'https://github.com/dm17ryk/OpenWrtGUI/releases')
+})
+
+test('an offer read from the release pages links its notes and shows no size', () => {
+  const latest = { ...UPDATE.latest!, notes: '', size: 0 }
+  renderSettings({ ...UPDATE, latest })
+  const updates = screen.getByRole('region', { name: 'Updates' })
+  expect(within(updates).getByRole('link', { name: 'Release notes on GitHub' })).toHaveAttribute('href', latest.url)
+  expect(within(updates).queryByText(/MB$/)).toBeNull()
 })
 
 test('update status says when no check has run yet', () => {

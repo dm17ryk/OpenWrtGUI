@@ -7,6 +7,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-17
+
+Update checks and the image library keep working when the office network has used up GitHub's hourly limit.
+
+### Added
+
+- Settings › Updates: **Download from GitHub** opens the newest release, to install a version by hand; an offer
+  links its **Release notes on GitHub**.
+
+### Fixed
+
+- **Check now** works when GitHub's limit of 60 anonymous API reads an hour is used up on this network: the app
+  then reads the release pages on github.com. If those do not answer either, the message says when the limit
+  ends instead of guessing at a 403.
+- The image library (Discovery, Settings › Images) reads the release pages the same way when that limit is used
+  up, so **Download and import** still finds the router's build.
+
 ## [1.0.0] - 2026-11-17
 
 1.0: the manual is complete, reads are faster, screens reconnect by themselves, and the security and correctness
@@ -435,7 +452,8 @@ The foundation: install, update, add routers, see them, and stay out of a runnin
 - Router simulator built from recorded router output, used for e2e tests, screenshots and demos.
 - CI, pre-release and release workflows, wiki sync, CodeQL and Dependabot.
 
-[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v1.0.1
 [1.0.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v1.0.0
 [0.8.2]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.8.2
 [0.8.1]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.8.1

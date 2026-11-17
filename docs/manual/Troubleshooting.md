@@ -115,6 +115,10 @@ see [A radio was left at a step-through step](#a-radio-was-left-at-a-step-throug
 
 ## An update does not download or install
 
+- **"Couldn't check for updates: GitHub's hourly limit for this network is used up until …"**. GitHub's API
+  allows 60 reads an hour per network address, and every PC behind the same address shares them. The app
+  already tried the release pages on github.com instead, and they did not answer either. Try again after the
+  time shown, or use **Download from GitHub** ([Updating](Updating#downloading-by-hand)).
 - **"Couldn't download the update: …"** with the reason. Either this PC could not reach GitHub, or the download
   broke off. Check the PC's internet connection (a proxy or a firewall may block `github.com` downloads), then
   **Check now** again.

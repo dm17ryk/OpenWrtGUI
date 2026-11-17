@@ -127,8 +127,13 @@ def _client(
     *,
     list_handler: Callable[[httpx.Request], httpx.Response] | None = None,
     seen: list[httpx.Request] | None = None,
+    pages: dict[str, httpx.Response | bytes | int] | None = None,
 ) -> httpx.AsyncClient:
-    by_url = {_profiles_url(s["release"]["tag_name"]): s["profiles"] for s in served}
+    """GitHub stand-in; anything it does not serve answers 404, as github.com does."""
+    by_url: dict[str, httpx.Response | bytes | int] = {
+        _profiles_url(s["release"]["tag_name"]): s["profiles"] for s in served
+    }
+    by_url.update(pages or {})
 
     def handler(request: httpx.Request) -> httpx.Response:
         if seen is not None:
@@ -137,12 +142,72 @@ def _client(
             if list_handler is not None:
                 return list_handler(request)
             return httpx.Response(200, json=[s["release"] for s in served])
-        body = by_url[str(request.url)]
+        body = by_url.get(str(request.url), 404)
+        if isinstance(body, httpx.Response):
+            return body
         if isinstance(body, int):
             return httpx.Response(body)
         return httpx.Response(200, content=body)
 
     return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+
+PAGE = "https://github.com/dm17ryk/openwrt/releases"
+LIMITED = httpx.Response(403, headers={"X-RateLimit-Remaining": "0", "X-RateLimit-Reset": str(EPOCH)})
+FEED = f"""<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry><id>tag:github.com,2008:Repository/1323348770/v24.10.8</id><title>v24.10.8</title>
+    <updated>2026-07-24T23:54:19Z</updated></entry>
+  <entry><id>tag:github.com,2008:Repository/1323348770/v25.12.5</id><title>{RELEASE["name"]}</title>
+    <updated>2026-10-15T14:50:53Z</updated></entry>
+</feed>"""
+
+
+def _limited_with_pages(profiles: bytes | int = PROFILES) -> dict[str, httpx.Response | bytes | int]:
+    """The API is used up; the pages answer, and only v25.12.5 carries a profiles.json (as on GitHub)."""
+    return {
+        f"{PAGE}/latest": httpx.Response(302, headers={"Location": f"{PAGE}/tag/v25.12.5"}),
+        f"{PAGE}.atom": httpx.Response(200, text=FEED),
+        f"{PAGE}/download/v25.12.5/profiles.json": profiles,
+    }
+
+
+async def test_a_used_up_api_reads_the_catalog_from_the_release_pages() -> None:
+    async with _client([], list_handler=lambda _: LIMITED, pages=_limited_with_pages()) as client:
+        entries, skipped = await fetch_catalog(client)
+    [api] = parse_profiles(PROFILES, RELEASE)
+    [e] = entries
+    assert skipped == 0
+    assert (e.sha256, e.board, e.revision, e.size, e.image_name) == (
+        api.sha256,
+        api.board,
+        api.revision,
+        api.size,
+        api.image_name,
+    )
+    assert (e.url, e.release_tag, e.release_name, e.release_url) == (
+        api.url,
+        api.release_tag,
+        api.release_name,
+        api.release_url,
+    )
+
+
+async def test_a_page_release_whose_profiles_json_fails_is_counted() -> None:
+    pages = _limited_with_pages(profiles=500)
+    async with _client([], list_handler=lambda _: LIMITED, pages=pages) as client:
+        entries, skipped = await fetch_catalog(client)
+    assert (entries, skipped) == ([], 1)
+
+
+async def test_an_image_name_cannot_leave_its_release_folder() -> None:
+    doc = json.loads(PROFILES)
+    for image in doc["profiles"][SYSUPGRADE]["images"]:
+        if image["type"] == "sysupgrade":
+            image["name"] = "../../evil.bin"
+    pages = _limited_with_pages(profiles=json.dumps(doc).encode())
+    async with _client([], list_handler=lambda _: LIMITED, pages=pages) as client:
+        [e], _ = await fetch_catalog(client)
+    assert e.url == f"{PAGE}/download/v25.12.5/..%2F..%2Fevil.bin"
 
 
 async def test_the_catalog_is_read_from_every_release() -> None:

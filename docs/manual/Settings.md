@@ -8,7 +8,8 @@
 
 Installed version, the update channel (**Stable** or **Pre-release (CI builds)**), **Check now**, and
 **Check at start-up and daily**. When an update is offered: **Update now**, **Skip this version**,
-**Later**. See [Updating](Updating).
+**Later**, and **Release notes on GitHub**. **Download from GitHub** opens the releases page, to download an
+installer yourself. See [Updating](Updating).
 
 ## Appearance
 
@@ -59,7 +60,8 @@ shows the board, the revision, the size and the release it comes from (marked **
 row then says **Imported**. Nothing is downloaded until you click. **Refresh** reads the releases again; **Read
 at** shows when they were last read. A release whose `profiles.json` cannot be read is only counted ("1 release
 could not be read"). An image imported from the library shows a **from the image library** link to its release
-in [Images](#images).
+in [Images](#images). When GitHub's hourly API limit for this network is used up, the list comes from the release
+pages instead ([Discovery](Discovery)): only the newest releases, and none is marked **pre-release**.
 
 ## App SSH key
 
