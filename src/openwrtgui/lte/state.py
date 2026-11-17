@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal
@@ -20,6 +21,7 @@ from openwrtgui.transport.base import Transport
 
 NO_LTE = "This router has no LTE interface (no qmi interface in its network config)"
 AUTOCONNECT_NOTE = QMI_LOCKED["autoconnect"]
+INVALID_HANDLES = frozenset({"0xffffffff", "4294967295"})  # QMI's "no packet-data handle"
 
 
 class Measure(BaseModel):
@@ -41,6 +43,8 @@ class LteState(BaseModel):
     pending: bool | None = None
     uptime_s: int | None = None
     ipv4: str | None = None
+    data_handle: bool | None = None  # spec 4.1: None while the session is down or unread
+    works: bool = False  # up, a valid packet-data handle and an lte_4 address
     rx_bytes: int | None = None
     tx_bytes: int | None = None
     registration: str | None = None
@@ -58,6 +62,22 @@ class LteState(BaseModel):
     modem: ModemInfo = ModemInfo()
     autoconnect_note: str = AUTOCONNECT_NOTE
     missing: tuple[str, ...] = ()
+
+
+def handle_ok(session: Mapping[str, Any] | None) -> bool | None:
+    """Whether an up session's status names a valid packet-data handle (`data.pdh_4`); None while the session
+    is down or unread. A BM806C that lost its bearer stays up with 0xffffffff, or with no handle at all."""
+    if session is None or session.get("up") is not True:
+        return None
+    data = session.get("data")
+    handle = data.get("pdh_4") if isinstance(data, Mapping) else None
+    value = handle.strip().lower() if isinstance(handle, str) else ""
+    return value != "" and value not in INVALID_HANDLES
+
+
+def lte_works(state: LteState) -> bool:
+    """Spec 4.1: the interface is up, with a valid packet-data handle and an lte_4 address."""
+    return state.up is True and state.data_handle is True and bool(state.ipv4)
 
 
 def _flag(value: object) -> bool | None:
@@ -195,6 +215,7 @@ async def read_lte(
         pending=_flag(session.get("pending")) if session else None,
         uptime_s=_count(session.get("uptime")) if session else None,
         ipv4=ipv4,
+        data_handle=handle_ok(session),
         rx_bytes=_count(stats.get("rx_bytes")) if stats else None,
         tx_bytes=_count(stats.get("tx_bytes")) if stats else None,
         registration=serving.registration if serving else None,
@@ -212,4 +233,4 @@ async def read_lte(
         modem=modem,
         missing=tuple(missing),
     )
-    return state, kept
+    return state.model_copy(update={"works": lte_works(state)}), kept

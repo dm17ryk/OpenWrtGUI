@@ -5972,6 +5972,8 @@ export interface components {
             autoconnect_note: string;
             /** Available */
             available: boolean;
+            /** Data Handle */
+            data_handle?: boolean | null;
             /** Device */
             device?: string | null;
             /** Ipv4 */
@@ -6022,6 +6024,11 @@ export interface components {
             up?: boolean | null;
             /** Uptime S */
             uptime_s?: number | null;
+            /**
+             * Works
+             * @default false
+             */
+            works: boolean;
         };
         /** Measure */
         Measure: {
