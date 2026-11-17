@@ -22,6 +22,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Pins not yet on the router say this change adds them; Check firmware is greyed during a harness run; options
   locked by the LTE screen say so; Frame analysis no longer shows a stale Off after Start; new VLAN rows in the
   switch matrix keep unique keys.
+- Image library: only https links are followed, a malformed answer or an image whose size disagrees is left out or
+  counted, the release files are read in parallel within a minute, and the download is hashed as it arrives.
 
 ## [1.0.1] - 2026-11-17
 

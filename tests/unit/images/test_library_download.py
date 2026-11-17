@@ -170,7 +170,9 @@ async def test_a_failing_download_gives_the_http_status(tmp_path: Path) -> None:
 
 
 async def test_a_malformed_asset_url_is_a_download_error(tmp_path: Path) -> None:
-    library, store = _library(tmp_path, Github(image_url="http://dl.test:bad/x"))
+    library, store = _library(
+        tmp_path, Github(image_url="https://dl.test:bad/x")
+    )  # https: http is not offered
     with pytest.raises(ValueError, match=r"^The image library on GitHub could not be reached: .+\.$"):
         await library.download(SHA)
     assert store.list() == []
