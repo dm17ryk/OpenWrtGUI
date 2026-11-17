@@ -13,6 +13,7 @@ DEV = "/dev/cdc-wdm0"
 LOW = f"uqmi -s -d {DEV} -t 3000 --set-device-operating-mode low_power"
 ONLINE = f"uqmi -s -d {DEV} -t 3000 --set-device-operating-mode online"
 SYNC = f"uqmi -s -d {DEV} -t 5000 --sync"
+AUTOCONNECT_OFF = f"uqmi -s -d {DEV} -t 5000 --set-autoconnect disabled"
 STATUS = "ubus call network.interface.lte status"
 
 
@@ -57,6 +58,22 @@ async def test_stale_qmi_blocks_ifup_until_sync(ctx: AppContext) -> None:
     assert (await _status(t))["up"] is False
     synced = await t.run(SYNC)
     assert (synced.exit_status, synced.stdout) == (0, "")
+    await t.run("ifup lte")
+    assert (await _status(t))["up"] is True
+
+
+async def test_modem_autoconnect_blocks_ifup_until_turned_off(ctx: AppContext) -> None:
+    t = await _transport(ctx)
+    modem = t.state.modem  # type: ignore[union-attr]
+    modem.autoconnect_on = True
+    modem.autoconnect_refusals = 1
+    await t.run("ifdown lte")
+    await t.run("ifup lte")
+    assert (await _status(t))["up"] is False
+    refused = await t.run(AUTOCONNECT_OFF)
+    assert refused.exit_status == 1 and modem.autoconnect_on
+    taken = await t.run(AUTOCONNECT_OFF)
+    assert (taken.exit_status, taken.stdout) == (0, "")
     await t.run("ifup lte")
     assert (await _status(t))["up"] is True
 

@@ -54,6 +54,12 @@ def sync(device: str) -> str:
     return uqmi(device, "--sync", timeout_ms=5000)
 
 
+def autoconnect_off(device: str) -> str:
+    """QMI WDS Set Autoconnect Settings, disabled: what the stock firmware's "restore modem defaults" sends
+    the BM806C (spec 4.9). It takes no value: the modem's own autoconnect fights the router's qmi.sh."""
+    return uqmi(device, "--set-autoconnect", "disabled", timeout_ms=5000)
+
+
 def iface_status(name: str) -> str:
     return f"ubus call network.interface.{_checked(IFACE, name, 'an interface name')} status"
 
