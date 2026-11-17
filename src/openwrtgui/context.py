@@ -27,6 +27,7 @@ from openwrtgui.images.store import ProfileStore
 from openwrtgui.live import LiveHub
 from openwrtgui.lte.sampler import LteHub
 from openwrtgui.lte.service import LteService
+from openwrtgui.lte.setups import SetupStore
 from openwrtgui.luci_bridge.service import LuciBridgeService, UpstreamFactory
 from openwrtgui.luci_bridge.upstream import Upstream, sim_upstream, ssh_upstream
 from openwrtgui.net.apply import ApplyRunner
@@ -93,6 +94,7 @@ class AppContext:
     flash: FlashService
     lte: LteService
     lte_live: LteHub
+    lte_setups: SetupStore  # saved good LTE setups (spec 4.4)
     system: SystemService
     system_live: SystemHub
     access: AccessService
@@ -382,6 +384,7 @@ def build_context(
         flash=flash,
         lte=lte,
         lte_live=LteHub(pool=pool, routers=routers, locate=lte.modem_device),
+        lte_setups=SetupStore(data.lte_setups_dir),
         system=system,
         system_live=SystemHub(pool=pool, routers=routers, busy=system.busy),
         access=access,

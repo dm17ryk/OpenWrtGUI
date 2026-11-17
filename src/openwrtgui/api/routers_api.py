@@ -70,4 +70,5 @@ async def remove_router(router_id: str, ctx: Ctx) -> Ok:
     ctx.descriptions.pop(router_id, None)
     ctx.discovery.summaries.pop(router_id, None)
     ctx.guard.forget_router(router_id)
+    ctx.lte_setups.delete(router_id)  # its APN password and SIM PIN go with it (spec 4.4)
     return Ok()

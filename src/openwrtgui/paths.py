@@ -27,6 +27,7 @@ class DataDir:
     tools_dir: Path
     reflash_dir: Path
     steps_dir: Path  # a step-through's saved radio options until it restores them (v0.7 D6)
+    lte_setups_dir: Path  # each router's saved good LTE setup, APN password and SIM PIN included (spec 4.4)
 
     @classmethod
     def at(cls, root: Path) -> DataDir:
@@ -43,6 +44,7 @@ class DataDir:
             tools_dir=root / "tools",
             reflash_dir=root / "reflash",
             steps_dir=root / "steps",
+            lte_setups_dir=root / "lte-setups",
         )
         for folder in (
             d.root,
@@ -54,6 +56,7 @@ class DataDir:
             d.tools_dir,
             d.reflash_dir,
             d.steps_dir,
+            d.lte_setups_dir,
         ):
             folder.mkdir(parents=True, exist_ok=True)
         return d

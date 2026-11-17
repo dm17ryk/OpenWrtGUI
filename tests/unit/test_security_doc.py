@@ -11,7 +11,7 @@ SECURITY = (ROOT / "SECURITY.md").read_text(encoding="utf-8")
 
 def test_every_data_folder_is_in_the_table() -> None:
     paths_py = (ROOT / "src" / "openwrtgui" / "paths.py").read_text(encoding="utf-8")
-    named = set(re.findall(r'root / "([a-z_.]+)"', paths_py)) | {"backups", "exports"}
+    named = set(re.findall(r'root / "([a-z_.-]+)"', paths_py)) | {"backups", "exports"}
     for name in named:  # a folder is written `name\`, a file `name`
         assert re.search(rf"`{re.escape(name)}\\?`", SECURITY), f"{name} is missing from SECURITY.md's table"
 

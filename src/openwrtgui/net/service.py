@@ -45,7 +45,7 @@ from openwrtgui.net.interfaces import (
     target_host,
 )
 from openwrtgui.net.model import Address, Lease, parse_cidr
-from openwrtgui.net.parse import parse_host_hints, parse_leases
+from openwrtgui.net.parse import options, parse_host_hints, parse_leases
 from openwrtgui.net.routes import (
     LiveTables,
     RouteRequest,
@@ -171,6 +171,12 @@ class NetworkService:
     async def interface_options(self, router_id: str, name: str) -> list[OptionRow]:
         _rec, _t, state, uci, desc = await self._read(router_id)
         return interface_rows(state, uci, protocols(desc), name)
+
+    async def interface_values(self, router_id: str, name: str) -> tuple[list[OptionRow], dict[str, str]]:
+        """The rows interface_options gives, plus network.<name>'s raw values, secrets included. For the app
+        itself only (a saved good setup, spec 4.4): never sent to the browser."""
+        _rec, _t, state, uci, desc = await self._read(router_id)
+        return interface_rows(state, uci, protocols(desc), name), options(uci, "network", name)
 
     def _interface_plan(
         self,

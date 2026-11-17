@@ -13,8 +13,9 @@ from openwrtgui.api.wifi_api import OptionEditIn
 from openwrtgui.context import AppContext
 from openwrtgui.forms import OptionEdit, OptionRow
 from openwrtgui.lte.at import AtResult
-from openwrtgui.lte.service import AtNeedsConfirm, LteAction, LteBusy
+from openwrtgui.lte.service import AtNeedsConfirm, LteAction, LteBusy, SetupMissing
 from openwrtgui.lte.settings import METRIC_MAX, Auth, LteSettings, PdpType
+from openwrtgui.lte.setups import LteSetupSummary
 from openwrtgui.lte.state import LteState
 from openwrtgui.net.apply import NetApplyResult
 
@@ -121,6 +122,38 @@ async def at_command(router_id: str, body: AtIn, ctx: Ctx) -> AtResult:
         raise HTTPException(status_code=428, detail=str(exc)) from exc
     except LteBusy as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/setup")
+async def save_setup(router_id: str, ctx: Ctx) -> LteSetupSummary:
+    """Save good setup: refused (422) unless LTE works on the router right now."""
+    return await ctx.lte.save_setup(_known(ctx, router_id), ctx.lte_setups)
+
+
+class SetupSourceIn(BaseModel):
+    """Reconfigure's source: the router whose saved setup is put back (the spec's `from`)."""
+
+    source: str = Field(min_length=1, max_length=64)
+
+
+class SetupApplyIn(SetupSourceIn, Digest):
+    pass
+
+
+@router.post("/setup/preview")
+async def setup_preview(router_id: str, body: SetupSourceIn, ctx: Ctx) -> NetPlanOut:
+    try:
+        return NetPlanOut.of(await ctx.lte.plan_setup(_known(ctx, router_id), body.source, ctx.lte_setups))
+    except SetupMissing as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/setup/apply")
+async def setup_apply(router_id: str, body: SetupApplyIn, ctx: Ctx) -> NetApplyResult:
+    try:
+        return await ctx.lte.apply_setup(_known(ctx, router_id), body.source, ctx.lte_setups, body.digest)
+    except SetupMissing as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.post("/imei")

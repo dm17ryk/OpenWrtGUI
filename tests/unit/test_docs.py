@@ -433,8 +433,17 @@ def test_uninstall_deletes_backups_and_the_manual_says_what() -> None:
     deleted = {n for n in _ISS_DELETES.findall(iss) if not n.endswith((".tmp", ".bad", ".lock"))}
     assert "backups" in deleted
     yes = _section("Files-and-data", "Moving or removing").split("**Yes** deletes", 1)[1].split(" - ", 1)[0]
-    documented = set(re.findall(r"`([a-z_.]+)\\?`", yes))
+    documented = set(re.findall(r"`([a-z_.-]+)\\?`", yes))
     assert documented == deleted, sorted(documented ^ deleted)
+
+
+def test_uninstall_deletes_the_lte_setups() -> None:
+    """Spec 4.4: saved good setups hold APN passwords and SIM PINs, so Yes deletes them as it does backups,
+    and a folder that stays is named."""
+    iss = _read(ROOT / "installer" / "OpenWrtGUI.iss")
+    assert "lte-setups" in set(_ISS_DELETES.findall(iss))
+    body = iss.split("procedure DeleteAppData", 1)[1].split("\nend;", 1)[0]
+    assert "DirExists(Dir + '\\lte-setups')" in body
 
 
 def test_uninstall_says_when_secrets_remain() -> None:

@@ -7,6 +7,7 @@ import json
 import re
 import weakref
 from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import replace
 from datetime import datetime
 from typing import Literal
 
@@ -19,8 +20,9 @@ from openwrtgui.lte.at import AtResult, ModemIdentity, find_at_port, is_query
 from openwrtgui.lte.commands import MODEM_DEVICE
 from openwrtgui.lte.parse import parse_at, parse_opmode
 from openwrtgui.lte.settings import LteSettings, settings_request
-from openwrtgui.lte.state import NO_LTE, LteState, read_lte
-from openwrtgui.net.apply import NetApplyResult, NetCheck, NetPlan, net_plan
+from openwrtgui.lte.setups import NAMED, LteSetup, LteSetupSummary, SetupStore, setup_change, summary_of
+from openwrtgui.lte.state import NO_LTE, LteState, lte_works, read_lte
+from openwrtgui.net.apply import NOTHING, NetApplyResult, NetCheck, NetPlan, net_plan
 from openwrtgui.net.interfaces import InterfaceRequest, dynamic_refusal
 from openwrtgui.net.service import NetworkService
 from openwrtgui.net.state import NetworkState
@@ -63,6 +65,18 @@ class LteBusy(Exception):
 
 class AtNeedsConfirm(Exception):
     """D5: an AT command that is not a query runs only once the person confirms it (428)."""
+
+
+class LteNotWorking(ValueError):
+    """Save good setup while LTE does not work (422): a broken setup would be put back later."""
+
+
+class SetupMissing(LookupError):
+    """Reconfigure from a router that has no saved good setup (404)."""
+
+
+SETUP_SAVED = "LTE good setup saved"
+SECRET_OPTIONS = ("password", "pincode")
 
 
 def _reason(result: CommandResult) -> str:
@@ -364,6 +378,71 @@ class LteService:
     async def settings_options(self, router_id: str) -> list[OptionRow]:
         name = _lte_name(await self._qmi(router_id))
         return await self._net.interface_options(router_id, name)
+
+    # ---------------------------------------------------------------- saved good setups (spec 4.4)
+    async def save_setup(self, router_id: str, setups: SetupStore) -> LteSetupSummary:
+        """Keep the router's LTE options while LTE works: every option the Settings card can edit (the rows
+        that are not control-locked), the APN password and SIM PIN included, as the router has them."""
+        rec = self._record(router_id)
+        state = await self.state(router_id)
+        if not lte_works(state):
+            raise LteNotWorking(
+                f"LTE does not work on {rec.name} right now; save a good setup while it works"
+            )
+        name = _lte_name(await self._qmi(router_id))
+        rows, values = await self._net.interface_values(router_id, name)
+        editable = {row.name for row in rows if row.control is None} | set(NAMED)
+        kept = {key: value for key, value in values.items() if key in editable}
+        setup = LteSetup(
+            router_id=rec.id,
+            router_name=rec.name,
+            saved_at=self._clock().astimezone(),
+            modem=state.modem,
+            options=kept,
+        )
+        await asyncio.to_thread(setups.save, setup)  # icacls blocks: never on the event loop
+        secrets = [kept[key] for key in SECRET_OPTIONS if kept.get(key)]
+        self._audit.record(
+            router=rec.id, screen=SCREEN, command=SETUP_SAVED, exit_status=0, source="user", secrets=secrets
+        )
+        return summary_of(setup)
+
+    async def setup_settings(
+        self, router_id: str, source: str, setups: SetupStore
+    ) -> tuple[LteSettings, list[str]]:
+        """Reconfigure's settings change from `source`'s saved setup, and the warnings its preview adds."""
+        rec = self._record(router_id)
+        setup = setups.get(source)
+        if setup is None:
+            raise SetupMissing(f"No good setup saved for {source}")
+        name = _lte_name(await self._qmi(router_id))
+        rows, values = await self._net.interface_values(router_id, name)
+        change = setup_change(setup, rows, values, same_router=source == router_id)
+        warnings = []
+        if change.skipped:
+            warnings.append(f"Not restored (no such option on {rec.name}): {', '.join(change.skipped)}")
+        if change.kept:
+            warnings.append(
+                f"Left as it is (the setup has none, and the Settings card cannot remove it): "
+                f"{', '.join(change.kept)}"
+            )
+        return change.settings, warnings
+
+    async def plan_setup(self, router_id: str, source: str, setups: SetupStore) -> NetPlan:
+        settings, warnings = await self.setup_settings(router_id, source, setups)
+        try:
+            plan = await self.plan_settings(router_id, settings)
+        except ValueError as exc:  # "Nothing to apply": say what was not restored too
+            if str(exc) == NOTHING and warnings:
+                raise ValueError(" ".join((NOTHING, *(f"{w}." for w in warnings)))) from exc
+            raise
+        return replace(plan, warnings=(*plan.warnings, *warnings))  # the digest covers the lines only
+
+    async def apply_setup(
+        self, router_id: str, source: str, setups: SetupStore, digest: str
+    ) -> NetApplyResult:
+        settings, _warnings = await self.setup_settings(router_id, source, setups)
+        return await self.apply_settings(router_id, settings, digest)
 
     # ---------------------------------------------------------------- AT console and IMEI
     async def at_command(self, router_id: str, text: str, confirmed: bool) -> AtResult:

@@ -123,7 +123,7 @@ begin
   end;
 end;
 
-{ Uninstall may delete the data folder's logs, keys, audit, updates and backups subfolders, so the data
+{ Uninstall may delete the data folder's logs, keys, audit, updates, backups and lte-setups subfolders, so the data
   folder must be the app's own: new, empty, or an OpenWrtGUI data folder already. }
 function DataDirProblem(Dir: String): String;
 begin
@@ -209,12 +209,16 @@ begin
   DelTree(Dir + '\logs', True, True, True);
   { Routers' configuration backups hold password hashes and Wi-Fi keys: Yes removes them too (2026-11-16). }
   DelTree(Dir + '\backups', True, True, True);
+  { Saved good LTE setups hold APN passwords and SIM PINs (2026-11-17). }
+  DelTree(Dir + '\lte-setups', True, True, True);
   RemoveDir(Dir);
   { A locked or access-denied file keeps its folder: name the secrets still there instead of finishing
     silently. The uninstall itself goes on (PR #74 review, 2026-11-16). }
   Left := '';
   if DirExists(Dir + '\backups') then
     Left := Left + #13#10 + '    backups (router backups: password hashes and Wi-Fi keys)';
+  if DirExists(Dir + '\lte-setups') then
+    Left := Left + #13#10 + '    lte-setups (saved LTE setups: APN passwords and SIM PINs)';
   if DirExists(Dir + '\keys') then
     Left := Left + #13#10 + '    keys (the app''s SSH key)';
   if Left <> '' then

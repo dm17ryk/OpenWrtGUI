@@ -243,6 +243,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/lte-setups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lte Setups */
+        get: operations["lte_setups_api_lte_setups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/onboard": {
         parameters: {
             query?: never;
@@ -1429,6 +1446,60 @@ export interface paths {
         put?: never;
         /** Settings Preview */
         post: operations["settings_preview_api_routers__router_id__lte_settings_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save Setup
+         * @description Save good setup: refused (422) unless LTE works on the router right now.
+         */
+        post: operations["save_setup_api_routers__router_id__lte_setup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/setup/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Setup Apply */
+        post: operations["setup_apply_api_routers__router_id__lte_setup_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/setup/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Setup Preview */
+        post: operations["setup_preview_api_routers__router_id__lte_setup_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5963,6 +6034,24 @@ export interface components {
             /** Username */
             username?: string | null;
         };
+        /**
+         * LteSetupSummary
+         * @description What the setup list shows: never an option value but the APN and PDP type.
+         */
+        LteSetupSummary: {
+            /** Apn */
+            apn: string | null;
+            /** Pdptype */
+            pdptype: string | null;
+            /** Readable */
+            readable: boolean;
+            /** Router Id */
+            router_id: string;
+            /** Router Name */
+            router_name: string;
+            /** Saved At */
+            saved_at: string | null;
+        };
         /** LteState */
         LteState: {
             /**
@@ -7809,6 +7898,21 @@ export interface components {
             /** Zonename */
             zonename: string | null;
         };
+        /** SetupApplyIn */
+        SetupApplyIn: {
+            /** Digest */
+            digest: string;
+            /** Source */
+            source: string;
+        };
+        /**
+         * SetupSourceIn
+         * @description Reconfigure's source: the router whose saved setup is put back (the spec's `from`).
+         */
+        SetupSourceIn: {
+            /** Source */
+            source: string;
+        };
         /** SshApplyIn */
         SshApplyIn: {
             /** Digest */
@@ -9196,6 +9300,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lte_setups_api_lte_setups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LteSetupSummary"][];
                 };
             };
         };
@@ -11569,6 +11693,107 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LteSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_setup_api_routers__router_id__lte_setup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LteSetupSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    setup_apply_api_routers__router_id__lte_setup_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    setup_preview_api_routers__router_id__lte_setup_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupSourceIn"];
             };
         };
         responses: {
