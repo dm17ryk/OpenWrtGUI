@@ -7,6 +7,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- An accessibility check (axe) of every screen in the browser tests, in both themes; serious and critical findings
+  fail it. The one it found, the dark theme's "Block all" text contrast, is fixed.
+
 ### Fixed
 
 - Reads: an empty iptables answer is an error, a newer page list reads its own facts, a scan interface left behind

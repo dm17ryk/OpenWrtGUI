@@ -841,7 +841,7 @@ h2 {
 /* Firewall: model cells, policies, pins, flagged rules, editors */
 .seg button.onblock {
   background: var(--bad);
-  color: #ffffff;
+  color: var(--bad-ink);
 }
 .pol {
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
