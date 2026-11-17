@@ -290,6 +290,20 @@ async def test_a_failing_list_gives_the_http_status() -> None:
     assert str(err.value) == "The image library on GitHub could not be reached: HTTP 502."
 
 
+def test_a_profiles_json_without_a_revision_is_unreadable() -> None:
+    """The 0.8.2 ledger, Task 1: entries with an empty revision were listed, then refused at the download."""
+    doc = json.loads(PROFILES)
+    doc["version_code"] = ""
+    with pytest.raises(LibraryError, match="no revision"):
+        parse_profiles(json.dumps(doc).encode(), RELEASE)
+
+
+def test_an_untitled_entry_takes_its_board_as_title() -> None:
+    """The 0.8.2 ledger, Task 1: an empty title gave a blank line in Settings and "Image library: , …"."""
+    [e] = parse_profiles(_profiles(titles=[]), RELEASE)
+    assert e.title == "dlink,dwr-921-c3-uboot"
+
+
 def _asset(release: dict[str, Any], name: str) -> dict[str, Any]:
     return next(a for a in release["assets"] if a["name"] == name)
 

@@ -60,8 +60,9 @@ shows the board, the revision, the size and the release it comes from (marked **
 row then says **Imported**. Nothing is downloaded until you click. **Refresh** reads the releases again; **Read
 at** shows when they were last read. A release whose `profiles.json` cannot be read is only counted ("1 release
 could not be read"). An image imported from the library shows a **from the image library** link to its release
-in [Images](#images). When GitHub's hourly API limit for this network is used up, the list comes from the release
-pages instead ([Discovery](Discovery)): only the newest releases, and none is marked **pre-release**.
+in [Images](#images), with the release's tag, for example "from the image library (v25.12.5)". When GitHub's
+hourly API limit for this network is used up, the list comes from the release pages instead
+([Discovery](Discovery)): only the newest releases, and none is marked **pre-release**.
 
 ## App SSH key
 

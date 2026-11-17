@@ -24,6 +24,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   switch matrix keep unique keys.
 - Image library: only https links are followed, a malformed answer or an image whose size disagrees is left out or
   counted, the release files are read in parallel within a minute, and the download is hashed as it arrives.
+- Image library: a release file without a revision is counted as unreadable, an untitled entry shows its board, a
+  clock set back does not keep a failed read, screen readers hear the notes, the origin link names its release,
+  and Import image… looks disabled during a download.
 
 ## [1.0.1] - 2026-11-17
 

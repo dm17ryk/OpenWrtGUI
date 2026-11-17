@@ -80,19 +80,44 @@ class Github:
 
 
 class Clock:
+    """The wall clock shown as "Read at", and the monotonic seconds the cache's age is measured with."""
+
     def __init__(self) -> None:
         self.now = T0
+        self.seconds = 1000.0
 
     def __call__(self) -> datetime:
         return self.now
 
+    def mono(self) -> float:
+        return self.seconds
+
     def advance(self, seconds: int) -> None:
         self.now += timedelta(seconds=seconds)
+        self.seconds += seconds
+
+    def set_back(self, seconds: int) -> None:
+        """The PC's clock changed (daylight saving, a manual change): the wall clock only."""
+        self.now -= timedelta(seconds=seconds)
 
 
 def _library(tmp_path: Path, github: Github, clock: Clock | None = None) -> tuple[ImageLibrary, ProfileStore]:
     store = ProfileStore(tmp_path)
-    return ImageLibrary(store, github.factory, clock or Clock()), store
+    clock = clock or Clock()
+    return ImageLibrary(store, github.factory, clock, monotonic=clock.mono), store
+
+
+async def test_a_clock_set_back_does_not_keep_a_failed_read(tmp_path: Path) -> None:
+    """The 0.8.2 ledger, Task 3: a negative wall-clock age counted as fresh."""
+    github, clock = Github(), Clock()
+    github.list_status = 502
+    library, _ = _library(tmp_path, github, clock)
+    assert (await library.read()).error is not None
+    clock.set_back(3600)
+    clock.advance(61)  # past the minute a failed read is kept, by the monotonic clock
+    github.list_status = 200
+    again = await library.read()
+    assert (again.error, github.calls["releases"]) == (None, 2)
 
 
 async def _chunks(*parts: bytes, then: Exception | None = None) -> AsyncIterator[bytes]:

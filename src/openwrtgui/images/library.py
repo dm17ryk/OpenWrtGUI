@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import time
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any
@@ -71,7 +72,8 @@ def _title(profile: dict[str, Any]) -> str:
         parts = [str(first[k]) for k in ("vendor", "model", "variant") if first.get(k)]
         if parts:
             return " ".join(parts)
-    return ""
+    devices = profile.get("supported_devices")  # no title: its board, never a blank line (0.8.2 ledger)
+    return str(devices[0]) if isinstance(devices, list) and devices else ""
 
 
 def _https(url: object) -> bool:
@@ -167,6 +169,8 @@ def parse_profiles(
     if not isinstance(profiles, dict):
         return []
     revision, target = str(doc.get("version_code", "")), str(doc.get("target", ""))
+    if not revision.strip():  # an entry the download would refuse later (0.8.2 ledger, Task 1)
+        raise LibraryError(f"{PROFILES_NAME} has no revision (version_code)")
     assets = _assets(release)
     entries = (
         _entry(
@@ -352,25 +356,28 @@ class ImageLibrary:
         profiles: ProfileStore,
         client_factory: Callable[[], httpx.AsyncClient],
         clock: Callable[[], datetime] = datetime.now,
+        monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         self._profiles = profiles
         self._client_factory = client_factory
-        self._clock = clock
+        self._clock = clock  # "Read at", as shown
+        self._monotonic = monotonic  # the cache's age: a clock set back never keeps a read (0.8.2 ledger)
         self._cached: LibraryRead | None = None
+        self._read_mono: float | None = None
         self._lock = asyncio.Lock()
         self._busy: set[str] = set()
 
-    def _fresh(self, cached: LibraryRead, now: datetime) -> bool:
-        if cached.read_at is None:
+    def _fresh(self, cached: LibraryRead) -> bool:
+        if self._read_mono is None:
             return False
         limit = ERROR_CACHE_SECONDS if cached.error else CACHE_SECONDS
-        return (now - cached.read_at).total_seconds() < limit
+        return 0 <= self._monotonic() - self._read_mono < limit
 
     async def read(self, force: bool = False) -> LibraryRead:
         async with self._lock:
             now = self._clock()
             previous = self._cached
-            if not force and previous is not None and self._fresh(previous, now):
+            if not force and previous is not None and self._fresh(previous):
                 return previous
             try:
                 async with self._client_factory() as client:
@@ -385,6 +392,7 @@ class ImageLibrary:
             else:
                 result = LibraryRead(entries=tuple(entries), read_at=now, skipped=skipped)
             self._cached = result
+            self._read_mono = self._monotonic()
             return result
 
     async def download(self, sha256: str) -> Profile:

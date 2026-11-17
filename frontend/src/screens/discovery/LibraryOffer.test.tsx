@@ -139,6 +139,13 @@ test('says how many releases could not be read', async () => {
   expect(await screen.findByText('1 release could not be read')).toBeVisible()
 })
 
+test('screen readers hear the notes and the errors (0.8.2 ledger, Task 6)', async () => {
+  library = { ...libraryFixture, skipped: 1, error: 'The image library on GitHub could not be reached: offline.' }
+  renderOffer()
+  expect(await screen.findByRole('alert')).toHaveTextContent('could not be reached: offline')
+  expect(screen.getByRole('status')).toHaveTextContent('1 release could not be read')
+})
+
 test('shows the download error', async () => {
   downloadError = new ApiError(422, 'x.bin does not match its release’s profiles.json; nothing was imported.', null)
   const { user, onImported } = renderOffer()

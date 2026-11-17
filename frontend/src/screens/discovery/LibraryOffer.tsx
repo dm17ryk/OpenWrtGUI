@@ -27,10 +27,11 @@ export function LibraryOffer({ board, revision, onImported, disabled, onBusyChan
   const [isBusy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  if (library.isPending) return <div className="muted">Looking in the image library…</div>
+  // notes are status messages and errors are alerts, so a screen reader hears them (0.8.2 ledger, Task 6)
+  if (library.isPending) return <div className="muted" role="status">Looking in the image library…</div>
   if (library.isError) {
     const detail = library.error instanceof ApiError ? library.error.detail : String(library.error)
-    return <div className="note x">{detail}</div>
+    return <div className="note x" role="alert">{detail}</div>
   }
   const { entries, skipped, error: libraryError } = library.data
   const [entry, ...others] = entries
@@ -50,8 +51,8 @@ export function LibraryOffer({ board, revision, onImported, disabled, onBusyChan
   }
   return (
     <div className="stack" style={{ gap: 6 }}>
-      {libraryError && <div className="note x">{libraryError}</div>}
-      {!libraryError && !entry && <div className="muted">The image library has no build for {board} {revision}.</div>}
+      {libraryError && <div className="note x" role="alert">{libraryError}</div>}
+      {!libraryError && !entry && <div className="muted" role="status">The image library has no build for {board} {revision}.</div>}
       {entry && (
         <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
           <span>{`Image library: ${entry.title}, ${entry.revision}, ${megabytes(entry.size)}, release ${entry.release_name}`}</span>
@@ -66,8 +67,8 @@ export function LibraryOffer({ board, revision, onImported, disabled, onBusyChan
           {`${others.length} ${plural(others.length, 'other build', 'other builds')} of this revision ${plural(others.length, 'is', 'are')} listed in Settings › Images; Check firmware tells whether the router runs the one you downloaded.`}
         </div>
       )}
-      {skipped > 0 && <div className="muted">{`${skipped} ${plural(skipped, 'release', 'releases')} could not be read`}</div>}
-      {error && <div className="note x">{error}</div>}
+      {skipped > 0 && <div className="muted" role="status">{`${skipped} ${plural(skipped, 'release', 'releases')} could not be read`}</div>}
+      {error && <div className="note x" role="alert">{error}</div>}
     </div>
   )
 }
