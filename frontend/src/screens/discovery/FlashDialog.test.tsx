@@ -24,6 +24,10 @@ const job = (phase: FlashJob['phase'], extra: Partial<FlashJob> = {}): FlashJob 
   ...extra,
 })
 let current: FlashJob | null = null
+// The preview waits 300 ms before it asks (usePreview), so a loaded PC can show it after Testing
+// Library's 1 s default: 1277 ms in a full gate on 2026-11-17.
+const PREVIEW_WAIT = { timeout: 5_000 }
+const commandPreview = (): Promise<HTMLElement> => screen.findByRole('region', { name: 'Command preview' }, PREVIEW_WAIT)
 
 vi.mock('../../api/client', async (orig) => {
   const actual = await orig<typeof import('../../api/client')>()
@@ -53,7 +57,7 @@ beforeEach(() => {
 test('Flash is greyed while a harness run is live', async () => {
   guard = LIVE
   const user = renderFlash()
-  await screen.findByRole('region', { name: 'Command preview' })
+  await commandPreview() // with the plan shown, the guard is the only thing that greys Flash
   await user.type(screen.getByLabelText('Type the router’s name to flash it'), 'AP2')
   expect(await screen.findByText('Bench Guard: dima_night.py started 21:04 (PID 18244)')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Flash' })).toBeDisabled()
@@ -76,7 +80,7 @@ async function typeName(user: ReturnType<typeof userEvent.setup>) {
 test('offers the newer image and needs the router name typed before Flash', async () => {
   const user = renderFlash()
   expect(await screen.findByRole('combobox', { name: 'Image' })).toHaveValue(NEWER_PROFILE.folder)
-  expect(await screen.findByRole('region', { name: 'Command preview' })).toHaveTextContent('sysupgrade -T /tmp/owg/fw-06988f7bb216.bin')
+  expect(await commandPreview()).toHaveTextContent('sysupgrade -T /tmp/owg/fw-06988f7bb216.bin')
   expect(screen.getByText(FLASH_PLAN.warnings[0])).toBeVisible()
   const flash = screen.getByRole('button', { name: 'Flash' })
   expect(flash).toBeDisabled()
@@ -93,19 +97,19 @@ test('offers the newer image and needs the router name typed before Flash', asyn
 
 test('needs the isolation tick without keep settings', async () => {
   const user = renderFlash()
-  await screen.findByRole('region', { name: 'Command preview' })
+  await commandPreview()
   await user.click(screen.getByRole('checkbox', { name: 'Keep settings' }))
   expect(screen.queryByRole('region', { name: 'Command preview' })).not.toBeInTheDocument()
   expect(screen.getByText(/comes back as 192\.168\.1\.1 with no password/)).toBeVisible()
   await user.click(screen.getByRole('checkbox', { name: 'I have isolated AP2 · office from the bench LAN' }))
-  expect(await screen.findByRole('region', { name: 'Command preview' })).toBeVisible()
+  expect(await commandPreview()).toBeVisible()
   const previews = calls.filter((c) => c.path.endsWith('/flash/preview')).map((c) => c.body as { keep_settings: boolean; isolated: boolean })
   expect(previews.at(-1)).toMatchObject({ keep_settings: false, isolated: true })
 })
 
 test('shows upload progress and the phases until done', async () => {
   const user = renderFlash()
-  await screen.findByRole('region', { name: 'Command preview' })
+  await commandPreview()
   await typeName(user)
   current = job('upload')
   await user.click(screen.getByRole('button', { name: 'Flash' }))
@@ -133,7 +137,7 @@ test('a done flash from before can be followed by another', async () => {
 
 test('shows a failed flash with its reason and no Copy back', async () => {
   const user = renderFlash()
-  await screen.findByRole('region', { name: 'Command preview' })
+  await commandPreview()
   await typeName(user)
   current = job('failed', { error: 'sysupgrade -T: Image check failed' })
   await user.click(screen.getByRole('button', { name: 'Flash' }))
