@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { apiFetch, postJson } from '../../api/client'
 import type { GuardOut, LteAction, LteRecoverJob, NetApplyResult, RecoverPreview } from '../../api/types'
 import { usePlanApply } from '../../components/usePlanApply'
@@ -73,6 +73,15 @@ function RecoverStart({ routerId, live, runTitle }: { routerId: string; live: bo
   const [error, setError] = useState<string | null>(null)
   const running = isRecovering(job)
   const base = `/api/routers/${routerId}/lte/recover`
+  // when a job ends, the Status card and Save good setup read the modem again (PR #82 review)
+  const phase = job?.phase
+  const was = useRef(phase)
+  useEffect(() => {
+    if (was.current === 'running' && phase !== undefined && phase !== 'running') {
+      for (const key of ['lte', 'lte-options', 'network']) void client.invalidateQueries({ queryKey: [key, routerId] })
+    }
+    was.current = phase
+  }, [phase, client, routerId])
 
   async function show() {
     setError(null)
@@ -104,7 +113,9 @@ function RecoverStart({ routerId, live, runTitle }: { routerId: string; live: bo
       </div>
       {preview && (
         <section className="stack" aria-label="Recover preview">
-          <pre className="mono">{preview.lines.join('\n')}</pre>
+          <div className="code" role="region" aria-label="Recover commands" tabIndex={0}>
+            {preview.lines.join('\n')}
+          </div>
           {preview.warnings.map((w) => (
             <div key={w} className="note w">
               {w}

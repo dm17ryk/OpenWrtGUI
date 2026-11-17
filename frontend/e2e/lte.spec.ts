@@ -18,7 +18,15 @@ test('Recover on a working modem says there is nothing to do', async ({ page }, 
   const preview = page.getByRole('region', { name: 'Recover preview' })
   await expect(preview).toContainText('# only if LTE does not work after the step before')
   await preview.getByRole('button', { name: 'Start' }).click()
-  await expect(page.getByRole('region', { name: 'Recover' })).toContainText('LTE works; nothing to do.')
+  await expect(page.getByRole('region', { name: 'Recover', exact: true })).toContainText('LTE works; nothing to do.')
+})
+
+test('the Recover preview fits the screen', async ({ page }) => {
+  // PR #82 review: the long uqmi lines must scroll inside their box, not widen the page at 375 px
+  await open(page, '/routers/ap1/lte')
+  await page.getByRole('button', { name: 'Recover', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Recover preview' })).toContainText('--set-autoconnect disabled')
+  await noHorizontalScroll(page)
 })
 
 test('Save good setup, then Reconfigure from it changes nothing', async ({ page }, info) => {

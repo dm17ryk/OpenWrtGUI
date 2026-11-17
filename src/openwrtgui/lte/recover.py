@@ -397,7 +397,11 @@ class LteRecover:
                 self._rung(rec.id, 0, "skipped", "no good setup saved" if setup is None else "settings match")
                 continue
             self._update(rec.id, current=index)
+            # the pool's live connection: another apply may have replaced the one the job started with
+            run.t = await self._lte.transport(rec)
             problem = await rung(run)
+            if problem:  # shown even if a Stop or a harness run ends the job during the wait
+                self._rung(rec.id, index, "failed", problem)
             works = await self._wait_works(run)
             if works:
                 self._rung(rec.id, index, "works", problem)
@@ -458,7 +462,11 @@ class LteRecover:
             raise _Failed(NO_ANSWER.format(command="the settings change", name=run.rec.name)) from exc
         except (ValueError, PreviewChanged, RouterBusy) as exc:
             return f"the settings change: {exc}"
-        return None if result.applied else (result.error or "the settings change was not applied")
+        # the rollback runner reconnects (pool.drop): the next steps use the pool's new connection (PR #82)
+        run.t = await self._lte.transport(run.rec)
+        if result.error:  # applied and still an error, e.g. confirmed after a harness run began
+            return f"the settings change: {result.error}"
+        return None if result.applied else "the settings change was not applied"
 
     async def _reconnect(self, run: _Run) -> str | None:
         async def nothing() -> str | None:
@@ -557,15 +565,14 @@ class LteRecover:
         harness run is live (spec 4.2: "Finish putting back")."""
         order = [run.pending[k] for k in ("online", "ifup") if k in run.pending]
         if harness or (order and self._guard.state().live):
-            self._harness_put_back(run, await self._lte.put_back(run.rec, run.t, order))
+            await self._put_back_locked(run, order)
             return
         for line, where in order:
             try:
                 async with self._lte.write_lock(run.rec.id):
                     done = await self._lte.run(run.rec, run.t, line)
             except GuardLocked:
-                remaining = order[order.index((line, where)) :]
-                self._harness_put_back(run, await self._lte.put_back(run.rec, run.t, remaining))
+                await self._put_back_locked(run, order[order.index((line, where)) :])
                 return
             except TransportError:  # final review I1: say where the modem was left, never "no result"
                 self._end(
@@ -581,6 +588,12 @@ class LteRecover:
                 return
         works = await self._lte.works_now(run.t)
         self._end(run, "stopped", detail="Stopped; LTE works." if works else "Stopped; LTE does not work.")
+
+    async def _put_back_locked(self, run: _Run, order: list[tuple[str, str]]) -> None:
+        """The put-back past Bench Guard, still under the router's write lock (PR #82 review)."""
+        async with self._lte.write_lock(run.rec.id):
+            result = await self._lte.put_back(run.rec, run.t, order)
+        self._harness_put_back(run, result)
 
     def _harness_put_back(self, run: _Run, result: str) -> None:
         if result == HARNESS_STOPPED:

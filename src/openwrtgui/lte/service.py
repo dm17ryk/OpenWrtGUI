@@ -60,8 +60,8 @@ def shown_answer(lines: Sequence[str]) -> tuple[str, ...]:
     return tuple(_PIN_ECHO.sub(r"\1<hidden>", mask(line, ())) for line in lines)
 
 
-class LteBusy(Exception):
-    """One LTE action at a time per router (409)."""
+class LteBusy(RouterBusy):
+    """One LTE action at a time per router (409 on every endpoint)."""
 
 
 class AtNeedsConfirm(Exception):
@@ -128,6 +128,7 @@ class LteService:
         # router → (connection, the modem's identity read on it): asked once per connection (v1.0c D2)
         self._identity: dict[str, tuple[weakref.ref[Transport], ModemIdentity]] = {}
         self._busy: dict[str, asyncio.Lock] = {}
+        self._saving: dict[str, asyncio.Lock] = {}  # Save good setup, one per router at a time
         self._at: dict[str, asyncio.Lock] = {}  # one AT exchange at a time per router (v1.0b2 D11)
         self.poll_s = POLL_S
         self.readback_s = 1.0
@@ -432,11 +433,20 @@ class LteService:
     async def apply_settings(
         self, router_id: str, settings: LteSettings, digest: str, *, recover: bool = False
     ) -> NetApplyResult:
-        """`recover`: the Recover job's own rung 1, which holds the router itself."""
-        if not recover:
-            self._refuse_if_busy(router_id)
-        req = await self._settings_request(router_id, settings)
-        return await self._net.apply_interface(router_id, req, digest)
+        """`recover`: the Recover job's own rung 1, which holds the router itself. Any other apply holds the
+        LTE busy reservation for its whole run, so Recover cannot start under it (PR #82 review)."""
+        if recover:
+            return await self._net.apply_interface(
+                router_id, await self._settings_request(router_id, settings), digest
+            )
+        rec = self._record(router_id)
+        self._refuse_if_busy(rec.id)
+        busy = self._busy.setdefault(rec.id, asyncio.Lock())
+        if busy.locked():
+            raise LteBusy(f"An LTE action is already running on {rec.name}")
+        async with busy:
+            req = await self._settings_request(router_id, settings)
+            return await self._net.apply_interface(router_id, req, digest)
 
     async def settings_options(self, router_id: str) -> list[OptionRow]:
         name = _lte_name(await self._qmi(router_id))
@@ -463,7 +473,9 @@ class LteService:
             modem=state.modem,
             options=kept,
         )
-        await asyncio.to_thread(setups.save, setup)  # icacls blocks: never on the event loop
+        # one save per router at a time: two would race on the same temporary file (PR #82 review)
+        async with self._saving.setdefault(rec.id, asyncio.Lock()):
+            await asyncio.to_thread(setups.save, setup)  # icacls blocks: never on the event loop
         secrets = [kept[key] for key in SECRET_OPTIONS if kept.get(key)]
         self._audit.record(
             router=rec.id, screen=SCREEN, command=SETUP_SAVED, exit_status=0, source="user", secrets=secrets
@@ -528,7 +540,9 @@ class LteService:
                 port, done = await self._exchange(rec, t, command, write=False)
         else:
             # one LTE write at a time, as the actions: a command that may change the modem never waits behind
-            # a connect or reboot to run later; it is refused (409)
+            # a connect or reboot to run later; it is refused (409). Recover may have started while the
+            # connection was made: checked again with no await before the reservation (PR #82 review)
+            self._refuse_if_busy(rec.id)
             busy = self._busy.setdefault(rec.id, asyncio.Lock())
             if busy.locked():
                 raise LteBusy(f"An LTE action is already running on {rec.name}")

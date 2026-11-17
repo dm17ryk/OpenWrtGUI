@@ -49,7 +49,13 @@ export function SetupsBlock({ routerId, works, onApplied }: Props) {
   return (
     <div className="stack" aria-label="Saved setups">
       <div className="row">
-        <button type="button" onClick={() => void save()} disabled={!works} title={works ? undefined : SAVE_WHEN}>
+        {/* PR #82 review: until the list is read, an existing setup would look absent and be replaced unasked */}
+        <button
+          type="button"
+          onClick={() => void save()}
+          disabled={!works || !setups.isSuccess}
+          title={!works ? SAVE_WHEN : setups.isSuccess ? undefined : 'Reading the saved setups…'}
+        >
           Save good setup
         </button>
         <label className="row" style={{ gap: 6 }}>

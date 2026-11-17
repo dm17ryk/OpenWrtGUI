@@ -8,12 +8,14 @@ import { SetupsBlock } from './SetupsBlock'
 
 const calls: Array<{ path: string; body: unknown }> = []
 let setups: LteSetupSummary[] = []
+let listing: Promise<LteSetupSummary[]> | null = null // a list that has not arrived yet
 
 vi.mock('../../api/client', async (orig) => {
   const actual = await orig<typeof import('../../api/client')>()
   return {
     ...actual,
     apiFetch: vi.fn(async (path: string) => {
+      if (path === '/api/lte-setups' && listing) return listing
       if (path === '/api/lte-setups') return setups
       throw new Error(`unexpected ${path}`)
     }),
@@ -41,6 +43,15 @@ const BROKEN: LteSetupSummary = { router_id: 'ap3', router_name: 'ap3', saved_at
 beforeEach(() => {
   calls.length = 0
   setups = []
+  listing = null
+})
+
+test('Save waits for the list of saved setups, so it cannot replace one without asking', async () => {
+  // PR #82 review: while the list loads, an existing setup would look absent and be replaced silently
+  listing = new Promise<LteSetupSummary[]>(() => {})
+  show(true)
+  const save = await screen.findByRole('button', { name: 'Save good setup' })
+  expect(save).toBeDisabled()
 })
 afterEach(() => vi.unstubAllGlobals())
 

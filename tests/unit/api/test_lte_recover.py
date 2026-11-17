@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import threading
+import time
 from collections.abc import Iterator
 
 import httpx
@@ -13,6 +15,7 @@ from openwrtgui.context import AppContext
 from openwrtgui.lte.recover import RUNGS, LteRecoverBusy, LteRecoverJob
 from openwrtgui.lte.service import HARNESS_STOPPED, PUT_BACK_SCREEN
 from openwrtgui.lte.settings import LteSettings
+from openwrtgui.net.apply import NetApplyResult
 from openwrtgui.transport.base import CommandResult, TransportError
 from openwrtgui.transport.fake import ReplayTransport
 
@@ -444,6 +447,162 @@ async def test_remove_waits_for_the_job(ctx: AppContext, authed: httpx.AsyncClie
     finally:
         gate.set()
         await ctx.lte_recover.finished("ap2")
+
+
+async def test_a_settings_apply_holds_off_recover(ctx: AppContext) -> None:
+    """PR #82 review: a Settings or Reconfigure apply holds the LTE busy reservation for its whole run."""
+    gate = asyncio.Event()
+    real = ctx.net.apply_interface
+
+    async def slow_apply(*args, **kwargs):  # type: ignore[no-untyped-def]
+        await gate.wait()
+        return await real(*args, **kwargs)
+
+    ctx.net.apply_interface = slow_apply  # type: ignore[method-assign]
+    drift = LteSettings(apn="other")
+    plan = await ctx.lte.plan_settings("ap2", drift)
+    applying = asyncio.create_task(ctx.lte.apply_settings("ap2", drift, plan.digest))
+    await asyncio.sleep(0.05)
+    try:
+        preview = await ctx.lte_recover.preview("ap2")
+        with pytest.raises(LteRecoverBusy, match="An LTE action is already running on AP2 · office"):
+            await ctx.lte_recover.start("ap2", preview.digest)
+        with pytest.raises(RouterBusy, match="An LTE action is already running"):
+            await ctx.lte.apply_settings("ap2", drift, plan.digest)
+    finally:
+        gate.set()
+        await applying
+
+
+async def test_an_at_write_rechecks_recover_after_connecting(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PR #82 review: Recover starting while the AT write waits for its connection gets the write a 409."""
+    gate = asyncio.Event()
+
+    async def slow(_s: float) -> None:
+        await gate.wait()
+
+    ctx.lte._sleep = slow  # type: ignore[assignment]
+    ctx.lte.poll_s = 1.0
+    (await _modem(ctx)).wedged = True
+    preview = await ctx.lte_recover.preview("ap2")
+    real_get = ctx.pool.get
+    started = False
+
+    async def get(rec):  # type: ignore[no-untyped-def]
+        nonlocal started
+        t = await real_get(rec)
+        if not started:  # the connection is ready just as Recover starts
+            started = True
+            await ctx.lte_recover.start("ap2", preview.digest)
+        return t
+
+    monkeypatch.setattr(ctx.pool, "get", get)
+    try:
+        with pytest.raises(RouterBusy, match="LTE recovery runs on AP2 · office"):
+            await ctx.lte.at_command("ap2", "AT+COPS=0", confirmed=True)
+        assert not any("AT+COPS=0" in c for c in _calls(ctx))
+    finally:
+        gate.set()
+        await ctx.lte_recover.finished("ap2")
+
+
+async def test_an_applied_setup_with_an_error_is_shown(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PR #82 review: rung 1's apply can be applied and still carry an error; the job keeps it."""
+    await _save(ctx)
+    await _drift(ctx)
+    (await _modem(ctx)).connected = False
+
+    async def applied_with_error(router_id: str, *args, **kwargs):  # type: ignore[no-untyped-def]
+        monkeypatch.setenv("OPENWRTGUI_SIM_GUARD", "live")
+        ctx.guard.check_local()
+        return NetApplyResult(router_id, True, False, (), "Confirmed after a harness run began", "127.0.0.1")
+
+    monkeypatch.setattr(ctx.lte, "apply_setup", applied_with_error)
+    job = await _recover(ctx)
+    assert job.phase == "stopped"
+    assert job.rungs[0].outcome == "failed"
+    assert "Confirmed after a harness run began" in (job.rungs[0].detail or "")
+
+
+async def test_two_saves_for_one_router_run_one_at_a_time(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PR #82 review: two Saves for one router would race on the same temporary file."""
+    lock = threading.Lock()
+    active = most = 0
+    real = ctx.lte_setups.save
+
+    def tracked(setup):  # type: ignore[no-untyped-def]
+        nonlocal active, most
+        with lock:
+            active += 1
+            most = max(most, active)
+        time.sleep(0.05)
+        real(setup)
+        with lock:
+            active -= 1
+
+    monkeypatch.setattr(ctx.lte_setups, "save", tracked)
+    await asyncio.gather(ctx.lte.save_setup("ap2", ctx.lte_setups), ctx.lte.save_setup("ap2", ctx.lte_setups))
+    assert most == 1
+
+
+async def test_rung_1_goes_on_over_the_pools_new_connection(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PR #82 review: the rollback runner reconnects (pool.drop); the next checks use the pool's new one."""
+    await _save(ctx)
+    await _drift(ctx)
+    (await _modem(ctx)).connected = False
+    real = ctx.lte.apply_setup
+
+    async def apply_then_reconnect(*args, **kwargs):  # type: ignore[no-untyped-def]
+        old = await ctx.pool.get(ctx.routers.get("ap2"))  # type: ignore[arg-type]  # the job's connection
+        result = await real(*args, **kwargs)
+
+        async def closed(*_a, **_k):  # type: ignore[no-untyped-def]
+            raise TransportError("this connection was closed")
+
+        monkeypatch.setattr(old, "run", closed)
+        await ctx.pool.drop("ap2")
+        return result
+
+    monkeypatch.setattr(ctx.lte, "apply_setup", apply_then_reconnect)
+    job = await _recover(ctx)
+    assert (job.phase, job.detail) == ("recovered", "LTE works again after: Put back the saved setup.")
+
+
+async def test_the_harness_put_back_holds_the_write_lock(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PR #82 review: past Bench Guard, but still serialised with the router's other writes."""
+    modem = await _modem(ctx)
+    modem.wedged = True
+    real_answer = modem.answer
+
+    def run_starts(command: str) -> CommandResult | None:
+        result = real_answer(command)
+        if command == LOW:
+            monkeypatch.setenv("OPENWRTGUI_SIM_GUARD", "live")
+            ctx.guard.check_local()
+        return result
+
+    modem.answer = run_starts
+    held: list[bool] = []
+    real_put_back = ctx.lte._put_back
+
+    async def tracked(rec, t, command):  # type: ignore[no-untyped-def]
+        held.append(ctx.pool.write_lock("ap2").locked())
+        return await real_put_back(rec, t, command)
+
+    monkeypatch.setattr(ctx.lte, "_put_back", tracked)
+    job = await _recover(ctx)
+    assert job.phase == "stopped"
+    assert held == [True, True]
 
 
 def test_the_rungs_are_the_specs() -> None:
