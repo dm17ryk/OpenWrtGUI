@@ -53,7 +53,8 @@ Non-goals:
 Anti-goals (failure even if it "works"):
 - Recover ever sends QMI `--set-device-operating-mode reset`, `AT&F`, `AT&W` or `AT+CFUN`. The first wedges the
   BM806C until a power cycle.
-- Anything here writes to a router while a harness run is live.
+- Anything here writes to a router while a harness run is live, except the two put-back lines Dmitry allowed
+  (4.2, Stopping).
 - The modem is left in low power without the result saying so.
 - A saved password or PIN shows on screen, in the API, in a preview line or in the audit log.
 - Another router's PIN is written to a router.
@@ -145,10 +146,17 @@ its own saved setup (4.4), if there is one.
 - **Stop (my call):** the job finishes putting back what the running rung took down (`online` after
   `low_power`, `ifup lte` after `ifdown lte`), then stops before the next rung. The result says "stopped" and
   whether LTE works.
-- **A harness run going live mid-rung: OPEN, Dmitry's answer pending (see section 8).** Today's Reboot modem
-  has the same hole: `run_audited` refuses `online` with `GuardLocked` and the modem stays in low power with no
-  result saying so. Whatever the answer, the job checks the guard between commands, ends with "stopped: a
-  harness run started", and says where the modem was left.
+- **A harness run going live mid-rung (Dmitry, 2026-11-17: "Finish putting back").**
+  - The job checks the guard before every command.
+  - Once the run is live, it sends no new rung and no new step. It still sends the put-back lines of the running
+    rung, past Bench Guard, the way the network rollback's reload does: `online` after `low_power`, then
+    `ifup lte` after `ifdown lte`.
+  - Then it stops: "stopped: a harness run started; the modem was put back online and LTE reconnected". If a
+    put-back line failed, the result names it and says where the modem was left.
+  - Only those two put-back lines are exempt from the guard. Each goes to the audit log marked "put back during
+    a harness run".
+  - **Reboot modem gets the same rule (my call).** Today it has the same hole: `run_audited` refuses `online`
+    with `GuardLocked`, and the modem stays in low power with no result saying so.
 
 **Preview.** Recover shows every command it may run before it starts, as every LTE action does. Lines of a
 rung that runs only if needed are marked so: "runs only if LTE does not work after the step before". The start
@@ -304,18 +312,14 @@ passwords.
 
 ## 8. Open, for Dmitry
 
-- **A harness run starts mid-rung (blocks the plan).** Either:
-  - (a) the job still sends the put-back (`online`, `ifup lte`) past Bench Guard, as the network rollback does,
-    then stops; or
-  - (b) it stops at once, leaves the modem as it is (perhaps in low power, or with LTE down), says so, and
-    offers **Put back** once the run is over, as the step-through's Restore does.
+- **A harness run starts mid-rung:** answered "Finish putting back" (4.2, Stopping).
 - **Which release ships it (does not block the plan):** with 1.1.0 (1.1a, 1.1b) by default, or a 1.0.2 of its
   own.
 
 ## 9. The builder check (2026-11-17)
 
 A fresh reviewer read this design as its builder. Its five questions:
-1. A harness run mid-rung: Dmitry's (section 8).
+1. A harness run mid-rung: Dmitry answered "Finish putting back" (4.2).
 2. Where Recover's setup comes from: settled, the router's own setup only (4.2).
 3. LTE works but the settings differ: settled, nothing is written (4.2).
 4. A failed `--sync`: settled, the job goes on to the next rung (4.2).
