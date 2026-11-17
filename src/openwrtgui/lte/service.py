@@ -41,8 +41,8 @@ READBACK_TRIES = 3
 NO_ADDRESS = "no address yet: waiting for the carrier's DHCP"
 DROPS = "{name}'s LTE session drops; devices that route through it lose the internet until it is back"
 NOT_IN_MODE = "The modem did not go {mode}{why}; it may need ifup lte or a power cycle"
-# Spec 4.2, Stopping (Dmitry, 2026-11-17: "Finish putting back"): once a harness run is live, only the lines
-# that put back what the running step took down are sent, past Bench Guard, and audited under this screen.
+# Spec 4.2, Stopping ("Finish putting back"): once a harness run is live, only the lines that put back what the
+# running step took down are sent, past Bench Guard, and audited under this screen.
 PUT_BACK_SCREEN = "LTE (put back during a harness run)"
 HARNESS_STOPPED = "Stopped: a harness run started; the modem was put back online and LTE reconnected."
 PUT_BACK_FAILED = "Stopped: a harness run started; {command}: {reason}; the modem was left {where}."

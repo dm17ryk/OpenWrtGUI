@@ -511,7 +511,7 @@ class LteRecover:
 
     async def _stopped(self, run: _Run, harness: bool) -> None:
         """Put back what the running rung took down: online first, then ifup lte. Past Bench Guard only when a
-        harness run is live (Dmitry, 2026-11-17: "Finish putting back")."""
+        harness run is live (spec 4.2: "Finish putting back")."""
         order = [run.pending[k] for k in ("online", "ifup") if k in run.pending]
         if harness or (order and self._guard.state().live):
             result = await self._lte.put_back(run.rec, run.t, order)
