@@ -25,6 +25,18 @@ async def test_kept_files_edit_read_back(ctx: AppContext) -> None:
     assert (await ctx.system.kept_files("ap2")).text == wanted
 
 
+async def test_a_kept_path_outside_etc_is_saved_with_a_warning(ctx: AppContext) -> None:
+    """#35: sysupgrade keeps it, but this app's restore puts back /etc only (R3)."""
+    kept = await ctx.system.kept_files("ap2")
+    plan = await ctx.system.plan_kept_files("ap2", kept.text + "/root/notes.txt\n/etc/owg-test.conf\n")
+    outside = [w for w in plan.warnings if "/root/notes.txt" in w]
+    assert outside == [
+        "A firmware upgrade keeps /root/notes.txt, but this app's backup restore puts back files under /etc "
+        "only."
+    ]
+    assert not any("/etc/owg-test.conf" in w for w in plan.warnings)
+
+
 async def test_a_kept_list_that_does_not_read_is_never_overwritten(
     ctx: AppContext, monkeypatch: pytest.MonkeyPatch
 ) -> None:

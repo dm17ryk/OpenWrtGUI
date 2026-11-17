@@ -233,6 +233,28 @@ async def test_the_include_file_is_written_before_the_section_that_loads_it(env:
     assert file_line < plan.lines.index("uci set firewall.owg_bridge_voipdscp='include'")
 
 
+async def test_a_refused_include_section_names_the_file_left_before_it(
+    env: FwEnv, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#77 minor 8: the file is written first; when the router then refuses the uci change, the answer says
+    the file stays (it is not deleted: a saved include may already name that path, R1)."""
+    original = ReplayTransport.run
+
+    async def run(self: ReplayTransport, command: str, *, timeout: float = 15.0) -> CommandResult:
+        if "uci set firewall.owg_bridge_voipdscp=" in command:
+            return CommandResult(command, "", "uci: I/O error\n", 1)
+        return await original(self, command, timeout=timeout)
+
+    monkeypatch.setattr(ReplayTransport, "run", run)
+    req = TableRequest(VOIP, "edit", override=True, rules=VOIP_RULES, keep="include")
+    plan = await env.fw.plan_table("ap1", req)
+    result = await env.fw.apply_table("ap1", req, plan.digest)
+    assert result.applied and not result.verified
+    assert result.error is not None
+    assert "refused the change" in result.error, result.error
+    assert "/etc/owg/nft/bridge-voipdscp.nft written before it stays on the router" in result.error
+
+
 async def test_a_run_starting_after_the_include_file_leaves_no_section_naming_it(
     env: FwEnv, monkeypatch: pytest.MonkeyPatch
 ) -> None:

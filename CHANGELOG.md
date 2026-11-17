@@ -12,6 +12,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Reads: an empty iptables answer is an error, a newer page list reads its own facts, a scan interface left behind
   is removed before an on-air scan too, the app's own ingress shows as the app's, a numeric operator code is
   labelled, and OWE networks are labelled OWE.
+- A refused firewall change names the include file it left; a kept path outside /etc is saved with a warning that
+  restore puts back /etc only; Reset takes the router's name in any case.
 
 ## [1.0.1] - 2026-11-17
 

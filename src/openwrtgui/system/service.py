@@ -34,6 +34,7 @@ from openwrtgui.system.backup import (
     backup_dir,
     backup_name,
     check_kept,
+    kept_warnings,
     listing,
     save_archive,
     save_upload,
@@ -484,7 +485,7 @@ class SystemService(JobsMixin):
         current = await self._kept_text(t)
         if current == wanted:
             raise ValueError(NOTHING)
-        warnings = []
+        warnings = kept_warnings(wanted)
         if OWG_KEPT in current.split() and OWG_KEPT not in wanted.split():
             warnings.append(
                 f"A flash that keeps settings adds {OWG_KEPT} back (the app's own files on {rec.name})."

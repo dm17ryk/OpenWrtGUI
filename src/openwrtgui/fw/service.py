@@ -338,6 +338,7 @@ class FirewallService:
             current=uci,
             commands=() if writes_file else change.include_commands,
             first=change.include_commands if writes_file else (),
+            first_files=(change.include_file[0],) if change.include_file is not None else (),
         )
         return replace(runtime, lines=(*runtime.lines, *include.lines)), include
 

@@ -238,7 +238,8 @@ class JobsMixin:
         and its entry then waits for Add again (the flash-without-settings marker, reason reset)."""
         rec = self._record(router_id)
         self._not_busy(rec)
-        if confirm_name != rec.name or not alone:
+        typed_name = confirm_name.strip().casefold() == rec.name.strip().casefold()  # #36: any case (R4)
+        if not typed_name or not alone:
             raise ValueError(
                 f"Type the router's name ({rec.name}) and tick that it is alone on this PC's network"
             )

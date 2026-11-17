@@ -52,6 +52,16 @@ function renderCard() {
   )
 }
 
+test("the name may be typed in any case and with spaces around it, as the server takes it", async () => {
+  const user = userEvent.setup()
+  renderCard()
+  await user.click(await screen.findByRole('button', { name: 'Preview reset' }))
+  const start = await screen.findByRole('button', { name: 'Start reset' })
+  await user.type(screen.getByRole('textbox', { name: 'Type AP2 · office to confirm' }), ' ap2 · OFFICE ')
+  await user.click(screen.getByRole('checkbox', { name: "AP2 · office is alone on this PC's network" }))
+  expect(start).toBeEnabled()
+})
+
 test("Start needs the router's name typed and the alone tick, then the job ends with the add-again note", async () => {
   vi.useFakeTimers({ shouldAdvanceTime: true })
   const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })

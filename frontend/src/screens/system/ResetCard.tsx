@@ -26,7 +26,8 @@ export function ResetCard({ routerId, routerName }: Props) {
   const [isBusy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const running = isRunning(job.data)
-  const isReady = typed === routerName && isAlone
+  // the server compares trimmed and in any case (#36); the full name is still needed
+  const isReady = typed.trim().toLowerCase() === routerName.trim().toLowerCase() && isAlone
   const preview = async (): Promise<void> => {
     setError(null)
     try {
