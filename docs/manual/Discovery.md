@@ -35,6 +35,10 @@ downloaded.
 
 The library is read again at most every ten minutes; **Refresh** in Settings › Images reads it at once.
 
+GitHub's API allows 60 reads an hour from one network address, shared by every PC behind it. When they are used
+up, the app reads the release pages on github.com instead, which have no such limit; those pages list only the
+newest releases. If the pages do not answer either, the card says when GitHub's limit ends.
+
 ## Firmware check
 
 **Check firmware** hashes the router's firmware partition and compares it with the same bytes of the image: equal

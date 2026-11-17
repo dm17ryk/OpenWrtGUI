@@ -13,7 +13,7 @@ import httpx
 
 from openwrtgui.live import LiveHub
 from openwrtgui.store.settings import SettingsStore
-from openwrtgui.update.github import Release, fetch_releases, pick_release
+from openwrtgui.update.github import RateLimited, Release, fetch_releases, pick_release
 from openwrtgui.update.installer import ChecksumMismatch, download_release, installer_command, installers
 from openwrtgui.update.versions import Version
 
@@ -44,11 +44,13 @@ class UpdateStatus:
 
 
 def _reason(exc: Exception) -> str:
+    if isinstance(exc, RateLimited):
+        used_up = "GitHub's hourly limit for this network is used up"
+        if exc.reset is None:
+            return f"{used_up}. Try again later, or download it from GitHub."
+        return f"{used_up} until {exc.reset.strftime('%H:%M')}. Try again then, or download it from GitHub."
     if isinstance(exc, httpx.HTTPStatusError):
-        code = exc.response.status_code
-        if code == 403:
-            return "GitHub refused the request (403, likely the hourly rate limit). Try again later."
-        return f"GitHub answered {code}."
+        return f"GitHub answered {exc.response.status_code}."
     return str(exc) or type(exc).__name__
 
 
@@ -95,7 +97,7 @@ class Updater:
             async with self._client_factory() as client:
                 self._releases = await fetch_releases(client)
             self._error = None
-        except (httpx.HTTPError, ValueError) as exc:
+        except (httpx.HTTPError, ValueError, RateLimited) as exc:
             self._error = f"Couldn't check for updates: {_reason(exc)}"
             log.info(self._error)
         self._settings.save(self._settings.load().model_copy(update={"last_check": datetime.now()}))

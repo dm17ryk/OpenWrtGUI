@@ -42,6 +42,13 @@ function mb(bytes: number): string {
   return `${(bytes / 1_000_000).toFixed(1)} MB`
 }
 
+const RELEASES = 'https://github.com/dm17ryk/OpenWrtGUI/releases'
+
+/** Where to download by hand: the latest stable release, or every release on the pre-release channel. */
+function releasesLink(channel: string | undefined): string {
+  return channel === 'prerelease' ? RELEASES : `${RELEASES}/latest`
+}
+
 function WatchGroup({ title, noun, items, onChange }: { title: string; noun: string; items: string[]; onChange: (next: string[]) => void }) {
   const [value, setValue] = useState('')
   const id = `add-${noun.replace(/\s+/g, '-')}`
@@ -266,12 +273,21 @@ export function SettingsScreen() {
         {u && !u.available && !u.error && (
           <div className="muted">{u.last_check ? `You are up to date (checked ${new Date(u.last_check).toLocaleString()}).` : 'Not checked yet.'}</div>
         )}
+        <div className="muted">
+          To install a version by hand:{' '}
+          <a href={releasesLink(s?.update_channel)} target="_blank" rel="noopener noreferrer">
+            Download from GitHub
+          </a>
+        </div>
         {u?.latest && u.available && !hidden && (
           <div className="card stack" style={{ background: 'var(--surface2)' }}>
             <div className="row">
               <strong style={{ fontSize: 16 }}>{u.latest.name}</strong>
               <span className={u.latest.prerelease ? 'b park' : 'b air'}>{u.latest.prerelease ? 'CI pre-release' : 'stable'}</span>
-              <span className="muted">{mb(u.latest.size)}</span>
+              {u.latest.size > 0 && <span className="muted">{mb(u.latest.size)}</span>}
+              <a href={u.latest.url} target="_blank" rel="noopener noreferrer">
+                Release notes on GitHub
+              </a>
             </div>
             {u.latest.notes && <div style={{ whiteSpace: 'pre-wrap', fontSize: 13 }}>{u.latest.notes}</div>}
             <div className="row" style={{ gap: 8 }}>

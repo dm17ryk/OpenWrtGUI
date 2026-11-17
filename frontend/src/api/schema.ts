@@ -7226,6 +7226,8 @@ export interface components {
             published_at: string | null;
             /** Size */
             size: number;
+            /** Url */
+            url: string;
             /** Version */
             version: string;
         };
