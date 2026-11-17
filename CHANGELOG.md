@@ -19,6 +19,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - A capture runs on its own SSH connection, so a change with rollback no longer ends it.
 - A malformed live message is dropped instead of breaking the screen; an unexpected error's traceback is logged
   once.
+- Pins not yet on the router say this change adds them; Check firmware is greyed during a harness run; options
+  locked by the LTE screen say so; Frame analysis no longer shows a stale Off after Start; new VLAN rows in the
+  switch matrix keep unique keys.
 
 ## [1.0.1] - 2026-11-17
 

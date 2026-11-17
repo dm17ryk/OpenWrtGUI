@@ -92,5 +92,6 @@ test('All options show the fields above and the locked options read-only', async
   expect(within(table).queryByRole('combobox', { name: 'autoconnect' })).not.toBeInTheDocument()
   expect(within(table).queryByRole('textbox', { name: 'metric' })).not.toBeInTheDocument()
   expect(table).toHaveTextContent('set above: Settings')
-  expect(table).toHaveTextContent('set above: LTE screen')
+  expect(table).toHaveTextContent('kept by the LTE screen') // #30: a locked row is not "set above"
+  expect(table).not.toHaveTextContent('set above: LTE screen')
 })

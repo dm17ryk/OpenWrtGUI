@@ -13,6 +13,7 @@ import { DiscoveryScreen } from './DiscoveryScreen'
 const calls: Array<{ path: string; body?: unknown }> = []
 let discovery: DiscoveryState = AP1_DISCOVERY
 let firmwareError: ApiError | null = null
+let guardLive = false
 let holdDownload = false
 let releaseDownload: (() => void) | null = null
 
@@ -21,7 +22,10 @@ vi.mock('../../api/client', async (orig) => {
   const respond = async (path: string, body?: unknown): Promise<unknown> => {
     calls.push({ path, body })
     if (path === '/api/routers') return ROUTERS
-    if (path === '/api/guard') return { live: false, reasons: [], checked_at: '2026-11-08T12:00:00' }
+    if (path === '/api/guard') {
+      const reasons = guardLive ? [{ kind: 'process', text: 'dima_night.py runs', router: null }] : []
+      return { live: guardLive, reasons, checked_at: '2026-11-08T12:00:00' }
+    }
     if (path === '/api/tools/dlink%2Cdwr-921-c3-uboot') return []
     if (path === '/api/routers/ap1') return AP1
     if (path === '/api/routers/ap1/discovery') return discovery
@@ -52,6 +56,7 @@ beforeEach(() => {
   calls.length = 0
   discovery = AP1_DISCOVERY
   firmwareError = null
+  guardLive = false
   holdDownload = false
   releaseDownload = null
 })
@@ -82,6 +87,13 @@ test('shows the refusal of the firmware check, not a crash', async () => {
   const user = renderDiscovery()
   await user.click(await screen.findByRole('button', { name: 'Check firmware' }))
   expect(await screen.findByText(/not while dima_night\.py runs/)).toBeVisible()
+})
+
+test('Check firmware is greyed during a harness run, with the guard note (#21)', async () => {
+  guardLive = true
+  renderDiscovery()
+  expect(await screen.findByText('Bench Guard: dima_night.py runs')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Check firmware' })).toBeDisabled()
 })
 
 test('shows the no-match note with both ways out', async () => {

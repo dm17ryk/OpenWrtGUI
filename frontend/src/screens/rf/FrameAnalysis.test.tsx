@@ -114,6 +114,16 @@ test('frames stopped shows why', async () => {
   expect(within(card).getByText(/Stopped: Bench Guard: dima_night\.py/)).toBeInTheDocument()
 })
 
+test('a second Start shows running at once, not the socket\'s stale Off (#50)', async () => {
+  const user = userEvent.setup()
+  renderFrames({ ...OFF, windows: 3 }) // the socket's last message: the first run ended
+  const card = await screen.findByRole('region', { name: 'Frame analysis' })
+  await user.click(within(card).getByRole('button', { name: 'Frame analysis…' }))
+  await within(card).findByRole('region', { name: 'Command preview' })
+  await user.click(within(card).getByRole('button', { name: 'Start frame analysis' }))
+  expect(await within(card).findByRole('button', { name: 'Stop frame analysis' })).toBeEnabled()
+})
+
 test('a refused start shows the reason', async () => {
   startError = 'radio0 is parked: nothing of its own to analyse'
   const user = userEvent.setup()

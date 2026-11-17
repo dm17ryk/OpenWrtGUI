@@ -105,7 +105,10 @@ export function FrameAnalysis({ routerId, radio, live, retryPct }: Props) {
   const [plan, setPlan] = useState<FramePlanOut | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const state = live ?? fetched.data ?? null
+  // a Start or Stop answer holds until the socket sends something newer: the socket's last message is from
+  // before it and would show a stale Off for 3-5 s (#50)
+  const [answered, setAnswered] = useState<{ state: FrameState; liveAt: FrameState | null } | null>(null)
+  const state = answered !== null && answered.liveAt === live ? answered.state : (live ?? fetched.data ?? null)
 
   const act = async (fn: () => Promise<void>): Promise<void> => {
     setBusy(true)
@@ -122,12 +125,16 @@ export function FrameAnalysis({ routerId, radio, live, retryPct }: Props) {
   const start = (): Promise<void> =>
     act(async () => {
       if (!plan) return
-      client.setQueryData(['frames', routerId, radio], await postJson<FrameState>(`${base}/start`, { digest: plan.digest }))
+      const started = await postJson<FrameState>(`${base}/start`, { digest: plan.digest })
+      client.setQueryData(['frames', routerId, radio], started)
+      setAnswered({ state: started, liveAt: live })
       setPlan(null)
     })
   const stop = (): Promise<void> =>
     act(async () => {
-      client.setQueryData(['frames', routerId, radio], await postJson<FrameState>(`${base}/stop`))
+      const stopped = await postJson<FrameState>(`${base}/stop`)
+      client.setQueryData(['frames', routerId, radio], stopped)
+      setAnswered({ state: stopped, liveAt: live })
     })
 
   return (
