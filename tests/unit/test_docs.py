@@ -439,8 +439,8 @@ def test_uninstall_deletes_backups_and_the_manual_says_what() -> None:
 
 
 def test_the_lte_page_explains_recover_and_saved_setups() -> None:
-    """Spec 4.7: Recovering the modem names the five steps; Save good setup, Reconfigure and the AT warning are
-    in their sections; Troubleshooting points to Recover."""
+    """Spec 4.7: Recovering the modem names the five steps; Save good setup, Reconfigure and the AT warning
+    are in their sections; Troubleshooting points to Recover."""
     sections = _sections(_read(MANUAL / "LTE-modem.md"))
     recovering = sections["Recovering the modem"]
     for rung in (
