@@ -64,7 +64,7 @@ test('Reboot modem previews the four uqmi lines and ifup lte', async () => {
   expect(LTE_REBOOT_PLAN.lines.filter((l) => l.startsWith('uqmi '))).toHaveLength(4)
   expect(calls.at(-1)).toEqual({ path: '/api/routers/ap2/lte/action/preview', body: { action: 'reboot' } })
   expect(screen.getByText(LTE_REBOOT_PLAN.warnings[0])).toBeInTheDocument()
-  expect(screen.getByText(/Reset to factory defaults is not in this version/)).toBeInTheDocument()
+  expect(screen.getByText(/only turns the modem's autoconnect off; Recover's fourth step does the same/)).toBeInTheDocument()
 })
 
 test('a connect without an address yet is a note, not a failure', async () => {

@@ -56,7 +56,7 @@ export function ActionsCard({ routerId, routerName, onDone }: Props) {
           </button>
         ))}
       </div>
-      <span className="muted">Reset to factory defaults is not in this version.</span>
+      <span className="muted">The stock firmware's "Restore modem defaults" only turns the modem's autoconnect off; Recover's fourth step does the same.</span>
       <NetChange change={change} short={short} helpTopic={HELP.lteActions} show={action !== null} applyLabel={`Run: ${label}`} provenText="Applied and checked" />
       {waiting && <div className="note">No address yet: waiting for the carrier's DHCP. The session is up; the address follows.</div>}
       <RecoverStart routerId={routerId} live={live} runTitle={runTitle} />

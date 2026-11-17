@@ -11,6 +11,27 @@ test('the LTE screen shows the operator, the labelled signal and four charts', a
   await noHorizontalScroll(page)
 })
 
+test('Recover on a working modem says there is nothing to do', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop-light', 'one project starts LTE jobs in the simulator')
+  await open(page, '/routers/ap1/lte')
+  await page.getByRole('button', { name: 'Recover', exact: true }).click()
+  const preview = page.getByRole('region', { name: 'Recover preview' })
+  await expect(preview).toContainText('# only if LTE does not work after the step before')
+  await preview.getByRole('button', { name: 'Start' }).click()
+  await expect(page.getByRole('region', { name: 'Recover' })).toContainText('LTE works; nothing to do.')
+})
+
+test('Save good setup, then Reconfigure from it changes nothing', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop-light', 'one project saves setups in the simulator')
+  await open(page, '/routers/ap1/lte')
+  page.on('dialog', (dialog) => void dialog.accept()) // a setup saved by an earlier run is replaced
+  await page.getByRole('button', { name: 'Save good setup' }).click()
+  const source = page.getByRole('combobox', { name: 'Reconfigure from' })
+  await expect(source.getByRole('option', { name: /This router's good setup/ })).toHaveCount(1)
+  await source.selectOption('ap1')
+  await expect(page.getByText('Nothing to apply: the router already has these settings.')).toBeVisible()
+})
+
 test('an AT query, then disconnect and connect in the simulator', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop-light', 'one project changes the simulator')
   await open(page, '/routers/ap1/lte')

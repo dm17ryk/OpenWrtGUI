@@ -7,6 +7,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- LTE › **Recover**: finds what is wrong with the modem, then tries one step at a time until LTE works: put back
+  the saved good setup, reconnect, clear the modem's QMI state, turn off the modem's autoconnect (what the stock
+  firmware's "Restore modem defaults" does), restart the modem. Live progress, **Stop**, and a plain answer
+  when nothing helped (reboot the router, then power-cycle it). It never reboots the router itself.
+- LTE › Settings: **Save good setup** (while LTE works) and **Reconfigure** from this router's setup or another
+  router's, without its SIM PIN, with the usual preview and rollback. The setups stay in `lte-setups\` in the
+  data folder; uninstall's data-folder delete and Remove from the app delete them.
+- LTE › Status says when the session is up but has no packet-data handle (it carries no data).
+- LTE › AT console: `AT&F`, `AT&W` and `AT+CFUN=` get a stronger question, since they can erase the modem's
+  profiles or leave it unusable until a power cycle.
+
+### Fixed
+
+- **Reboot modem** no longer leaves the modem in low power when a harness run starts mid-way: it sets it online
+  and brings LTE up again (two lines past Bench Guard, marked in the audit log), then stops and says so.
+
 ## [1.0.1] - 2026-11-17
 
 Update checks and the image library keep working when the office network has used up GitHub's hourly limit.

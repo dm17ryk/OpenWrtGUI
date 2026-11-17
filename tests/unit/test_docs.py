@@ -438,6 +438,25 @@ def test_uninstall_deletes_backups_and_the_manual_says_what() -> None:
     assert documented == deleted, sorted(documented ^ deleted)
 
 
+def test_the_lte_page_explains_recover_and_saved_setups() -> None:
+    """Spec 4.7: Recovering the modem names the five steps; Save good setup, Reconfigure and the AT warning are
+    in their sections; Troubleshooting points to Recover."""
+    sections = _sections(_read(MANUAL / "LTE-modem.md"))
+    recovering = sections["Recovering the modem"]
+    for rung in (
+        "Put back the saved setup",
+        "Reconnect",
+        "Clear QMI state",
+        "Turn off the modem's autoconnect",
+        "Restart the modem",
+    ):
+        assert rung in recovering, rung
+    assert "**Save good setup**" in sections["Settings"] and "**Reconfigure**" in sections["Settings"]
+    assert "Use Recover instead" in sections["AT console"]
+    assert "no packet-data handle" in sections["Status"]
+    assert "Recover" in _section("Troubleshooting", "LTE does not connect")
+
+
 def test_uninstall_deletes_the_lte_setups() -> None:
     """Spec 4.4: saved good setups hold APN passwords and SIM PINs, so Yes deletes them as it does backups,
     and a folder that stays is named."""

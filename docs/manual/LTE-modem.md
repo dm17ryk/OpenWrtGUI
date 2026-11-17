@@ -21,6 +21,10 @@ returns that name with wrong characters.
 When a part of the modem does not answer, the screen names it ("No answer from the modem for: signal") and
 shows the rest.
 
+A session can be up and still carry no data: the modem then reports no packet-data handle. The card says
+"Session up but no packet-data handle: the modem carries no data. Use Recover." LTE works only when the session
+is up, has a packet-data handle, and lte_4 has an address.
+
 ## Signal quality
 
 The four LTE values, each with a label from common LTE field thresholds; a value on a boundary gets the better
@@ -63,6 +67,21 @@ Two options stay as they are:
 - **DHCP on lte_4**: lte_4 must stay DHCP, because the BM806C sends downlink only after a DHCP exchange binds
   the router's MAC.
 
+**Save good setup** keeps this router's LTE options while LTE works: every option the card can edit, the
+password and SIM PIN included. It is greyed while LTE does not work, and it asks before it replaces an older
+setup ("Replace the good setup saved 2026-11-10?"). The setup stays on this PC, in `lte-setups\` in the
+[data folder](Files-and-data), readable by your Windows user only.
+
+**Reconfigure** puts a saved setup back as one settings change, with the preview and the rollback above:
+- choose this router's setup, or another router's (by its name and the day it was saved);
+- only the options that differ are changed; an option the router has and the setup lacks is removed;
+- the device is never changed, and another router's setup never brings its SIM PIN: each SIM has its own;
+- an option the setup has but this router does not know is named and left out; an MTU the setup lacks stays,
+  since the card cannot remove it.
+
+A setup file that cannot be read shows as "(cannot be read)" and cannot be chosen. Removing a router from the
+app deletes its saved setup.
+
 ## Modem
 
 Manufacturer, model and firmware (from `AT+CGMI`, `AT+CGMM`, `AT+CGMR`), the operating mode, and the
@@ -82,7 +101,41 @@ the audit log.
   the modem does not come back online the result says so; then use Connect again or power-cycle the router.
 
 Each shows its commands before it runs, one action at a time per router, and none runs during a harness run.
-Reset to factory defaults is not in this version.
+If a harness run starts while Reboot modem has the modem in low power, the app still sets it online and
+brings LTE up again, then stops and says so.
+
+The stock firmware's "Restore modem defaults" only turns the modem's autoconnect off; it wipes nothing.
+Recover's fourth step does the same.
+
+## Recovering the modem
+
+**Recover** brings LTE back without SSH. It first reads what is wrong (not registered, no session, a session
+with no packet-data handle, no address, or settings that differ from the saved good setup). If LTE works, it
+stops at once and changes nothing, and tells you when the settings differ from the saved setup (use
+Reconfigure for that). Otherwise it tries these steps in order, and stops as soon as LTE works:
+
+1. **Put back the saved setup**: only if this router has a saved good setup and its settings differ.
+2. **Reconnect**: `ifdown lte`, then `ifup lte`.
+3. **Clear QMI state**: `ifdown lte`, then `uqmi --sync` (it frees what the modem still holds of an old
+   session), then `ifup lte`.
+4. **Turn off the modem's autoconnect**: `ifdown lte`, then `uqmi --set-autoconnect disabled`, up to 10 times
+   one second apart, then `ifup lte`. This is what the stock firmware's "Restore modem defaults" does.
+5. **Restart the modem**: `ifdown lte`, then Reboot modem's low power and online.
+
+After each step it waits up to 60 seconds for LTE to work. The preview lists every command it may run; each
+one after the first checks runs "only if LTE does not work after the step before". While it runs, the card
+lists each step with its result, and the other LTE writes on this router wait for it.
+
+- **Stop** puts back what the running step took down (the modem online, `ifup lte`), then stops.
+- **A harness run** that starts during Recover gets the same two put-back lines, sent past Bench Guard and marked
+  in the audit log; then Recover stops and says so.
+- A step that fails (for example `uqmi --sync` gives an error) is noted and Recover goes on to the next one.
+  Only a failure in **Restart the modem** ends it, saying where the modem was left.
+- If LTE still does not work after the last step, Recover says so. Then reboot the router (**Reboot router** opens
+  the [System](System) screen, which asks first), and power-cycle it if that does not help. Recover itself never
+  reboots the router.
+
+Recover never sends the modem's reset mode, `AT&F`, `AT&W` or `AT+CFUN`.
 
 ## AT console
 
@@ -95,3 +148,6 @@ them shows as typed. Every command goes to the audit log.
 Queries (`AT`, `ATI`, `AT+CSQ`, `AT+CGMI`, `AT+CGMM`, `AT+CGMR`, and any `AT+<name>?` or `AT+<name>=?`)
 cannot change the modem and work any time, also during a harness run. Any other command may change the modem:
 the console asks "This command may change the modem. Send it?" first, and it is disabled during a run.
+
+`AT&F`, `AT&W` and any `AT+CFUN=` get a stronger question: "This command can erase the modem's saved profiles
+or leave it unusable until the router is power-cycled. Use Recover instead. Send it anyway?"
