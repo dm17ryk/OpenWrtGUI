@@ -30,8 +30,9 @@ versions.
 ## Global Constraints
 
 - **Test first** (AGENTS.md): every change starts with a test that fails before it.
-- **Never sent:** QMI `--set-device-operating-mode reset`, `AT&F`, `AT&W` or `AT+CFUN` (spec section 2, anti-goals).
-  `commands.set_opmode` keeps refusing every mode but `low_power` and `online`.
+- **Never sent:** QMI `--set-device-operating-mode reset`, `--reset-wds`, `--set-autoconnect` with any value but
+  `disabled`, `AT&F`, `AT&W` or `AT+CFUN` (spec section 2, anti-goals). `commands.set_opmode` keeps refusing
+  every mode but `low_power` and `online`; `commands.autoconnect_off` takes no value.
 - **uqmi:** every command is built through `commands.uqmi()`.
 - **Writes:** use `run_audited` (`guard/writes.py`) or `ApplyRunner`, under `pool.write_lock`, refused during a
   harness run. The only exception is the put-back of 4.2: `online` after `low_power`, and `ifup lte` after
@@ -164,6 +165,20 @@ versions.
   text.
 - [ ] **Step 4:** Run `uv run pytest tests/unit/lte tests/unit/api/test_lte_actions.py -q`. Expected: pass.
 - [ ] **Step 5:** Commit: `fix: Reboot modem puts the modem back online when a harness run starts`.
+
+**Added 2026-11-17 (spec 4.9, Dmitry: "Add a Recover step"), a second commit in this task:**
+- Produces:
+  - `def autoconnect_off(device: str) -> str` in `commands.py`: `uqmi(device, "--set-autoconnect", "disabled",
+    timeout_ms=5000)`, i.e. `"uqmi -s -d /dev/cdc-wdm0 -t 5000 --set-autoconnect disabled"`. It takes no value.
+  - `SimModem.autoconnect_on: bool` (default False): while set, `ifup lte` leaves `connected=False`.
+    `SimModem.autoconnect_refusals: int` (default 0): that many `--set-autoconnect disabled` calls fail first
+    (exit 1, "Request failed"); the next one clears `autoconnect_on` and exits 0.
+- Tests:
+  - `test_autoconnect_off_command_text`: the text above; `autoconnect_off("/dev/x")` raises ValueError; it is
+    not a read.
+  - `test_modem_autoconnect_blocks_ifup_until_turned_off` (tests/unit/api/test_simmodem_faults.py), with one
+    refusal first.
+- Commit: `test: the simulated modem's own autoconnect can hold the bearer`.
 
 ### Task 4: Saved good setups: the store, Save, and their life cycle
 
@@ -301,7 +316,9 @@ versions.
 - Produces:
   - `RecoverPhase = Literal["running", "works", "recovered", "not recovered", "stopped", "failed"]`.
   - `RungOutcome = Literal["skipped", "not needed", "works", "not yet", "failed"]`.
-  - `RUNGS = ("Put back the saved setup", "Reconnect", "Clear QMI state", "Restart the modem")`.
+  - `RUNGS = ("Put back the saved setup", "Reconnect", "Clear QMI state", "Turn off the modem's autoconnect",
+    "Restart the modem")` (spec 4.9 added the fourth). Rung 4 sends `autoconnect_off` up to
+    `AUTOCONNECT_TRIES = 10` times, `AUTOCONNECT_GAP_S = 1.0` apart, until one exits 0; each try is audited.
   - `class RungResult(BaseModel)` (frozen): `name: str`, `outcome: RungOutcome`, `detail: str | None`.
   - `class LteRecoverJob(BaseModel)` (frozen): `router_id`, `phase: RecoverPhase`, `diagnosis: list[str]`,
     `rungs: list[RungResult]`, `current: int | None`, `started_at: datetime`, `ended_at: datetime | None`,
@@ -333,8 +350,9 @@ versions.
     - failed: "<command>: <reason>; the modem was left <where>." (where is "online", "in low power" or "with LTE
       down").
   - **Behaviour:**
-    - A failed command in rungs 1-3 records the rung as "failed" and goes on to the next rung, after `ifup lte` if
-      the rung ran `ifdown lte`. A failed command in rung 4 ends the job "failed".
+    - A failed command in rungs 1-4 records the rung as "failed" and goes on to the next rung, after `ifup lte` if
+      the rung ran `ifdown lte`. Rung 4 fails only when all 10 tries fail. A failed command in rung 5 ends the
+      job "failed".
     - Stop and a harness run put back what the running rung took down (`_put_back` for the harness case), then
       end.
     - A TransportError ends the job "failed", with "<router> did not answer".
@@ -344,15 +362,20 @@ versions.
   - `test_a_working_modem_ends_at_once_with_nothing_written`: phase "works", and no write in the audit log.
   - `test_works_but_settings_differ_writes_nothing_and_says_so`.
   - `test_a_dropped_session_is_back_after_reconnect`: disconnect first. Phase "recovered", rung 2 "works", and
-    rungs 3-4 "not needed".
+    rungs 3-5 "not needed".
   - `test_stale_qmi_needs_the_sync_rung`: phase "recovered" at "Clear QMI state". The audit log has
     `ifdown lte`, then `--sync`, then `ifup lte`, in that order.
+  - `test_modem_autoconnect_needs_the_autoconnect_rung`: `autoconnect_on` with 2 refusals. Phase "recovered" at
+    "Turn off the modem's autoconnect"; the audit log has three `--set-autoconnect disabled` lines between
+    `ifdown lte` and `ifup lte`.
+  - `test_autoconnect_that_never_takes_goes_on_to_the_restart`: 10 refusals. Rung 4 "failed" naming the
+    command; rung 5 runs.
   - `test_a_wedged_modem_needs_the_restart_rung`: phase "recovered" at "Restart the modem".
-  - `test_a_failing_sync_goes_on_to_the_restart` (the sim `--sync` fails once).
+  - `test_a_failing_sync_goes_on_to_the_next_rung` (the sim `--sync` fails once).
   - `test_differing_settings_are_put_back_first`: rung 1 "works", and the apn is restored with rollback and
     confirm.
   - `test_nothing_helps_ends_not_recovered_with_the_reboot_advice`: the modem stays low power.
-  - `test_stop_finishes_the_put_back`: stop while rung 4 is between `low_power` and `online`. Phase "stopped",
+  - `test_stop_finishes_the_put_back`: stop while rung 5 is between `low_power` and `online`. Phase "stopped",
     and the modem is online.
   - `test_a_harness_run_mid_rung_puts_back_and_stops`: phase "stopped", detail `HARNESS_STOPPED`, and the
     put-back lines are audited with `PUT_BACK_SCREEN`.
@@ -365,7 +388,7 @@ versions.
     naming the job.
   - `test_a_step_through_blocks_recover_and_recover_blocks_a_step_through`.
   - `test_never_sends_reset_or_risky_at`: across all the tests above, no audit line contains `mode reset`,
-    `AT&F`, `AT&W` or `AT+CFUN`.
+    `--reset-wds`, `--set-autoconnect enabled`, `--set-autoconnect paused`, `AT&F`, `AT&W` or `AT+CFUN`.
 - [ ] **Step 2:** Run `uv run pytest tests/unit/lte/test_lte_recover.py -q`. Expected: FAIL.
 - [ ] **Step 3:** Implement `lte/recover.py` and the wiring:
   - `ctx.lte_recover`;
@@ -419,7 +442,7 @@ versions.
   - **ActionsCard:** a **Recover** button. A click shows the preview lines, including a line ending "# only if LTE
     does not work after the step before", and a Start button.
   - **RecoverPanel:**
-    - it lists the diagnosis and the four rungs with their outcomes;
+    - it lists the diagnosis and the five rungs with their outcomes;
     - it shows **Stop** while running;
     - a "not recovered" end shows a **Reboot router** link to the router's System screen, and the power-cycle
       line;
@@ -494,8 +517,9 @@ versions.
 **Files:**
 - Modify:
   - `docs/manual/LTE-modem.md`: a new "Recovering the modem" section; Recover; Save good setup and Reconfigure
-    under Settings; the status line; the AT warning under AT console. Drop "(open item O1)" in favour of "Reset
-    to factory defaults is not in this version."
+    under Settings; the status line; the AT warning under AT console. Replace the reset-to-defaults line with
+    what the stock firmware's "Restore modem defaults" does (it turns the modem's autoconnect off) and that
+    Recover's fourth step does the same. The Actions card's reset-to-defaults note changes to match.
   - `docs/manual/Files-and-data.md`: a `lte-setups\` row ("the APN password and SIM PIN of each router's good
     setup"), and the uninstall text.
   - `docs/manual/Troubleshooting.md`: "LTE does not connect" points to Recover.
@@ -505,7 +529,7 @@ versions.
 - Test: `tests/unit/test_docs.py` (extend), `frontend/e2e/lte.spec.ts`
 
 - [ ] **Step 1: Write the failing tests:**
-  - `test_docs`: LTE-modem.md has a "## Recovering the modem" heading that names the four rungs. Files-and-data
+  - `test_docs`: LTE-modem.md has a "## Recovering the modem" heading that names the five rungs. Files-and-data
     names `lte-setups`.
   - e2e "Recover on a working modem says nothing to do": open AP2's LTE screen, Recover, Start, then see
     "LTE works; nothing to do.".
@@ -546,9 +570,10 @@ Spec 4.8. Before it starts: Dmitry's own OK in the orchestrator, Bench Guard cle
   Real APN credentials and IMEIs are replaced as the recorder does.
 - [ ] **Step 2:** Recover on the working modem gives "LTE works; nothing to do.".
 - [ ] **Step 3:** Disconnect, then Recover, gives "recovered" at "Reconnect".
-- [ ] **Step 4:** Run rungs 3 and 4 once each, through a test hook or by forcing the earlier rungs to not
-  settle. Both must end with LTE working. If `--sync` answers differently from the simulator, fix the simulator
-  test first and record a ruling.
+- [ ] **Step 4:** Run rungs 3, 4 and 5 once each, through a test hook or by forcing the earlier rungs to not
+  settle. Each must end with LTE working. If `--sync` or `--set-autoconnect disabled` answers differently from
+  the simulator (for example a QMI error printed with exit 0), fix the simulator test first and record a
+  ruling.
 - [ ] **Step 5:** Save good setup on AP2, then Reconfigure from it gives no change.
 - [ ] **Step 6:** Commit the fixtures and results: `test: LTE recover proven on AP2`.
 

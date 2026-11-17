@@ -43,16 +43,15 @@ Goals:
 - **G6 AP2 proof:** one short AP2 window records the new commands and proves each rung on the real modem.
 
 Non-goals:
-- The modem's factory reset. The stock firmware's sequence (`cpe.Execute` in `libusbmodem.so`) is unknown;
-  that is open item O1, in 1.3.
-- Changing the modem's own autoconnect. The bench image's qmi.sh turns it off at every connect (manual, LTE
-  modem › Settings).
+- A modem NVRAM wipe. None exists for this modem in the stock firmware (O1, traced 2026-11-17, see 4.9).
+- Turning the modem's autoconnect on. Recover only ever turns it off (4.9); the uci `autoconnect` row stays
+  locked, as qmi.sh ignores it.
 - Rebooting the router or power-cycling it automatically.
 - Modems other than the qmi interface named `lte` (the only one the LTE screen supports today).
 
 Anti-goals (failure even if it "works"):
-- Recover ever sends QMI `--set-device-operating-mode reset`, `AT&F`, `AT&W` or `AT+CFUN`. The first wedges the
-  BM806C until a power cycle.
+- Recover ever sends QMI `--set-device-operating-mode reset`, `--reset-wds`, `--set-autoconnect` with any value
+  but `disabled`, `AT&F`, `AT&W` or `AT+CFUN`. The first wedges the BM806C until a power cycle.
 - Anything here writes to a router while a harness run is live, except the two put-back lines Dmitry allowed
   (4.2, Stopping).
 - The modem is left in low power without the result saying so.
@@ -129,16 +128,17 @@ its own saved setup (4.4), if there is one.
 | 1 | Put back the saved setup (only if a setup is chosen and differs) | the settings change of 4.4, with rollback and confirm | wait for "works", up to `CONNECT_S` |
 | 2 | Reconnect | `ifdown lte`, `ifup lte` | wait for "works", up to `CONNECT_S` |
 | 3 | Clear QMI state | `ifdown lte`, `uqmi -s -d DEV -t 5000 --sync`, `ifup lte` | wait for "works", up to `CONNECT_S` |
-| 4 | Restart the modem | `ifdown lte`, then the Reboot modem sequence (`low_power`, readback, `online`, readback, `ifup lte`) | wait for "works", up to `CONNECT_S` |
+| 4 | Turn off the modem's autoconnect (4.9) | `ifdown lte`, `uqmi -s -d DEV -t 5000 --set-autoconnect disabled` (sent up to 10 times, 1 s apart, until it exits 0), `ifup lte` | wait for "works", up to `CONNECT_S` |
+| 5 | Restart the modem | `ifdown lte`, then the Reboot modem sequence (`low_power`, readback, `online`, readback, `ifup lte`) | wait for "works", up to `CONNECT_S` |
 
 - `--sync` comes only after `ifdown lte`, so it cannot release the client id of a live session.
-- **A failed command in rungs 1-3 does not end the job (my call).** A stuck modem is exactly when `--sync` or
-  `ifup` may fail. The rung records "failed: <command>: <reason>" (a non-zero exit or no answer within the
-  timeout), still runs its `ifup lte` if it ran `ifdown lte`, and the job goes on to the next rung. A refused
-  settings change (rung 1) is rolled back by the router as today, then the job goes on.
-- **A failed command in rung 4 ends the job ("failed")**, naming the command and where the modem was left. It
+- **A failed command in rungs 1-4 does not end the job (my call).** A stuck modem is exactly when `--sync`,
+  `--set-autoconnect` or `ifup` may fail. The rung records "failed: <command>: <reason>" (a non-zero exit or no
+  answer within the timeout), still runs its `ifup lte` if it ran `ifdown lte`, and the job goes on to the next
+  rung. A refused settings change (rung 1) is rolled back by the router as today, then the job goes on.
+- **A failed command in rung 5 ends the job ("failed")**, naming the command and where the modem was left. It
   keeps today's rule: if `online` does not take, the result says the modem is in low power.
-- After rung 4, if LTE still does not work, the job ends "not recovered". It lists what each rung did and
+- After rung 5, if LTE still does not work, the job ends "not recovered". It lists what each rung did and
   offers **Reboot router**: the System reboot, which asks first and is never started by the job. If that does
   not help either, power-cycle the router.
 
@@ -253,6 +253,9 @@ The UI polls `GET /recover` every 2 s while the job runs (the `useStepJob` patte
     cleared by a `low_power` then `online` cycle.
   - A `stale_qmi` flag. While it is set, `ifup lte` fails to start the session. It is cleared by `--sync`.
   - A `--sync` branch in its uqmi handling.
+  - An `autoconnect_on` flag (the modem's own autoconnect holds the bearer, and qmi.sh's unchecked attempt to
+    turn it off at ifup did not take). While it is set, `ifup lte` fails to start the session. It is cleared by
+    `--set-autoconnect disabled`, which can be made to fail a given number of times first.
 - **`simnet._dump`:** puts `data.pdh_4` (a valid handle, or `0xffffffff` while wedged) in the lte status.
 - **Seeding:** tests set the flags directly. The e2e simulator can start one router wedged through an
   environment variable, like `OPENWRTGUI_SIM_GUARD`.
@@ -273,11 +276,27 @@ One window with Dmitry's OK at the time, Bench Guard clear, and the txctl sessio
 1. Record `uqmi --sync` (after `ifdown lte`), and the lte status with `pdh_4`, as fixtures.
 2. Recover on a working modem: it must end "LTE works; nothing to do".
 3. Disconnect, then Recover: it must end "recovered" at rung 2.
-4. Run rungs 3 and 4 once each and record their commands. They must come back working.
+4. Run rungs 3, 4 and 5 once each and record their commands, including how uqmi answers `--set-autoconnect
+   disabled` (its exit status and output). They must come back working.
 5. Save good setup, then Reconfigure from it: no change.
 
 Nothing in the window breaks the modem on purpose: no `AT&F`, no QMI reset. Agents never type router
 passwords.
+
+### 4.9 The stock "restore modem defaults" (O1, traced 2026-11-17)
+
+Dmitry pasted the offline trace of the stock firmware (DWR-921 4.0.2), made on his Linux PC:
+- The path: web UI `resetModem()` → `Device.USB.Modem.<n>.Reset` → `libdlink_modules.so`
+  `handler_usbmodem_reset` → `libusbmodem.so` `usbmodem_set_defaults`.
+- For the BM806C (USB 2020:2033) it sends QMI WDS Set Autoconnect Settings (0x0051) with autoconnect disabled,
+  up to 10 times about 1 s apart, and checks it with WDS Get Autoconnect Settings (0x0034).
+- It wipes nothing: no AT&F, no DMS reset. `usbmodem_dwp812_reset` and `usbmodem_restart_modem` serve other
+  modem families and are never used here.
+
+The bench image's qmi.sh already turns autoconnect off at every `ifup lte`, but it does not check or retry
+that. **Dmitry, 2026-11-17: "Add a Recover step".** Rung 4 sends uqmi's `--set-autoconnect disabled` (WDS
+0x0051) itself, retried as the stock firmware does. uqmi has no command for 0x0034, so the check is that LTE
+works after the rung's `ifup lte`. Not yet run on AP2 (4.8).
 
 ## 5. Approaches considered
 
@@ -313,6 +332,7 @@ passwords.
 ## 8. Open, for Dmitry
 
 - **A harness run starts mid-rung:** answered "Finish putting back" (4.2, Stopping).
+- **The stock restore-defaults sequence (O1):** traced, and answered "Add a Recover step" (4.9).
 - **Which release ships it (does not block the plan):** with 1.1.0 (1.1a, 1.1b) by default, or a 1.0.2 of its
   own.
 
