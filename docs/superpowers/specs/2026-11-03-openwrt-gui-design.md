@@ -477,7 +477,13 @@ New router images may bring more LuCI apps. The prober compares the router's LuC
 | v0.6 LTE and System | LTE screen (status, settings, actions, AT console), System screen (all LuCI System and Status pages) |
 | v0.7 Test helpers | Step-through runner, `mon0` frame analysis, channel analysis |
 | v1.0 | Native screens for every LuCI page on the bench image (the fallback stays for pages that later images bring), manual complete, hardening |
-| 1.x (phase 2) | Tool pages, SIM PIN / SMS / USSD, DSA backend and 5/6 GHz checked on real hardware |
+| v1.1 Leftovers, rate statistics and key rotation | The v1.0 reviews' open minors, an accessibility check, RF rate statistics (minstrel), app key rotation |
+| v1.2 Tool pages | The capability chips on Discovery and a page per tool (7.8 Phase 2) |
+| v1.3 LTE phase 2 | SIM PIN, SMS, USSD (7.10 Phase 2), the modem's factory reset (O1) and its mode names (O2) |
+| 1.x (phase 2) | When the hardware is on the bench: the DSA backend (front panel, the exact own-port lock, mirroring), 5/6 GHz checked on real hardware, Wi-Fi mirror excluded MACs and the iperf warning |
+
+The 1.x split is the proposal in `docs/superpowers/plans/2026-11-17-1.x-inventory-and-split.md` (Dmitry,
+2026-11-17: "All recommended").
 
 Each milestone gets its own implementation plan. The first plan covers v0.1 Foundation.
 
