@@ -27,6 +27,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Image library: a release file without a revision is counted as unreadable, an untitled entry shows its board, a
   clock set back does not keep a failed read, screen readers hear the notes, the origin link names its release,
   and Import image… looks disabled during a download.
+- The simulator cuts the PC off when a firewall rule drops its SSH, as a router does; Discovery's service read is
+  in the read-only grammar; tests check the frontend's copies of the server's AT and signal tables.
 
 ## [1.0.1] - 2026-11-17
 
