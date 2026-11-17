@@ -10,6 +10,7 @@ import pytest
 
 from openwrtgui.context import AppContext
 from openwrtgui.probe.status import RouterStatus
+from openwrtgui.transport.base import Unreachable
 from openwrtgui.wifi.step_service import PendingRestore
 
 
@@ -27,11 +28,18 @@ def _status(faults: int | None) -> RouterStatus:
     )
 
 
-def _pending(ctx: AppContext) -> None:
-    folder = ctx.steps._steps_dir  # noqa: SLF001 - a restore a step-through left, as the service saves it
+async def _pending(ctx: AppContext, *, online: bool = True) -> None:
+    """A restore a step-through left, as the service saves it; the router answering, or not."""
+    folder = ctx.steps._steps_dir  # noqa: SLF001
     folder.mkdir(parents=True, exist_ok=True)
     saved = PendingRestore(router_id="ap2", radio="radio0", saved_at=datetime(2026, 11, 17), options={})
     (folder / "ap2-radio0.json").write_text(saved.model_dump_json(), encoding="utf-8")
+    rec = ctx.routers.get("ap2")
+    assert rec is not None
+    if online:
+        await ctx.pool.get(rec)
+    else:
+        ctx.pool.mark_failed("ap2", Unreachable("192.168.1.2:22 did not answer"))
 
 
 async def _remove(authed: httpx.AsyncClient) -> httpx.Response:
@@ -47,10 +55,21 @@ async def test_armed_faults_refuse_the_remove(authed: httpx.AsyncClient, ctx: Ap
 
 
 async def test_a_pending_restore_refuses_the_remove(authed: httpx.AsyncClient, ctx: AppContext) -> None:
-    _pending(ctx)
+    await _pending(ctx)
     r = await _remove(authed)
     assert r.status_code == 409
     assert "a step-through restore waits on radio0" in r.json()["detail"]
+
+
+async def test_a_pending_restore_on_a_router_that_does_not_answer_does_not_block(
+    authed: httpx.AsyncClient, ctx: AppContext
+) -> None:
+    """The final review (Important 3): the restore needs the router, so on a dead one it could never be done
+    and the router could never leave the app. The saved options stay on this PC for when it is added again."""
+    await _pending(ctx, online=False)
+    assert (await _remove(authed)).status_code == 200
+    assert ctx.routers.get("ap2") is None
+    assert [p.radio for p in ctx.steps.pending() if p.router_id == "ap2"] == ["radio0"]
 
 
 async def test_a_running_flash_refuses_the_remove(
@@ -82,7 +101,7 @@ async def test_a_running_capture_refuses_the_remove(
 
 async def test_two_at_once_are_both_named(authed: httpx.AsyncClient, ctx: AppContext) -> None:
     ctx.statuses["ap2"] = _status(1)
-    _pending(ctx)
+    await _pending(ctx)
     detail = (await _remove(authed)).json()["detail"]
     assert detail == (
         "AP2 · office is not removed: 1 fault armed; a step-through restore waits on radio0. "

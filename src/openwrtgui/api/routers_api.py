@@ -70,8 +70,11 @@ def _running_on(ctx: AppContext, router_id: str) -> list[str]:
     if status is not None and status.faults_armed:
         n = status.faults_armed
         found.append(f"{n} fault{'s' if n != 1 else ''} armed")
-    pending = [p.radio for p in ctx.steps.pending() if p.router_id == router_id]
-    found += [f"a step-through restore waits on {radio}" for radio in pending]
+    # a restore needs the router: on one that does not answer it can never be done, so it does not block
+    # (the final review); its saved options stay on this PC for when the router is added again
+    if ctx.pool.health(router_id).online:
+        pending = [p.radio for p in ctx.steps.pending() if p.router_id == router_id]
+        found += [f"a step-through restore waits on {radio}" for radio in pending]
     if (step := ctx.steps.busy(router_id)) is not None:
         found.append(step[:1].lower() + step[1:])
     if ctx.flash.running(router_id):
