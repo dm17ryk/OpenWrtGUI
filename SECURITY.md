@@ -82,5 +82,5 @@ installer runs. The installer is not Authenticode-signed yet.
   with about 8 MB of RAM); flash those with LuCI or the terminal.
 - **Bench Guard** knows the harness processes and lock files you list in Settings; a writer it does not know
   about is not seen.
-- **Bench routers:** the app key is installed only on the routers the bench owner chose, and no Claude GitHub
-  Action runs on this repository.
+- **Bench routers:** the app key is installed only on the routers the bench owner chose (not yet on AP1), and no
+  Claude GitHub Action runs on this repository.
