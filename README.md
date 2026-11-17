@@ -14,9 +14,15 @@ is connected, and how each router describes itself. It never disturbs a test run
 
 ![Dashboard: three routers, the 2.4 GHz air map and one station](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/dashboard.png)
 
-> v0.8 adds LuCI parity: the LuCI page list shows only the pages LuCI itself shows on each router, and the
+> v1.0 adds the complete manual, with How changes work, Files and data and a Glossary, and the hardening for
+> 1.0: refreshes send fewer commands (the LTE screen asks the modem once instead of five times, Legacy iptables
+> reads every table in one command instead of nine), LTE, RF live and System status reconnect by themselves
+> after a lost connection, Discovery, Plugins and LuCI change lists hide every secret option, and CI runs
+> security checks.
+> v0.8 added LuCI parity: the LuCI page list shows only the pages LuCI itself shows on each router, and the
 > remaining LuCI pages have screens here (Plugins, Mount points editing, Legacy iptables, and a bridge VLAN
-> editor for DSA routers).
+> editor for DSA routers). 0.8.2 added the image library: Discovery downloads and imports a router's exact
+> firmware build from the releases of dm17ryk/openwrt.
 > v0.7 added the test helpers: a step-through that walks a radio through modes, channels and TX powers, each
 > step proven on air, and waits on a timer, by hand or until a station re-joins; frame analysis (rate mix, RX
 > signal, retries and broken frames) from a monitor interface; and a passive channel analysis of the networks
@@ -33,10 +39,25 @@ is connected, and how each router describes itself. It never disturbs a test run
 > LuCI fallback; v0.1 the foundation: install, update, add routers, the dashboard, Bench Guard, the terminal
 > and the audit log. What comes next is in the [roadmap](ROADMAP.md).
 
+## What v1.0 adds
+
+| Screen | What you get |
+|---|---|
+| **The manual** | Every screen has its page, with a screenshot, and the `?` on a screen opens its section. Troubleshooting and the FAQ cover the common failures. New pages: **How changes work** (preview, apply with rollback, proof, and what is refused), **Files and data** (what the app keeps on this PC and leaves on a router) and a **Glossary**. |
+| **Faster reads** | A refresh sends fewer commands: the LTE screen asks the modem once instead of five times (model, firmware and mode order are read once per connection), Legacy iptables reads every table in one command instead of nine, Faults sends 16 commands instead of 19, two LuCI page lists asked at once read the router once, and Discovery checks a program in two commands. |
+| **Reconnecting screens** | LTE, RF live and System status reconnect by themselves after a lost connection; RF live says when a recording stopped with it. An unexpected error shows a plain message instead of a blank screen, with the details in the app log. |
+| **Bench Guard** | Flash is greyed during a harness run and says why; a step-through that a run stops names the step the radio is really at; the VLAN editor greys what the router would refuse. |
+| **Routers** | A router can be removed from the app on its overview; the router itself is not changed. |
+| **Fixes** | The firewall, faults, step-through restore, LuCI's page list, Legacy iptables counters, the LTE AT port and the VLAN editor: the full list is in the [changelog](CHANGELOG.md). |
+| **Security** | Discovery, Plugins and a LuCI page's change list hide every secret option. The AT console never shows a SIM PIN or an APN password. Names a router reports are checked before they go into a command or a file name. A backup archive or an image with too many entries, or an image that unpacks too large, is refused. CI runs ruff's bandit rules, pip-audit and npm audit. |
+
+The faster reads are counted by tests (the commands a refresh sends); they are not timed on a router yet.
+
 ## What v0.8 adds
 
 | Screen | What you get |
 |---|---|
+| **Discovery and Settings › Images** (0.8.2) | Discovery finds a router's exact firmware build in the releases of dm17ryk/openwrt and downloads and imports it on one click; Settings › Images lists every image the library offers. Nothing is downloaded without a click, and a download that does not match its release's `profiles.json` is not kept. |
 | **LuCI pages** | The list shows the pages LuCI itself shows on that router, read from LuCI's own menu rules. The others are under **Not on this router**, each with what it needs (a program, a configuration). A page with a screen here opens that screen, on its own tab. Status › Realtime Graphs › Wireless opens RF live. |
 | **System › Plugins** | LuCI's plugin switches: the global one, one per group and one per plugin. A plugin's options are shown, secret ones hidden; they are edited in LuCI. |
 | **System › Mount points** | On a router with block-mount: the settings, mounts and swap from fstab, Mount attached devices, Generate config and Unmount. Without block-mount the page is read only. |

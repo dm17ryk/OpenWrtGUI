@@ -7,14 +7,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-17
+
+1.0: the manual is complete, reads are faster, screens reconnect by themselves, and the security and correctness
+hardening is done. LuCI parity came in 0.8.0.
+
+The faster reads are counted by tests (the commands a refresh sends), not timed on a router.
+
 ### Added
 
 - Manual: How changes work, Files and data, and a Glossary.
 
 ### Changed
 
-- LTE: the modem's model, firmware and mode order are read once per connection and the rest of the read runs
-  alongside the operator query: about 2 s instead of 10-12 s per refresh.
+- LTE: the modem's model, firmware and mode order are read once per connection, so a refresh asks the modem once
+  instead of five times, and the rest of the read runs alongside that question.
 - Firewall › Legacy iptables reads every table in one command instead of nine, every 10 s.
 - LuCI pages: two lists asked at the same time read the router once, and a list read during a change is not kept.
 - Discovery: Run --help and tool cards check the program in two commands instead of reading the whole page again.
@@ -428,7 +435,8 @@ The foundation: install, update, add routers, see them, and stay out of a runnin
 - Router simulator built from recorded router output, used for e2e tests, screenshots and demos.
 - CI, pre-release and release workflows, wiki sync, CodeQL and Dependabot.
 
-[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v1.0.0
 [0.8.2]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.8.2
 [0.8.1]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.8.1
 [0.8.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.8.0
