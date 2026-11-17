@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from openwrtgui.api.deps import get_ctx, require_token
 from openwrtgui.api.models import Ok, RouterDetail, RouterItem
+from openwrtgui.busy import RouterBusy
 from openwrtgui.context import AppContext
 from openwrtgui.probe.describe import DescriptionSummary, describe_router, summarize
 from openwrtgui.store.routers import RouterRecord
@@ -64,6 +65,8 @@ async def describe_again(router_id: str, ctx: Ctx) -> DescriptionSummary:
 @router.delete("/{router_id}")
 async def remove_router(router_id: str, ctx: Ctx) -> Ok:
     _record(ctx, router_id)
+    if (why := ctx.lte_recover.busy(router_id)) is not None:  # mid-rung the modem may be in low power
+        raise RouterBusy(why)
     ctx.routers.remove(router_id)
     await ctx.pool.drop(router_id)
     ctx.statuses.pop(router_id, None)

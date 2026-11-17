@@ -339,6 +339,113 @@ async def test_a_step_through_blocks_recover_and_recover_blocks_a_step_through(
         await ctx.lte_recover.start("ap2", preview.digest)
 
 
+READ = f"uqmi -s -d {DEV} -t 2000 --get-device-operating-mode"
+
+
+async def test_no_answer_after_low_power_says_the_modem_is_in_low_power(ctx: AppContext) -> None:
+    """Final review I1: the result names where the modem was left when the router stops answering."""
+    modem = await _modem(ctx)
+    modem.wedged = True
+    real = modem.answer
+
+    def dead_after_low(command: str) -> CommandResult | None:
+        if command == READ and modem.opmode == "low_power":
+            raise TransportError("connection lost")
+        return real(command)
+
+    modem.answer = dead_after_low
+    job = await _recover(ctx)
+    assert job.phase == "failed"
+    assert job.error is not None and "did not answer" in job.error and "in low power" in job.error
+
+
+async def test_a_put_back_without_an_answer_says_where_the_modem_is(ctx: AppContext) -> None:
+    modem = await _modem(ctx)
+    modem.wedged = True
+    real = modem.answer
+
+    def stop_then_die(command: str) -> CommandResult | None:
+        if command == LOW:
+            ctx.lte_recover.request_stop("ap2")
+        if command == ONLINE:
+            raise TransportError("connection lost")
+        return real(command)
+
+    modem.answer = stop_then_die
+    job = await _recover(ctx)
+    assert job.phase == "stopped"
+    assert job.error is not None and ONLINE in job.error and "in low power" in job.error
+
+
+async def test_a_cancelled_job_says_where_the_modem_is(ctx: AppContext) -> None:
+    gate = asyncio.Event()
+    modem = await _modem(ctx)
+
+    async def stuck(_s: float) -> None:  # only the low_power read-back's wait between tries hangs
+        if modem.opmode == "low_power":
+            await gate.wait()
+
+    modem.wedged = True
+    real = modem.answer
+
+    def never_low(command: str) -> CommandResult | None:  # the read-back waits between its tries
+        if command == READ and modem.opmode == "low_power":
+            return CommandResult(command, '"online"\n', "", 0)
+        return real(command)
+
+    modem.answer = never_low
+    ctx.lte._sleep = stuck  # type: ignore[assignment]
+    ctx.lte.readback_s = 1.0
+    preview = await ctx.lte_recover.preview("ap2")
+    await ctx.lte_recover.start("ap2", preview.digest)
+    for _ in range(200):
+        await asyncio.sleep(0.01)
+        if LOW in _calls(ctx):
+            break
+    await ctx.lte_recover.stop_all(limit_s=0.05)
+    job = ctx.lte_recover.job("ap2")
+    assert job is not None and job.phase != "running"
+    assert job.error is not None and "in low power" in job.error
+    gate.set()
+
+
+async def test_an_unreadable_own_setup_does_not_block_recover(ctx: AppContext) -> None:
+    """Final review I2: the preview names the file and Recover starts at Reconnect."""
+    (ctx.data.lte_setups_dir / "ap2.json").write_text("{", encoding="utf-8")
+    (await _modem(ctx)).connected = False
+    preview = await ctx.lte_recover.preview("ap2")
+    assert any("ap2.json cannot be read" in w for w in preview.warnings)
+    job = await _recover(ctx)
+    assert (job.phase, job.detail) == ("recovered", "LTE works again after: Reconnect.")
+    assert job.rungs[0].outcome == "skipped"
+
+
+async def test_a_setup_that_cannot_be_put_back_goes_on_to_reconnect(ctx: AppContext) -> None:
+    """Final review I3: rung 1 fails, says why, and the job goes on; the preview says it too."""
+    await _save(ctx)
+    setup = ctx.lte_setups.get("ap2")
+    assert setup is not None
+    ctx.lte_setups.save(setup.model_copy(update={"options": {**setup.options, "mtu": "abc"}}))
+    (await _modem(ctx)).connected = False
+    preview = await ctx.lte_recover.preview("ap2")
+    assert any("not a whole number" in w for w in preview.warnings)
+    job = await _recover(ctx)
+    assert job.rungs[0].outcome == "failed" and "not a whole number" in (job.rungs[0].detail or "")
+    assert (job.phase, job.detail) == ("recovered", "LTE works again after: Reconnect.")
+
+
+async def test_remove_waits_for_the_job(ctx: AppContext, authed: httpx.AsyncClient) -> None:
+    """Final review I5: removing a router mid-job would drop its connection with the modem in low power."""
+    gate = await _held(ctx)
+    try:
+        refused = await authed.delete("/api/routers/ap2")
+        assert (refused.status_code, refused.json()["detail"]) == (409, "LTE recovery runs on AP2 · office")
+        assert ctx.routers.get("ap2") is not None
+    finally:
+        gate.set()
+        await ctx.lte_recover.finished("ap2")
+
+
 def test_the_rungs_are_the_specs() -> None:
     assert RUNGS == (
         "Put back the saved setup",

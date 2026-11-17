@@ -20,9 +20,10 @@ from pydantic import BaseModel, ConfigDict
 from openwrtgui.busy import RouterBusy
 from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked
 from openwrtgui.lte import commands as c
-from openwrtgui.lte.service import DROPS, LteService
-from openwrtgui.lte.setups import SetupStore, setup_change
+from openwrtgui.lte.service import DROPS, HARNESS_STOPPED, LteService
+from openwrtgui.lte.setups import SetupStore, SetupUnreadable, setup_change
 from openwrtgui.lte.state import LteState, lte_works
+from openwrtgui.net.apply import NOTHING
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import CommandResult, Transport, TransportError
 from openwrtgui.wifi.service import PreviewChanged
@@ -189,13 +190,21 @@ class LteRecover:
 
     # ---------------------------------------------------------------- preview
     async def _setup_lines(self, rec: RouterRecord) -> tuple[list[str], list[str]]:
-        """Rung 1's lines (the settings preview, secrets masked) and the warnings about the saved setup."""
-        if self._setups.get(rec.id) is None:
+        """Rung 1's lines (the settings preview, secrets masked) and the warnings about the saved setup. A
+        setup that cannot be read or put back is named here and never blocks the other steps (review I2,
+        I3)."""
+        try:
+            setup = self._setups.get(rec.id)
+        except SetupUnreadable as exc:
+            return [], [f"{exc}: Recover starts at Reconnect."]
+        if setup is None:
             return [], [f"No good setup is saved for {rec.name}: Recover starts at Reconnect."]
         try:
             plan = await self._lte.plan_setup(rec.id, rec.id, self._setups)
-        except ValueError:  # "Nothing to apply": the settings match the saved setup
-            return [], []
+        except ValueError as exc:
+            if str(exc).startswith(NOTHING):  # the settings match the saved setup
+                return [], []
+            return [], [f"The saved good setup cannot be put back: {exc}"]
         return list(plan.lines), list(plan.warnings)
 
     async def preview(self, router_id: str) -> RecoverPreview:
@@ -307,33 +316,60 @@ class LteRecover:
             ended_at=self._clock(),
         )
 
+    @staticmethod
+    def _left(run: _Run, text: str) -> str:
+        """Spec anti-goal: never leave the modem in low power (or LTE down) without the result saying so."""
+        where = (
+            "in low power" if "online" in run.pending else "with LTE down" if "ifup" in run.pending else None
+        )
+        if where is None or "the modem was left" in text:
+            return text
+        return f"{text.rstrip('.')}; the modem was left {where}."
+
     async def _runner(self, run: _Run) -> None:
         try:
             await self._climb(run)
         except _Stopped as stopped:
             await self._stopped(run, stopped.harness)
         except _Failed as failed:
-            self._end(run, "failed", error=str(failed))
+            self._end(run, "failed", error=self._left(run, str(failed)))
+        except asyncio.CancelledError:  # stop_all ran out of time: say where the modem is, then end
+            self._end(run, "stopped", error=self._left(run, "Recover was cancelled before it finished"))
+            raise
         except Exception as exc:  # never left "running"
             log.exception("LTE recovery on %s failed", run.rec.id)
-            self._end(run, "failed", error=f"Recover failed: {exc}")
+            self._end(run, "failed", error=self._left(run, f"Recover failed: {exc}"))
         finally:
             if self._jobs[run.rec.id].phase == "running":
-                self._end(run, "failed", error="Recover ended without a result")
+                self._end(run, "failed", error=self._left(run, "Recover ended without a result"))
 
     async def _climb(self, run: _Run) -> None:
         rec = run.rec
         state = await self._lte.state(rec.id)
         diagnosis = diagnose(state)
-        setup = self._setups.get(rec.id)
+        try:
+            setup = self._setups.get(rec.id)
+        except SetupUnreadable:  # the preview named it; Recover starts at Reconnect
+            setup = None
         differs: list[str] = []
+        broken: str | None = (
+            None  # a setup that cannot become a settings change: rung 1 fails, the job goes on
+        )
         if setup is not None:
             rows, values = await self._lte.setup_values(rec.id)
-            change = setup_change(setup, rows, values, same_router=True)
-            changed = [
-                *(k for k, v in vars(change.settings).items() if v is not None and k != "edits"),
-                *(e.name for e in change.settings.edits),
-            ]
+            try:
+                change = setup_change(setup, rows, values, same_router=True)
+            except ValueError as exc:
+                broken = str(exc)
+                change = None
+            changed = (
+                [
+                    *(k for k, v in vars(change.settings).items() if v is not None and k != "edits"),
+                    *(e.name for e in change.settings.edits),
+                ]
+                if change is not None
+                else []
+            )
             differs = sorted(changed)
             if differs:
                 date = f"{setup.saved_at:%Y-%m-%d}"
@@ -354,6 +390,9 @@ class LteRecover:
         )
         for index, rung in enumerate(rungs):
             self._check(run)
+            if index == 0 and broken is not None:
+                self._rung(rec.id, 0, "failed", f"the saved good setup cannot be put back: {broken}")
+                continue
             if index == 0 and not differs:
                 self._rung(rec.id, 0, "skipped", "no good setup saved" if setup is None else "settings match")
                 continue
@@ -405,9 +444,11 @@ class LteRecover:
         return problem or up
 
     async def _put_back_setup(self, run: _Run) -> str | None:
-        plan = await self._lte.plan_setup(run.rec.id, run.rec.id, self._setups)
-        self._check(run)
+        """Rung 1. A setup that cannot become a change, a preview that moved, or another writer: the rung
+        fails, says why, and the job goes on (spec 4.2; final review I3)."""
         try:
+            plan = await self._lte.plan_setup(run.rec.id, run.rec.id, self._setups)
+            self._check(run)
             result = await self._lte.apply_setup(
                 run.rec.id, run.rec.id, self._setups, plan.digest, recover=True
             )
@@ -415,6 +456,8 @@ class LteRecover:
             raise _Stopped(harness=True) from exc
         except TransportError as exc:
             raise _Failed(NO_ANSWER.format(command="the settings change", name=run.rec.name)) from exc
+        except (ValueError, PreviewChanged, RouterBusy) as exc:
+            return f"the settings change: {exc}"
         return None if result.applied else (result.error or "the settings change was not applied")
 
     async def _reconnect(self, run: _Run) -> str | None:
@@ -514,8 +557,7 @@ class LteRecover:
         harness run is live (spec 4.2: "Finish putting back")."""
         order = [run.pending[k] for k in ("online", "ifup") if k in run.pending]
         if harness or (order and self._guard.state().live):
-            result = await self._lte.put_back(run.rec, run.t, order)
-            self._end(run, "stopped", detail=result)
+            self._harness_put_back(run, await self._lte.put_back(run.rec, run.t, order))
             return
         for line, where in order:
             try:
@@ -523,7 +565,14 @@ class LteRecover:
                     done = await self._lte.run(run.rec, run.t, line)
             except GuardLocked:
                 remaining = order[order.index((line, where)) :]
-                self._end(run, "stopped", detail=await self._lte.put_back(run.rec, run.t, remaining))
+                self._harness_put_back(run, await self._lte.put_back(run.rec, run.t, remaining))
+                return
+            except TransportError:  # final review I1: say where the modem was left, never "no result"
+                self._end(
+                    run,
+                    "stopped",
+                    error=f"{line}: {run.rec.name} did not answer; the modem was left {where}.",
+                )
                 return
             if not done.ok:
                 self._end(
@@ -532,6 +581,12 @@ class LteRecover:
                 return
         works = await self._lte.works_now(run.t)
         self._end(run, "stopped", detail="Stopped; LTE works." if works else "Stopped; LTE does not work.")
+
+    def _harness_put_back(self, run: _Run, result: str) -> None:
+        if result == HARNESS_STOPPED:
+            self._end(run, "stopped", detail=result)
+        else:  # a put-back line failed: the text names it and where the modem was left
+            self._end(run, "stopped", error=result)
 
 
 def _reason(result: CommandResult) -> str:

@@ -82,6 +82,11 @@ async def test_modem_info_without_a_port() -> None:
         ("AT+CFUN=1,1", True),
         ("AT+CFUN = 0", True),
         (" at+cfun=4 ", True),
+        ("AT&F&W", True),  # final review I4: chained commands
+        ("ATE0&F", True),
+        ("ATZ;+CFUN=1,1", True),
+        ('AT+CGDCONT=1,"IP","x";+CFUN=1,1', True),
+        ("AT+CFUN?;+CSQ", False),
         ("AT+CFUN?", False),
         ("AT+CFUN=?", False),
         ("AT+CSQ", False),

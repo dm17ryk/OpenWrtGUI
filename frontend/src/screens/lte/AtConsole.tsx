@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState, type KeyboardEvent } from 'react'
+import { useRef, useState, type KeyboardEvent } from 'react'
 import { ApiError, apiFetch, postJson } from '../../api/client'
 import type { AtResult, GuardOut } from '../../api/types'
 import { Help } from '../../help/Help'
@@ -52,14 +52,17 @@ export function AtConsole({ routerId }: { routerId: string }) {
   const [entries, setEntries] = useState<Entry[]>([])
   const [history, setHistory] = useState<string[]>([])
   const [recall, setRecall] = useState<number | null>(null)
-  const [asking, setAsking] = useState<string | null>(null) // the question the 428 calls for
+  // the question the 428 calls for, and the command it was asked about (final review: Send sends that one)
+  const [asking, setAsking] = useState<{ command: string; question: string } | null>(null)
+  const askingFor = useRef<string | null>(null) // the command whose unconfirmed send is on its way
   const [isBusy, setBusy] = useState(false)
   const command = text.trim()
   const query = isQuery(command)
   const blocked = live && !query
 
-  const run = async (confirmed: boolean): Promise<void> => {
+  const run = async (confirmed: boolean, command: string = text.trim()): Promise<void> => {
     setAsking(null)
+    askingFor.current = null
     setBusy(true)
     const shown = hidePin(command)
     // a command with a PIN is not kept for Up / Down: raw it shows the PIN, hidden it would send `<hidden>`
@@ -80,13 +83,18 @@ export function AtConsole({ routerId }: { routerId: string }) {
   // spec 4.5: a command that may change the modem goes unconfirmed first, and the text stays in the input; the
   // server's 428 says which question to ask (the server keeps the rule: no second copy of it here)
   const ask = async (): Promise<void> => {
+    const sent = command
+    askingFor.current = sent
     setBusy(true)
     try {
-      await postJson<AtResult>(`/api/routers/${routerId}/lte/at`, { command, confirmed: false })
-      setAsking(QUESTION) // never expected: the server asks for every command that is not a query
+      await postJson<AtResult>(`/api/routers/${routerId}/lte/at`, { command: sent, confirmed: false })
+      if (askingFor.current === sent) setAsking({ command: sent, question: QUESTION }) // never expected
     } catch (err) {
       if (err instanceof ApiError && err.status === 428) {
-        setAsking((err.body as { risky?: boolean } | null)?.risky === true ? RISKY_QUESTION : QUESTION)
+        // the text was changed meanwhile: that question is not about what the input holds now
+        if (askingFor.current !== sent) return
+        const risky = (err.body as { risky?: boolean } | null)?.risky === true
+        setAsking({ command: sent, question: risky ? RISKY_QUESTION : QUESTION })
       } else {
         const id = Date.now() + Math.random()
         setEntries((e) => [...e, { id, command: hidePin(command), error: err instanceof ApiError ? err.detail : String(err) }].slice(-HISTORY))
@@ -144,6 +152,7 @@ export function AtConsole({ routerId }: { routerId: string }) {
           onChange={(e) => {
             setText(e.target.value)
             setAsking(null)
+            askingFor.current = null
           }}
           onKeyDown={onKey}
         />
@@ -153,10 +162,10 @@ export function AtConsole({ routerId }: { routerId: string }) {
       </div>
       {blocked && guard.data && <div className="note w">This command may change the modem, so it waits for the run: {guardReasonText(guard.data)}. Queries still work.</div>}
       {asking && (
-        <div className={asking === RISKY_QUESTION ? 'note x row' : 'note w row'} role="group" aria-label="Confirm AT command">
-          <span>{asking}</span>
+        <div className={asking.question === RISKY_QUESTION ? 'note x row' : 'note w row'} role="group" aria-label="Confirm AT command">
+          <span>{asking.question}</span>
           <div className="spacer" />
-          <button className="btn pri" type="button" onClick={() => void run(true)}>
+          <button className="btn pri" type="button" onClick={() => void run(true, asking.command)}>
             Send
           </button>
           <button className="btn" type="button" onClick={() => setAsking(null)}>

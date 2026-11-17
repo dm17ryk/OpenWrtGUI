@@ -10,7 +10,7 @@ import pytest
 from openwrtgui.context import AppContext
 from openwrtgui.guard.bench_guard import GuardLocked
 from openwrtgui.lte.service import HARNESS_STOPPED, PUT_BACK_SCREEN, LteBusy
-from openwrtgui.transport.base import CommandResult
+from openwrtgui.transport.base import CommandResult, TransportError
 from openwrtgui.transport.fake import ReplayTransport
 from openwrtgui.wifi.service import PreviewChanged
 
@@ -164,6 +164,26 @@ async def test_a_run_after_the_modem_is_back_online_puts_back_ifup_only(
     put_back = [e.command for e in reversed(ctx.audit.query()) if e.screen == PUT_BACK_SCREEN]
     assert put_back == ["ifup lte"]
     assert (await _modem(ctx)).connected
+
+
+async def test_a_put_back_without_an_answer_names_where_the_modem_was_left(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Final review I1: a TransportError on the put-back is the result's error, not a bare 502."""
+    await _run_starts_after(ctx, monkeypatch, LOW)
+    modem = await _modem(ctx)
+    real = modem.answer
+
+    def dead(command: str) -> CommandResult | None:
+        if command == ONLINE:
+            raise TransportError("connection lost")
+        return real(command)
+
+    modem.answer = dead  # type: ignore[method-assign]
+    plan = await ctx.lte.plan_action("ap2", "reboot")
+    result = await ctx.lte.apply_action("ap2", "reboot", plan.digest)
+    assert result.error is not None
+    assert ONLINE in result.error and "in low power" in result.error and "did not answer" in result.error
 
 
 async def test_reboot_put_back_failure_names_where_the_modem_was_left(

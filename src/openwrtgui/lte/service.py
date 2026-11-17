@@ -28,7 +28,7 @@ from openwrtgui.net.interfaces import InterfaceRequest, dynamic_refusal
 from openwrtgui.net.service import NetworkService
 from openwrtgui.net.state import NetworkState
 from openwrtgui.store.routers import RouterRecord, RouterStore
-from openwrtgui.transport.base import CommandResult, Transport
+from openwrtgui.transport.base import CommandResult, Transport, TransportError
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.wifi.service import PreviewChanged
 
@@ -316,7 +316,12 @@ class LteService:
         """Send each (line, where the modem is left if it fails) in order; stop at the first failure. The
         result is HARNESS_STOPPED, or the failure naming its command and where the modem was left."""
         for command, where in commands:
-            done = await self._put_back(rec, t, command)
+            try:
+                done = await self._put_back(rec, t, command)
+            except TransportError:  # final review I1: the result says where, never a bare 502
+                return PUT_BACK_FAILED.format(
+                    command=command, reason=f"{rec.name} did not answer", where=where
+                )
             if not done.ok:
                 return PUT_BACK_FAILED.format(command=command, reason=_reason(done), where=where)
         return HARNESS_STOPPED

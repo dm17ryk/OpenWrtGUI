@@ -7,6 +7,7 @@ import { LTE_AT_CFUN, LTE_AT_CSQ } from '../../testing/lte'
 import { AtConsole, RISKY_QUESTION } from './AtConsole'
 
 const calls: Array<{ path: string; body: unknown }> = []
+let hold: Promise<void> | null = null
 
 vi.mock('../../api/client', async (orig) => {
   const actual = await orig<typeof import('../../api/client')>()
@@ -21,6 +22,7 @@ vi.mock('../../api/client', async (orig) => {
       const { command, confirmed } = body as { command: string; confirmed: boolean }
       if (command === 'AT+CSQ' || command === 'AT+CPIN=?') return LTE_AT_CSQ
       if (!confirmed) {
+        if (hold) await hold // a slow answer: the person may type meanwhile
         // the server's 428 (spec 4.5): its own rule decides `risky`
         const risky = /^AT(&[FW]|\+CFUN=)/i.test(command)
         throw new actual.ApiError(428, 'This command may change the modem; send it again with confirm', { risky })
@@ -35,6 +37,7 @@ const LIVE = { live: true, reasons: [{ kind: 'process', text: 'TXCTL v14 night r
 
 beforeEach(() => {
   calls.length = 0
+  hold = null
 })
 
 function renderConsole(guard: GuardOut = CLEAR) {
@@ -85,6 +88,27 @@ test('a risky command asks the stronger question', async () => {
   expect(ask).toHaveTextContent(RISKY_QUESTION)
   await user.click(within(ask).getByRole('button', { name: 'Send' }))
   expect(calls.at(-1)).toEqual({ path: AT, body: { command: 'AT+CFUN=0', confirmed: true } })
+})
+
+test('Send after the question sends the command it asked about, not text typed meanwhile', async () => {
+  // final review: editing AT+COPS=0 into AT&F during the unconfirmed round trip must not send AT&F under the
+  // generic question
+  const user = userEvent.setup()
+  let answer = (): void => {}
+  hold = new Promise<void>((resolve) => {
+    answer = resolve
+  })
+  const { input, send } = renderConsole()
+  await user.type(input, 'AT+COPS=0')
+  await user.click(send)
+  await user.clear(input)
+  await user.type(input, 'AT&F') // typed while the server's 428 for AT+COPS=0 is on its way
+  answer()
+  await new Promise((r) => setTimeout(r, 0))
+  const ask = screen.queryByRole('group', { name: 'Confirm AT command' })
+  if (ask) await user.click(within(ask).getByRole('button', { name: 'Send' }))
+  const confirmed = calls.filter((c) => (c.body as { confirmed: boolean }).confirmed).map((c) => (c.body as { command: string }).command)
+  expect(confirmed).not.toContain('AT&F')
 })
 
 test('a query is sent once, with no question', async () => {
