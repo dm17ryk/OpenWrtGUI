@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from openwrtgui.api.deps import get_ctx, require_token
@@ -115,12 +116,14 @@ async def settings_apply(router_id: str, body: LteSettingsApplyIn, ctx: Ctx) -> 
     return await ctx.lte.apply_settings(_known(ctx, router_id), body.to_domain(), body.digest)
 
 
-@router.post("/at")
-async def at_command(router_id: str, body: AtIn, ctx: Ctx) -> AtResult:
+@router.post(
+    "/at", response_model=AtResult, responses={428: {"description": "Confirm first: {detail, risky}"}}
+)
+async def at_command(router_id: str, body: AtIn, ctx: Ctx) -> AtResult | JSONResponse:
     try:
         return await ctx.lte.at_command(_known(ctx, router_id), body.command, body.confirmed)
-    except AtNeedsConfirm as exc:
-        raise HTTPException(status_code=428, detail=str(exc)) from exc
+    except AtNeedsConfirm as exc:  # spec 4.5: the console asks the stronger question when risky
+        return JSONResponse(status_code=428, content={"detail": str(exc), "risky": exc.risky})
     except LteBusy as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 

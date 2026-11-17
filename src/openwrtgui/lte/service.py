@@ -17,7 +17,7 @@ from openwrtgui.guard.audit import AT_MASKED_COMMANDS, AuditLog, mask
 from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked
 from openwrtgui.guard.writes import run_audited
 from openwrtgui.lte import commands as c
-from openwrtgui.lte.at import AtResult, ModemIdentity, find_at_port, is_query
+from openwrtgui.lte.at import AtResult, ModemIdentity, find_at_port, is_query, is_risky
 from openwrtgui.lte.commands import MODEM_DEVICE
 from openwrtgui.lte.parse import parse_at, parse_opmode
 from openwrtgui.lte.settings import LteSettings, settings_request
@@ -65,7 +65,12 @@ class LteBusy(Exception):
 
 
 class AtNeedsConfirm(Exception):
-    """D5: an AT command that is not a query runs only once the person confirms it (428)."""
+    """D5: an AT command that is not a query runs only once the person confirms it (428). `risky`: one that
+    can erase the modem's profiles or wedge it (spec 4.5), so the console asks a stronger question."""
+
+    def __init__(self, message: str, *, risky: bool = False) -> None:
+        super().__init__(message)
+        self.risky = risky
 
 
 class LteNotWorking(ValueError):
@@ -511,7 +516,7 @@ class LteService:
             self._guard.require_clear()
             self._refuse_if_busy(rec.id)
             if not confirmed:
-                raise AtNeedsConfirm(NEEDS_CONFIRM)
+                raise AtNeedsConfirm(NEEDS_CONFIRM, risky=is_risky(command))
         t = await self._pool.get(rec)
         if query:
             async with self._at_lock(rec.id):

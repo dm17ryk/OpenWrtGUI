@@ -11685,6 +11685,13 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Confirm first: {detail, risky} */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     imei_api_routers__router_id__lte_imei_post: {

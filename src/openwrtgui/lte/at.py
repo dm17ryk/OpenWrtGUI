@@ -21,6 +21,15 @@ def is_query(text: str) -> bool:
     return _QUERY.fullmatch(text.strip()) is not None
 
 
+# Spec 4.5: AT&F[n] (factory profile), AT&W[n] (store profile) and any AT+CFUN=... (functionality, a reset
+# among them) can erase the modem's saved profiles or leave the BM806C unusable until a power cycle.
+_RISKY = re.compile(r"AT\s*(&\s*[FW]\s*\d*|\+\s*CFUN\s*=(?!\s*\?).*)", re.IGNORECASE)
+
+
+def is_risky(text: str) -> bool:
+    return _RISKY.fullmatch(text.strip()) is not None
+
+
 class AtResult(BaseModel):
     model_config = ConfigDict(frozen=True)
 

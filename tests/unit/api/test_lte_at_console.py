@@ -190,3 +190,11 @@ async def test_at_exchanges_never_overlap_on_one_router(
     monkeypatch.setattr(t, "run", tracked)
     await asyncio.gather(ctx.lte.state("ap2"), ctx.lte.at_command("ap2", "AT+CSQ", False))
     assert most[0] == 1
+
+
+async def test_the_428_says_whether_the_command_is_risky(authed: httpx.AsyncClient) -> None:
+    risky = await authed.post("/api/routers/ap2/lte/at", json={"command": "AT&F"})
+    assert (risky.status_code, risky.json()["risky"]) == (428, True)
+    plain = await authed.post("/api/routers/ap2/lte/at", json={"command": "AT+COPS=0"})
+    assert (plain.status_code, plain.json()["risky"]) == (428, False)
+    assert plain.json()["detail"] == "This command may change the modem; send it again with confirm"

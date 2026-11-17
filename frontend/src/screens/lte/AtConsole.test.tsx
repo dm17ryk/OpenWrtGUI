@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, test, vi } from 'vitest'
 import type { GuardOut } from '../../api/types'
 import { LTE_AT_CFUN, LTE_AT_CSQ } from '../../testing/lte'
-import { AtConsole } from './AtConsole'
+import { AtConsole, RISKY_QUESTION } from './AtConsole'
 
 const calls: Array<{ path: string; body: unknown }> = []
 
@@ -18,7 +18,14 @@ vi.mock('../../api/client', async (orig) => {
     postJson: vi.fn(async (path: string, body?: unknown) => {
       calls.push({ path, body })
       if (path !== '/api/routers/ap2/lte/at') throw new Error(`unexpected ${path}`)
-      return (body as { command: string }).command === 'AT+CSQ' ? LTE_AT_CSQ : LTE_AT_CFUN
+      const { command, confirmed } = body as { command: string; confirmed: boolean }
+      if (command === 'AT+CSQ' || command === 'AT+CPIN=?') return LTE_AT_CSQ
+      if (!confirmed) {
+        // the server's 428 (spec 4.5): its own rule decides `risky`
+        const risky = /^AT(&[FW]|\+CFUN=)/i.test(command)
+        throw new actual.ApiError(428, 'This command may change the modem; send it again with confirm', { risky })
+      }
+      return LTE_AT_CFUN
     }),
   }
 })
@@ -54,26 +61,49 @@ test('a query prints the modem lines and OK', async () => {
   expect(screen.getByRole('button', { name: 'Help: AT console' })).toBeInTheDocument()
 })
 
-test('a command that may change the modem asks first and sends confirmed on Send', async () => {
+const AT = '/api/routers/ap2/lte/at'
+
+test('a command that may change the modem goes unconfirmed first, asks on the 428, then sends confirmed', async () => {
   const user = userEvent.setup()
   const { input, send } = renderConsole()
-  await user.type(input, 'AT+CFUN=0')
+  await user.type(input, 'AT+COPS=0')
   await user.click(send)
-  expect(calls).toEqual([])
-  const ask = screen.getByRole('group', { name: 'Confirm AT command' })
+  const ask = await screen.findByRole('group', { name: 'Confirm AT command' })
+  expect(calls).toEqual([{ path: AT, body: { command: 'AT+COPS=0', confirmed: false } }])
   expect(ask).toHaveTextContent('This command may change the modem. Send it?')
   await user.click(within(ask).getByRole('button', { name: 'Send' }))
-  expect(calls).toEqual([{ path: '/api/routers/ap2/lte/at', body: { command: 'AT+CFUN=0', confirmed: true } }])
+  expect(calls.at(-1)).toEqual({ path: AT, body: { command: 'AT+COPS=0', confirmed: true } })
   expect(screen.queryByRole('group', { name: 'Confirm AT command' })).not.toBeInTheDocument()
 })
 
-test('Cancel sends nothing', async () => {
+test('a risky command asks the stronger question', async () => {
   const user = userEvent.setup()
   const { input, send } = renderConsole()
   await user.type(input, 'AT+CFUN=0')
   await user.click(send)
-  await user.click(within(screen.getByRole('group', { name: 'Confirm AT command' })).getByRole('button', { name: 'Cancel' }))
-  expect(calls).toEqual([])
+  const ask = await screen.findByRole('group', { name: 'Confirm AT command' })
+  expect(ask).toHaveTextContent(RISKY_QUESTION)
+  await user.click(within(ask).getByRole('button', { name: 'Send' }))
+  expect(calls.at(-1)).toEqual({ path: AT, body: { command: 'AT+CFUN=0', confirmed: true } })
+})
+
+test('a query is sent once, with no question', async () => {
+  const user = userEvent.setup()
+  const { input, send } = renderConsole()
+  await user.type(input, 'AT+CSQ')
+  await user.click(send)
+  await screen.findByText('+CSQ: 20,99')
+  expect(calls).toHaveLength(1)
+  expect(screen.queryByRole('group', { name: 'Confirm AT command' })).not.toBeInTheDocument()
+})
+
+test('Cancel sends nothing more', async () => {
+  const user = userEvent.setup()
+  const { input, send } = renderConsole()
+  await user.type(input, 'AT+CFUN=0')
+  await user.click(send)
+  await user.click(within(await screen.findByRole('group', { name: 'Confirm AT command' })).getByRole('button', { name: 'Cancel' }))
+  expect(calls).toEqual([{ path: AT, body: { command: 'AT+CFUN=0', confirmed: false } }])
   expect(input).toHaveValue('AT+CFUN=0')
 })
 
@@ -93,8 +123,8 @@ test('a SIM PIN is shown hidden and never recalled with Up', async () => {
   const { input, send } = renderConsole()
   await user.type(input, 'AT+CPIN=1234')
   await user.click(send)
-  await user.click(within(screen.getByRole('group', { name: 'Confirm AT command' })).getByRole('button', { name: 'Send' }))
-  expect(calls).toEqual([{ path: '/api/routers/ap2/lte/at', body: { command: 'AT+CPIN=1234', confirmed: true } }])
+  await user.click(within(await screen.findByRole('group', { name: 'Confirm AT command' })).getByRole('button', { name: 'Send' }))
+  expect(calls.at(-1)).toEqual({ path: AT, body: { command: 'AT+CPIN=1234', confirmed: true } })
   const log = await screen.findByRole('log', { name: 'AT console output' })
   expect(within(log).getByText('> AT+CPIN=<hidden>')).toBeInTheDocument()
   expect(log).not.toHaveTextContent('1234')
@@ -108,7 +138,7 @@ test('a SIM PIN typed with spaces is hidden too', async () => {
   const { input, send } = renderConsole()
   await user.type(input, 'AT + CPIN = 1234')
   await user.click(send)
-  await user.click(within(screen.getByRole('group', { name: 'Confirm AT command' })).getByRole('button', { name: 'Send' }))
+  await user.click(within(await screen.findByRole('group', { name: 'Confirm AT command' })).getByRole('button', { name: 'Send' }))
   const log = await screen.findByRole('log', { name: 'AT console output' })
   expect(log).not.toHaveTextContent('1234')
   await user.click(input)
@@ -121,7 +151,7 @@ test('an APN password is hidden and not recalled; a query of it stays readable',
   const { input, send } = renderConsole()
   await user.type(input, 'AT+CGAUTH=1,1,"bench","apnpw42"')
   await user.click(send)
-  await user.click(within(screen.getByRole('group', { name: 'Confirm AT command' })).getByRole('button', { name: 'Send' }))
+  await user.click(within(await screen.findByRole('group', { name: 'Confirm AT command' })).getByRole('button', { name: 'Send' }))
   const log = await screen.findByRole('log', { name: 'AT console output' })
   expect(log).not.toHaveTextContent('apnpw42')
   expect(within(log).getByText('> AT+CGAUTH=<hidden>')).toBeInTheDocument()
