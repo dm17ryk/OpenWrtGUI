@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, test, vi } from 'vitest'
 import type { GuardOut } from '../../api/types'
-import { LTE_CONNECT_NO_ADDRESS, LTE_CONNECT_PLAN, LTE_REBOOT_PLAN } from '../../testing/lte'
+import { LTE_CONNECT_NO_ADDRESS, LTE_CONNECT_PLAN, LTE_REBOOT_PLAN, RECOVER_PREVIEW, RECOVER_RUNNING } from '../../testing/lte'
 import { ActionsCard } from './ActionsCard'
 
 const calls: Array<{ path: string; body: unknown }> = []
@@ -14,10 +14,13 @@ vi.mock('../../api/client', async (orig) => {
   return {
     ...actual,
     apiFetch: vi.fn(async (path: string) => {
+      if (path === '/api/routers/ap2/lte/recover') return null
       throw new Error(`unexpected ${path}`)
     }),
     postJson: vi.fn(async (path: string, body?: unknown) => {
       calls.push({ path, body })
+      if (path === '/api/routers/ap2/lte/recover/preview') return RECOVER_PREVIEW
+      if (path === '/api/routers/ap2/lte/recover') return RECOVER_RUNNING
       const action = (body as { action: string }).action
       if (path === '/api/routers/ap2/lte/action/preview') return action === 'reboot' ? LTE_REBOOT_PLAN : LTE_CONNECT_PLAN
       if (path === '/api/routers/ap2/lte/action/apply') {
@@ -84,6 +87,17 @@ test('a 423 shows the run', async () => {
   await screen.findByRole('region', { name: 'Command preview' })
   await user.click(screen.getByRole('button', { name: 'Run: Disconnect' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('TXCTL v14 night run')
+})
+
+test('Recover shows every command it may run, then starts with the digest', async () => {
+  const user = userEvent.setup()
+  renderActions()
+  await user.click(screen.getByRole('button', { name: 'Recover' }))
+  const preview = await screen.findByRole('region', { name: 'Recover preview' })
+  expect(preview).toHaveTextContent(RECOVER_PREVIEW.lines[0], { normalizeWhitespace: false })
+  expect(RECOVER_PREVIEW.lines.some((l) => l.endsWith('# only if LTE does not work after the step before'))).toBe(true)
+  await user.click(within(preview).getByRole('button', { name: 'Start' }))
+  expect(calls.at(-1)).toEqual({ path: '/api/routers/ap2/lte/recover', body: { digest: RECOVER_PREVIEW.digest } })
 })
 
 test('the actions wait while a harness run is live', () => {

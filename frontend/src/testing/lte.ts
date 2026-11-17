@@ -1,5 +1,5 @@
 // Generated from the simulator (sim ap2, signal at its base values); do not edit by hand.
-import type { AtResult, LteState, NetApplyResult, NetPlan, OptionRow } from '../api/types'
+import type { AtResult, LteRecoverJob, LteState, NetApplyResult, NetPlan, OptionRow, RecoverPreview } from '../api/types'
 
 export const AP2_LTE: LteState = {
   "router_id": "ap2",
@@ -562,4 +562,45 @@ export const LTE_AT_CFUN: AtResult = {
   "lines": [],
   "status": "OK",
   "error": null
+}
+
+// Recover's preview on sim ap2 with no saved setup (spec 4.2); written by hand from the server's answer.
+const ONLY_IF = '  # only if LTE does not work after the step before'
+export const RECOVER_PREVIEW: RecoverPreview = {
+  lines: [
+    'ifdown lte',
+    'ifup lte',
+    'ifdown lte',
+    'uqmi -s -d /dev/cdc-wdm0 -t 5000 --sync',
+    'ifup lte',
+    'ifdown lte',
+    'uqmi -s -d /dev/cdc-wdm0 -t 5000 --set-autoconnect disabled',
+    'ifup lte',
+    'ifdown lte',
+    'uqmi -s -d /dev/cdc-wdm0 -t 3000 --set-device-operating-mode low_power',
+    'uqmi -s -d /dev/cdc-wdm0 -t 2000 --get-device-operating-mode',
+    'uqmi -s -d /dev/cdc-wdm0 -t 3000 --set-device-operating-mode online',
+    'uqmi -s -d /dev/cdc-wdm0 -t 2000 --get-device-operating-mode',
+    'ifup lte',
+  ].map((line) => `${line}${ONLY_IF}`),
+  warnings: [
+    "AP2 · office's LTE session drops; devices that route through it lose the internet until it is back",
+    "Turn off the modem's autoconnect sends its command up to 10 times, 1 s apart.",
+    'No good setup is saved for AP2 · office: Recover starts at Reconnect.',
+  ],
+  digest: '5f0c1d2e3a4b5c6d',
+}
+
+export const RECOVER_RUNNING: LteRecoverJob = {
+  router_id: 'ap2',
+  phase: 'running',
+  diagnosis: ['no session'],
+  rungs: ['Put back the saved setup', 'Reconnect', 'Clear QMI state', "Turn off the modem's autoconnect", 'Restart the modem'].map(
+    (name) => ({ name, outcome: null, detail: null }),
+  ),
+  current: 1,
+  started_at: '2026-11-17T12:00:00',
+  ended_at: null,
+  detail: null,
+  error: null,
 }
