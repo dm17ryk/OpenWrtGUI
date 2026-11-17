@@ -9,6 +9,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Wiki** in the top bar, beside the theme button, opens the manual on the project wiki in your browser.
 - An accessibility check (axe) of every screen in the browser tests, in both themes; serious and critical findings
   fail it. The one it found, the dark theme's "Block all" text contrast, is fixed.
 

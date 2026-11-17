@@ -15,7 +15,7 @@ installer yourself. See [Updating](Updating).
 
 **System** (follows Windows light or dark), **Light** or **Dark**. The choice is saved at once and applies to
 every screen, the charts included; with **System** the app follows Windows' own setting. The moon button in the
-top bar switches between light and dark directly.
+top bar switches between light and dark directly; **Wiki** beside it opens this manual in your browser.
 
 ## Folders
 

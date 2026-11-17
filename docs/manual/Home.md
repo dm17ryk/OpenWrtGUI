@@ -41,7 +41,8 @@ Guard, the terminal and the audit log. What comes next is on the
 
 Every page title and section has a **?** next to it, and the main buttons explain themselves when you
 rest the pointer on them. The text is the matching part of this manual, built into the app so it works
-offline; **More in the manual** opens the page here.
+offline; **More in the manual** opens the page here. **Wiki** in the top bar, beside the theme button, opens
+this manual's Home in your browser.
 
 Questions are welcome in [Discussions](https://github.com/dm17ryk/OpenWrtGUI/discussions); bugs and
 feature requests go to [Issues](https://github.com/dm17ryk/OpenWrtGUI/issues/new/choose).

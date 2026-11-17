@@ -41,6 +41,20 @@ test('header shows the pill and the screens', () => {
   expect(screen.getByText('Update available')).toBeInTheDocument()
 })
 
+test('the top bar links the wiki, which opens in the browser, apart from the screens', () => {
+  render(
+    <MemoryRouter>
+      <Header guard={clear} theme="light" onToggleTheme={() => undefined} updateAvailable={false} />
+    </MemoryRouter>,
+  )
+  const wiki = screen.getByRole('link', { name: 'Wiki' })
+  expect(wiki).toHaveAttribute('href', 'https://github.com/dm17ryk/OpenWrtGUI/wiki/')
+  expect(wiki).toHaveAttribute('target', '_blank')
+  expect(wiki).toHaveAttribute('rel', 'noopener noreferrer')
+  expect(wiki).toHaveAttribute('title', 'The manual on the project wiki (opens in your browser)')
+  expect(screen.getByRole('navigation', { name: 'Screens' })).not.toContainElement(wiki)
+})
+
 test('banner names the run and only shows while live', () => {
   const { container, rerender } = render(<GuardBanner guard={clear} />)
   expect(container).toBeEmptyDOMElement()

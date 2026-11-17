@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router'
 import type { GuardOut } from '../api/types'
 import { HelpTip } from '../help/Help'
+import { WIKI } from '../help/manual'
 import { HELP } from '../help/topics'
 import type { Resolved } from '../theme'
 import { guardPillText } from './guardText'
@@ -51,6 +52,15 @@ export function Header({ guard, theme, onToggleTheme, updateAvailable }: Props) 
           {guardPillText(guard)}
         </span>
       </HelpTip>
+      {/* the manual, outside the app: beside the theme button, not among the screens (2026-11-17) */}
+      <a className="theme ext" href={WIKI} target="_blank" rel="noopener noreferrer" title="The manual on the project wiki (opens in your browser)">
+        Wiki
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+          <path d="M14 4h6v6" />
+          <path d="M20 4l-9 9" />
+          <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+        </svg>
+      </a>
       <button className="theme" type="button" aria-pressed={theme === 'dark'} onClick={onToggleTheme}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
           <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />

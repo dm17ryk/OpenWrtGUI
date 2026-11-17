@@ -103,6 +103,12 @@ a {
   min-height: 40px;
   cursor: pointer;
 }
+.theme.ext {
+  text-decoration: none;
+}
+.theme.ext:hover {
+  background: #3a414a;
+}
 
 /* page */
 .wrap {
@@ -277,6 +283,7 @@ h2 {
 .btn:focus-visible,
 .nav a:focus-visible,
 .theme:focus-visible,
+.theme.ext:focus-visible,
 .seg button:focus-visible,
 .tg:focus-visible,
 .rt:focus-visible {
