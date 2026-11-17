@@ -65,6 +65,7 @@ class ReleaseOut(BaseModel):
     prerelease: bool
     published_at: datetime | None
     size: int
+    url: str
 
     @classmethod
     def of(cls, r: Release) -> ReleaseOut:
@@ -75,6 +76,7 @@ class ReleaseOut(BaseModel):
             prerelease=r.prerelease,
             published_at=r.published_at,
             size=r.installer_size,
+            url=r.url,
         )
 
 

@@ -1,4 +1,7 @@
-"""The image library: firmware builds listed in the profiles.json of dm17ryk/openwrt releases."""
+"""The image library: firmware builds listed in the profiles.json of dm17ryk/openwrt releases.
+
+When the API's hourly budget for this network is used up, the release pages are read instead (github_pages).
+"""
 
 from __future__ import annotations
 
@@ -8,21 +11,25 @@ import json
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 from pydantic import BaseModel, ConfigDict
 
+from openwrtgui.github_pages import PageRelease, releases_from_pages, reset_time, used_up
 from openwrtgui.images.profile import Profile
 from openwrtgui.images.store import ProfileStore
 from openwrtgui.images.sysupgrade import MAX_IMAGE
 from openwrtgui.version import APP_VERSION
 
 RELEASES_URL = "https://api.github.com/repos/dm17ryk/openwrt/releases"
+RELEASES_PAGE = "https://github.com/dm17ryk/openwrt/releases"
 MAX_PROFILES = 2**20
 PROFILES_NAME = "profiles.json"
 CACHE_SECONDS = 600
 ERROR_CACHE_SECONDS = 60
-_HEADERS = {"Accept": "application/vnd.github+json", "User-Agent": f"OpenWrtGUI/{APP_VERSION}"}
+_PAGE_HEADERS = {"User-Agent": f"OpenWrtGUI/{APP_VERSION}"}
+_HEADERS = {"Accept": "application/vnd.github+json", **_PAGE_HEADERS}
 
 
 class LibraryError(ValueError):
@@ -82,6 +89,7 @@ def _entry(
     target: str,
     release: dict[str, Any],
     assets: dict[str, dict[str, Any]],
+    download_base: str | None,
 ) -> LibraryEntry | None:
     if not isinstance(profile, dict):
         return None
@@ -99,12 +107,16 @@ def _entry(
         return None
     if not isinstance(size, int) or isinstance(size, bool) or size <= 0:
         return None
-    asset = assets.get(name)
-    if asset is None or not asset.get("browser_download_url"):
-        return None
-    digest = asset.get("digest")
-    if digest and digest != f"sha256:{sha256}":
-        return None
+    if download_base is not None:  # read from the pages: no asset list; the download is checked by its sha256
+        url = f"{download_base}/{quote(name, safe='')}"
+    else:
+        asset = assets.get(name)
+        if asset is None or not asset.get("browser_download_url"):
+            return None
+        digest = asset.get("digest")
+        if digest and digest != f"sha256:{sha256}":
+            return None
+        url = str(asset["browser_download_url"])
     tag = str(release.get("tag_name", ""))
     return LibraryEntry(
         sha256=sha256,
@@ -114,7 +126,7 @@ def _entry(
         title=_title(profile),
         image_name=name,
         size=size,
-        url=str(asset["browser_download_url"]),
+        url=url,
         release_tag=tag,
         release_name=str(release.get("name") or tag),
         release_url=str(release.get("html_url", "")),
@@ -123,8 +135,14 @@ def _entry(
     )
 
 
-def parse_profiles(raw: bytes, release: dict[str, Any]) -> list[LibraryEntry]:
-    """Entries for the sysupgrade images of one release; `release` is a GitHub releases API item."""
+def parse_profiles(
+    raw: bytes, release: dict[str, Any], download_base: str | None = None
+) -> list[LibraryEntry]:
+    """Entries for the sysupgrade images of one release; `release` is a GitHub releases API item.
+
+    `download_base` is the release's download folder when the release was read from the pages, which list no
+    assets: each image's URL is then that folder plus the image's name.
+    """
     if len(raw) > MAX_PROFILES:
         raise LibraryError(f"{PROFILES_NAME} is larger than {MAX_PROFILES} bytes")
     try:
@@ -141,7 +159,10 @@ def parse_profiles(raw: bytes, release: dict[str, Any]) -> list[LibraryEntry]:
     revision, target = str(doc.get("version_code", "")), str(doc.get("target", ""))
     assets = _assets(release)
     entries = (
-        _entry(p, revision=revision, target=target, release=release, assets=assets) for p in profiles.values()
+        _entry(
+            p, revision=revision, target=target, release=release, assets=assets, download_base=download_base
+        )
+        for p in profiles.values()
     )
     return [e for e in entries if e is not None]
 
@@ -153,22 +174,23 @@ def _assets(release: dict[str, Any]) -> dict[str, dict[str, Any]]:
     return {str(a["name"]): a for a in raw if isinstance(a, dict) and a.get("name")}
 
 
-async def _profiles_bytes(client: httpx.AsyncClient, url: str) -> bytes | None:
-    """The body of profiles.json, or None when it cannot be downloaded or is over MAX_PROFILES."""
+async def _profiles_bytes(client: httpx.AsyncClient, url: str) -> tuple[int, bytes | None]:
+    """The HTTP status and the body of profiles.json; the body is None when it cannot be downloaded or is over
+    MAX_PROFILES, and the status is 0 when no answer came."""
     try:
         async with client.stream(
             "GET", url, headers=_HEADERS, timeout=20.0, follow_redirects=True
         ) as response:
             if response.status_code // 100 != 2:
-                return None
+                return response.status_code, None
             body = bytearray()
             async for chunk in response.aiter_bytes():
                 body += chunk
                 if len(body) > MAX_PROFILES:
-                    return None
-            return bytes(body)
+                    return response.status_code, None
+            return response.status_code, bytes(body)
     except (httpx.HTTPError, httpx.InvalidURL):
-        return None
+        return 0, None
 
 
 def _unreachable(reason: str) -> LibraryError:
@@ -180,15 +202,13 @@ def _reason(exc: Exception) -> str:
 
 
 def _list_error(response: httpx.Response) -> LibraryError:
-    if response.status_code in (403, 429) and response.headers.get("X-RateLimit-Remaining") == "0":
-        try:
-            reset = datetime.fromtimestamp(int(response.headers["X-RateLimit-Reset"]))
-        except (KeyError, ValueError, OverflowError, OSError):
-            pass
-        else:
+    if used_up(response):
+        reset = reset_time(response)
+        if reset is not None:
             return LibraryError(
                 f"GitHub's limit for anonymous reads is reached; try again after {reset.strftime('%H:%M')}."
             )
+        return LibraryError("GitHub's limit for anonymous reads is reached; try again later.")
     return _unreachable(f"HTTP {response.status_code}")
 
 
@@ -197,12 +217,56 @@ def _newest_first(release: dict[str, Any]) -> tuple[bool, float]:
     return (published is None, -published.timestamp() if published else 0.0)
 
 
+# One release to read: the release (an API item, or one made from the pages), where its profiles.json is,
+# and the download folder when the pages had no asset list (a 404 then means it has no profiles.json).
+_Source = tuple[dict[str, Any], str, str | None]
+
+
+def _from_page(page: PageRelease) -> _Source:
+    folder = f"{RELEASES_PAGE}/download/{page.tag}"
+    release = {
+        "tag_name": page.tag,
+        "name": page.title,
+        "html_url": f"{RELEASES_PAGE}/tag/{page.tag}",
+        "published_at": page.updated.isoformat() if page.updated else None,
+    }
+    return release, f"{folder}/{PROFILES_NAME}", folder
+
+
+async def _collect(client: httpx.AsyncClient, sources: list[_Source]) -> tuple[list[LibraryEntry], int]:
+    entries: list[LibraryEntry] = []
+    seen: set[str] = set()
+    skipped = 0
+    for release, profiles_url, download_base in sorted(sources, key=lambda s: _newest_first(s[0])):
+        status, raw = await _profiles_bytes(client, profiles_url)
+        if download_base is not None and status == 404:
+            continue
+        try:
+            if raw is None:
+                raise LibraryError("profiles.json could not be downloaded")
+            found = parse_profiles(raw, release, download_base)
+        except LibraryError:
+            skipped += 1
+            continue
+        for entry in found:
+            if entry.sha256 not in seen:
+                seen.add(entry.sha256)
+                entries.append(entry)
+    return entries, skipped
+
+
 async def fetch_catalog(client: httpx.AsyncClient) -> tuple[list[LibraryEntry], int]:
     """Entries of every published release, newest first, and the number of unreadable profiles.json files."""
     try:
         response = await client.get(RELEASES_URL, params={"per_page": 100}, headers=_HEADERS, timeout=20.0)
     except httpx.HTTPError as exc:
         raise _unreachable(_reason(exc)) from exc
+    if used_up(response):
+        try:
+            pages = await releases_from_pages(client, RELEASES_PAGE, _PAGE_HEADERS)
+        except (httpx.HTTPError, ValueError) as exc:
+            raise _list_error(response) from exc
+        return await _collect(client, [_from_page(p) for p in pages])
     if response.status_code // 100 != 2:
         raise _list_error(response)
     try:
@@ -212,27 +276,14 @@ async def fetch_catalog(client: httpx.AsyncClient) -> tuple[list[LibraryEntry], 
     if not isinstance(releases, list):
         raise _unreachable("the answer is not a list of releases")
 
-    published = [r for r in releases if isinstance(r, dict) and not r.get("draft")]
-    entries: list[LibraryEntry] = []
-    seen: set[str] = set()
-    skipped = 0
-    for release in sorted(published, key=_newest_first):
+    sources: list[_Source] = []
+    for release in releases:
+        if not isinstance(release, dict) or release.get("draft"):
+            continue
         asset = _assets(release).get(PROFILES_NAME)
-        if asset is None or not asset.get("browser_download_url"):
-            continue
-        raw = await _profiles_bytes(client, str(asset["browser_download_url"]))
-        try:
-            if raw is None:
-                raise LibraryError("profiles.json could not be downloaded")
-            found = parse_profiles(raw, release)
-        except LibraryError:
-            skipped += 1
-            continue
-        for entry in found:
-            if entry.sha256 not in seen:
-                seen.add(entry.sha256)
-                entries.append(entry)
-    return entries, skipped
+        if asset is not None and asset.get("browser_download_url"):
+            sources.append((release, str(asset["browser_download_url"]), None))
+    return await _collect(client, sources)
 
 
 class LibraryRead(BaseModel):

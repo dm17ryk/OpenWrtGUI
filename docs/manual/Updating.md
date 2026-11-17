@@ -11,6 +11,17 @@ At start-up and once a day, unless you switch off **Check at start-up and daily*
 [Settings](Settings). **Check now** checks immediately. The Updates section says when it last checked,
 or "Not checked yet."
 
+The check reads GitHub's API, which allows 60 reads an hour from one network address. Every PC behind the
+office's address shares them, so they can run out. The app then reads the release pages on github.com instead,
+which have no such limit. Those pages carry no release notes, so the offer shows **Release notes on GitHub**
+and no size. If the pages do not answer either, the message says when GitHub's limit ends.
+
+## Downloading by hand
+
+**Download from GitHub** (in Settings › Updates) opens the newest stable release on GitHub, or every release
+on the **Pre-release** channel. Download `OpenWrtGUI-Setup-<version>.exe` and run it: it updates the installed
+app in place and keeps the data folder. The release's `SHA256SUMS.txt` lists the installer's SHA-256.
+
 ## Channels
 
 - **Stable**: releases such as `0.1.0`.
@@ -20,7 +31,8 @@ or "Not checked yet."
 
 ## Installing an update
 
-When a newer version exists, Settings shows its name, size and release notes. **Update now** installs it in place
+When a newer version exists, Settings shows its name, size and release notes, and links its page on GitHub
+(**Release notes on GitHub**). **Update now** installs it in place
 and starts it again, **Skip this version** stops offering it, and **Later** hides the offer until the next check.
 In detail:
 

@@ -12,7 +12,7 @@ import pytest
 
 from openwrtgui.live import LiveHub
 from openwrtgui.store.settings import SettingsStore
-from openwrtgui.update.github import RELEASES_URL, fetch_releases, pick_release
+from openwrtgui.update.github import RELEASES_PAGE, RELEASES_URL, fetch_releases, pick_release
 from openwrtgui.update.installer import ChecksumMismatch, download_release, installer_command
 from openwrtgui.update.service import UpdateFailed, UpdateInProgress, Updater
 from openwrtgui.update.versions import Version, parse_version
@@ -230,6 +230,97 @@ async def test_skip_hides_that_version(tmp_path: Path) -> None:
     assert (
         not status.available and SettingsStore(tmp_path / "settings.json").load().skipped_version == "0.1.0"
     )
+
+
+RESET = 1794909302  # X-RateLimit-Reset: when GitHub's hourly API budget for this network refills
+API_LIMIT = {"X-RateLimit-Limit": "60", "X-RateLimit-Remaining": "0", "X-RateLimit-Reset": str(RESET)}
+FEED = """<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <id>tag:github.com,2008:https://github.com/dm17ryk/OpenWrtGUI/releases</id>
+  <title>Release notes from OpenWrtGUI</title>
+  <entry>
+    <id>tag:github.com,2008:Repository/1444606878/v0.1.1-ci.7</id>
+    <link rel="alternate" type="text/html" href="https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.1.1-ci.7"/>
+    <title>OpenWrtGUI 0.1.1-ci.7</title>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/1444606878/nightly</id>
+    <title>not a release version</title>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/1444606878/v0.1.0</id>
+    <title>OpenWrtGUI 0.1.0</title>
+  </entry>
+</feed>
+"""
+
+
+def _api_limited(pages_ok: bool = True) -> httpx.MockTransport:
+    """The API answers 403 for its hourly limit; the release pages still answer unless pages_ok is False."""
+    inner = _handler()
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if url.startswith(RELEASES_URL):
+            return httpx.Response(403, headers=API_LIMIT, json={"message": "API rate limit exceeded"})
+        if not pages_ok and url.startswith(RELEASES_PAGE) and "/download/" not in url:
+            return httpx.Response(429)
+        if url == f"{RELEASES_PAGE}/latest":
+            return httpx.Response(302, headers={"Location": f"{RELEASES_PAGE}/tag/v0.1.0"})
+        if url == f"{RELEASES_PAGE}.atom":
+            return httpx.Response(200, text=FEED)
+        return inner.handle_request(request)
+
+    return httpx.MockTransport(handle)
+
+
+async def test_a_used_up_api_limit_reads_the_release_pages_instead() -> None:
+    async with _client(_api_limited()) as client:
+        releases = await fetch_releases(client)
+    by_version = {str(r.version): r for r in releases}
+    assert sorted(by_version) == ["0.1.0", "0.1.1-ci.7"]
+    stable, ci = by_version["0.1.0"], by_version["0.1.1-ci.7"]
+    assert not stable.prerelease and ci.prerelease
+    assert stable.name == "OpenWrtGUI 0.1.0"
+    assert stable.installer_url == f"{RELEASES_PAGE}/download/v0.1.0/OpenWrtGUI-Setup-0.1.0.exe"
+    assert stable.sums_url == f"{RELEASES_PAGE}/download/v0.1.0/SHA256SUMS.txt"
+    assert stable.url == f"{RELEASES_PAGE}/tag/v0.1.0"
+
+
+async def test_check_and_install_work_while_the_api_limit_is_used_up(tmp_path: Path) -> None:
+    updater = _updater(tmp_path, _api_limited(), install_dir=tmp_path / "app")
+    status = await updater.check(force=True)
+    assert status.error is None and status.latest is not None and str(status.latest.version) == "0.1.0"
+    cmd = await updater.install("0.1.0")
+    assert cmd[0].endswith("OpenWrtGUI-Setup-0.1.0.exe")
+
+
+async def test_when_the_pages_fail_too_it_says_when_to_try_again(tmp_path: Path) -> None:
+    status = await _updater(tmp_path, _api_limited(pages_ok=False)).check(force=True)
+    at = datetime.fromtimestamp(RESET).strftime("%H:%M")
+    assert status.error == (
+        f"Couldn't check for updates: GitHub's hourly limit for this network is used up until {at}. "
+        "Try again then, or download it from GitHub."
+    )
+
+
+async def test_a_limit_without_a_reset_time_says_try_again_later(tmp_path: Path) -> None:
+    def handle(request: httpx.Request) -> httpx.Response:
+        if str(request.url).startswith(RELEASES_URL):
+            return httpx.Response(429, headers={"Retry-After": "60"})
+        return httpx.Response(503)
+
+    status = await _updater(tmp_path, httpx.MockTransport(handle)).check(force=True)
+    assert status.error == (
+        "Couldn't check for updates: GitHub's hourly limit for this network is used up. "
+        "Try again later, or download it from GitHub."
+    )
+
+
+async def test_a_release_from_the_api_links_its_page() -> None:
+    async with _client(_handler()) as client:
+        releases = await fetch_releases(client)
+    assert releases[1].url == "https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.1.0"
 
 
 def test_installer_command_keeps_spaced_dir_as_one_argument() -> None:
