@@ -5,6 +5,7 @@ import '@xterm/xterm/css/xterm.css'
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, useParams } from 'react-router'
 import { apiFetch, openSocket } from '../api/client'
+import { parseFrame } from '../api/frames'
 import type { RouterItem, TerminalMessage } from '../api/types'
 import { Help } from '../help/Help'
 import { HELP } from '../help/topics'
@@ -48,7 +49,8 @@ function Session({ routerId }: { routerId: string }) {
     const observer = new ResizeObserver(() => fit.fit())
     if (box) observer.observe(box)
     socket.onmessage = (event: MessageEvent<string>) => {
-      const msg = JSON.parse(event.data) as TerminalMessage
+      const msg = parseFrame<TerminalMessage>(event.data)
+      if (msg === null) return // a cut or garbled frame is dropped (#77 minor 11)
       if (msg.type === 'mode') {
         if (msg.mode === 'line-available-pty') {
           setCanPty(true)

@@ -33,6 +33,22 @@ async def test_an_unexpected_error_answers_500_with_a_plain_message(
     assert "secret detail" in caplog.text  # the traceback is in the app log
 
 
+def test_uvicorn_does_not_log_the_traceback_a_second_time(
+    ctx: AppContext, caplog: pytest.LogCaptureFixture
+) -> None:
+    """#77 minor 13: Starlette re-raises after the handler, and uvicorn logs the traceback again (R5)."""
+    create_app(ctx)
+    uvicorn_error = logging.getLogger("uvicorn.error")
+    try:
+        raise RuntimeError("secret detail")
+    except RuntimeError:
+        with caplog.at_level(logging.ERROR):
+            uvicorn_error.error("Exception in ASGI application\n", exc_info=True)
+            uvicorn_error.error("Something else went wrong")
+    assert "Exception in ASGI application" not in caplog.text
+    assert "Something else went wrong" in caplog.text
+
+
 async def test_a_known_error_keeps_its_own_answer(ctx: AppContext) -> None:
     app = create_app(ctx)
 

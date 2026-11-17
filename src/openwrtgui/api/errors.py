@@ -21,7 +21,23 @@ UNEXPECTED = "Unexpected error in OpenWrtGUI ({kind}). The details are in the ap
 log = logging.getLogger(__name__)
 
 
+class _NoSecondTraceback(logging.Filter):
+    """Starlette re-raises after the catch-all handler, and uvicorn then logs the same traceback again; the
+    handler's record names the request, so uvicorn's is dropped (#77 minor 13, R5)."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return not record.getMessage().startswith("Exception in ASGI application")
+
+
+def _quiet_uvicorn() -> None:
+    target = logging.getLogger("uvicorn.error")
+    if not any(isinstance(f, _NoSecondTraceback) for f in target.filters):
+        target.addFilter(_NoSecondTraceback())
+
+
 def install(app: FastAPI) -> None:
+    _quiet_uvicorn()
+
     @app.exception_handler(Exception)
     async def unexpected(request: Request, exc: Exception) -> JSONResponse:
         """An error nobody planned for (v1.0c D8): a plain answer; the traceback goes to the app log only."""
