@@ -48,6 +48,12 @@ def set_opmode(device: str, mode: Literal["low_power", "online"]) -> str:
     return uqmi(device, "--set-device-operating-mode", mode, timeout_ms=3000)
 
 
+def sync(device: str) -> str:
+    """Release the client ids the modem still holds (stale QMI state). Sent only after `ifdown lte`, so it
+    cannot release a live session's client (spec 4.2)."""
+    return uqmi(device, "--sync", timeout_ms=5000)
+
+
 def iface_status(name: str) -> str:
     return f"ubus call network.interface.{_checked(IFACE, name, 'an interface name')} status"
 

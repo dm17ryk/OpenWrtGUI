@@ -12,7 +12,7 @@ from typing import Literal
 
 from openwrtgui.forms import OptionRow
 from openwrtgui.guard.audit import AT_MASKED_COMMANDS, AuditLog, mask
-from openwrtgui.guard.bench_guard import BenchGuard
+from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked
 from openwrtgui.guard.writes import run_audited
 from openwrtgui.lte import commands as c
 from openwrtgui.lte.at import AtResult, ModemIdentity, find_at_port, is_query
@@ -38,6 +38,11 @@ READBACK_TRIES = 3
 NO_ADDRESS = "no address yet: waiting for the carrier's DHCP"
 DROPS = "{name}'s LTE session drops; devices that route through it lose the internet until it is back"
 NOT_IN_MODE = "The modem did not go {mode}{why}; it may need ifup lte or a power cycle"
+# Spec 4.2, Stopping (Dmitry, 2026-11-17: "Finish putting back"): once a harness run is live, only the lines
+# that put back what the running step took down are sent, past Bench Guard, and audited under this screen.
+PUT_BACK_SCREEN = "LTE (put back during a harness run)"
+HARNESS_STOPPED = "Stopped: a harness run started; the modem was put back online and LTE reconnected."
+PUT_BACK_FAILED = "Stopped: a harness run started; {command}: {reason}; the modem was left {where}."
 
 
 NEEDS_CONFIRM = "This command may change the modem; send it again with confirm"
@@ -228,30 +233,52 @@ class LteService:
             t, command, router_id=rec.id, screen=SCREEN, guard=self._guard, audit=self._audit
         )
 
+    async def _put_back(self, rec: RouterRecord, t: Transport, command: str) -> CommandResult:
+        """One put-back line during a harness run: sent past Bench Guard, audited under PUT_BACK_SCREEN."""
+        return await run_audited(
+            t,
+            command,
+            router_id=rec.id,
+            screen=PUT_BACK_SCREEN,
+            guard=self._guard,
+            audit=self._audit,
+            require_guard=False,
+        )
+
+    async def put_back(self, rec: RouterRecord, t: Transport, commands: Sequence[tuple[str, str]]) -> str:
+        """Send each (line, where the modem is left if it fails) in order; stop at the first failure. The
+        result is HARNESS_STOPPED, or the failure naming its command and where the modem was left."""
+        for command, where in commands:
+            done = await self._put_back(rec, t, command)
+            if not done.ok:
+                return PUT_BACK_FAILED.format(command=command, reason=_reason(done), where=where)
+        return HARNESS_STOPPED
+
     async def _run_action(
         self, rec: RouterRecord, t: Transport, action: LteAction, lines: tuple[str, ...]
     ) -> NetApplyResult:
         checks: list[NetCheck] = []
         if action == "reboot":
             self.forget_identity(rec.id)  # a rebooted modem is asked who it is again (v1.0c D2)
-            for set_line, read_line, mode in (
-                (lines[0], lines[1], "low_power"),
-                (lines[2], lines[3], "online"),
-            ):
-                done = await self._cmd(rec, t, set_line)
-                if not done.ok and not checks:  # the first line: nothing changed yet
-                    return NetApplyResult(rec.id, False, False, (), f"{set_line}: {_reason(done)}", rec.host)
-                if not done.ok:  # low_power went through: say where the modem was left
-                    checks.append(NetCheck(f"modem {mode}", False, _reason(done)))
-                    error = NOT_IN_MODE.format(mode=mode, why=f" ({_reason(done)})")
-                    return NetApplyResult(rec.id, True, False, tuple(checks), error, rec.host)
-                ok = await self._readback(rec, t, read_line, mode)
-                checks.append(NetCheck(f"modem {mode}", ok, mode if ok else f"still not {mode}"))
-                if not ok:
-                    error = NOT_IN_MODE.format(mode=mode, why="")
-                    return NetApplyResult(rec.id, True, False, tuple(checks), error, rec.host)
+            low = await self._cmd(rec, t, lines[0])  # GuardLocked here: nothing changed yet
+            if not low.ok:
+                return NetApplyResult(rec.id, False, False, (), f"{lines[0]}: {_reason(low)}", rec.host)
+            try:
+                failed = await self._restart_modem(rec, t, lines, checks)
+            except GuardLocked:  # a harness run started with the modem in low power: put it back, then stop
+                put_back = ((lines[2], "in low power"), (c.IFUP_LTE, "online with LTE down"))
+                error = await self.put_back(rec, t, put_back)
+                return NetApplyResult(rec.id, True, False, tuple(checks), error, rec.host)
+            if failed is not None:
+                return failed
         command = c.IFDOWN_LTE if action == "disconnect" else c.IFUP_LTE
-        done = await self._cmd(rec, t, command)
+        try:
+            done = await self._cmd(rec, t, command)
+        except GuardLocked:
+            if action != "reboot":
+                raise
+            error = await self.put_back(rec, t, ((c.IFUP_LTE, "online with LTE down"),))
+            return NetApplyResult(rec.id, True, False, tuple(checks), error, rec.host)
         if not done.ok:  # after a reboot the modem's mode did change: that counts as applied
             return NetApplyResult(
                 rec.id, bool(checks), False, tuple(checks), f"{command}: {_reason(done)}", rec.host
@@ -269,6 +296,25 @@ class LteService:
                 checks.append(NetCheck("lte_4 address", True if address else None, address or NO_ADDRESS))
         verified = all(check.ok is not False for check in checks)
         return NetApplyResult(rec.id, True, verified, tuple(checks), None, rec.host)
+
+    async def _restart_modem(
+        self, rec: RouterRecord, t: Transport, lines: tuple[str, ...], checks: list[NetCheck]
+    ) -> NetApplyResult | None:
+        """After low_power went through: its read-back, then online and its read-back. None: the modem is
+        online. A GuardLocked from any of them goes to the caller, which puts the modem back."""
+        for set_line, read_line, mode in ((None, lines[1], "low_power"), (lines[2], lines[3], "online")):
+            if set_line is not None:
+                done = await self._cmd(rec, t, set_line)
+                if not done.ok:  # low_power went through: say where the modem was left
+                    checks.append(NetCheck(f"modem {mode}", False, _reason(done)))
+                    error = NOT_IN_MODE.format(mode=mode, why=f" ({_reason(done)})")
+                    return NetApplyResult(rec.id, True, False, tuple(checks), error, rec.host)
+            ok = await self._readback(rec, t, read_line, mode)
+            checks.append(NetCheck(f"modem {mode}", ok, mode if ok else f"still not {mode}"))
+            if not ok:
+                error = NOT_IN_MODE.format(mode=mode, why="")
+                return NetApplyResult(rec.id, True, False, tuple(checks), error, rec.host)
+        return None
 
     async def _readback(self, rec: RouterRecord, t: Transport, read_line: str, mode: str) -> bool:
         for attempt in range(READBACK_TRIES):

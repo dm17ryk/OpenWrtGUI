@@ -82,3 +82,10 @@ def test_reads_pass_the_read_only_check_and_writes_do_not() -> None:
         assert is_read_only_command(read), read
     for write in (c.set_opmode(DEV, "online"), c.IFUP_LTE, c.IMEI(DEV)):
         assert not is_read_only_command(write), write
+
+
+def test_sync_command_text() -> None:
+    assert c.sync("/dev/cdc-wdm0") == "uqmi -s -d /dev/cdc-wdm0 -t 5000 --sync"
+    with pytest.raises(ValueError):
+        c.sync("/dev/x")
+    assert not is_read_only_command(c.sync(DEV))  # it releases client ids: never a background read

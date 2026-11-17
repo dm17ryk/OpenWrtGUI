@@ -9,7 +9,7 @@ import pytest
 
 from openwrtgui.context import AppContext
 from openwrtgui.guard.bench_guard import GuardLocked
-from openwrtgui.lte.service import LteBusy
+from openwrtgui.lte.service import HARNESS_STOPPED, PUT_BACK_SCREEN, LteBusy
 from openwrtgui.transport.base import CommandResult
 from openwrtgui.transport.fake import ReplayTransport
 from openwrtgui.wifi.service import PreviewChanged
@@ -115,6 +115,67 @@ async def test_a_failed_ifup_after_the_reboot_still_counts_as_applied(ctx: AppCo
     connect = await ctx.lte.plan_action("ap2", "connect")
     nothing = await ctx.lte.apply_action("ap2", "connect", connect.digest)
     assert (nothing.applied, nothing.error) == (False, "ifup lte: Request failed")
+
+
+async def _run_starts_after(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch, line: str, nth: int = 1
+) -> None:
+    """Bench Guard goes live as soon as `line` has been answered `nth` times (a harness run starting
+    mid-action)."""
+    modem = await _modem(ctx)
+    real = modem.answer
+    seen = 0
+
+    def answering(command: str) -> CommandResult | None:
+        nonlocal seen
+        result = real(command)
+        seen += command == line
+        if command == line and seen == nth:
+            monkeypatch.setenv("OPENWRTGUI_SIM_GUARD", "live")
+            ctx.guard.check_local()
+        return result
+
+    modem.answer = answering  # type: ignore[method-assign]
+
+
+async def test_reboot_puts_the_modem_back_when_a_run_starts_after_low_power(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await _run_starts_after(ctx, monkeypatch, LOW)
+    plan = await ctx.lte.plan_action("ap2", "reboot")
+    result = await ctx.lte.apply_action("ap2", "reboot", plan.digest)
+    assert result.error == HARNESS_STOPPED
+    assert not result.verified
+    modem = await _modem(ctx)
+    assert modem.opmode == "online" and modem.connected
+    entries = list(reversed(ctx.audit.query()))
+    put_back = [(e.command, e.screen) for e in entries if e.screen == PUT_BACK_SCREEN]
+    assert put_back == [(ONLINE, PUT_BACK_SCREEN), ("ifup lte", PUT_BACK_SCREEN)]
+    assert entries[-1].command == "ifup lte"  # nothing after the put-back
+
+
+async def test_a_run_after_the_modem_is_back_online_puts_back_ifup_only(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await _run_starts_after(ctx, monkeypatch, READ, nth=2)  # the online read-back
+    plan = await ctx.lte.plan_action("ap2", "reboot")
+    result = await ctx.lte.apply_action("ap2", "reboot", plan.digest)
+    assert result.error == HARNESS_STOPPED
+    put_back = [e.command for e in reversed(ctx.audit.query()) if e.screen == PUT_BACK_SCREEN]
+    assert put_back == ["ifup lte"]
+    assert (await _modem(ctx)).connected
+
+
+async def test_reboot_put_back_failure_names_where_the_modem_was_left(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await _run_starts_after(ctx, monkeypatch, LOW)
+    await _refuse(ctx, ONLINE)
+    plan = await ctx.lte.plan_action("ap2", "reboot")
+    result = await ctx.lte.apply_action("ap2", "reboot", plan.digest)
+    assert result.error is not None
+    assert ONLINE in result.error and "in low power" in result.error
+    assert "ifup lte" not in _calls(ctx)
 
 
 async def test_actions_wait_for_the_run(ctx_guard_live: AppContext) -> None:
