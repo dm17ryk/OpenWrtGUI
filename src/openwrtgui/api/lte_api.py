@@ -13,6 +13,7 @@ from openwrtgui.api.wifi_api import OptionEditIn
 from openwrtgui.context import AppContext
 from openwrtgui.forms import OptionEdit, OptionRow
 from openwrtgui.lte.at import AtResult
+from openwrtgui.lte.recover import LteRecoverJob
 from openwrtgui.lte.service import AtNeedsConfirm, LteAction, LteBusy, SetupMissing
 from openwrtgui.lte.settings import METRIC_MAX, Auth, LteSettings, PdpType
 from openwrtgui.lte.setups import LteSetupSummary
@@ -154,6 +155,35 @@ async def setup_apply(router_id: str, body: SetupApplyIn, ctx: Ctx) -> NetApplyR
         return await ctx.lte.apply_setup(_known(ctx, router_id), body.source, ctx.lte_setups, body.digest)
     except SetupMissing as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+class RecoverPreviewOut(BaseModel):
+    lines: list[str]
+    warnings: list[str]
+    digest: str
+
+
+@router.post("/recover/preview")
+async def recover_preview(router_id: str, ctx: Ctx) -> RecoverPreviewOut:
+    """Every command Recover may run; the server picks the router's own saved setup (spec 4.2)."""
+    p = await ctx.lte_recover.preview(_known(ctx, router_id))
+    return RecoverPreviewOut(lines=list(p.lines), warnings=list(p.warnings), digest=p.digest)
+
+
+@router.post("/recover")
+async def recover_start(router_id: str, body: Digest, ctx: Ctx) -> LteRecoverJob:
+    """409 while another job holds the router or the preview changed; 423 during a harness run."""
+    return await ctx.lte_recover.start(_known(ctx, router_id), body.digest)
+
+
+@router.get("/recover")
+async def recover_job(router_id: str, ctx: Ctx) -> LteRecoverJob | None:
+    return ctx.lte_recover.job(_known(ctx, router_id))
+
+
+@router.post("/recover/stop")
+async def recover_stop(router_id: str, ctx: Ctx) -> LteRecoverJob | None:
+    return await ctx.lte_recover.stop(_known(ctx, router_id))
 
 
 @router.post("/imei")

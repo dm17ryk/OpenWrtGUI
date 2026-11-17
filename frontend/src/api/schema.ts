@@ -1401,6 +1401,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/lte/recover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recover Job */
+        get: operations["recover_job_api_routers__router_id__lte_recover_get"];
+        put?: never;
+        /**
+         * Recover Start
+         * @description 409 while another job holds the router or the preview changed; 423 during a harness run.
+         */
+        post: operations["recover_start_api_routers__router_id__lte_recover_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/recover/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recover Preview
+         * @description Every command Recover may run; the server picks the router's own saved setup (spec 4.2).
+         */
+        post: operations["recover_preview_api_routers__router_id__lte_recover_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/recover/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recover Stop */
+        post: operations["recover_stop_api_routers__router_id__lte_recover_stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/lte/settings/apply": {
         parameters: {
             query?: never;
@@ -5973,6 +6031,33 @@ export interface components {
              */
             username: string;
         };
+        /** LteRecoverJob */
+        LteRecoverJob: {
+            /** Current */
+            current: number | null;
+            /** Detail */
+            detail: string | null;
+            /** Diagnosis */
+            diagnosis: string[];
+            /** Ended At */
+            ended_at: string | null;
+            /** Error */
+            error: string | null;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "running" | "works" | "recovered" | "not recovered" | "stopped" | "failed";
+            /** Router Id */
+            router_id: string;
+            /** Rungs */
+            rungs: components["schemas"]["RungResult"][];
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+        };
         /** LteSettingsApplyIn */
         LteSettingsApplyIn: {
             /** Apn */
@@ -7253,6 +7338,15 @@ export interface components {
             /** Uptime S */
             uptime_s?: number | null;
         };
+        /** RecoverPreviewOut */
+        RecoverPreviewOut: {
+            /** Digest */
+            digest: string;
+            /** Lines */
+            lines: string[];
+            /** Warnings */
+            warnings: string[];
+        };
         /** RedirectConf */
         RedirectConf: {
             /** Dest */
@@ -7680,6 +7774,15 @@ export interface components {
         RulesetOut: {
             /** Text */
             text: string;
+        };
+        /** RungResult */
+        RungResult: {
+            /** Detail */
+            detail?: string | null;
+            /** Name */
+            name: string;
+            /** Outcome */
+            outcome?: ("skipped" | "not needed" | "works" | "not yet" | "failed") | null;
         };
         /** ScanPlanOut */
         ScanPlanOut: {
@@ -11602,6 +11705,134 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImeiOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recover_job_api_routers__router_id__lte_recover_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LteRecoverJob"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recover_start_api_routers__router_id__lte_recover_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Digest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LteRecoverJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recover_preview_api_routers__router_id__lte_recover_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoverPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recover_stop_api_routers__router_id__lte_recover_stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LteRecoverJob"] | null;
                 };
             };
             /** @description Validation Error */
