@@ -16,6 +16,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   restore puts back /etc only; Reset takes the router's name in any case.
 - Remove from the app refuses while faults are armed, a step-through runs or waits for its restore, a flash runs or
   a capture runs, and names what runs.
+- A capture runs on its own SSH connection, so a change with rollback no longer ends it.
 
 ## [1.0.1] - 2026-11-17
 

@@ -266,6 +266,85 @@ async def test_beacon_check_keeps_a_capture_monitor(
     assert env.audit_lines().count("iw dev owgmon0 del") == 1
 
 
+class _Connections:
+    """Streams held until their connection closes, as an SSH channel ends with its connection."""
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self.streams: dict[int, _HeldStream] = {}
+        self.closed: list[int] = []
+        real_close = ReplayTransport.close
+        test = self
+
+        async def stream(self: ReplayTransport, command: str) -> _HeldStream:
+            held = test.streams[id(self)] = _HeldStream()
+            return held
+
+        async def close(self: ReplayTransport) -> None:
+            test.closed.append(id(self))
+            if (held := test.streams.get(id(self))) is not None:
+                held.ended.set()
+            await real_close(self)
+
+        monkeypatch.setattr(ReplayTransport, "stream", stream)
+        monkeypatch.setattr(ReplayTransport, "close", close)
+
+
+async def test_a_rollback_reconnect_does_not_end_a_capture(
+    env: FwEnv, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#3 (the 1.x proposal's D5): the capture streamed on the pooled connection a rollback's reconnect
+    drops."""
+    links = _Connections(monkeypatch)
+    service = _captures(env, tmp_path)
+    view = await service.start("ap1", CaptureRequest("br-lan", "", 60))
+    await env.pool.drop("ap1")  # what a change with rollback does to reconnect
+    for _ in range(20):
+        await asyncio.sleep(0)
+    assert next(v for v in service.list("ap1") if v.id == view.id).running
+    await service.stop(view.id)
+    await _done(service, view.id)
+    assert len(links.streams) == 1
+
+
+async def test_the_captures_own_connection_is_closed_and_the_pooled_one_kept(
+    env: FwEnv, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    links = _Connections(monkeypatch)
+    rec = env.routers.get("ap1")
+    assert rec is not None
+    pooled = await env.pool.get(rec)
+    service = _captures(env, tmp_path)
+    view = await service.start("ap1", CaptureRequest("mon0", "", 60))
+    [own] = links.streams
+    assert own != id(pooled)  # the stream is not on the pooled connection
+    await service.stop(view.id)
+    await _done(service, view.id)
+    assert links.closed.count(own) >= 1 and id(pooled) not in links.closed
+    assert "iw dev owgmon0 del" in env.audit_lines()  # mon0 still removed, on the pooled connection
+
+
+async def test_a_capture_that_cannot_start_closes_its_own_connection(
+    env: FwEnv, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    opened: list[int] = []
+    closed: list[int] = []
+    real_close = ReplayTransport.close
+
+    async def refused(self: ReplayTransport, command: str) -> BytesStream:
+        opened.append(id(self))
+        raise TransportError("SSH channel open failed")
+
+    async def close(self: ReplayTransport) -> None:
+        closed.append(id(self))
+        await real_close(self)
+
+    monkeypatch.setattr(ReplayTransport, "stream", refused)
+    monkeypatch.setattr(ReplayTransport, "close", close)
+    with pytest.raises(TransportError):
+        await _captures(env, tmp_path).start("ap1", CaptureRequest("br-lan", "", 3))
+    assert opened and opened[0] in closed
+
+
 async def test_a_capture_that_cannot_start_leaves_nothing(
     env: FwEnv, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
