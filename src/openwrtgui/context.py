@@ -25,6 +25,7 @@ from openwrtgui.guard.bench_guard import BenchGuard, psutil_lister
 from openwrtgui.images.library import ImageLibrary
 from openwrtgui.images.store import ProfileStore
 from openwrtgui.live import LiveHub
+from openwrtgui.lte.recover import LteRecover
 from openwrtgui.lte.sampler import LteHub
 from openwrtgui.lte.service import LteService
 from openwrtgui.lte.setups import SetupStore
@@ -95,6 +96,7 @@ class AppContext:
     lte: LteService
     lte_live: LteHub
     lte_setups: SetupStore  # saved good LTE setups (spec 4.4)
+    lte_recover: LteRecover  # the Recover job (spec 4.2)
     system: SystemService
     system_live: SystemHub
     access: AccessService
@@ -342,10 +344,24 @@ def build_context(
         statuses=statuses,
         steps_dir=data.steps_dir,
         documents=data.root / "documents" if simulator is not None else documents_dir(),
-        busy=(system.busy, flashing),
+        busy=(system.busy, flashing, lambda router_id: lte_recover.busy(router_id)),
     )
-    system.extra_busy = steps.busy
-    flash.extra_busy = steps.busy
+    lte_setups = SetupStore(data.lte_setups_dir)
+    # one LTE job per router; it and the step-through, System jobs and Flash check each other (spec 4.2)
+    lte_recover = LteRecover(
+        lte=lte,
+        setups=lte_setups,
+        routers=routers,
+        guard=guard,
+        busy=(system.busy, flashing, lambda router_id: steps.busy(router_id)),
+    )
+    lte.extra_busy = lte_recover.busy
+
+    def steps_or_recover(router_id: str) -> str | None:
+        return steps.busy(router_id) or lte_recover.busy(router_id)
+
+    system.extra_busy = steps_or_recover
+    flash.extra_busy = steps_or_recover
     return AppContext(
         data=data,
         settings=settings,
@@ -384,7 +400,8 @@ def build_context(
         flash=flash,
         lte=lte,
         lte_live=LteHub(pool=pool, routers=routers, locate=lte.modem_device),
-        lte_setups=SetupStore(data.lte_setups_dir),
+        lte_setups=lte_setups,
+        lte_recover=lte_recover,
         system=system,
         system_live=SystemHub(pool=pool, routers=routers, busy=system.busy),
         access=access,

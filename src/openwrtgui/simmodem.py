@@ -125,6 +125,11 @@ class SimModem:
             return _ok()
         return _fail("Invalid argument\n")
 
+    def netifd_restart(self) -> None:
+        """netifd restarts an interface whose config changed (a network reload): the session comes back unless
+        a fault keeps it down."""
+        self.connected = not (self.stale_qmi or self.autoconnect_on)
+
     def session_data(self) -> dict[str, str]:
         """The `data` entry of the lte interface's status while its session is up."""
         return dict(NO_HANDLE if self.wedged else HANDLE)

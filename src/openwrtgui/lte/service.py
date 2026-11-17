@@ -11,6 +11,7 @@ from dataclasses import replace
 from datetime import datetime
 from typing import Literal
 
+from openwrtgui.busy import RouterBusy
 from openwrtgui.forms import OptionRow
 from openwrtgui.guard.audit import AT_MASKED_COMMANDS, AuditLog, mask
 from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked
@@ -21,7 +22,7 @@ from openwrtgui.lte.commands import MODEM_DEVICE
 from openwrtgui.lte.parse import parse_at, parse_opmode
 from openwrtgui.lte.settings import LteSettings, settings_request
 from openwrtgui.lte.setups import NAMED, LteSetup, LteSetupSummary, SetupStore, setup_change, summary_of
-from openwrtgui.lte.state import NO_LTE, LteState, lte_works, read_lte
+from openwrtgui.lte.state import NO_LTE, LteState, handle_ok, lte_works, read_lte
 from openwrtgui.net.apply import NOTHING, NetApplyResult, NetCheck, NetPlan, net_plan
 from openwrtgui.net.interfaces import InterfaceRequest, dynamic_refusal
 from openwrtgui.net.service import NetworkService
@@ -125,6 +126,52 @@ class LteService:
         self._at: dict[str, asyncio.Lock] = {}  # one AT exchange at a time per router (v1.0b2 D11)
         self.poll_s = POLL_S
         self.readback_s = 1.0
+        self.connect_s = CONNECT_S
+        self.nominal_poll_s = POLL_S
+        # the Recover job (spec 4.2): while it runs, this screen's other writes answer 409 naming it
+        self.extra_busy: Callable[[str], str | None] | None = None
+
+    def _refuse_if_busy(self, router_id: str) -> None:
+        why = self.extra_busy(router_id) if self.extra_busy is not None else None
+        if why is not None:
+            raise RouterBusy(why)
+
+    def action_busy(self, router_id: str) -> str | None:
+        """Why the Recover job may not start: an LTE action or AT write holds the router."""
+        lock = self._busy.get(router_id)
+        if lock is None or not lock.locked():
+            return None
+        return f"An LTE action is already running on {self._record(router_id).name}"
+
+    # ---------------------------------------------------------------- what the Recover job uses
+    async def transport(self, rec: RouterRecord) -> Transport:
+        return await self._pool.get(rec)
+
+    def write_lock(self, router_id: str) -> asyncio.Lock:
+        return self._pool.write_lock(router_id)
+
+    async def run(self, rec: RouterRecord, t: Transport, command: str) -> CommandResult:
+        """One audited write; the caller holds the write lock. Refused (GuardLocked) during a harness run."""
+        return await self._cmd(rec, t, command)
+
+    async def readback(self, rec: RouterRecord, t: Transport, read_line: str, mode: str) -> bool:
+        return await self._readback(rec, t, read_line, mode)
+
+    async def lte_device(self, router_id: str) -> str | None:
+        return await self._lte_device(router_id)
+
+    async def setup_values(self, router_id: str) -> tuple[list[OptionRow], dict[str, str]]:
+        return await self._net.interface_values(router_id, _lte_name(await self._qmi(router_id)))
+
+    async def works_now(self, t: Transport) -> bool:
+        """Spec 4.1 from the two status reads alone: up, a valid packet-data handle, an lte_4 address."""
+        status = await self._status(t, "lte")
+        if status is None or status.get("up") is not True or handle_ok(status) is not True:
+            return False
+        return await self._address(t) is not None
+
+    async def pause(self) -> None:
+        await self._sleep(self.poll_s)
 
     def _record(self, router_id: str) -> RouterRecord:
         rec = self._routers.get(router_id)
@@ -226,6 +273,7 @@ class LteService:
 
     async def apply_action(self, router_id: str, action: LteAction, digest: str) -> NetApplyResult:
         rec = self._record(router_id)
+        self._refuse_if_busy(rec.id)
         busy = self._busy.setdefault(rec.id, asyncio.Lock())
         if busy.locked():
             raise LteBusy(f"An LTE action is already running on {rec.name}")
@@ -371,7 +419,12 @@ class LteService:
     async def plan_settings(self, router_id: str, settings: LteSettings) -> NetPlan:
         return await self._net.plan_interface(router_id, await self._settings_request(router_id, settings))
 
-    async def apply_settings(self, router_id: str, settings: LteSettings, digest: str) -> NetApplyResult:
+    async def apply_settings(
+        self, router_id: str, settings: LteSettings, digest: str, *, recover: bool = False
+    ) -> NetApplyResult:
+        """`recover`: the Recover job's own rung 1, which holds the router itself."""
+        if not recover:
+            self._refuse_if_busy(router_id)
         req = await self._settings_request(router_id, settings)
         return await self._net.apply_interface(router_id, req, digest)
 
@@ -439,10 +492,12 @@ class LteService:
         return replace(plan, warnings=(*plan.warnings, *warnings))  # the digest covers the lines only
 
     async def apply_setup(
-        self, router_id: str, source: str, setups: SetupStore, digest: str
+        self, router_id: str, source: str, setups: SetupStore, digest: str, *, recover: bool = False
     ) -> NetApplyResult:
+        if not recover:
+            self._refuse_if_busy(router_id)
         settings, _warnings = await self.setup_settings(router_id, source, setups)
-        return await self.apply_settings(router_id, settings, digest)
+        return await self.apply_settings(router_id, settings, digest, recover=recover)
 
     # ---------------------------------------------------------------- AT console and IMEI
     async def at_command(self, router_id: str, text: str, confirmed: bool) -> AtResult:
@@ -454,6 +509,7 @@ class LteService:
         query = is_query(command)
         if not query:
             self._guard.require_clear()
+            self._refuse_if_busy(rec.id)
             if not confirmed:
                 raise AtNeedsConfirm(NEEDS_CONFIRM)
         t = await self._pool.get(rec)

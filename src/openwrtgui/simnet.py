@@ -406,9 +406,16 @@ class SimNetwork:
             self._snapshot = dict(self._committed)
             self._deadline = self._clock() + int(args.get("timeout", 30))
             self._apply_sid = sid
+        lte_changed = self.modem is not None and any(
+            self._committed.get(k) != work.get(k)
+            for k in {*self._committed, *work}
+            if k.startswith("network.lte.")
+        )
         self._committed = _libuci_names(self._committed, work)
         if network_changed:
             self._reset_switch()  # the network reload re-applies the switch config
+        if lte_changed and self.modem is not None:
+            self.modem.netifd_restart()
         return _ok()
 
     def _uci_get(self, config: str, section: Any) -> CommandResult:

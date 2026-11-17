@@ -57,7 +57,10 @@ router. In detail:
 - Each screen's **Apply**, including every change that applies with the 60 s rollback (addresses, VLANs, the
   firewall).
 - On the Network screen, Wi-Fi access by MAC too.
-- LTE actions (connect, disconnect, modem reboot, settings) and AT commands that are not queries.
+- LTE actions (connect, disconnect, modem reboot, settings, Reconfigure) and AT commands that are not queries.
+- LTE **Recover**: starting it, and its next step. A run that starts while Recover or Reboot modem has the
+  modem in low power or LTE down still gets two lines, sent past the guard and marked in the audit log as
+  "put back during a harness run": the modem back online, then `ifup lte`. Then it stops and says so.
 - On the System screen:
   - a reboot, a restore or a reset;
   - a new router password;
