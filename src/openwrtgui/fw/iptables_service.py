@@ -23,7 +23,7 @@ from openwrtgui.fw.iptables import (
 from openwrtgui.luci_bridge.depends import files_command, parse_ls
 from openwrtgui.net.apply import ApplyRunner, NetApplyResult, NetCheck, NetPlan, Planned, net_plan
 from openwrtgui.store.routers import RouterRecord, RouterStore
-from openwrtgui.transport.base import Transport
+from openwrtgui.transport.base import Transport, TransportError
 from openwrtgui.transport.pool import ConnectionPool
 
 SCREEN = "Firewall"
@@ -75,9 +75,12 @@ class IptablesService:
 
     async def state(self, router_id: str) -> IptablesState:
         """One command for every table, every 10 s while the tab is open (v1.0c Task 3, #63)."""
-        t = await self._pool.get(self._record(router_id))
+        rec = self._record(router_id)
+        t = await self._pool.get(rec)
         done = await t.run(IPT_STATE)
-        p, sections = split_state(done.stdout)
+        p, sections, seen = split_state(done.stdout)
+        if seen != frozenset(PROGRAMS):  # empty or cut off: say so, never "no iptables" (#77 minor 6)
+            raise TransportError(f"The iptables read of {rec.name} did not answer")
         tables: list[IptTable] = []
         for program in self._programs(p):
             for table in TABLES:

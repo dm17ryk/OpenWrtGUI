@@ -109,10 +109,15 @@ def _program(word: str) -> Program | None:
     return "iptables" if word == "iptables" else "ip6tables" if word == "ip6tables" else None
 
 
-def split_state(text: str) -> tuple[IptablesPresence, dict[tuple[Program, str], tuple[int, str]]]:
-    """IPT_STATE's answer: presence per program, and (exit status, listing) per table it finished. A table cut
-    off before its exit line is left out, so it shows as unanswered rather than as a short listing."""
+def split_state(
+    text: str,
+) -> tuple[IptablesPresence, dict[tuple[Program, str], tuple[int, str]], frozenset[Program]]:
+    """IPT_STATE's answer: presence per program, (exit status, listing) per table it finished, and the
+    programs whose presence line came back. A table cut off before its exit line is left out, so it shows as
+    unanswered rather than as a short listing; a program with no presence line is no answer, not "absent"
+    (#77 minor 6)."""
     present: dict[Program, bool] = {"iptables": False, "ip6tables": False}
+    seen: set[Program] = set()
     tables: dict[tuple[Program, str], tuple[int, str]] = {}
     current: tuple[Program, str] | None = None
     lines: list[str] = []
@@ -125,9 +130,11 @@ def split_state(text: str) -> tuple[IptablesPresence, dict[tuple[Program, str], 
             current, lines = (program, words[1]), []
         elif len(words) == 2 and (program := _program(words[0])) is not None and words[1] in _SEEN:
             present[program] = words[1] == "present"
+            seen.add(program)
         elif current is not None:
             lines.append(line)
-    return IptablesPresence(iptables=present["iptables"], ip6tables=present["ip6tables"]), tables
+    presence = IptablesPresence(iptables=present["iptables"], ip6tables=present["ip6tables"])
+    return presence, tables, frozenset(seen)
 
 
 def _rule(m: re.Match[str]) -> IptRule:

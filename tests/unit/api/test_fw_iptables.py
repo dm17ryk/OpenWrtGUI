@@ -9,9 +9,10 @@ import pytest
 from readcount import commands_of
 
 from openwrtgui.context import AppContext
-from openwrtgui.fw.iptables import IPT_STATE, RESET_NOTE, listing, parse_listing, skipped_lines
+from openwrtgui.fw.iptables import IPT_STATE, MARK, RESET_NOTE, listing, parse_listing, skipped_lines
 from openwrtgui.guard.bench_guard import GuardLocked
 from openwrtgui.store.routers import RouterRecord
+from openwrtgui.transport.base import CommandResult, TransportError
 
 
 def add_ap4(c: AppContext) -> None:
@@ -60,6 +61,25 @@ async def test_the_one_command_shows_what_the_eight_listings_showed(ctx: AppCont
             expected.append((program, table, parse_listing(done.stdout), skipped_lines(done.stdout)))
     assert [(x.program, x.table, x.chains, x.skipped) for x in state.tables] == expected
     assert all(x.error is None for x in state.tables)
+
+
+@pytest.mark.parametrize("answer", ["", f"{MARK} iptables present\n"])
+async def test_an_empty_or_cut_state_answer_is_an_error_not_absent(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch, answer: str
+) -> None:
+    """#77 minor 6: exit 0 with no presence line (or only one) says nothing about iptables."""
+    add_ap4(ctx)
+    t = await ctx.pool.get(ctx.routers.get("ap4"))  # type: ignore[arg-type]
+    original = t.run
+
+    async def run(command: str, *, timeout: float = 15.0) -> CommandResult:
+        if command == IPT_STATE:
+            return CommandResult(command, answer, "", 0)
+        return await original(command, timeout=timeout)
+
+    monkeypatch.setattr(t, "run", run)
+    with pytest.raises(TransportError, match="did not answer"):
+        await ctx.iptables.state("ap4")
 
 
 async def test_ap2_has_no_iptables(ctx: AppContext) -> None:

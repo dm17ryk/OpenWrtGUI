@@ -7,6 +7,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- Reads: an empty iptables answer is an error, a newer page list reads its own facts, a scan interface left behind
+  is removed before an on-air scan too, the app's own ingress shows as the app's, a numeric operator code is
+  labelled, and OWE networks are labelled OWE.
+
 ## [1.0.1] - 2026-11-17
 
 Update checks and the image library keep working when the office network has used up GitHub's hourly limit.

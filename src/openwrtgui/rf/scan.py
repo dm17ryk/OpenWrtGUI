@@ -14,7 +14,10 @@ from typing import Literal
 
 from openwrtgui.rf.parse import SurveyEntry
 
-Security = Literal["open", "WEP", "WPA", "WPA2", "WPA3", "WPA2/WPA3"]
+Security = Literal["open", "OWE", "WEP", "WPA", "WPA2", "WPA3", "WPA2/WPA3"]
+# iw's names for the RSN key managements: plain, SHA-256 and fast-transition spellings (#52)
+_PSK_SUITES = frozenset({"PSK", "PSK/SHA-256", "FT/PSK", "802.1X", "802.1X/SHA-256", "FT/802.1X"})
+_SAE_SUITES = frozenset({"SAE", "FT/SAE"})
 Secondary = Literal["above", "below"]
 
 _BSS = re.compile(r"BSS ([0-9a-fA-F]{2}(?::[0-9a-fA-F]{2}){5})\(on [^)]*\)")
@@ -75,10 +78,13 @@ def _ssid(raw: str) -> str | None:
 def _security(suites: dict[str, str], privacy: bool) -> Security:
     rsn = suites.get("RSN")
     if rsn is not None:
-        psk, sae = "PSK" in rsn.split() or "802.1X" in rsn, "SAE" in rsn.split()
+        names = set(rsn.split())
+        psk, sae = bool(names & _PSK_SUITES), bool(names & _SAE_SUITES)
         if psk and sae:
             return "WPA2/WPA3"
-        return "WPA3" if sae else "WPA2"
+        if sae:
+            return "WPA3"
+        return "OWE" if "OWE" in names and not psk else "WPA2"
     if "WPA" in suites:
         return "WPA"
     return "WEP" if privacy else "open"

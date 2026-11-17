@@ -127,7 +127,8 @@ class LuciBridgeService:
         self._facts: dict[str, tuple[datetime, SelfDescription | None, Facts]] = {}
         # v1.0c Task 4: the read in flight per router, shared by every caller (#54), and a count of the app's
         # changes per router, so a read a change overtook is answered but not kept
-        self._facts_reads: dict[str, asyncio.Future[Facts]] = {}
+        # the read in flight per router, with the description it was made for (#77 minor 7)
+        self._facts_reads: dict[str, tuple[SelfDescription | None, asyncio.Future[Facts]]] = {}
         self._facts_gen: dict[str, int] = {}
 
     async def _connect(self, router_id: str) -> tuple[RouterRecord, Transport]:
@@ -176,10 +177,12 @@ class LuciBridgeService:
         cached = self._facts.get(rec.id)
         if cached is not None and cached[1] is desc and self._clock() - cached[0] < FACTS_TTL:
             return cached[2]
-        read = self._facts_reads.get(rec.id)
-        if read is None:
+        shared = self._facts_reads.get(rec.id)
+        if shared is not None and shared[0] is desc:
+            read = shared[1]
+        else:  # none, or one made for an older page list: never shared with this caller (#77 minor 7)
             read = asyncio.ensure_future(self._read_facts(rec, t, pages))
-            self._facts_reads[rec.id] = read
+            self._facts_reads[rec.id] = (desc, read)
             gen = self._facts_gen.get(rec.id, 0)
             read.add_done_callback(lambda done: self._facts_read(rec.id, done, desc, gen))
         return await asyncio.shield(read)  # one caller giving up does not end the read for the others
@@ -188,7 +191,8 @@ class LuciBridgeService:
         self, router_id: str, done: asyncio.Future[Facts], desc: SelfDescription | None, gen: int
     ) -> None:
         """Keep a finished read only when it is whole and no change of the app's overtook it."""
-        if self._facts_reads.get(router_id) is done:
+        shared = self._facts_reads.get(router_id)
+        if shared is not None and shared[1] is done:
             del self._facts_reads[router_id]
         if done.cancelled() or done.exception() is not None:
             return

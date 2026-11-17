@@ -11,10 +11,11 @@ from openwrtgui.fw import commands as c
 from openwrtgui.fw.custom import CustomFile, parse_custom
 from openwrtgui.fw.model import Direction, FirewallConf, FwRuleConf
 from openwrtgui.fw.nft import Ruleset, parse_ruleset_json
-from openwrtgui.fw.owners import NftObject, TcHook, nft_objects, tc_hooks
+from openwrtgui.fw.owners import NftObject, TcHook, ingress_devices, nft_objects, tc_hooks
 from openwrtgui.fw.parse import firewall_conf
 from openwrtgui.fw.tc import parse_qdiscs
 from openwrtgui.net.state import NetworkState
+from openwrtgui.probe.commands import FAULT_RECORDS
 from openwrtgui.probe.describe import SelfDescription
 from openwrtgui.store.settings import KnownTable
 from openwrtgui.transport.base import Transport
@@ -165,6 +166,10 @@ async def read_firewall(
         parse_ruleset_json((await t.run(c.NFT_JSON)).stdout) if available(desc) else Ruleset((), (), (), ())
     )
     qdiscs = parse_qdiscs((await t.run(c.TC_QDISCS)).stdout)
+    if not app_devices and any(q.kind == "ingress" for q in qdiscs):
+        # whose ingress is it? The fault records say, read only when one is listed (R6, #4)
+        records = await t.run(FAULT_RECORDS)
+        app_devices = ingress_devices(records.stdout) if records.ok else frozenset()
     packets = counters(ruleset)
     state = FirewallState(
         router_id=router_id,

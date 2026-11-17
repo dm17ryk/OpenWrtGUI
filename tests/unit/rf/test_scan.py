@@ -105,6 +105,24 @@ def test_security_kinds() -> None:
     assert [b.security for b in parse_scan(text)] == ["WPA2/WPA3", "WPA3", "WPA", "WEP", "open"]
 
 
+def test_owe_and_the_other_suite_spellings() -> None:
+    """#52: OWE read as WPA2; iw spells the SHA-256 and FT suites with a slash."""
+    privacy = "ESS Privacy ShortSlotTime (0x0411)"
+    suites = ["OWE", "FT/SAE", "PSK/SHA-256", "FT/PSK SAE"]
+    text = "".join(
+        _bss(
+            f"02:00:00:00:00:0{i}",
+            "x",
+            2412,
+            -60,
+            security=RSN_PSK.replace("suites: PSK", f"suites: {s}"),
+            capability=privacy,
+        )
+        for i, s in enumerate(suites, 1)
+    )
+    assert [b.security for b in parse_scan(text)] == ["OWE", "WPA3", "WPA2", "WPA2/WPA3"]
+
+
 def test_no_networks() -> None:
     assert parse_scan("") == []
 
