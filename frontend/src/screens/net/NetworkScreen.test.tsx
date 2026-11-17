@@ -9,6 +9,11 @@ import { NetworkScreen } from './NetworkScreen'
 
 const calls: Array<{ path: string; body: unknown }> = []
 let refuse: { status: number; detail: string } | null = null
+// The preview waits 300 ms before it asks (usePreview), so a loaded PC can show it after Testing
+// Library's 1 s default (a Flash dialog preview took 1277 ms in a full gate on 2026-11-17).
+const PREVIEW_WAIT = { timeout: 5_000 }
+const commandPreview = (): Promise<HTMLElement> => screen.findByRole('region', { name: 'Command preview' }, PREVIEW_WAIT)
+const lastPreviewBody = (): unknown => calls.filter((c) => c.path.endsWith('/interfaces/preview')).at(-1)?.body
 
 vi.mock('../../api/client', async (orig) => {
   const actual = await orig<typeof import('../../api/client')>()
@@ -81,15 +86,16 @@ test('the screen lists the interfaces, marks this app\'s own, and offers help', 
 
 test('editing lan previews the change with its rollback note', async () => {
   await editLan('192.168.1.12/24')
-  const preview = await screen.findByRole('region', { name: 'Command preview' })
+  const preview = await commandPreview()
   expect(preview).toHaveTextContent("set network.lan.ipaddr='192.168.1.12/24'")
   expect(screen.getByText(/Applies with a 60 s rollback/)).toBeInTheDocument()
-  expect(calls.find((c) => c.path.endsWith('/interfaces/preview'))?.body).toEqual({ name: 'lan', address: '192.168.1.12/24' })
+  // The shown plan answers the last call; a loaded PC can also preview the cleared field first (2026-11-17).
+  expect(lastPreviewBody()).toEqual({ name: 'lan', address: '192.168.1.12/24' })
 })
 
 test('Apply confirms and names the new address', async () => {
   const user = await editLan('192.168.1.12/24')
-  await screen.findByRole('region', { name: 'Command preview' })
+  await commandPreview()
   await user.click(screen.getByRole('button', { name: 'Apply with rollback' }))
   expect(await screen.findByText('Applied and confirmed')).toBeInTheDocument()
   expect(screen.getByText(/AP2 · office is now at 192\.168\.1\.12/)).toBeInTheDocument()
@@ -103,7 +109,7 @@ test('Apply confirms and names the new address', async () => {
 test('a refusal and a guard lock show their reasons', async () => {
   refuse = { status: 422, detail: 'Write the address with its prefix, e.g. 192.168.1.2/24 (a bare address becomes /32 on this image)' }
   await editLan('192.168.1.12')
-  expect(await screen.findByRole('alert')).toHaveTextContent('Write the address with its prefix')
+  expect(await screen.findByRole('alert', {}, PREVIEW_WAIT)).toHaveTextContent('Write the address with its prefix')
 })
 
 test('All options come from the router and feed the same preview', async () => {
@@ -112,9 +118,8 @@ test('All options come from the router and feed the same preview', async () => {
   await user.click(await screen.findByRole('button', { name: 'All' }))
   const ip6 = await screen.findByRole('textbox', { name: 'ip6addr' })
   await user.type(ip6, 'fd00::1/64')
-  await screen.findByRole('region', { name: 'Command preview' })
-  const body = calls.filter((c) => c.path.endsWith('/interfaces/preview')).at(-1)?.body
-  expect(body).toEqual({ name: 'lan', edits: [{ section: 'lan', name: 'ip6addr', value: 'fd00::1/64' }] })
+  await commandPreview()
+  expect(lastPreviewBody()).toEqual({ name: 'lan', edits: [{ section: 'lan', name: 'ip6addr', value: 'fd00::1/64' }] })
 })
 
 test('the State column shows how long an interface has been up', async () => {

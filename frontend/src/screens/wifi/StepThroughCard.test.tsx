@@ -56,6 +56,10 @@ let job: StepJob | null = null
 let pending: PendingRestore[] = []
 let guard: GuardOut = CLEAR
 let previewError: string | null = null
+// The preview waits 300 ms before it asks (usePreview), so a loaded PC can show it after Testing
+// Library's 1 s default (a Flash dialog preview took 1277 ms in a full gate on 2026-11-17).
+const PREVIEW_WAIT = { timeout: 5_000 }
+const commandPreview = (card: HTMLElement): Promise<HTMLElement> => within(card).findByRole('region', { name: 'Command preview' }, PREVIEW_WAIT)
 
 vi.mock('../../api/client', async (orig) => {
   const actual = await orig<typeof import('../../api/client')>()
@@ -115,12 +119,13 @@ async function tickG16() {
 
 test('previews numbered steps and the restore', async () => {
   const { card } = await tickG16()
-  const code = await within(card).findByRole('region', { name: 'Command preview' })
+  const code = await commandPreview(card)
   expect(code.textContent).toContain('# Step 1 · 802.11g · channel 1')
   expect(code.textContent).toContain('# Step 2 · 802.11g · channel 6')
   expect(code.textContent).toContain('# Restore at the end')
   expect(within(card).getByText('Step-through preview: 2 steps, about 1 min')).toBeInTheDocument()
-  const asked = calls.find((c) => c.path.endsWith('/step-through/preview'))
+  // The shown plan answers the last call; a loaded PC can also preview the mode alone first (2026-11-17).
+  const asked = calls.filter((c) => c.path.endsWith('/step-through/preview')).at(-1)
   expect(asked?.body).toMatchObject({ radio: 'radio0', modes: ['g'], channels: [1, 6], advance: 'timer' })
 })
 
@@ -128,12 +133,12 @@ test('a re-join run shows its worst case', async () => {
   // PR #59 review: each step may wait the whole re-join limit, so the time shown is an upper bound
   const { user, card } = await tickG16()
   await user.click(within(card).getByRole('button', { name: 'Station re-joins' }))
-  expect(await within(card).findByText('Step-through preview: 2 steps, at most 1 min')).toBeInTheDocument()
+  expect(await within(card).findByText('Step-through preview: 2 steps, at most 1 min', {}, PREVIEW_WAIT)).toBeInTheDocument()
 })
 
 test('start sends the preview digest', async () => {
   const { user, card } = await tickG16()
-  await within(card).findByRole('region', { name: 'Command preview' })
+  await commandPreview(card)
   await user.click(within(card).getByRole('button', { name: 'Start step-through' }))
   await waitFor(() => expect(calls.some((c) => c.path.endsWith('/step-through/start'))).toBe(true))
   const start = calls.find((c) => c.path.endsWith('/step-through/start'))
@@ -208,13 +213,13 @@ test('a run that ends reads the pending restores again', async () => {
 test('422 reason shown', async () => {
   previewError = 'Channel 14 is not allowed in country IL'
   const { card } = await tickG16()
-  expect(await within(card).findByRole('alert')).toHaveTextContent('Channel 14 is not allowed in country IL')
+  expect(await within(card).findByRole('alert', {}, PREVIEW_WAIT)).toHaveTextContent('Channel 14 is not allowed in country IL')
 })
 
 test('start disabled while the guard is live', async () => {
   guard = { ...CLEAR, live: true, reasons: [{ kind: 'process', text: 'dima_night.py started 21:04 (PID 18244)' }] as GuardOut['reasons'] }
   const { card } = await tickG16()
-  await within(card).findByRole('region', { name: 'Command preview' })
+  await commandPreview(card)
   expect(within(card).getByRole('button', { name: 'Start step-through' })).toBeDisabled()
   expect(within(card).getByText(/dima_night\.py started 21:04/)).toBeInTheDocument()
 })
