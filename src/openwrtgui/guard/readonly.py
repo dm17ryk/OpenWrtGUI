@@ -26,8 +26,8 @@ _FIRMWARE_HASH = re.compile(
 _UQMI_READ = re.compile(
     r"uqmi -s -d /dev/cdc-wdm[0-9] -t 2000 --get-(serving-system|signal-info|device-operating-mode)"
 )
-# Discovery's service read (discovery/services.py enabled_command): `enabled` only tests the rc.d link, and the
-# echo prints its exit status; the one `;` allowed, between exactly these two (#22, the v1.0 inventory)
+# Discovery's service read (discovery/services.py enabled_command): `enabled` only tests the rc.d link, and
+# the echo prints its exit status; the one `;` allowed, between exactly these two (#22, the v1.0 inventory)
 _SERVICE_ENABLED = re.compile(r"/etc/init\.d/[A-Za-z0-9_-][A-Za-z0-9._-]{0,63} enabled; echo \$\?")
 
 _ALWAYS = frozenset(

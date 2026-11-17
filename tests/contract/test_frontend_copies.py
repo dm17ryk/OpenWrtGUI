@@ -1,7 +1,7 @@
 """#29 (the v1.0 inventory): the frontend keeps copies of three server tables; they must stay the same.
 
 The AT console's query forms (lte/at.py is_query), the AT commands whose argument the server hides
-(guard/audit.py AT_MASKED_COMMANDS), and the LTE signal quality thresholds (lte/quality.py, v0.6a plan D11)."""
+(guard/audit.py AT_MASKED_COMMANDS), and the LTE signal quality thresholds (lte/quality.py, v0.6a D11)."""
 
 from __future__ import annotations
 
