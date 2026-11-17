@@ -218,12 +218,21 @@ class CaptureService:
         return None
 
     async def _mon0_gone(self, rec: RouterRecord, capture_id: str) -> str | None:
-        """_monitor_gone over the pooled connection as it is now; a router that does not answer says so."""
+        """At a capture's end: let go of the monitor over the pooled connection as it is then, taken under the
+        write lock (a reconnect while it waited is seen). A router that does not answer still loses this
+        holder, so a later holder's end removes the monitor (the v1.1a final review)."""
+        holder = f"capture {capture_id}"
         try:
-            t = await self._pool.get(rec)
+            async with self._pool.write_lock(rec.id):
+                t = await self._pool.get(rec)
+                removed = await self._monitors.release(rec.id, holder, self._run_fn(rec, t), t)
         except TransportError as exc:
+            await self._monitors.forget(rec.id, holder)
             return f"{MONITOR} may still be on {rec.name}: {exc}"
-        return await self._monitor_gone(rec, t, capture_id)
+        if removed is not None and not removed.ok:
+            reason = (removed.stderr or removed.stdout).strip() or f"exit {removed.exit_status}"
+            return f"{MONITOR} is still on {rec.name}: {reason}"
+        return None
 
     async def start(self, router_id: str, req: CaptureRequest) -> CaptureView:
         rec = self._record(router_id)

@@ -16,9 +16,10 @@ from fwenv import FwEnv
 from openwrtgui.capture.service import CaptureRequest, CaptureService, capture_command
 from openwrtgui.capture.wireshark import LiveSink, find_wireshark
 from openwrtgui.simwifi import SimWifi
-from openwrtgui.transport.base import CommandResult, TransportError
+from openwrtgui.transport.base import CommandResult, TransportError, Unreachable
 from openwrtgui.transport.fake import BytesStream, ReplayTransport
 from openwrtgui.wifi.model import ChannelSelection, RadioRequest
+from openwrtgui.wifi.monitor import MonitorLeases
 
 PCAP_MAGIC = bytes.fromhex("d4c3b2a1")
 
@@ -321,6 +322,29 @@ async def test_the_captures_own_connection_is_closed_and_the_pooled_one_kept(
     await _done(service, view.id)
     assert links.closed.count(own) >= 1 and id(pooled) not in links.closed
     assert "iw dev owgmon0 del" in env.audit_lines()  # mon0 still removed, on the pooled connection
+
+
+async def test_a_mon0_capture_ending_on_an_unreachable_router_lets_go_of_the_monitor(
+    env: FwEnv, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The final review (Important 2): the holder stayed when the router did not answer at the end, so a later
+    frame analysis was never the last holder and owgmon0 was never removed."""
+    links = _Connections(monkeypatch)
+    leases = MonitorLeases()
+    service = _captures(env, tmp_path, monitors=leases)
+    view = await service.start("ap1", CaptureRequest("mon0", "", 60))
+    assert leases.holders("ap1") == (f"capture {view.id}",)
+
+    async def gone(*args: object, **kw: object) -> object:
+        raise Unreachable("192.168.1.1:22 did not answer")
+
+    monkeypatch.setattr(env.pool, "get", gone)
+    [held] = links.streams.values()
+    held.ended.set()  # the router went away and the stream ended
+    await _done(service, view.id)
+    done = next(v for v in service.list("ap1") if v.id == view.id)
+    assert done.error is not None and "owgmon0 may still be on AP1" in done.error
+    assert leases.holders("ap1") == ()
 
 
 async def test_a_capture_that_cannot_start_closes_its_own_connection(
