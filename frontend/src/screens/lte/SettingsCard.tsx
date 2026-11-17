@@ -8,12 +8,19 @@ import { usePlanApply } from '../../components/usePlanApply'
 import { Help } from '../../help/Help'
 import { HELP } from '../../help/topics'
 import { NetChange } from '../net/NetChange'
+import { SetupsBlock } from './SetupsBlock'
 import { initialDraft, optionRows, settingsBody, type Auth, type PdpType, type SettingsBody, type SettingsDraft } from './settings'
 
 // src/openwrtgui/net/interfaces.py QMI_LOCKED["dhcp"] (v0.6a plan D8)
 const DHCP_NOTE = "lte_4 must stay DHCP: the BM806C sends downlink only after a DHCP exchange binds this router's MAC"
 
-type Props = { routerId: string; routerName: string; autoconnectNote: string; onApplied: (result: NetApplyResult) => void }
+type Props = {
+  routerId: string
+  routerName: string
+  autoconnectNote: string
+  onApplied: (result: NetApplyResult) => void
+  works?: boolean // spec 4.1: Save good setup only while LTE works
+}
 
 type FormProps = Props & { rows: OptionRow[]; auto: boolean }
 
@@ -122,6 +129,7 @@ export function SettingsCard(props: Props) {
       <div className="note">{DHCP_NOTE}</div>
       {error && <div className="note x">{error.message}</div>}
       {rows.data && net.data ? <SettingsForm key={rows.dataUpdatedAt} {...props} rows={rows.data} auto={lte?.auto ?? true} /> : !error && <div className="muted">Reading the settings…</div>}
+      <SetupsBlock routerId={routerId} works={props.works ?? false} onApplied={props.onApplied} />
     </section>
   )
 }
