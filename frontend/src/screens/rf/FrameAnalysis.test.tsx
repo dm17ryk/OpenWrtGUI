@@ -124,6 +124,29 @@ test('a second Start shows running at once, not the socket\'s stale Off (#50)', 
   expect(await within(card).findByRole('button', { name: 'Stop frame analysis' })).toBeEnabled()
 })
 
+test("one radio's Start answer is not shown on another radio (the v1.1a final review)", async () => {
+  const user = userEvent.setup()
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const { rerender } = render(
+    <QueryClientProvider client={client}>
+      <FrameAnalysis routerId="ap1" radio="radio0" live={null} retryPct={2.5} />
+    </QueryClientProvider>,
+  )
+  const card = await screen.findByRole('region', { name: 'Frame analysis' })
+  await user.click(within(card).getByRole('button', { name: 'Frame analysis…' }))
+  await within(card).findByRole('region', { name: 'Command preview' })
+  await user.click(within(card).getByRole('button', { name: 'Start frame analysis' }))
+  expect(await within(card).findByRole('button', { name: 'Stop frame analysis' })).toBeEnabled()
+  state = OFF // radio1 has nothing running
+  rerender(
+    <QueryClientProvider client={client}>
+      <FrameAnalysis routerId="ap1" radio="radio1" live={null} retryPct={2.5} />
+    </QueryClientProvider>,
+  )
+  expect(await within(card).findByRole('button', { name: 'Frame analysis…' })).toBeEnabled()
+  expect(within(card).queryByRole('button', { name: 'Stop frame analysis' })).not.toBeInTheDocument()
+})
+
 test('a refused start shows the reason', async () => {
   startError = 'radio0 is parked: nothing of its own to analyse'
   const user = userEvent.setup()
