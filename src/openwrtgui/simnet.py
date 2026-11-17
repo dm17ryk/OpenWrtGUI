@@ -458,6 +458,8 @@ class SimNetwork:
                 entry["uptime"] = 1000
                 if conf.proto == "static" and conf.address is not None:
                     entry["ipv4-address"] = [{"address": conf.address.ip, "mask": conf.address.prefix}]
+                if conf.proto == "qmi" and self.modem is not None:
+                    entry["data"] = self.modem.session_data()
             out.append(entry)
             if conf.proto == "qmi":
                 leased = bool(entry["up"]) and self.modem is not None and self.modem.lease
