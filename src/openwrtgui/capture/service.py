@@ -153,6 +153,13 @@ class CaptureService:
                 out.append(f"Capture on {rec.name if rec else view.router_id} {view.device}")
         return out
 
+    def running_on(self, router_id: str) -> str | None:
+        """What capture holds the router now, for Remove from the app (#77 minor 10); None when none does."""
+        if router_id not in self._running:
+            return None
+        view = self._views.get(self._running[router_id])
+        return f"a capture on {view.device} runs" if view is not None else "a capture is starting"
+
     async def stop_all(self) -> None:
         for view in builtins.list(self._views.values()):
             if view.running:
