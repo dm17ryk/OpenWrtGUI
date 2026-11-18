@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+import shutil
+import subprocess
+import sys
 from collections.abc import Callable, Sequence
 from datetime import datetime
 from pathlib import Path
@@ -18,12 +22,13 @@ from openwrtgui.onboard.rotate import (
     move_router,
     remove_old_key_command,
 )
+from openwrtgui.onboard.wizard import install_key_command
 from openwrtgui.simulator import SimConnector, seed_routers
 from openwrtgui.store import keys as keys_module
 from openwrtgui.store.keys import AppKeyRing
 from openwrtgui.store.routers import RouterRecord, RouterStore, router_key_paths
 from openwrtgui.store.settings import GuardWatchList
-from openwrtgui.transport.base import AuthFailed, Transport, Unreachable
+from openwrtgui.transport.base import AuthFailed, CommandResult, Transport, Unreachable
 from openwrtgui.transport.fake import SimState
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.wifi.service import PreviewChanged
@@ -31,6 +36,22 @@ from openwrtgui.wifi.service import PreviewChanged
 SIM_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "sim"
 AP2 = "192.168.1.2"
 AK = "/etc/dropbear/authorized_keys"
+
+
+class Dropping:
+    """A pooled connection that is lost when it runs the bench's `drop_on` command."""
+
+    def __init__(self, inner: Transport, bench: Bench) -> None:
+        self._inner, self._bench = inner, bench
+
+    async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
+        if self._bench.drop_on is not None and command.startswith(self._bench.drop_on):
+            self._bench.drop_on = None
+            raise Unreachable("192.168.1.2:22: connection lost")
+        return await self._inner.run(command, timeout=timeout)
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._inner, name)
 
 
 class Bench:
@@ -49,17 +70,21 @@ class Bench:
         self.guard.check_local()
         self.audit = AuditLog(tmp_path / "audit")
         self.offline: set[str] = set()  # routers that do not answer
+        self.connects = 0  # pooled connections made
+        self.drop_on: str | None = None  # a command whose run loses the connection
 
         async def factory(rec: RouterRecord) -> Transport:
             if rec.id in self.offline:
                 raise Unreachable(f"{rec.host}:22: No route to host")
-            return await self.sim.connect(
+            self.connects += 1
+            t = await self.sim.connect(
                 rec.host,
                 rec.port,
                 password=None,
                 key_paths=router_key_paths(rec, self.keys.login_paths()),
                 username=rec.username,
             )
+            return Dropping(t, self)
 
         self.pool = ConnectionPool(factory)
 
@@ -378,6 +403,119 @@ async def test_a_failed_replace_on_this_pc_ends_the_job(
     assert job.detail == "Replacing the key on this PC failed: The process cannot access the file"
 
 
+async def test_a_router_written_during_the_final_check_moves_again(bench: Bench) -> None:
+    """PR #89 review (P1): the final check holds every router's write lock until the key is replaced, so a
+    restore of an old-key-only backup on AP2 cannot land between AP2's proof and the replacement."""
+    bench.offline.add("ap1")
+    rotation = _rotation(bench)
+    await _run(rotation)
+    bench.offline.clear()
+    old = bench.keys.current.public_line
+    restore = bench.pool.write_lock("ap2")
+    await restore.acquire()  # a restore holds AP2 while the rotation finishes
+    try:
+        await rotation.retry("ap1")
+        for _ in range(200):  # AP1 moves, then the final check waits for AP2
+            if _rows(rotation.job()).get("ap1") == ("moved", None):
+                break
+            await asyncio.sleep(0.01)
+        await asyncio.sleep(0.05)
+        assert rotation.busy("ap2") == "The app key is being replaced on this PC"
+        bench.state().authorized_keys[:] = [old]  # the restore puts back a backup with only the old key
+    finally:
+        restore.release()
+    job = await rotation.finished()
+    assert job is not None and job.phase == "pending" and bench.keys.next is not None
+    assert _rows(job)["ap2"] == (
+        "failed",
+        "AP2 · office no longer accepts the new key: it moves again on Retry",
+    )
+
+
+async def test_add_router_starting_during_the_final_check_holds_the_finish(bench: Bench) -> None:
+    """PR #89 review (P1): the hold is asked again right before the replacement, not only before proofs."""
+    asked: list[str | None] = [
+        None,
+        "Add router has installed the app key on 192.168.1.4 and is not finished",
+    ]
+
+    def hold() -> str | None:
+        return asked.pop(0) if len(asked) > 1 else asked[0]
+
+    rotation = KeyRotation(
+        keys=bench.keys,
+        routers=bench.routers,
+        pool=bench.pool,
+        connector=bench.sim,
+        guard=bench.guard,
+        audit=bench.audit,
+        hold=hold,
+    )
+    job = await _run(rotation)
+    assert (job.phase, job.detail) == (
+        "pending",
+        "Add router has installed the app key on 192.168.1.4 and is not finished",
+    )
+    assert bench.keys.next is not None
+
+
+async def test_a_lost_connection_is_dropped_so_retry_reconnects(bench: Bench) -> None:
+    """PR #89 review (P2): a connection lost mid-move is not handed to the Retry again."""
+    await _seeded(bench)
+    bench.keys.begin()
+    bench.drop_on = "grep -qxF"  # lost while removing the old line
+    with pytest.raises(MoveFailed, match="did not answer"):
+        await move_router(
+            bench.ap2(),
+            keys=bench.keys,
+            pool=bench.pool,
+            connector=bench.sim,
+            guard=bench.guard,
+            audit=bench.audit,
+            on_step=lambda step: None,
+        )
+    before = bench.connects
+    await bench.pool.get(bench.ap2())
+    assert bench.connects == before + 1  # a new connection, not the lost one
+
+
+SH = shutil.which("sh")
+
+
+def _local(command: str, folder: Path) -> str:
+    return command.replace("/etc/dropbear", folder.as_posix())
+
+
+@pytest.mark.skipif(SH is None, reason="needs a POSIX sh with grep and tail")
+def test_installing_a_key_keeps_a_last_line_without_newline(tmp_path: Path) -> None:
+    """PR #89 review (P1): `echo >>` on a file whose last line has no newline glued the key onto it."""
+    ak = tmp_path / "authorized_keys"
+    ak.write_bytes(b"ssh-ed25519 AAAAold openwrtgui@pc")  # no final newline
+    cmd = _local(install_key_command("ssh-ed25519 AAAAnew openwrtgui@pc"), tmp_path)
+    assert subprocess.run([SH, "-c", cmd], check=False).returncode == 0  # noqa: S603
+    assert ak.read_bytes() == b"ssh-ed25519 AAAAold openwrtgui@pc\nssh-ed25519 AAAAnew openwrtgui@pc\n"
+    assert subprocess.run([SH, "-c", cmd], check=False).returncode == 0  # noqa: S603 - a second install adds nothing
+    assert ak.read_bytes().count(b"AAAAnew") == 1
+
+
+@pytest.mark.skipif(SH is None, reason="needs a POSIX sh with grep and tail")
+def test_the_remove_command_on_a_real_shell(tmp_path: Path) -> None:
+    """Review Focus 3 on real grep: only exact old lines go; CRLF and options copies stay byte for byte."""
+    old, new = "ssh-ed25519 AAAAold openwrtgui@pc", "ssh-ed25519 AAAAnew openwrtgui@pc"
+    ak = tmp_path / "authorized_keys"
+    # Git for Windows' grep writes CRLF lines back as LF; the router's BusyBox grep keeps the bytes (Linux CI)
+    other = b"ssh-ed25519 AAAAother bench@lab" + (b"" if sys.platform == "win32" else b"\r")
+    kept = [b"# kept", other, f"no-pty {old}".encode()]
+    ak.write_bytes(b"\n".join([*kept, old.encode(), old.encode(), new.encode()]) + b"\n")
+    cmd = _local(remove_old_key_command(new, old), tmp_path)
+    assert subprocess.run([SH, "-c", cmd], check=False).returncode == 0  # noqa: S603
+    assert ak.read_bytes() == b"\n".join([*kept, new.encode()]) + b"\n"
+    assert not (tmp_path / "authorized_keys.owg").exists()
+    ak.write_bytes(f"{old}\n".encode())  # no new line: the command refuses and writes nothing
+    assert subprocess.run([SH, "-c", cmd], check=False).returncode != 0  # noqa: S603
+    assert ak.read_bytes() == f"{old}\n".encode() and not (tmp_path / "authorized_keys.owg").exists()
+
+
 async def test_a_changed_router_list_needs_a_new_preview(bench: Bench) -> None:
     rotation = _rotation(bench)
     digest = rotation.preview().digest
@@ -456,7 +594,12 @@ async def test_busy_and_live_name_the_move(bench: Bench) -> None:
     await _run(rotation)
     assert seen == [
         ("The app key is being moved on AP2 · office", None, ["App key rotation"]),  # AP2's proof login
-        (None, None, ["App key rotation"]),  # the final check before the old key is deleted (F1)
+        # the final check before the old key is deleted (F1): every router is held (PR #89 review)
+        (
+            "The app key is being replaced on this PC",
+            "The app key is being replaced on this PC",
+            ["App key rotation"],
+        ),
     ]
     assert rotation.busy("ap2") is None and rotation.live() == []
 

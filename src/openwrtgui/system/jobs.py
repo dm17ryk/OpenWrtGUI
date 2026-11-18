@@ -327,11 +327,15 @@ class JobsMixin:
         fails removes the uploaded archive (it holds the router's secrets) and starts no job."""
         rec = self._record(router_id)
         self._not_busy(rec)
-        plan, data, info = self._restore_plan(rec, name, await router_ipv4(rec.host))
+        address = await router_ipv4(rec.host)
+        plan, data, info = self._restore_plan(rec, name, address)
         files = provable(info)
         configs = proven_configs(info)
 
         async def steps(t: Transport) -> None:
+            # asked again under the write lock: the app's key may have been rotated while this waited for it
+            if refused := self._restore_input(rec, name, address)[2]:
+                raise ValueError("Not restored: " + "; ".join(refused))
             sent = await run_audited_upload(
                 t,
                 s.UPLOAD_RESTORE,

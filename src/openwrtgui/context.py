@@ -362,8 +362,11 @@ def build_context(
     def steps_or_recover(router_id: str) -> str | None:
         return steps.busy(router_id) or lte_recover.busy(router_id)
 
-    system.extra_busy = steps_or_recover
-    flash.extra_busy = steps_or_recover
+    def holding_the_router(router_id: str) -> str | None:  # System's jobs and Flash also wait for a key move
+        return steps_or_recover(router_id) or key_rotation.busy(router_id)
+
+    system.extra_busy = holding_the_router
+    flash.extra_busy = holding_the_router
     # a router another job holds is left on the old key with that job's reason, for a Retry (D8)
     key_rotation = KeyRotation(
         keys=keys,

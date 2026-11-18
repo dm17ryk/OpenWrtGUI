@@ -89,6 +89,7 @@ export function KeyRotation() {
                 void act(async () => {
                   showJob(await postJson<RotationJob>('/api/app-key/rotation', { digest: preview.digest }))
                   setPreview(null)
+                  void client.invalidateQueries({ queryKey: ['app-key'] }) // the card shows the new key now
                 })
               }
             >

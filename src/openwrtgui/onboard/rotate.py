@@ -45,6 +45,7 @@ NEW = (
 CONTINUE = "Continue: {n} router(s) still on the old key."
 HARNESS = "A harness run started: the rest stay on the old key"
 STOPPED = "Stopped: the rest stay on the old key"
+FINISHING = "The app key is being replaced on this PC"
 NOT_CONNECTED = "not connected yet"  # what the pool says of a router it never tried
 
 MoveState = Literal["waiting", "adding", "proving", "removing", "moved", "failed"]
@@ -155,6 +156,7 @@ async def move_router(
             )
             after = await _read_keys(t, rec)
         except TransportError as exc:
+            await pool.drop(rec.id)  # a lost connection is not handed to the Retry again (PR #89 review)
             raise MoveFailed(did_not_answer) from exc
         if not removed.ok or after != expected or nxt.public_line not in after:
             raise MoveFailed(f"authorized_keys on {rec.name} is not as expected: check it on System › Access")
@@ -246,6 +248,7 @@ class KeyRotation:
         self._stop = asyncio.Event()
         self._starting = False
         self._moving: str | None = None
+        self._finishing = False  # the final check and the key replacement: every router is held
 
     # ---------------------------------------------------------------- what is moved
     def _targets(self) -> list[RouterRecord]:
@@ -305,6 +308,8 @@ class KeyRotation:
         )
 
     def busy(self, router_id: str) -> str | None:
+        if self._finishing and router_id in {r.id for r in self._targets()}:
+            return FINISHING
         if self._moving != router_id:
             return None
         rec = self._routers.get(router_id)
@@ -484,20 +489,39 @@ class KeyRotation:
         if self._keys.next is not None and not self._waiting():
             if (held := self._hold()) is not None:
                 fields["detail"] = held
-            elif await self._confirm_moved():
+            else:
+                fields |= await self._finish_held()
+        self._job = self._job.model_copy(update=fields)
+
+    async def _finish_held(self) -> dict[str, Any]:
+        """The final check and the key replacement, with every router's write lock held (a restore, the SSH
+        keys tab or an apply waits) and every router busy for System's jobs and Flash. Whatever could still
+        change a router's keys is asked again right before the replacement, with nothing awaited between the
+        checks and finish() (PR #89 review)."""
+        self._finishing = True  # busy from now, while the locks are being taken too
+        try:
+            async with contextlib.AsyncExitStack() as held:
+                for rec in sorted(self._targets(), key=lambda r: r.id):
+                    await held.enter_async_context(self._pool.write_lock(rec.id))
+                if not await self._confirm_moved():
+                    return {}
+                if self._waiting():  # added again or removed meanwhile: it must move again
+                    return {}
+                if (held_by := self._hold()) is not None:
+                    return {"detail": held_by}
                 old = self._keys.current.fingerprint
                 try:
                     new = self._keys.finish()
                 except (OSError, ValueError) as exc:
-                    fields["detail"] = f"Replacing the key on this PC failed: {exc}"
-                else:
-                    self._audit.record(
-                        router=None,
-                        screen=SCREEN,
-                        command="replace the app key on this PC",
-                        exit_status=0,
-                        verify=f"{old} -> {new.fingerprint}",
-                        source="user",
-                    )
-                    fields["phase"] = "done"
-        self._job = self._job.model_copy(update=fields)
+                    return {"detail": f"Replacing the key on this PC failed: {exc}"}
+        finally:
+            self._finishing = False
+        self._audit.record(
+            router=None,
+            screen=SCREEN,
+            command="replace the app key on this PC",
+            exit_status=0,
+            verify=f"{old} -> {new.fingerprint}",
+            source="user",
+        )
+        return {"phase": "done"}

@@ -11,11 +11,10 @@ LINE = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExample openwrtgui@TEST"
 
 
 def _install(line: str) -> str:
-    q = shlex.quote(line)
+    q, ak = shlex.quote(line), "/etc/dropbear/authorized_keys"
     return (
-        "mkdir -p /etc/dropbear && touch /etc/dropbear/authorized_keys && "
-        "chmod 600 /etc/dropbear/authorized_keys && "
-        f"(grep -qxF {q} /etc/dropbear/authorized_keys || echo {q} >> /etc/dropbear/authorized_keys)"
+        f"mkdir -p /etc/dropbear && touch {ak} && chmod 600 {ak} && "
+        f'(grep -qxF {q} {ak} || {{ [ -z "$(tail -c1 {ak})" ] || echo >> {ak}; echo {q} >> {ak}; }})'
     )
 
 

@@ -64,6 +64,16 @@ test('the preview lists its lines and Start posts its digest', async () => {
   expect(vi.mocked(postJson)).toHaveBeenLastCalledWith('/api/app-key/rotation', { digest: 'd1g3st' })
 })
 
+test('starting a rotation refreshes the key card so the new key shows', async () => {
+  const user = userEvent.setup()
+  vi.mocked(postJson).mockResolvedValueOnce(PREVIEW).mockResolvedValueOnce(job('running', []))
+  const client = renderRotation()
+  const spy = vi.spyOn(client, 'invalidateQueries')
+  await user.click(screen.getByRole('button', { name: 'Rotate key…' }))
+  await user.click(screen.getByRole('button', { name: 'Start' }))
+  expect(spy).toHaveBeenCalledWith({ queryKey: ['app-key'] })
+})
+
 test('a running job counts the routers done and offers Stop', () => {
   renderRotation(
     job('running', [

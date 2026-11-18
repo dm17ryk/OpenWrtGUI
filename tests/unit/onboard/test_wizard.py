@@ -134,7 +134,8 @@ def test_install_key_command_exact() -> None:
         "mkdir -p /etc/dropbear && touch /etc/dropbear/authorized_keys && "
         "chmod 600 /etc/dropbear/authorized_keys && "
         "(grep -qxF 'ssh-ed25519 AAAAC3Nz openwrtgui@PC' /etc/dropbear/authorized_keys || "
-        "echo 'ssh-ed25519 AAAAC3Nz openwrtgui@PC' >> /etc/dropbear/authorized_keys)"
+        '{ [ -z "$(tail -c1 /etc/dropbear/authorized_keys)" ] || echo >> /etc/dropbear/authorized_keys; '
+        "echo 'ssh-ed25519 AAAAC3Nz openwrtgui@PC' >> /etc/dropbear/authorized_keys; })"
     )
 
 

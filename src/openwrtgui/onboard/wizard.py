@@ -47,10 +47,12 @@ LoginMethod = Literal["app_key", "pc_key", "default_password", "no_password", "p
 
 
 def install_key_command(public_line: str) -> str:
-    q = shlex.quote(public_line)
+    """Append the line once. A last line without a newline gets one first, so the key is never glued onto it
+    (PR #89 review)."""
+    q, ak = shlex.quote(public_line), AUTHORIZED_KEYS
     return (
-        f"mkdir -p /etc/dropbear && touch {AUTHORIZED_KEYS} && chmod 600 {AUTHORIZED_KEYS} && "
-        f"(grep -qxF {q} {AUTHORIZED_KEYS} || echo {q} >> {AUTHORIZED_KEYS})"
+        f"mkdir -p /etc/dropbear && touch {ak} && chmod 600 {ak} && "
+        f'(grep -qxF {q} {ak} || {{ [ -z "$(tail -c1 {ak})" ] || echo >> {ak}; echo {q} >> {ak}; }})'
     )
 
 
