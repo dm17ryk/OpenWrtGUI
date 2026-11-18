@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
 from openwrtgui.lte import commands as c
-from openwrtgui.lte.at import find_at_port, read_modem_info
+from openwrtgui.lte.at import find_at_port, is_risky, read_modem_info
 from openwrtgui.transport.base import CommandResult
 
 OK = "AT\r\r\nOK\r\n"
@@ -69,3 +71,29 @@ async def test_modem_info_without_a_port() -> None:
         None,
     )
     assert t.calls == []
+
+
+@pytest.mark.parametrize(
+    ("text", "risky"),
+    [
+        ("AT&F", True),
+        ("at&f0", True),
+        ("AT&W", True),
+        ("AT+CFUN=1,1", True),
+        ("AT+CFUN = 0", True),
+        (" at+cfun=4 ", True),
+        ("AT&F&W", True),  # final review I4: chained commands
+        ("ATE0&F", True),
+        ("ATZ;+CFUN=1,1", True),
+        ('AT+CGDCONT=1,"IP","x";+CFUN=1,1', True),
+        ("AT+CFUN?;+CSQ", False),
+        ("AT+CFUN?", False),
+        ("AT+CFUN=?", False),
+        ("AT+CSQ", False),
+        ("ATI", False),
+        ("AT+COPS=0", False),
+    ],
+)
+def test_is_risky(text: str, risky: bool) -> None:
+    """Spec 4.5: AT&F (any number), AT&W and any AT+CFUN= can erase saved profiles or wedge the BM806C."""
+    assert is_risky(text) is risky

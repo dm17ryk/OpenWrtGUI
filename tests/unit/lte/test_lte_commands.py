@@ -82,3 +82,18 @@ def test_reads_pass_the_read_only_check_and_writes_do_not() -> None:
         assert is_read_only_command(read), read
     for write in (c.set_opmode(DEV, "online"), c.IFUP_LTE, c.IMEI(DEV)):
         assert not is_read_only_command(write), write
+
+
+def test_sync_command_text() -> None:
+    assert c.sync("/dev/cdc-wdm0") == "uqmi -s -d /dev/cdc-wdm0 -t 5000 --sync"
+    with pytest.raises(ValueError):
+        c.sync("/dev/x")
+    assert not is_read_only_command(c.sync(DEV))  # it releases client ids: never a background read
+
+
+def test_autoconnect_off_command_text() -> None:
+    """Spec 4.9: the stock restore-defaults (QMI WDS 0x0051, disabled). It takes no value."""
+    assert c.autoconnect_off(DEV) == "uqmi -s -d /dev/cdc-wdm0 -t 5000 --set-autoconnect disabled"
+    with pytest.raises(ValueError):
+        c.autoconnect_off("/dev/x")
+    assert not is_read_only_command(c.autoconnect_off(DEV))

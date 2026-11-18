@@ -1,23 +1,27 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, test, vi } from 'vitest'
-import type { GuardOut } from '../../api/types'
-import { LTE_CONNECT_NO_ADDRESS, LTE_CONNECT_PLAN, LTE_REBOOT_PLAN } from '../../testing/lte'
+import type { GuardOut, LteRecoverJob } from '../../api/types'
+import { LTE_CONNECT_NO_ADDRESS, LTE_CONNECT_PLAN, LTE_REBOOT_PLAN, RECOVER_PREVIEW, RECOVER_RUNNING } from '../../testing/lte'
 import { ActionsCard } from './ActionsCard'
 
 const calls: Array<{ path: string; body: unknown }> = []
 let refuse: { status: number; detail: string } | null = null
+let recoverJob: LteRecoverJob | null = null
 
 vi.mock('../../api/client', async (orig) => {
   const actual = await orig<typeof import('../../api/client')>()
   return {
     ...actual,
     apiFetch: vi.fn(async (path: string) => {
+      if (path === '/api/routers/ap2/lte/recover') return recoverJob
       throw new Error(`unexpected ${path}`)
     }),
     postJson: vi.fn(async (path: string, body?: unknown) => {
       calls.push({ path, body })
+      if (path === '/api/routers/ap2/lte/recover/preview') return RECOVER_PREVIEW
+      if (path === '/api/routers/ap2/lte/recover') return RECOVER_RUNNING
       const action = (body as { action: string }).action
       if (path === '/api/routers/ap2/lte/action/preview') return action === 'reboot' ? LTE_REBOOT_PLAN : LTE_CONNECT_PLAN
       if (path === '/api/routers/ap2/lte/action/apply') {
@@ -39,10 +43,14 @@ const LIVE: GuardOut = {
 beforeEach(() => {
   calls.length = 0
   refuse = null
+  recoverJob = null
 })
+
+let lastClient: QueryClient | null = null
 
 function renderActions(guard: GuardOut = CLEAR) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  lastClient = client
   client.setQueryData(['guard'], guard)
   render(
     <QueryClientProvider client={client}>
@@ -51,6 +59,19 @@ function renderActions(guard: GuardOut = CLEAR) {
   )
   return screen.getByRole('group', { name: 'LTE action' })
 }
+
+test('when Recover ends, the LTE state and settings are read again', async () => {
+  // PR #82 review: the Status card and Save good setup must not keep the state from before the recovery
+  recoverJob = RECOVER_RUNNING
+  renderActions()
+  await screen.findByRole('region', { name: 'Recover' })
+  const client = lastClient as QueryClient
+  const invalidate = vi.spyOn(client, 'invalidateQueries')
+  recoverJob = { ...RECOVER_RUNNING, phase: 'recovered', current: null, detail: 'LTE works again after: Reconnect.', ended_at: '2026-11-17T12:01:00' }
+  await client.refetchQueries({ queryKey: ['lte-recover', 'ap2'] })
+  await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ['lte', 'ap2'] }))
+  expect(invalidate).toHaveBeenCalledWith({ queryKey: ['lte-options', 'ap2'] })
+})
 
 test('Reboot modem previews the four uqmi lines and ifup lte', async () => {
   const user = userEvent.setup()
@@ -61,7 +82,7 @@ test('Reboot modem previews the four uqmi lines and ifup lte', async () => {
   expect(LTE_REBOOT_PLAN.lines.filter((l) => l.startsWith('uqmi '))).toHaveLength(4)
   expect(calls.at(-1)).toEqual({ path: '/api/routers/ap2/lte/action/preview', body: { action: 'reboot' } })
   expect(screen.getByText(LTE_REBOOT_PLAN.warnings[0])).toBeInTheDocument()
-  expect(screen.getByText(/Reset to factory defaults is not in this version/)).toBeInTheDocument()
+  expect(screen.getByText(/only turns the modem's autoconnect off; Recover's fourth step does the same/)).toBeInTheDocument()
 })
 
 test('a connect without an address yet is a note, not a failure', async () => {
@@ -84,6 +105,17 @@ test('a 423 shows the run', async () => {
   await screen.findByRole('region', { name: 'Command preview' })
   await user.click(screen.getByRole('button', { name: 'Run: Disconnect' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('TXCTL v14 night run')
+})
+
+test('Recover shows every command it may run, then starts with the digest', async () => {
+  const user = userEvent.setup()
+  renderActions()
+  await user.click(screen.getByRole('button', { name: 'Recover' }))
+  const preview = await screen.findByRole('region', { name: 'Recover preview' })
+  expect(preview).toHaveTextContent(RECOVER_PREVIEW.lines[0], { normalizeWhitespace: false })
+  expect(RECOVER_PREVIEW.lines.some((l) => l.endsWith('# only if LTE does not work after the step before'))).toBe(true)
+  await user.click(within(preview).getByRole('button', { name: 'Start' }))
+  expect(calls.at(-1)).toEqual({ path: '/api/routers/ap2/lte/recover', body: { digest: RECOVER_PREVIEW.digest } })
 })
 
 test('the actions wait while a harness run is live', () => {

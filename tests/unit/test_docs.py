@@ -296,6 +296,7 @@ GUARDED = {  # each module that calls require_clear() -> the words "What is refu
     "flash/service.py": "flash",
     "guard/writes.py": "Apply",
     "lte/service.py": "LTE",
+    "lte/recover.py": "Recover",
     "net/apply.py": "rollback",
     "net/service.py": "Network",
     "rf/frames_service.py": "frame analysis",
@@ -465,8 +466,36 @@ def test_uninstall_deletes_backups_and_the_manual_says_what() -> None:
     deleted = {n for n in _ISS_DELETES.findall(iss) if not n.endswith((".tmp", ".bad", ".lock"))}
     assert "backups" in deleted
     yes = _section("Files-and-data", "Moving or removing").split("**Yes** deletes", 1)[1].split(" - ", 1)[0]
-    documented = set(re.findall(r"`([a-z_.]+)\\?`", yes))
+    documented = set(re.findall(r"`([a-z_.-]+)\\?`", yes))
     assert documented == deleted, sorted(documented ^ deleted)
+
+
+def test_the_lte_page_explains_recover_and_saved_setups() -> None:
+    """Spec 4.7: Recovering the modem names the five steps; Save good setup, Reconfigure and the AT warning
+    are in their sections; Troubleshooting points to Recover."""
+    sections = _sections(_read(MANUAL / "LTE-modem.md"))
+    recovering = sections["Recovering the modem"]
+    for rung in (
+        "Put back the saved setup",
+        "Reconnect",
+        "Clear QMI state",
+        "Turn off the modem's autoconnect",
+        "Restart the modem",
+    ):
+        assert rung in recovering, rung
+    assert "**Save good setup**" in sections["Settings"] and "**Reconfigure**" in sections["Settings"]
+    assert "Use Recover instead" in sections["AT console"]
+    assert "no packet-data handle" in sections["Status"]
+    assert "Recover" in _section("Troubleshooting", "LTE does not connect")
+
+
+def test_uninstall_deletes_the_lte_setups() -> None:
+    """Spec 4.4: saved good setups hold APN passwords and SIM PINs, so Yes deletes them as it does backups,
+    and a folder that stays is named."""
+    iss = _read(ROOT / "installer" / "OpenWrtGUI.iss")
+    assert "lte-setups" in set(_ISS_DELETES.findall(iss))
+    body = iss.split("procedure DeleteAppData", 1)[1].split("\nend;", 1)[0]
+    assert "DirExists(Dir + '\\lte-setups')" in body
 
 
 def test_uninstall_says_when_secrets_remain() -> None:

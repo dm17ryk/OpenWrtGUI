@@ -79,7 +79,7 @@ export function LteScreen() {
             <ActionsCard routerId={id} routerName={name} onDone={refresh} />
             <AtConsole routerId={id} />
           </div>
-          <SettingsCard routerId={id} routerName={name} autoconnectNote={state.autoconnect_note} onApplied={refresh} />
+          <SettingsCard routerId={id} routerName={name} autoconnectNote={state.autoconnect_note} works={state.works} onApplied={refresh} />
         </>
       )}
     </main>

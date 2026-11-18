@@ -6,7 +6,8 @@ import { dbm } from '../routerState'
 import { current, METRICS, type Quality } from './signal'
 
 const CHIP: Record<Quality, string> = { excellent: 'b air', good: 'b air', fair: 'b park', poor: 'b bad' }
-const RADIO: Record<string, string> = { lte: 'LTE', umts: 'UMTS', gsm: 'GSM', cdma: 'CDMA', 'cdma-1x': 'CDMA 1x' }
+const NO_HANDLE = 'Session up but no packet-data handle: the modem carries no data. Use Recover.'
+const RADIO: Record<string, string> ={ lte: 'LTE', umts: 'UMTS', gsm: 'GSM', cdma: 'CDMA', 'cdma-1x': 'CDMA 1x' }
 
 function bytes(n: number | null | undefined): string {
   if (n == null) return '—'
@@ -97,6 +98,7 @@ export function StatusCard({ state, sample }: Props) {
           </div>
         ))}
       </dl>
+      {state.data_handle === false && <p className="note w" role="status">{NO_HANDLE}</p>}
     </section>
   )
 }

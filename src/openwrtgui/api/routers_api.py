@@ -81,6 +81,8 @@ def _running_on(ctx: AppContext, router_id: str) -> list[str]:
         found.append("a flash runs")
     if (capture := ctx.captures.running_on(router_id)) is not None:
         found.append(capture)
+    if ctx.lte_recover.busy(router_id) is not None:  # mid-rung the modem may be in low power (I5)
+        found.append("LTE recovery runs")
     return found
 
 
@@ -95,4 +97,5 @@ async def remove_router(router_id: str, ctx: Ctx) -> Ok:
     ctx.descriptions.pop(router_id, None)
     ctx.discovery.summaries.pop(router_id, None)
     ctx.guard.forget_router(router_id)
+    ctx.lte_setups.delete(router_id)  # its APN password and SIM PIN go with it (spec 4.4)
     return Ok()

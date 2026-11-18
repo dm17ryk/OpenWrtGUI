@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from openwrtgui.api.deps import get_ctx, require_token
@@ -13,8 +14,17 @@ from openwrtgui.api.wifi_api import OptionEditIn
 from openwrtgui.context import AppContext
 from openwrtgui.forms import OptionEdit, OptionRow
 from openwrtgui.lte.at import AtResult
-from openwrtgui.lte.service import AtNeedsConfirm, LteAction, LteBusy
+from openwrtgui.lte.recover import LteRecoverJob
+from openwrtgui.lte.service import (
+    NEEDS_CONFIRM,
+    AtNeedsConfirm,
+    AtNeedsRiskyConfirm,
+    LteAction,
+    LteBusy,
+    SetupMissing,
+)
 from openwrtgui.lte.settings import METRIC_MAX, Auth, LteSettings, PdpType
+from openwrtgui.lte.setups import LteSetupSummary
 from openwrtgui.lte.state import LteState
 from openwrtgui.net.apply import NetApplyResult
 
@@ -113,14 +123,84 @@ async def settings_apply(router_id: str, body: LteSettingsApplyIn, ctx: Ctx) -> 
     return await ctx.lte.apply_settings(_known(ctx, router_id), body.to_domain(), body.digest)
 
 
-@router.post("/at")
-async def at_command(router_id: str, body: AtIn, ctx: Ctx) -> AtResult:
+def _confirm_first(*, risky: bool) -> JSONResponse:
+    """The 428 from the server's own question: no text of the exception reaches the person (PR #82 CodeQL)."""
+    return JSONResponse(status_code=428, content={"detail": NEEDS_CONFIRM, "risky": risky})
+
+
+@router.post(
+    "/at", response_model=AtResult, responses={428: {"description": "Confirm first: {detail, risky}"}}
+)
+async def at_command(router_id: str, body: AtIn, ctx: Ctx) -> AtResult | JSONResponse:
     try:
         return await ctx.lte.at_command(_known(ctx, router_id), body.command, body.confirmed)
-    except AtNeedsConfirm as exc:
-        raise HTTPException(status_code=428, detail=str(exc)) from exc
+    except AtNeedsRiskyConfirm:  # spec 4.5: the console asks the stronger question
+        return _confirm_first(risky=True)
+    except AtNeedsConfirm:
+        return _confirm_first(risky=False)
     except LteBusy as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/setup")
+async def save_setup(router_id: str, ctx: Ctx) -> LteSetupSummary:
+    """Save good setup: refused (422) unless LTE works on the router right now."""
+    return await ctx.lte.save_setup(_known(ctx, router_id), ctx.lte_setups)
+
+
+class SetupSourceIn(BaseModel):
+    """Reconfigure's source: the router whose saved setup is put back (the spec's `from`)."""
+
+    source: str = Field(min_length=1, max_length=64)
+
+
+class SetupApplyIn(SetupSourceIn, Digest):
+    pass
+
+
+@router.post("/setup/preview")
+async def setup_preview(router_id: str, body: SetupSourceIn, ctx: Ctx) -> NetPlanOut:
+    try:
+        return NetPlanOut.of(await ctx.lte.plan_setup(_known(ctx, router_id), body.source, ctx.lte_setups))
+    except SetupMissing as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/setup/apply")
+async def setup_apply(router_id: str, body: SetupApplyIn, ctx: Ctx) -> NetApplyResult:
+    try:
+        return await ctx.lte.apply_setup(_known(ctx, router_id), body.source, ctx.lte_setups, body.digest)
+    except SetupMissing as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+class RecoverPreviewOut(BaseModel):
+    lines: list[str]
+    warnings: list[str]
+    digest: str
+
+
+@router.post("/recover/preview")
+async def recover_preview(router_id: str, ctx: Ctx) -> RecoverPreviewOut:
+    """Every command Recover may run; the server picks the router's own saved setup (spec 4.2)."""
+    p = await ctx.lte_recover.preview(_known(ctx, router_id))
+    return RecoverPreviewOut(lines=list(p.lines), warnings=list(p.warnings), digest=p.digest)
+
+
+@router.post("/recover")
+async def recover_start(router_id: str, body: Digest, ctx: Ctx) -> LteRecoverJob:
+    """409 while another job holds the router or the preview changed; 423 during a harness run."""
+    return await ctx.lte_recover.start(_known(ctx, router_id), body.digest)
+
+
+@router.get("/recover")
+async def recover_job(router_id: str, ctx: Ctx) -> LteRecoverJob | None:
+    return ctx.lte_recover.job(_known(ctx, router_id))
+
+
+@router.post("/recover/stop")
+async def recover_stop(router_id: str, ctx: Ctx) -> LteRecoverJob | None:
+    return await ctx.lte_recover.stop(_known(ctx, router_id))
 
 
 @router.post("/imei")

@@ -148,6 +148,12 @@ see [A radio was left at a step-through step](#a-radio-was-left-at-a-step-throug
 instead: the file goes to `Documents\OpenWrtGUI\captures` and opens in Wireshark later. See
 [Faults and capture](Faults-and-capture#capture).
 
+## LTE does not connect
+
+The session stays down, or it is up but the Status card says "no packet-data handle". Press **Recover** on the
+[LTE screen](LTE-modem#recovering-the-modem): it finds what is wrong and tries one step at a time until LTE
+works. If it says LTE did not come back, reboot the router, then power-cycle it.
+
 ## The LTE modem has no address
 
 The LTE screen shows "no address yet: waiting for the carrier's DHCP". The modem is registered, but the carrier has

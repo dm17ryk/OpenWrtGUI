@@ -207,6 +207,10 @@ export type ModemInfo = S['ModemInfo']
 export type AtResult = S['AtResult']
 export type LteSettingsIn = S['LteSettingsIn']
 export type LteAction = S['ActionIn']['action']
+export type LteRecoverJob = S['LteRecoverJob']
+export type RungResult = S['RungResult']
+export type RecoverPreview = S['RecoverPreviewOut']
+export type LteSetupSummary = S['LteSetupSummary']
 export type LteSample = {
   t: number
   rssi: number | null

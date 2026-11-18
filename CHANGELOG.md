@@ -9,6 +9,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- LTE › **Recover**: finds what is wrong with the modem, then tries one step at a time until LTE works: put back
+  the saved good setup, reconnect, clear the modem's QMI state, turn off the modem's autoconnect (what the stock
+  firmware's "Restore modem defaults" does), restart the modem. Live progress, **Stop**, and a plain answer
+  when nothing helped (reboot the router, then power-cycle it). It never reboots the router itself.
+- LTE › Settings: **Save good setup** (while LTE works) and **Reconfigure** from this router's setup or another
+  router's, without its SIM PIN, with the usual preview and rollback. The setups stay in `lte-setups\` in the
+  data folder; uninstall's data-folder delete and Remove from the app delete them.
+- LTE › Status says when the session is up but has no packet-data handle (it carries no data).
+- LTE › AT console: `AT&F`, `AT&W` and `AT+CFUN=` get a stronger question, since they can erase the modem's
+  profiles or leave it unusable until a power cycle.
 - **Wiki** in the top bar, beside the theme button, opens the manual on the project wiki in your browser.
 - An accessibility check (axe) of every screen in the browser tests, in both themes; serious and critical findings
   fail it. The one it found, the dark theme's "Block all" text contrast, is fixed.
@@ -20,8 +30,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   labelled, and OWE networks are labelled OWE.
 - A refused firewall change names the include file it left; a kept path outside /etc is saved with a warning that
   restore puts back /etc only; Reset takes the router's name in any case.
-- Remove from the app refuses while faults are armed, a step-through runs or waits for its restore, a flash runs or
-  a capture runs, and names what runs.
+- Remove from the app refuses while faults are armed, a step-through runs or waits for its restore, a flash runs,
+  a capture runs or LTE Recover runs, and names what runs.
 - A capture runs on its own SSH connection, so a change with rollback no longer ends it.
 - A malformed live message is dropped instead of breaking the screen; an unexpected error's traceback is logged
   once.
@@ -35,6 +45,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and Import image… looks disabled during a download.
 - The simulator cuts the PC off when a firewall rule drops its SSH, as a router does; Discovery's service read is
   in the read-only grammar; tests check the frontend's copies of the server's AT and signal tables.
+- **Reboot modem** no longer leaves the modem in low power when a harness run starts mid-way: it sets it online
+  and brings LTE up again (two lines past Bench Guard, marked in the audit log), then stops and says so.
 
 ## [1.0.1] - 2026-11-17
 

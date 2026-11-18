@@ -36,6 +36,21 @@ async def test_state_of_sim_ap2(ctx: AppContext) -> None:
     assert "qmi.sh" in s.autoconnect_note
 
 
+async def test_a_healthy_simulated_modem_works(ctx: AppContext) -> None:
+    s = await ctx.lte.state("ap2")
+    assert (s.data_handle, s.works) == (True, True)
+
+
+async def test_a_wedged_simulated_modem_reads_as_not_working(
+    ctx: AppContext, authed: httpx.AsyncClient
+) -> None:
+    t = await _sim(ctx)
+    assert t.state is not None and t.state.modem is not None
+    t.state.modem.wedged = True
+    body = (await authed.get("/api/routers/ap2/lte")).json()
+    assert (body["up"], body["data_handle"], body["works"]) == (True, False, False)
+
+
 async def test_state_without_a_modem(ctx: AppContext) -> None:
     t = await _sim(ctx)
     assert t.state is not None and t.state.modem is not None

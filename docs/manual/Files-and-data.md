@@ -22,6 +22,7 @@ You choose the data folder at install time; the default is `%LOCALAPPDATA%\OpenW
 | `reflash\` | Reflash checklists | To read a saved checklist outside the app |
 | `tools\` | Promoted tool cards | Rarely: manage cards on [Discovery](Discovery#promote-to-a-card) |
 | `steps\` | The saved radio options of a step-through that has not been restored yet | Never by hand: the Wi-Fi screen's **Restore** uses it |
+| `lte-setups\` | Each router's saved good LTE setup. It holds the APN password and SIM PIN; the folder is readable by your Windows user only | Never by hand: the LTE screen's **Save good setup** and **Reconfigure** use it |
 
 The app never stores router passwords. The root password you type in the Add-router wizard is used for that one
 login, to install the app key, and is then discarded.
@@ -62,9 +63,10 @@ The app never deletes these files.
   To move, quit the app, copy the folder's contents to the new place, and point one of those at it.
 - **Uninstall** (Windows Settings › Apps) removes the program and the data-folder setting. Then it asks "Also
   delete the data folder (routers, keys, backups, audit log)?"; the default is **No**.
-  - **Yes** deletes `routers.json`, `settings.json`, `known_hosts`, `keys\`, `audit\`, `updates\`, `logs\` and
-    `backups\` (the routers' backups hold password hashes and Wi-Fi keys).
-  - If a program still has a file open in the backups or keys folder, that folder cannot be deleted. The
+  - **Yes** deletes `routers.json`, `settings.json`, `known_hosts`, `keys\`, `audit\`, `updates\`, `logs\`,
+    `backups\` and `lte-setups\` (the routers' backups hold password hashes and Wi-Fi keys; the saved LTE
+    setups hold APN passwords and SIM PINs).
+  - If a program still has a file open in the backups, lte-setups or keys folder, that folder cannot be deleted. The
     uninstaller then says which folders are still there; delete them by hand.
   - `exports\`, `profiles\`, `reflash\`, `tools\` and `steps\` stay, and so does the folder while they are in it:
     delete them by hand if you no longer need them.

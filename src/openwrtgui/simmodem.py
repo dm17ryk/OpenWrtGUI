@@ -42,6 +42,10 @@ _MICROCOM = re.compile(
 _SET_OPMODE = re.compile(
     re.escape(c.uqmi(DEVICE, "--set-device-operating-mode", "", timeout_ms=3000)) + r"(\w+)"
 )
+_SYNC = c.uqmi(DEVICE, "--sync", timeout_ms=5000)
+_AUTOCONNECT_OFF = c.uqmi(DEVICE, "--set-autoconnect", "disabled", timeout_ms=5000)
+HANDLE = {"cid_4": "11", "pdh_4": "90215808"}  # AP2's recorded lte status: a live session's handle
+NO_HANDLE = {"pdh_4": "0xffffffff"}  # a wedged BM806C: the session is up but carries no data
 
 
 def _ok(stdout: str = "") -> CommandResult:
@@ -61,12 +65,20 @@ class SimModem:
         self.opmode = "online"
         self.plugged = True
         self.stays_low_power = False  # tests: the modem does not come back online
+        self.wedged = False  # tests: ifup brings the session up without a packet-data handle until a restart
+        self.stale_qmi = False  # tests: ifup starts no session until `uqmi --sync` releases the client ids
+        # tests: the modem's own autoconnect holds the bearer (qmi.sh's unchecked attempt to turn it off at
+        # ifup did not take); `--set-autoconnect disabled` clears it after `autoconnect_refusals` failures
+        self.autoconnect_on = False
+        self.autoconnect_refusals = 0
+        self._low_power_seen = False
         self.rx_bytes = 1_204_331
         self.tx_bytes = 3_876_002
 
     def answer(self, command: str) -> CommandResult | None:
         if command in (c.IFUP_LTE, c.IFDOWN_LTE):
-            self.connected = command == c.IFUP_LTE
+            blocked = self.stale_qmi or self.autoconnect_on
+            self.connected = command == c.IFUP_LTE and not blocked  # netifd's ifup exits 0 either way
             return _ok()
         if command == c.TTY_LIST:
             if not self.plugged:
@@ -93,12 +105,34 @@ class SimModem:
             return _ok(json.dumps(self.opmode) + "\n")
         if command == c.IMEI(DEVICE):
             return _ok(json.dumps(IMEI) + "\n")
+        if command == _SYNC:
+            self.stale_qmi = False
+            return _ok()
+        if command == _AUTOCONNECT_OFF:
+            if self.autoconnect_refusals > 0:
+                self.autoconnect_refusals -= 1
+                return _fail("Request failed\n")
+            self.autoconnect_on = False
+            return _ok()
         if (m := _SET_OPMODE.fullmatch(command)) is not None:
             mode = m.group(1)
             if not (mode == "online" and self.stays_low_power):
                 self.opmode = mode
+            if mode == "low_power":
+                self._low_power_seen = True
+            elif self.opmode == "online" and self._low_power_seen:
+                self.wedged = self._low_power_seen = False  # a low_power, online cycle restarts the modem
             return _ok()
         return _fail("Invalid argument\n")
+
+    def netifd_restart(self) -> None:
+        """netifd restarts an interface whose config changed (a network reload): the session comes back unless
+        a fault keeps it down."""
+        self.connected = not (self.stale_qmi or self.autoconnect_on)
+
+    def session_data(self) -> dict[str, str]:
+        """The `data` entry of the lte interface's status while its session is up."""
+        return dict(NO_HANDLE if self.wedged else HANDLE)
 
     def _at(self, port: str, commands: list[str]) -> CommandResult:
         if not self.plugged:

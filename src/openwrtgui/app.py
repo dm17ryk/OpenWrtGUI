@@ -23,6 +23,7 @@ from openwrtgui.api import (
     images_api,
     iptables_api,
     lte_api,
+    lte_setups_api,
     luci_api,
     misc_api,
     net_api,
@@ -83,6 +84,8 @@ def create_app(ctx: AppContext) -> FastAPI:
             await asyncio.gather(*tasks, return_exceptions=True)
             with contextlib.suppress(Exception):  # a step-through restores its radio (v0.7 D6), 60 s at most
                 await ctx.steps.stop_all(limit_s=60)
+            with contextlib.suppress(Exception):  # an LTE recovery puts back what it took down (spec 4.2)
+                await ctx.lte_recover.stop_all(limit_s=60)
             with contextlib.suppress(Exception):  # frame analysis removes its monitor before the pool closes
                 await ctx.rf.stop_frames()
             with contextlib.suppress(Exception):  # a capture closes its file; on mon0 it removes owgmon0
@@ -114,6 +117,7 @@ def create_app(ctx: AppContext) -> FastAPI:
         images_api,
         flash_api,
         lte_api,
+        lte_setups_api,
         system_api,
         system_access_api,
         plugins_api,

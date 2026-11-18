@@ -243,6 +243,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/lte-setups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lte Setups */
+        get: operations["lte_setups_api_lte_setups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/onboard": {
         parameters: {
             query?: never;
@@ -1384,6 +1401,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/lte/recover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recover Job */
+        get: operations["recover_job_api_routers__router_id__lte_recover_get"];
+        put?: never;
+        /**
+         * Recover Start
+         * @description 409 while another job holds the router or the preview changed; 423 during a harness run.
+         */
+        post: operations["recover_start_api_routers__router_id__lte_recover_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/recover/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recover Preview
+         * @description Every command Recover may run; the server picks the router's own saved setup (spec 4.2).
+         */
+        post: operations["recover_preview_api_routers__router_id__lte_recover_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/recover/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Recover Stop */
+        post: operations["recover_stop_api_routers__router_id__lte_recover_stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/lte/settings/apply": {
         parameters: {
             query?: never;
@@ -1429,6 +1504,60 @@ export interface paths {
         put?: never;
         /** Settings Preview */
         post: operations["settings_preview_api_routers__router_id__lte_settings_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save Setup
+         * @description Save good setup: refused (422) unless LTE works on the router right now.
+         */
+        post: operations["save_setup_api_routers__router_id__lte_setup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/setup/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Setup Apply */
+        post: operations["setup_apply_api_routers__router_id__lte_setup_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/setup/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Setup Preview */
+        post: operations["setup_preview_api_routers__router_id__lte_setup_preview_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5902,6 +6031,33 @@ export interface components {
              */
             username: string;
         };
+        /** LteRecoverJob */
+        LteRecoverJob: {
+            /** Current */
+            current: number | null;
+            /** Detail */
+            detail: string | null;
+            /** Diagnosis */
+            diagnosis: string[];
+            /** Ended At */
+            ended_at: string | null;
+            /** Error */
+            error: string | null;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "running" | "works" | "recovered" | "not recovered" | "stopped" | "failed";
+            /** Router Id */
+            router_id: string;
+            /** Rungs */
+            rungs: components["schemas"]["RungResult"][];
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+        };
         /** LteSettingsApplyIn */
         LteSettingsApplyIn: {
             /** Apn */
@@ -5963,6 +6119,24 @@ export interface components {
             /** Username */
             username?: string | null;
         };
+        /**
+         * LteSetupSummary
+         * @description What the setup list shows: never an option value but the APN and PDP type.
+         */
+        LteSetupSummary: {
+            /** Apn */
+            apn: string | null;
+            /** Pdptype */
+            pdptype: string | null;
+            /** Readable */
+            readable: boolean;
+            /** Router Id */
+            router_id: string;
+            /** Router Name */
+            router_name: string;
+            /** Saved At */
+            saved_at: string | null;
+        };
         /** LteState */
         LteState: {
             /**
@@ -5972,6 +6146,8 @@ export interface components {
             autoconnect_note: string;
             /** Available */
             available: boolean;
+            /** Data Handle */
+            data_handle?: boolean | null;
             /** Device */
             device?: string | null;
             /** Ipv4 */
@@ -6022,6 +6198,11 @@ export interface components {
             up?: boolean | null;
             /** Uptime S */
             uptime_s?: number | null;
+            /**
+             * Works
+             * @default false
+             */
+            works: boolean;
         };
         /** Measure */
         Measure: {
@@ -7157,6 +7338,15 @@ export interface components {
             /** Uptime S */
             uptime_s?: number | null;
         };
+        /** RecoverPreviewOut */
+        RecoverPreviewOut: {
+            /** Digest */
+            digest: string;
+            /** Lines */
+            lines: string[];
+            /** Warnings */
+            warnings: string[];
+        };
         /** RedirectConf */
         RedirectConf: {
             /** Dest */
@@ -7585,6 +7775,15 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** RungResult */
+        RungResult: {
+            /** Detail */
+            detail?: string | null;
+            /** Name */
+            name: string;
+            /** Outcome */
+            outcome?: ("skipped" | "not needed" | "works" | "not yet" | "failed") | null;
+        };
         /** ScanPlanOut */
         ScanPlanOut: {
             /** Digest */
@@ -7801,6 +8000,21 @@ export interface components {
             ntp_servers: string[];
             /** Zonename */
             zonename: string | null;
+        };
+        /** SetupApplyIn */
+        SetupApplyIn: {
+            /** Digest */
+            digest: string;
+            /** Source */
+            source: string;
+        };
+        /**
+         * SetupSourceIn
+         * @description Reconfigure's source: the router whose saved setup is put back (the spec's `from`).
+         */
+        SetupSourceIn: {
+            /** Source */
+            source: string;
         };
         /** SshApplyIn */
         SshApplyIn: {
@@ -9189,6 +9403,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lte_setups_api_lte_setups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LteSetupSummary"][];
                 };
             };
         };
@@ -11451,6 +11685,13 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Confirm first: {detail, risky} */
+            428: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     imei_api_routers__router_id__lte_imei_post: {
@@ -11471,6 +11712,134 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ImeiOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recover_job_api_routers__router_id__lte_recover_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LteRecoverJob"] | null;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recover_start_api_routers__router_id__lte_recover_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Digest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LteRecoverJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recover_preview_api_routers__router_id__lte_recover_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoverPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recover_stop_api_routers__router_id__lte_recover_stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LteRecoverJob"] | null;
                 };
             };
             /** @description Validation Error */
@@ -11562,6 +11931,107 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LteSettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_setup_api_routers__router_id__lte_setup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LteSetupSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    setup_apply_api_routers__router_id__lte_setup_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    setup_preview_api_routers__router_id__lte_setup_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupSourceIn"];
             };
         };
         responses: {

@@ -32,6 +32,7 @@ Everything lives in the data folder you picked at install time (default `%LOCALA
 | `reflash\` | Reflash checklists |
 | `tools\` | Promoted tool cards |
 | `steps\` | The saved radio options of a step-through that has not been restored yet |
+| `lte-setups\` | Each router's saved good LTE setup. It holds the APN password and SIM PIN; the folder is readable by your Windows user only |
 
 RF recordings, step-through results and captures go to `Documents\OpenWrtGUI`. The manual's
 [Files and data](https://github.com/dm17ryk/OpenWrtGUI/wiki/Files-and-data) page lists the same files, with

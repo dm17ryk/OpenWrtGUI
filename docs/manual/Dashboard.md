@@ -91,5 +91,5 @@ The row of links under the title opens the router's other screens:
 **Remove from the app** at the bottom makes the app forget the router. It first asks "Remove … from OpenWrtGUI?
 The router itself is not changed." Then the router leaves the dashboard and the app drops its connection. The app
 key, the settings and the address stay on the router, so [adding it again](First-router) logs in with the key.
-While faults are armed on the router, a step-through runs or waits for its restore, or a flash or a capture runs,
-the app does not remove it and says what runs: stop or clear that first.
+While faults are armed on the router, a step-through runs or waits for its restore, or a flash, a capture or LTE
+Recover runs, the app does not remove it and says what runs: stop or clear that first.

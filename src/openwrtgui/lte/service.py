@@ -7,25 +7,28 @@ import json
 import re
 import weakref
 from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import replace
 from datetime import datetime
 from typing import Literal
 
+from openwrtgui.busy import RouterBusy
 from openwrtgui.forms import OptionRow
 from openwrtgui.guard.audit import AT_MASKED_COMMANDS, AuditLog, mask
-from openwrtgui.guard.bench_guard import BenchGuard
+from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked
 from openwrtgui.guard.writes import run_audited
 from openwrtgui.lte import commands as c
-from openwrtgui.lte.at import AtResult, ModemIdentity, find_at_port, is_query
+from openwrtgui.lte.at import AtResult, ModemIdentity, find_at_port, is_query, is_risky
 from openwrtgui.lte.commands import MODEM_DEVICE
 from openwrtgui.lte.parse import parse_at, parse_opmode
 from openwrtgui.lte.settings import LteSettings, settings_request
-from openwrtgui.lte.state import NO_LTE, LteState, read_lte
-from openwrtgui.net.apply import NetApplyResult, NetCheck, NetPlan, net_plan
+from openwrtgui.lte.setups import NAMED, LteSetup, LteSetupSummary, SetupStore, setup_change, summary_of
+from openwrtgui.lte.state import NO_LTE, LteState, handle_ok, lte_works, read_lte
+from openwrtgui.net.apply import NOTHING, NetApplyResult, NetCheck, NetPlan, net_plan
 from openwrtgui.net.interfaces import InterfaceRequest, dynamic_refusal
 from openwrtgui.net.service import NetworkService
 from openwrtgui.net.state import NetworkState
 from openwrtgui.store.routers import RouterRecord, RouterStore
-from openwrtgui.transport.base import CommandResult, Transport
+from openwrtgui.transport.base import CommandResult, Transport, TransportError
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.wifi.service import PreviewChanged
 
@@ -38,6 +41,11 @@ READBACK_TRIES = 3
 NO_ADDRESS = "no address yet: waiting for the carrier's DHCP"
 DROPS = "{name}'s LTE session drops; devices that route through it lose the internet until it is back"
 NOT_IN_MODE = "The modem did not go {mode}{why}; it may need ifup lte or a power cycle"
+# Spec 4.2, Stopping ("Finish putting back"): once a harness run is live, only the lines that put back what
+# the running step took down are sent, past Bench Guard, and audited under this screen.
+PUT_BACK_SCREEN = "LTE (put back during a harness run)"
+HARNESS_STOPPED = "Stopped: a harness run started; the modem was put back online and LTE reconnected."
+PUT_BACK_FAILED = "Stopped: a harness run started; {command}: {reason}; the modem was left {where}."
 
 
 NEEDS_CONFIRM = "This command may change the modem; send it again with confirm"
@@ -52,12 +60,29 @@ def shown_answer(lines: Sequence[str]) -> tuple[str, ...]:
     return tuple(_PIN_ECHO.sub(r"\1<hidden>", mask(line, ())) for line in lines)
 
 
-class LteBusy(Exception):
-    """One LTE action at a time per router (409)."""
+class LteBusy(RouterBusy):
+    """One LTE action at a time per router (409 on every endpoint)."""
 
 
 class AtNeedsConfirm(Exception):
     """D5: an AT command that is not a query runs only once the person confirms it (428)."""
+
+
+class AtNeedsRiskyConfirm(AtNeedsConfirm):
+    """Spec 4.5: one that can erase the modem's profiles or wedge it, so the console asks a stronger question.
+    A type, not a flag: the 428 is built from the server's own text, nothing read from the exception."""
+
+
+class LteNotWorking(ValueError):
+    """Save good setup while LTE does not work (422): a broken setup would be put back later."""
+
+
+class SetupMissing(LookupError):
+    """Reconfigure from a router that has no saved good setup (404)."""
+
+
+SETUP_SAVED = "LTE good setup saved"
+SECRET_OPTIONS = ("password", "pincode")
 
 
 def _reason(result: CommandResult) -> str:
@@ -103,9 +128,56 @@ class LteService:
         # router → (connection, the modem's identity read on it): asked once per connection (v1.0c D2)
         self._identity: dict[str, tuple[weakref.ref[Transport], ModemIdentity]] = {}
         self._busy: dict[str, asyncio.Lock] = {}
+        self._saving: dict[str, asyncio.Lock] = {}  # Save good setup, one per router at a time
         self._at: dict[str, asyncio.Lock] = {}  # one AT exchange at a time per router (v1.0b2 D11)
         self.poll_s = POLL_S
         self.readback_s = 1.0
+        self.connect_s = CONNECT_S
+        self.nominal_poll_s = POLL_S
+        # the Recover job (spec 4.2): while it runs, this screen's other writes answer 409 naming it
+        self.extra_busy: Callable[[str], str | None] | None = None
+
+    def _refuse_if_busy(self, router_id: str) -> None:
+        why = self.extra_busy(router_id) if self.extra_busy is not None else None
+        if why is not None:
+            raise RouterBusy(why)
+
+    def action_busy(self, router_id: str) -> str | None:
+        """Why the Recover job may not start: an LTE action or AT write holds the router."""
+        lock = self._busy.get(router_id)
+        if lock is None or not lock.locked():
+            return None
+        return f"An LTE action is already running on {self._record(router_id).name}"
+
+    # ---------------------------------------------------------------- what the Recover job uses
+    async def transport(self, rec: RouterRecord) -> Transport:
+        return await self._pool.get(rec)
+
+    def write_lock(self, router_id: str) -> asyncio.Lock:
+        return self._pool.write_lock(router_id)
+
+    async def run(self, rec: RouterRecord, t: Transport, command: str) -> CommandResult:
+        """One audited write; the caller holds the write lock. Refused (GuardLocked) during a harness run."""
+        return await self._cmd(rec, t, command)
+
+    async def readback(self, rec: RouterRecord, t: Transport, read_line: str, mode: str) -> bool:
+        return await self._readback(rec, t, read_line, mode)
+
+    async def lte_device(self, router_id: str) -> str | None:
+        return await self._lte_device(router_id)
+
+    async def setup_values(self, router_id: str) -> tuple[list[OptionRow], dict[str, str]]:
+        return await self._net.interface_values(router_id, _lte_name(await self._qmi(router_id)))
+
+    async def works_now(self, t: Transport) -> bool:
+        """Spec 4.1 from the two status reads alone: up, a valid packet-data handle, an lte_4 address."""
+        status = await self._status(t, "lte")
+        if status is None or status.get("up") is not True or handle_ok(status) is not True:
+            return False
+        return await self._address(t) is not None
+
+    async def pause(self) -> None:
+        await self._sleep(self.poll_s)
 
     def _record(self, router_id: str) -> RouterRecord:
         rec = self._routers.get(router_id)
@@ -207,6 +279,7 @@ class LteService:
 
     async def apply_action(self, router_id: str, action: LteAction, digest: str) -> NetApplyResult:
         rec = self._record(router_id)
+        self._refuse_if_busy(rec.id)
         busy = self._busy.setdefault(rec.id, asyncio.Lock())
         if busy.locked():
             raise LteBusy(f"An LTE action is already running on {rec.name}")
@@ -228,30 +301,57 @@ class LteService:
             t, command, router_id=rec.id, screen=SCREEN, guard=self._guard, audit=self._audit
         )
 
+    async def _put_back(self, rec: RouterRecord, t: Transport, command: str) -> CommandResult:
+        """One put-back line during a harness run: sent past Bench Guard, audited under PUT_BACK_SCREEN."""
+        return await run_audited(
+            t,
+            command,
+            router_id=rec.id,
+            screen=PUT_BACK_SCREEN,
+            guard=self._guard,
+            audit=self._audit,
+            require_guard=False,
+        )
+
+    async def put_back(self, rec: RouterRecord, t: Transport, commands: Sequence[tuple[str, str]]) -> str:
+        """Send each (line, where the modem is left if it fails) in order; stop at the first failure. The
+        result is HARNESS_STOPPED, or the failure naming its command and where the modem was left."""
+        for command, where in commands:
+            try:
+                done = await self._put_back(rec, t, command)
+            except TransportError:  # final review I1: the result says where, never a bare 502
+                return PUT_BACK_FAILED.format(
+                    command=command, reason=f"{rec.name} did not answer", where=where
+                )
+            if not done.ok:
+                return PUT_BACK_FAILED.format(command=command, reason=_reason(done), where=where)
+        return HARNESS_STOPPED
+
     async def _run_action(
         self, rec: RouterRecord, t: Transport, action: LteAction, lines: tuple[str, ...]
     ) -> NetApplyResult:
         checks: list[NetCheck] = []
         if action == "reboot":
             self.forget_identity(rec.id)  # a rebooted modem is asked who it is again (v1.0c D2)
-            for set_line, read_line, mode in (
-                (lines[0], lines[1], "low_power"),
-                (lines[2], lines[3], "online"),
-            ):
-                done = await self._cmd(rec, t, set_line)
-                if not done.ok and not checks:  # the first line: nothing changed yet
-                    return NetApplyResult(rec.id, False, False, (), f"{set_line}: {_reason(done)}", rec.host)
-                if not done.ok:  # low_power went through: say where the modem was left
-                    checks.append(NetCheck(f"modem {mode}", False, _reason(done)))
-                    error = NOT_IN_MODE.format(mode=mode, why=f" ({_reason(done)})")
-                    return NetApplyResult(rec.id, True, False, tuple(checks), error, rec.host)
-                ok = await self._readback(rec, t, read_line, mode)
-                checks.append(NetCheck(f"modem {mode}", ok, mode if ok else f"still not {mode}"))
-                if not ok:
-                    error = NOT_IN_MODE.format(mode=mode, why="")
-                    return NetApplyResult(rec.id, True, False, tuple(checks), error, rec.host)
+            low = await self._cmd(rec, t, lines[0])  # GuardLocked here: nothing changed yet
+            if not low.ok:
+                return NetApplyResult(rec.id, False, False, (), f"{lines[0]}: {_reason(low)}", rec.host)
+            try:
+                failed = await self._restart_modem(rec, t, lines, checks)
+            except GuardLocked:  # a harness run started with the modem in low power: put it back, then stop
+                put_back = ((lines[2], "in low power"), (c.IFUP_LTE, "online with LTE down"))
+                error = await self.put_back(rec, t, put_back)
+                return NetApplyResult(rec.id, True, False, tuple(checks), error, rec.host)
+            if failed is not None:
+                return failed
         command = c.IFDOWN_LTE if action == "disconnect" else c.IFUP_LTE
-        done = await self._cmd(rec, t, command)
+        try:
+            done = await self._cmd(rec, t, command)
+        except GuardLocked:
+            if action != "reboot":
+                raise
+            error = await self.put_back(rec, t, ((c.IFUP_LTE, "online with LTE down"),))
+            return NetApplyResult(rec.id, True, False, tuple(checks), error, rec.host)
         if not done.ok:  # after a reboot the modem's mode did change: that counts as applied
             return NetApplyResult(
                 rec.id, bool(checks), False, tuple(checks), f"{command}: {_reason(done)}", rec.host
@@ -269,6 +369,25 @@ class LteService:
                 checks.append(NetCheck("lte_4 address", True if address else None, address or NO_ADDRESS))
         verified = all(check.ok is not False for check in checks)
         return NetApplyResult(rec.id, True, verified, tuple(checks), None, rec.host)
+
+    async def _restart_modem(
+        self, rec: RouterRecord, t: Transport, lines: tuple[str, ...], checks: list[NetCheck]
+    ) -> NetApplyResult | None:
+        """After low_power went through: its read-back, then online and its read-back. None: the modem is
+        online. A GuardLocked from any of them goes to the caller, which puts the modem back."""
+        for set_line, read_line, mode in ((None, lines[1], "low_power"), (lines[2], lines[3], "online")):
+            if set_line is not None:
+                done = await self._cmd(rec, t, set_line)
+                if not done.ok:  # low_power went through: say where the modem was left
+                    checks.append(NetCheck(f"modem {mode}", False, _reason(done)))
+                    error = NOT_IN_MODE.format(mode=mode, why=f" ({_reason(done)})")
+                    return NetApplyResult(rec.id, True, False, tuple(checks), error, rec.host)
+            ok = await self._readback(rec, t, read_line, mode)
+            checks.append(NetCheck(f"modem {mode}", ok, mode if ok else f"still not {mode}"))
+            if not ok:
+                error = NOT_IN_MODE.format(mode=mode, why="")
+                return NetApplyResult(rec.id, True, False, tuple(checks), error, rec.host)
+        return None
 
     async def _readback(self, rec: RouterRecord, t: Transport, read_line: str, mode: str) -> bool:
         for attempt in range(READBACK_TRIES):
@@ -311,13 +430,96 @@ class LteService:
     async def plan_settings(self, router_id: str, settings: LteSettings) -> NetPlan:
         return await self._net.plan_interface(router_id, await self._settings_request(router_id, settings))
 
-    async def apply_settings(self, router_id: str, settings: LteSettings, digest: str) -> NetApplyResult:
-        req = await self._settings_request(router_id, settings)
-        return await self._net.apply_interface(router_id, req, digest)
+    async def apply_settings(
+        self, router_id: str, settings: LteSettings, digest: str, *, recover: bool = False
+    ) -> NetApplyResult:
+        """`recover`: the Recover job's own rung 1, which holds the router itself. Any other apply holds the
+        LTE busy reservation for its whole run, so Recover cannot start under it (PR #82 review)."""
+        if recover:
+            return await self._net.apply_interface(
+                router_id, await self._settings_request(router_id, settings), digest
+            )
+        rec = self._record(router_id)
+        self._refuse_if_busy(rec.id)
+        busy = self._busy.setdefault(rec.id, asyncio.Lock())
+        if busy.locked():
+            raise LteBusy(f"An LTE action is already running on {rec.name}")
+        async with busy:
+            req = await self._settings_request(router_id, settings)
+            return await self._net.apply_interface(router_id, req, digest)
 
     async def settings_options(self, router_id: str) -> list[OptionRow]:
         name = _lte_name(await self._qmi(router_id))
         return await self._net.interface_options(router_id, name)
+
+    # ---------------------------------------------------------------- saved good setups (spec 4.4)
+    async def save_setup(self, router_id: str, setups: SetupStore) -> LteSetupSummary:
+        """Keep the router's LTE options while LTE works: every option the Settings card can edit (the rows
+        that are not control-locked), the APN password and SIM PIN included, as the router has them."""
+        rec = self._record(router_id)
+        state = await self.state(router_id)
+        if not lte_works(state):
+            raise LteNotWorking(
+                f"LTE does not work on {rec.name} right now; save a good setup while it works"
+            )
+        name = _lte_name(await self._qmi(router_id))
+        rows, values = await self._net.interface_values(router_id, name)
+        editable = {row.name for row in rows if row.control is None} | set(NAMED)
+        kept = {key: value for key, value in values.items() if key in editable}
+        setup = LteSetup(
+            router_id=rec.id,
+            router_name=rec.name,
+            saved_at=self._clock().astimezone(),
+            modem=state.modem,
+            options=kept,
+        )
+        # one save per router at a time: two would race on the same temporary file (PR #82 review)
+        async with self._saving.setdefault(rec.id, asyncio.Lock()):
+            await asyncio.to_thread(setups.save, setup)  # icacls blocks: never on the event loop
+        secrets = [kept[key] for key in SECRET_OPTIONS if kept.get(key)]
+        self._audit.record(
+            router=rec.id, screen=SCREEN, command=SETUP_SAVED, exit_status=0, source="user", secrets=secrets
+        )
+        return summary_of(setup)
+
+    async def setup_settings(
+        self, router_id: str, source: str, setups: SetupStore
+    ) -> tuple[LteSettings, list[str]]:
+        """Reconfigure's settings change from `source`'s saved setup, and the warnings its preview adds."""
+        rec = self._record(router_id)
+        setup = setups.get(source)
+        if setup is None:
+            raise SetupMissing(f"No good setup saved for {source}")
+        name = _lte_name(await self._qmi(router_id))
+        rows, values = await self._net.interface_values(router_id, name)
+        change = setup_change(setup, rows, values, same_router=source == router_id)
+        warnings = []
+        if change.skipped:
+            warnings.append(f"Not restored (no such option on {rec.name}): {', '.join(change.skipped)}")
+        if change.kept:
+            warnings.append(
+                f"Left as it is (the setup has none, and the Settings card cannot remove it): "
+                f"{', '.join(change.kept)}"
+            )
+        return change.settings, warnings
+
+    async def plan_setup(self, router_id: str, source: str, setups: SetupStore) -> NetPlan:
+        settings, warnings = await self.setup_settings(router_id, source, setups)
+        try:
+            plan = await self.plan_settings(router_id, settings)
+        except ValueError as exc:  # "Nothing to apply": say what was not restored too
+            if str(exc) == NOTHING and warnings:
+                raise ValueError(" ".join((NOTHING, *(f"{w}." for w in warnings)))) from exc
+            raise
+        return replace(plan, warnings=(*plan.warnings, *warnings))  # the digest covers the lines only
+
+    async def apply_setup(
+        self, router_id: str, source: str, setups: SetupStore, digest: str, *, recover: bool = False
+    ) -> NetApplyResult:
+        if not recover:
+            self._refuse_if_busy(router_id)
+        settings, _warnings = await self.setup_settings(router_id, source, setups)
+        return await self.apply_settings(router_id, settings, digest, recover=recover)
 
     # ---------------------------------------------------------------- AT console and IMEI
     async def at_command(self, router_id: str, text: str, confirmed: bool) -> AtResult:
@@ -329,15 +531,18 @@ class LteService:
         query = is_query(command)
         if not query:
             self._guard.require_clear()
+            self._refuse_if_busy(rec.id)
             if not confirmed:
-                raise AtNeedsConfirm(NEEDS_CONFIRM)
+                raise (AtNeedsRiskyConfirm if is_risky(command) else AtNeedsConfirm)(NEEDS_CONFIRM)
         t = await self._pool.get(rec)
         if query:
             async with self._at_lock(rec.id):
                 port, done = await self._exchange(rec, t, command, write=False)
         else:
             # one LTE write at a time, as the actions: a command that may change the modem never waits behind
-            # a connect or reboot to run later; it is refused (409)
+            # a connect or reboot to run later; it is refused (409). Recover may have started while the
+            # connection was made: checked again with no await before the reservation (PR #82 review)
+            self._refuse_if_busy(rec.id)
             busy = self._busy.setdefault(rec.id, asyncio.Lock())
             if busy.locked():
                 raise LteBusy(f"An LTE action is already running on {rec.name}")
