@@ -7543,7 +7543,7 @@ export interface components {
         };
         /**
          * RotationJob
-         * @description The rotation as Settings shows it. `started_at` is None for a rotation found on disk after a restart.
+         * @description The rotation as Settings shows it. `started_at` is None for a rotation found on disk at start-up.
          */
         RotationJob: {
             /** Detail */
