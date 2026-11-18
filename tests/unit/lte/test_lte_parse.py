@@ -104,6 +104,12 @@ def test_at_answers() -> None:
     assert parse_cops(("+COPS: 0",)) is None
 
 
+def test_a_numeric_operator_answer_is_a_network_code() -> None:
+    """#27: AT+COPS? format 2 answers the MCC and MNC, not a name (R2)."""
+    assert parse_cops(('+COPS: 0,2,"42501",7',)) == "42501 (network code)"
+    assert parse_cops(('+COPS: 0,1,"Partner",7',)) == "Partner"  # short alphanumeric stays a name
+
+
 def test_identity() -> None:
     assert parse_identity("AT+CGMI\r\r\nBroadMobi\r\n\r\nOK\r\n", "AT+CGMI") == "BroadMobi"  # AP2, echo on
     assert (

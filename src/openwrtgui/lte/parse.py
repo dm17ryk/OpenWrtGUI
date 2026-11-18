@@ -9,7 +9,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
-_COPS = re.compile(r'\+COPS:\s*\d+\s*,\s*\d+\s*,\s*"([^"]*)"')
+_COPS = re.compile(r'\+COPS:\s*\d+\s*,\s*(\d+)\s*,\s*"([^"]*)"')
+_COPS_NUMERIC = "2"  # AT+COPS format 2: the MCC and MNC as digits, not a name
 _MODE_ORDER = re.compile(r"\+BMMODODR:\s*(\d+)")
 _CGM_PREFIX = re.compile(r"^\+CGM[IMR]:\s*", re.IGNORECASE)
 
@@ -125,7 +126,9 @@ def parse_at(text: str, command: str) -> AtAnswer | None:
 def parse_cops(lines: Sequence[str]) -> str | None:
     for line in lines:
         if m := _COPS.search(line):
-            return m.group(1)
+            if m.group(1) == _COPS_NUMERIC:  # #27: a code is labelled, never shown as a name (R2)
+                return f"{m.group(2)} (network code)"
+            return m.group(2)
     return None
 
 

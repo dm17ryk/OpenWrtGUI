@@ -30,13 +30,18 @@ export function vlanDraft(state: PortsState): VlanRow[] {
   return state.vlans.map((v) => ({ key: v.section, section: v.section, vlan: v.vlan, cells: { ...empty, ...v.members }, deleted: false }))
 }
 
-/** A new VLAN with the lowest number no row uses, tagged on the CPU port so the router can reach it. */
+/** A new VLAN with the lowest number no row uses, tagged on the CPU port so the router can reach it. Its key is
+ * one past every new row's key so far, never reused after a remove and a renumber (as the bridge card's). */
 export function newVlan(state: PortsState, rows: VlanRow[]): VlanRow {
   const used = new Set(rows.map((r) => r.vlan))
   let vlan = 1
   while (used.has(vlan) && vlan < state.max_vlan) vlan += 1
   const cells: Record<number, Cell> = Object.fromEntries(columns(state).map((c) => [c.num, c.num === state.cpu_port ? 't' : '-']))
-  return { key: `new-${rows.length}-${vlan}`, section: null, vlan, cells, deleted: false }
+  const taken = rows.flatMap((r) => {
+    const m = /^new-(\d+)$/.exec(r.key)
+    return m ? [Number(m[1])] : []
+  })
+  return { key: `new-${Math.max(0, ...taken) + 1}`, section: null, vlan, cells, deleted: false }
 }
 
 /** The changed VLANs (each with its whole member list) and the deleted ones; null when nothing changed. */

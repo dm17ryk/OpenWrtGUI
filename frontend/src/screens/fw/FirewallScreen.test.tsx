@@ -113,6 +113,13 @@ test('lan input to Block all shows the pins and a preview with the SSH pin and t
   expect(lastModel()).toEqual({ cells: { 'lan.input': 'REJECT' }, pins_removed: [] })
 })
 
+test('pins not on the router yet say this change adds them (#6)', async () => {
+  const user = renderFirewall()
+  await user.click(within(await cell('lan To this router')).getByRole('button', { name: 'Block all' }))
+  const ssh = screen.getByText('Allow SSH from this PC').closest('.pin') as HTMLElement
+  expect(within(ssh).getByText('added with this change')).toBeInTheDocument() // the fixture's pins are not present
+})
+
 test('Remove… warns first; Remove anyway sends the pin, Put back takes it back', async () => {
   const user = renderFirewall()
   await user.click(within(await cell('lan To this router')).getByRole('button', { name: 'Block all' }))

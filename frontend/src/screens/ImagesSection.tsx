@@ -11,6 +11,12 @@ async function importImage(file: File): Promise<ProfileOut> {
   return postBytes<ProfileOut>('/api/images', await file.arrayBuffer(), file.name)
 }
 
+/** The link text for an image from the library: its release tag when the origin names one (0.8.2 ledger). */
+function originText(origin: string): string {
+  const tag = /\/releases\/tag\/([^/?#]+)$/.exec(origin)?.[1]
+  return tag ? `from the image library (${decodeURIComponent(tag)})` : 'from the image library'
+}
+
 type ImportProps = { onImported: (profile: ProfileOut) => void; disabled?: boolean }
 
 /** The file picker with its busy and error states (Settings › Images and Discovery's no-match note). */
@@ -32,7 +38,8 @@ export function ImportImage({ onImported, disabled = false }: ImportProps) {
   return (
     <div className="stack">
       <HelpTip topic={HELP.routerFamily}>
-        <label className="btn">
+        {/* a label is never :disabled, so it says so itself (the 0.8.2 final review) */}
+        <label className={isBusy || disabled ? 'btn disabled' : 'btn'} aria-disabled={isBusy || disabled}>
           {isBusy ? 'Reading the image…' : 'Import image…'}
           <input
             type="file"
@@ -90,7 +97,7 @@ export function ImagesSection() {
             </span>
             {p.origin && (
               <a href={p.origin} target="_blank" rel="noopener noreferrer">
-                from the image library
+                {originText(p.origin)}
               </a>
             )}
           </div>

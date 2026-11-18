@@ -3919,7 +3919,7 @@ export interface components {
              * Security
              * @enum {string}
              */
-            security: "open" | "WEP" | "WPA" | "WPA2" | "WPA3" | "WPA2/WPA3";
+            security: "open" | "OWE" | "WEP" | "WPA" | "WPA2" | "WPA3" | "WPA2/WPA3";
             /** Signal Dbm */
             signal_dbm: number | null;
             /** Ssid */

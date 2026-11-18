@@ -2,6 +2,17 @@ import { expect, test } from 'vitest'
 import { AP2_PORTS } from '../../testing/ports'
 import { columns, newVlan, nextCell, vlanDraft, vlanRequest } from './vlan'
 
+test('a new row never takes a key a row still has: add, add, renumber, remove, add (the 1.x inventory)', () => {
+  let rows = vlanDraft(AP2_PORTS)
+  const x = newVlan(AP2_PORTS, rows)
+  rows = [...rows, x]
+  const y = newVlan(AP2_PORTS, rows)
+  rows = [...rows, y].map((r) => (r.key === y.key ? { ...r, vlan: x.vlan } : r)) // y renumbered to x's VLAN
+  rows = rows.filter((r) => r.key !== x.key) // x removed
+  const z = newVlan(AP2_PORTS, rows)
+  expect(rows.map((r) => r.key)).not.toContain(z.key)
+})
+
 test('a cell cycles not a member → untagged → tagged → not a member', () => {
   expect(nextCell('-')).toBe('u')
   expect(nextCell('u')).toBe('t')

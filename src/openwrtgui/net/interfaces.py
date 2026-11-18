@@ -26,7 +26,7 @@ CONTROLLED_INTERFACE = {
     "mtu": "MTU",
 }
 STATIC_ONLY = ("ipaddr", "netmask", "gateway", "broadcast")
-# qmi options the LTE screen keeps as they are (v0.6a plan D7, D8): the row shows "set above: LTE screen"
+# qmi options the LTE screen keeps as they are (v0.6a plan D7, D8): the row shows "kept by the LTE screen"
 QMI_LOCKED = {
     "dhcp": (
         "lte_4 must stay DHCP: the BM806C sends downlink only after a DHCP exchange binds this router's MAC"

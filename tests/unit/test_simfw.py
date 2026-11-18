@@ -64,6 +64,38 @@ async def test_block_all_without_pin_is_unreachable() -> None:
     assert not net.reachable()
 
 
+async def test_a_user_rule_that_drops_the_pc_cuts_it_off() -> None:
+    """#7 (the v1.0 inventory): admits_ssh looked only at the zone and chain policies."""
+    t, net, _fw, _clock = _sim()
+    rule = "firewall.owg_test_drop"
+    await _apply_firewall(
+        t,
+        f"uci -P {S} set {rule}='rule'",
+        f"uci -P {S} set {rule}.src='lan'",
+        f"uci -P {S} set {rule}.proto='tcp'",
+        f"uci -P {S} set {rule}.dest_port='22'",
+        f"uci -P {S} set {rule}.src_ip='{net.pc_ip}'",
+        f"uci -P {S} set {rule}.target='DROP'",
+    )
+    assert not net.reachable()
+
+
+async def test_an_accept_before_a_drop_keeps_the_pc() -> None:
+    t, net, _fw, _clock = _sim()
+    lines = []
+    for name, target in (("owg_test_ok", "ACCEPT"), ("owg_test_drop", "REJECT")):
+        rule = f"firewall.{name}"
+        lines += [
+            f"uci -P {S} set {rule}='rule'",
+            f"uci -P {S} set {rule}.src='lan'",
+            f"uci -P {S} set {rule}.proto='tcp'",
+            f"uci -P {S} set {rule}.dest_port='22'",
+            f"uci -P {S} set {rule}.target='{target}'",
+        ]
+    await _apply_firewall(t, *lines)
+    assert net.reachable()  # fw4 takes the first rule that matches
+
+
 async def test_pin_keeps_ssh() -> None:
     t, net, _fw, _clock = _sim()
     await _apply_firewall(

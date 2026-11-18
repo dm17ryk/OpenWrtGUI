@@ -126,6 +126,23 @@ def test_roadmap_has_every_milestone() -> None:
         assert milestone in roadmap, milestone
 
 
+# the GitHub milestones made for 1.x (the 1.x proposal's D11 and D12), one ROADMAP row each
+ONE_X = (
+    "v1.1 Leftovers, rate statistics and key rotation",
+    "v1.2 Tool pages",
+    "v1.3 LTE phase 2",
+    "1.x (phase 2)",
+)
+
+
+def test_roadmap_and_the_spec_split_1_x_alike() -> None:
+    roadmap = _read(ROOT / "ROADMAP.md")
+    spec = _read(ROOT / "docs" / "superpowers" / "specs" / "2026-11-03-openwrt-gui-design.md")
+    for row in ONE_X:
+        assert f"| {row} |" in roadmap, row
+        assert f"| {row} |" in spec, row
+
+
 def test_agents_file_carries_the_bench_rules() -> None:
     agents = _read(ROOT / "AGENTS.md")
     assert "192.168.1.2" in agents
@@ -140,6 +157,13 @@ def test_installer_test_covers_update_in_place() -> None:
         assert words in script, words
     ci = _read(ROOT / ".github" / "workflows" / "ci.yml")
     assert "gh release download" in ci and "-Previous" in ci
+
+
+def test_installer_update_check_hashes_the_whole_data_folder_by_name() -> None:
+    """The v1.0d final review: only top-level files were hashed; a renamed file kept the same hash list."""
+    script = _read(ROOT / "tools" / "test_installer.ps1")
+    assert "function Snapshot" in script and "-Recurse" in script
+    assert "$before = Snapshot $DataU" in script and "$after = Snapshot $DataU" in script
 
 
 def test_repo_files_exist() -> None:
@@ -242,14 +266,22 @@ def test_troubleshooting_covers_the_common_failures() -> None:
     wanted = {
         "The router is busy": "is busy",
         "An update does not download or install": "SHA256SUMS",
-        "A reboot or a flash does not come back": "power",
-        "A LuCI page does not open": "LuCI",
+        # the app's own messages, quoted: a word like "power" is in any text (the v1.0d final review)
+        "A reboot or a flash does not come back": "did not come back within 10\n  minutes",
+        "A LuCI page does not open": "No LuCI page",
         "Wireshark does not start": "Wireshark is not installed on this PC",
         "The LTE modem has no address": "no address yet: waiting for the carrier's DHCP",
         '"This screen hit an error"': "Unexpected error in OpenWrtGUI",
     }
     missing = [h for h, words in wanted.items() if words not in sections.get(h, "")]
     assert missing == []
+
+
+def test_troubleshooting_names_the_capture_buttons_as_they_read() -> None:
+    """The v1.0d final review: the page bolded "to Wireshark", which no button says."""
+    body = _sections(_read(MANUAL / "Troubleshooting.md"))["Wireshark does not start"]
+    assert "**Live in Wireshark**" in body and "**Save .pcap**" in body
+    assert "**to Wireshark**" not in body
 
 
 def test_faq_answers_the_common_questions() -> None:

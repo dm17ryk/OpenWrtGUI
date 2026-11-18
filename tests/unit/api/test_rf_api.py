@@ -158,6 +158,26 @@ async def test_a_scan_removes_owgscan0_left_from_an_earlier_one(
     assert "Interface owgscan0" not in await _iw_info(ctx)
 
 
+async def test_an_on_air_scan_removes_owgscan0_left_from_an_earlier_one(
+    authed: httpx.AsyncClient, ctx: AppContext
+) -> None:
+    """#77 minor 9: a leftover was removed only by a temporary scan, never while the radio is on air."""
+    rec = ctx.routers.get("ap2")
+    assert rec is not None
+    assert (await (await ctx.pool.get(rec)).run(scan_add("phy0"))).ok  # left while the radio was parked
+    on_air = RadioRequest(radio="radio0", modes=ModeSelection.of("n20"), channels=ChannelSelection.of(6))
+    assert (await ctx.wifi.apply("ap2", on_air)).applied
+    preview = (await authed.post(f"{AP2}/scan/preview")).json()
+    assert preview["via"] == "ap"
+    assert preview["lines"][0] == SCAN_DEL
+    assert (
+        "owgscan0 is left from an earlier scan on AP2 · office: it is removed first." in preview["warnings"]
+    )
+    r = await authed.post(f"{AP2}/scan", json={"digest": preview["digest"]})
+    assert r.status_code == 200, r.text
+    assert "Interface owgscan0" not in await _iw_info(ctx)
+
+
 async def test_a_scan_whose_add_drops_the_connection_removes_owgscan0(
     authed: httpx.AsyncClient, ctx: AppContext, monkeypatch: pytest.MonkeyPatch
 ) -> None:

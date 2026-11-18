@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
@@ -70,6 +71,14 @@ def nft_objects(ruleset: Ruleset, known: Sequence[KnownTable]) -> list[NftObject
         else:
             out.append(NftObject(key, family, table, None, "unknown", None, UNKNOWN, rules))
     return out
+
+
+_INGRESS_CLEAR = re.compile(r"tc qdisc del dev (\S+?) ingress")
+
+
+def ingress_devices(records: str) -> frozenset[str]:
+    """The devices whose ingress qdisc an armed fault made: its record's clear lines delete them (#4)."""
+    return frozenset(_INGRESS_CLEAR.findall(records))
 
 
 def tc_hooks(qdiscs: Sequence[Qdisc], app_devices: frozenset[str]) -> list[TcHook]:

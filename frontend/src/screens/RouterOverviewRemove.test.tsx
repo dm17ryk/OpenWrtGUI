@@ -8,6 +8,7 @@ import { LUCI_PAGES } from '../testing/luci'
 import { RouterOverview } from './RouterOverview'
 
 const calls: Array<{ path: string; method: string }> = []
+const refusal: { detail: string | null } = { detail: null } // the server's 409 detail, when it refuses
 
 vi.mock('../api/client', async (orig) => {
   const actual = await orig<typeof import('../api/client')>()
@@ -15,6 +16,9 @@ vi.mock('../api/client', async (orig) => {
     ...actual,
     apiFetch: vi.fn((path: string, init: RequestInit = {}) => {
       calls.push({ path, method: init.method ?? 'GET' })
+      if (path === '/api/routers/ap2' && init.method === 'DELETE' && refusal.detail !== null) {
+        return Promise.reject(new actual.ApiError(409, refusal.detail, { detail: refusal.detail }))
+      }
       if (path === '/api/routers/ap2' && init.method === 'DELETE') return Promise.resolve({ ok: true })
       if (path === '/api/routers/ap2') return Promise.resolve({ ...AP2, summary: SUMMARY })
       if (path === '/api/routers/ap2/luci/pages') return Promise.resolve(LUCI_PAGES)
@@ -25,6 +29,7 @@ vi.mock('../api/client', async (orig) => {
 
 beforeEach(() => {
   calls.length = 0
+  refusal.detail = null
 })
 
 afterEach(() => {
@@ -53,6 +58,16 @@ test('Remove from the app asks, then removes and goes to the dashboard', async (
   expect(confirm).toHaveBeenCalledWith('Remove AP2 · office from OpenWrtGUI? The router itself is not changed.')
   expect(await screen.findByText('the dashboard')).toBeInTheDocument()
   expect(calls).toContainEqual({ path: '/api/routers/ap2', method: 'DELETE' })
+})
+
+test('a refused remove says what runs and keeps the router', async () => {
+  const busy = 'AP2 · office is not removed: 2 faults armed. Stop or clear them first.'
+  refusal.detail = busy
+  vi.spyOn(window, 'confirm').mockReturnValue(true)
+  const user = renderOverview()
+  await user.click(await screen.findByRole('button', { name: 'Remove from the app' }))
+  expect(await screen.findByText(busy)).toBeInTheDocument()
+  expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('AP2 · office')
 })
 
 test('saying no keeps the router', async () => {

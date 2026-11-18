@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import time
 from collections.abc import Callable
 from datetime import datetime
 from typing import Any
@@ -28,6 +29,8 @@ MAX_PROFILES = 2**20
 PROFILES_NAME = "profiles.json"
 CACHE_SECONDS = 600
 ERROR_CACHE_SECONDS = 60
+CATALOG_DEADLINE_S = 60.0  # every release's profiles.json together; one not read by then is skipped
+FETCH_AT_ONCE = 4  # profiles.json files asked at the same time
 _PAGE_HEADERS = {"User-Agent": f"OpenWrtGUI/{APP_VERSION}"}
 _HEADERS = {"Accept": "application/vnd.github+json", **_PAGE_HEADERS}
 
@@ -69,7 +72,13 @@ def _title(profile: dict[str, Any]) -> str:
         parts = [str(first[k]) for k in ("vendor", "model", "variant") if first.get(k)]
         if parts:
             return " ".join(parts)
-    return ""
+    devices = profile.get("supported_devices")  # no title: its board, never a blank line (0.8.2 ledger)
+    return str(devices[0]) if isinstance(devices, list) and devices else ""
+
+
+def _https(url: object) -> bool:
+    """Only https links taken from GitHub's answers are followed (the 0.8.2 final review)."""
+    return isinstance(url, str) and url.startswith("https://")
 
 
 def _published(release: dict[str, Any]) -> datetime | None:
@@ -111,11 +120,14 @@ def _entry(
         url = f"{download_base}/{quote(name, safe='')}"
     else:
         asset = assets.get(name)
-        if asset is None or not asset.get("browser_download_url"):
+        if asset is None or not _https(asset.get("browser_download_url")):
             return None
         digest = asset.get("digest")
         if digest and digest != f"sha256:{sha256}":
             return None
+        listed = asset.get("size")
+        if isinstance(listed, int) and not isinstance(listed, bool) and listed != size:
+            return None  # the asset is not the file profiles.json describes (the 0.8.2 ledger, Task 1)
         url = str(asset["browser_download_url"])
     tag = str(release.get("tag_name", ""))
     return LibraryEntry(
@@ -157,6 +169,8 @@ def parse_profiles(
     if not isinstance(profiles, dict):
         return []
     revision, target = str(doc.get("version_code", "")), str(doc.get("target", ""))
+    if not revision.strip():  # an entry the download would refuse later (0.8.2 ledger, Task 1)
+        raise LibraryError(f"{PROFILES_NAME} has no revision (version_code)")
     assets = _assets(release)
     entries = (
         _entry(
@@ -233,19 +247,51 @@ def _from_page(page: PageRelease) -> _Source:
     return release, f"{folder}/{PROFILES_NAME}", folder
 
 
-async def _collect(client: httpx.AsyncClient, sources: list[_Source]) -> tuple[list[LibraryEntry], int]:
+async def _source_entries(client: httpx.AsyncClient, source: _Source) -> list[LibraryEntry] | None:
+    """One release's entries: [] when the pages say it has no profiles.json (404), None when that file cannot
+    be read or its link is not https (the 0.8.2 final review)."""
+    release, profiles_url, download_base = source
+    if not _https(profiles_url):
+        return None
+    status, raw = await _profiles_bytes(client, profiles_url)
+    if download_base is not None and status == 404:
+        return []
+    if raw is None:
+        return None
+    try:
+        return parse_profiles(raw, release, download_base)
+    except LibraryError:
+        return None
+
+
+async def _every_source(client: httpx.AsyncClient, sources: list[_Source]) -> list[list[LibraryEntry] | None]:
+    """Each release's entries, in order, asked FETCH_AT_ONCE at a time within CATALOG_DEADLINE_S; a release
+    not read by then, or whose read failed, is None (the 0.8.2 final review: one by one, 20 s each)."""
+    gate = asyncio.Semaphore(FETCH_AT_ONCE)
+
+    async def one(source: _Source) -> list[LibraryEntry] | None:
+        async with gate:
+            return await _source_entries(client, source)
+
+    tasks = [asyncio.ensure_future(one(s)) for s in sources]
+    if not tasks:
+        return []
+    done, pending = await asyncio.wait(tasks, timeout=CATALOG_DEADLINE_S)
+    for task in pending:
+        task.cancel()
+    await asyncio.gather(*pending, return_exceptions=True)
+    return [t.result() if t in done and t.exception() is None else None for t in tasks]
+
+
+async def _collect(
+    client: httpx.AsyncClient, sources: list[_Source], skipped: int = 0
+) -> tuple[list[LibraryEntry], int]:
+    """Every release's entries, newest first, each image once (under the newest release that lists it), and
+    the releases that could not be read added to `skipped`."""
     entries: list[LibraryEntry] = []
     seen: set[str] = set()
-    skipped = 0
-    for release, profiles_url, download_base in sorted(sources, key=lambda s: _newest_first(s[0])):
-        status, raw = await _profiles_bytes(client, profiles_url)
-        if download_base is not None and status == 404:
-            continue
-        try:
-            if raw is None:
-                raise LibraryError("profiles.json could not be downloaded")
-            found = parse_profiles(raw, release, download_base)
-        except LibraryError:
+    for found in await _every_source(client, sorted(sources, key=lambda s: _newest_first(s[0]))):
+        if found is None:
             skipped += 1
             continue
         for entry in found:
@@ -271,19 +317,24 @@ async def fetch_catalog(client: httpx.AsyncClient) -> tuple[list[LibraryEntry], 
         raise _list_error(response)
     try:
         releases = response.json()
-    except ValueError as exc:
+    except (ValueError, RecursionError) as exc:  # RecursionError: nested too deeply (the 0.8.2 final review)
         raise _unreachable("the answer is not JSON") from exc
     if not isinstance(releases, list):
         raise _unreachable("the answer is not a list of releases")
 
     sources: list[_Source] = []
+    no_link = 0  # a profiles.json asset without a link: counted (the 0.8.2 ledger, Task 2)
     for release in releases:
         if not isinstance(release, dict) or release.get("draft"):
             continue
         asset = _assets(release).get(PROFILES_NAME)
-        if asset is not None and asset.get("browser_download_url"):
+        if asset is None:
+            continue
+        if asset.get("browser_download_url"):
             sources.append((release, str(asset["browser_download_url"]), None))
-    return await _collect(client, sources)
+        else:
+            no_link += 1
+    return await _collect(client, sources, skipped=no_link)
 
 
 class LibraryRead(BaseModel):
@@ -305,25 +356,28 @@ class ImageLibrary:
         profiles: ProfileStore,
         client_factory: Callable[[], httpx.AsyncClient],
         clock: Callable[[], datetime] = datetime.now,
+        monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         self._profiles = profiles
         self._client_factory = client_factory
-        self._clock = clock
+        self._clock = clock  # "Read at", as shown
+        self._monotonic = monotonic  # the cache's age: a clock set back never keeps a read (0.8.2 ledger)
         self._cached: LibraryRead | None = None
+        self._read_mono: float | None = None
         self._lock = asyncio.Lock()
         self._busy: set[str] = set()
 
-    def _fresh(self, cached: LibraryRead, now: datetime) -> bool:
-        if cached.read_at is None:
+    def _fresh(self, cached: LibraryRead) -> bool:
+        if self._read_mono is None:
             return False
         limit = ERROR_CACHE_SECONDS if cached.error else CACHE_SECONDS
-        return (now - cached.read_at).total_seconds() < limit
+        return 0 <= self._monotonic() - self._read_mono < limit
 
     async def read(self, force: bool = False) -> LibraryRead:
         async with self._lock:
             now = self._clock()
             previous = self._cached
-            if not force and previous is not None and self._fresh(previous, now):
+            if not force and previous is not None and self._fresh(previous):
                 return previous
             try:
                 async with self._client_factory() as client:
@@ -338,6 +392,7 @@ class ImageLibrary:
             else:
                 result = LibraryRead(entries=tuple(entries), read_at=now, skipped=skipped)
             self._cached = result
+            self._read_mono = self._monotonic()
             return result
 
     async def download(self, sha256: str) -> Profile:
@@ -352,7 +407,8 @@ class ImageLibrary:
             raise ValueError(f"{entry.image_name} is already downloading.")
         self._busy.add(sha256)
         try:
-            known = next((p for p in self._profiles.list() if p.key.sha256 == sha256), None)
+            imported = await asyncio.to_thread(self._profiles.list)  # reads the data folder (0.8.2 ledger)
+            known = next((p for p in imported if p.key.sha256 == sha256), None)
             if known is not None:
                 raise ValueError(f"This image is already imported ({known.key.label})")
             data = await self._fetch(entry)
@@ -371,6 +427,7 @@ class ImageLibrary:
         limit = min(entry.size, MAX_IMAGE)
         too_large = ValueError(f"{entry.image_name} is larger than its release says; nothing was imported.")
         body = bytearray()
+        digest = hashlib.sha256()  # hashed as it arrives, not 64 MB at once on the event loop (0.8.2 ledger)
         try:
             async with (
                 self._client_factory() as client,
@@ -387,10 +444,11 @@ class ImageLibrary:
                     body += chunk
                     if len(body) > limit:
                         raise too_large
+                    digest.update(chunk)
         except (httpx.HTTPError, httpx.InvalidURL) as exc:
             raise _unreachable(_reason(exc)) from exc
-        if hashlib.sha256(body).hexdigest() != entry.sha256:
+        if digest.hexdigest() != entry.sha256:
             raise ValueError(
                 f"{entry.image_name} does not match its release's profiles.json; nothing was imported."
             )
-        return bytes(body)
+        return await asyncio.to_thread(bytes, body)  # the 64 MB copy off the event loop too

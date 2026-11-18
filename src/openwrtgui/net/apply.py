@@ -81,6 +81,7 @@ class NetPlan:
     restore: tuple[str, ...] = ()
     target_port: int | None = None  # v0.6c: the SSH port the router answers on after the change
     first: tuple[str, ...] = ()  # run before the uci script: a file the change names (v1.0c Task 11)
+    first_files: tuple[str, ...] = ()  # the files `first` writes: named when the uci script is then refused
 
     @property
     def timer(self) -> bool:
@@ -204,6 +205,7 @@ def net_plan(
     restore: Sequence[str] = (),
     target_port: int | None = None,
     first: Sequence[str] = (),
+    first_files: Sequence[str] = (),
 ) -> NetPlan:
     """The exact preview: only changes, section deletes last; nothing left is refused with NOTHING. `first`
     runs before the uci script: a file the change names is written before the change (v1.0c Task 11)."""
@@ -242,7 +244,15 @@ def net_plan(
         restore=tuple(restore),
         target_port=target_port,
         first=tuple(first),
+        first_files=tuple(first_files),
     )
+
+
+def _left_note(plan: NetPlan, wrote_first: bool) -> str:
+    """#77 minor 8: a refused or lost uci change after `first` leaves its file; the answer says so (R1)."""
+    if not wrote_first or not plan.first_files:
+        return ""
+    return f". The file {', '.join(plan.first_files)} written before it stays on the router."
 
 
 def _where(host: str, port: int, usual: int) -> str:
@@ -514,11 +524,11 @@ class ApplyRunner:
                     lost = (
                         f"Lost the connection to {rec.name} while the change ran; it may have been committed"
                     )
-                    return self._finish(rec, plan, False, (), f"{lost}: {exc}", rec.host)
+                    left = _left_note(plan, applied)
+                    return self._finish(rec, plan, applied, (), f"{lost}: {exc}{left}", rec.host)
                 if not done.ok:
-                    return self._finish(
-                        rec, plan, False, (), f"The router refused the change: {_reason(done)}", rec.host
-                    )
+                    refused = f"The router refused the change: {_reason(done)}"
+                    return self._finish(rec, plan, applied, (), refused + _left_note(plan, applied), rec.host)
                 applied = True
             for command in plan.commands:
                 done = await self._run(

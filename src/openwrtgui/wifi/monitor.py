@@ -110,6 +110,17 @@ class MonitorLeases:
                 return CommandResult(DEL, "", "", 0)
             return await run(DEL, False)
 
+    async def forget(self, router_id: str, holder: str) -> None:
+        """Drop a holder without touching the router, which does not answer: the next first holder adds the
+        monitor with `clear_leftover`, which removes one left on the radio (the v1.1a final review)."""
+        async with self._lock(router_id):
+            held = self._holders.get(router_id, [])
+            if holder in held:
+                held.remove(holder)
+            if not held:
+                self._holders.pop(router_id, None)
+                self._phys.pop(router_id, None)
+
     async def ensure(self, router_id: str, phy: str, t: Transport, run: RunFn) -> bool:
         """True when the monitor was gone (a Wi-Fi reload) and was added again."""
         async with self._lock(router_id):

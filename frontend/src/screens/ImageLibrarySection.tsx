@@ -63,10 +63,10 @@ export function ImageLibrarySection() {
           {isRefreshing ? 'Refreshing…' : 'Refresh'}
         </button>
       </div>
-      {library.isPending && <div className="muted">Looking in the image library…</div>}
-      {library.isError && <div className="note x">{detail(library.error)}</div>}
-      {data?.error && <div className="note x">{data.error}</div>}
-      {data && !data.error && data.entries.length === 0 && <div className="muted">The image library lists no images.</div>}
+      {library.isPending && <div className="muted" role="status">Looking in the image library…</div>}
+      {library.isError && <div className="note x" role="alert">{detail(library.error)}</div>}
+      {data?.error && <div className="note x" role="alert">{data.error}</div>}
+      {data && !data.error && data.entries.length === 0 && <div className="muted" role="status">The image library lists no images.</div>}
       {data && data.entries.length > 0 && (
         <ul className="stack" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {data.entries.map((e) => (
@@ -93,8 +93,8 @@ export function ImageLibrarySection() {
           ))}
         </ul>
       )}
-      {skipped > 0 && <div className="muted">{`${skipped} ${skipped === 1 ? 'release' : 'releases'} could not be read`}</div>}
-      {error && <div className="note x">{error}</div>}
+      {skipped > 0 && <div className="muted" role="status">{`${skipped} ${skipped === 1 ? 'release' : 'releases'} could not be read`}</div>}
+      {error && <div className="note x" role="alert">{error}</div>}
     </section>
   )
 }
