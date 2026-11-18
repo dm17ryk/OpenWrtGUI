@@ -11,7 +11,7 @@ You choose the data folder at install time; the default is `%LOCALAPPDATA%\OpenW
 |---|---|---|
 | `routers.json` | The routers you added: name, address, port map | Rarely: change routers in the app |
 | `known_hosts` | The routers' pinned SSH host keys | To check which key a router was pinned with |
-| `keys\` | The app's own SSH key pair. The private key is readable by your Windows user only | Never by hand: [Settings](Settings#app-ssh-key) exports the public key |
+| `keys\` | The app's own SSH key pair. The private key is readable by your Windows user only. During a key rotation also the new key (`id_ed25519.next`) and `rotation.json`, the routers moved so far | Never by hand: [Settings](Settings#app-ssh-key) exports the public key and rotates the key |
 | `audit\` | The audit log: one file per day, every command the app sent, secrets masked | Read it in the app's [audit log](Terminal-and-audit-log#audit-log) |
 | `settings.json` | Theme, update channel, Bench Guard watch list, audit-log retention | Rarely: change settings in the app |
 | `updates\` | Downloaded installers (the current and the previous one) | To install a version again by hand |

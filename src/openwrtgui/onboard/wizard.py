@@ -28,7 +28,7 @@ from openwrtgui.probe.describe import (
     summarize,
 )
 from openwrtgui.probe.identity import parse_release
-from openwrtgui.store.keys import AppKey
+from openwrtgui.store.keys import AppKeyRing
 from openwrtgui.store.routers import RouterRecord, RouterStore, make_router_id
 from openwrtgui.transport.base import AuthFailed, HostKeyInfo, KeyFileError, Transport, TransportError
 from openwrtgui.transport.pool import ConnectionPool
@@ -47,10 +47,12 @@ LoginMethod = Literal["app_key", "pc_key", "default_password", "no_password", "p
 
 
 def install_key_command(public_line: str) -> str:
-    q = shlex.quote(public_line)
+    """Append the line once. A last line without a newline gets one first, so the key is never glued onto it
+    (PR #89 review)."""
+    q, ak = shlex.quote(public_line), AUTHORIZED_KEYS
     return (
-        f"mkdir -p /etc/dropbear && touch {AUTHORIZED_KEYS} && chmod 600 {AUTHORIZED_KEYS} && "
-        f"(grep -qxF {q} {AUTHORIZED_KEYS} || echo {q} >> {AUTHORIZED_KEYS})"
+        f"mkdir -p /etc/dropbear && touch {ak} && chmod 600 {ak} && "
+        f'(grep -qxF {q} {ak} || {{ [ -z "$(tail -c1 {ak})" ] || echo >> {ak}; echo {q} >> {ak}; }})'
     )
 
 
@@ -205,7 +207,7 @@ class OnboardService:
         *,
         connector: Connector,
         host_keys: HostKeyStore,
-        app_key: AppKey,
+        keys: AppKeyRing,
         routers: RouterStore,
         guard: BenchGuard,
         audit: AuditLog,
@@ -217,7 +219,7 @@ class OnboardService:
         self._connector = connector
         self._pc_keys = pc_keys
         self._host_keys = host_keys
-        self._app_key = app_key
+        self._keys = keys  # read at each use: a finished rotation changes the current key (v1.1b)
         self._routers = routers
         self._guard = guard
         self._audit = audit
@@ -343,19 +345,20 @@ class OnboardService:
         """
         s = await self._get(sid)
         self._require_trusted(s)
-        app_key = self._app_key.private_path
-        tries: list[tuple[LoginMethod, str | None, Path | None]] = [("app_key", None, app_key)]
-        tries += [("pc_key", None, p) for p in self._pc_keys() if p != app_key]
-        tries.append(("default_password", DEFAULT_PASSWORD, None))
-        tries.append(("no_password", None, None))
-        for method, password, key in tries:
+        app_keys = self._keys.login_paths()  # both keys during a rotation (R4)
+        tries: list[tuple[LoginMethod, str | None, list[Path]]] = [("app_key", None, app_keys)]
+        tries += [("pc_key", None, [p]) for p in self._pc_keys() if p not in app_keys]
+        tries.append(("default_password", DEFAULT_PASSWORD, []))
+        tries.append(("no_password", None, []))
+        for method, password, key_paths in tries:
+            key = key_paths[0] if key_paths else None
             try:
                 transport = await self._connector.connect(
                     s.host,
                     s.port,
                     username=s.username,
                     password=password,
-                    key_paths=[key] if key else [],
+                    key_paths=key_paths,
                     prove=method != "no_password",
                 )
             except AuthFailed:
@@ -399,14 +402,14 @@ class OnboardService:
 
     def install_key_preview(self, sid: str) -> list[str]:
         self._sessions[sid].last_used = self._clock()
-        return [install_key_command(self._app_key.public_line)]
+        return [install_key_command(self._keys.current.public_line)]
 
     async def install_key(self, sid: str) -> SessionView:
         s = await self._get(sid)
         action = WriteAction(
             router_id=f"onboard:{s.sid}",
             screen=SCREEN,
-            commands=(install_key_command(self._app_key.public_line),),
+            commands=(install_key_command(self._keys.current.public_line),),
         )
         results = await perform_write(
             action,
@@ -452,7 +455,7 @@ class OnboardService:
     async def verify_key(self, sid: str) -> SessionView:
         s = await self._get(sid)
         t = await self._connector.connect(
-            s.host, s.port, username=s.username, password=None, key_paths=[self._app_key.private_path]
+            s.host, s.port, username=s.username, password=None, key_paths=[self._keys.current.private_path]
         )
         try:
             ok = (await t.run("true")).ok
@@ -489,10 +492,22 @@ class OnboardService:
             added_at=self._clock(),
         )
         self._routers.upsert(record)
+        if record.auth == "key" and record.key_path is None:
+            self._keys.unmark_moved(
+                record.id
+            )  # it got the current key: during a rotation it moves again (F1)
         await self._pool.drop(record.id)
         s.step = Step.DONE
         await self.cancel(sid)
         return record
+
+    def holding(self) -> str | None:
+        """A key rotation must not delete the current key while a wizard has installed it and is not finished:
+        the router it adds would hold only a key that no longer exists (final review F1)."""
+        for s in self._sessions.values():
+            if s.key_installed:
+                return f"Add router has installed the app key on {s.host} and is not finished"
+        return None
 
     async def cancel(self, sid: str) -> None:
         s = self._sessions.pop(sid, None)

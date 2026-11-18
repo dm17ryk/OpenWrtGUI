@@ -34,6 +34,7 @@ from openwrtgui.luci_bridge.upstream import Upstream, sim_upstream, ssh_upstream
 from openwrtgui.net.apply import ApplyRunner
 from openwrtgui.net.service import NetworkService
 from openwrtgui.onboard.pc_keys import find_pc_keys, ssh_dirs
+from openwrtgui.onboard.rotate import KeyRotation
 from openwrtgui.onboard.wizard import Connector, OnboardService, SshConnector
 from openwrtgui.paths import DataDir, documents_dir
 from openwrtgui.poller import StatusPoller
@@ -44,7 +45,7 @@ from openwrtgui.probe.status import RouterStatus
 from openwrtgui.rf.sampler import RfHub
 from openwrtgui.rf.scan_service import ScanService
 from openwrtgui.simulator import SimConnector, seed_routers, sim_http_client, sim_process_lister
-from openwrtgui.store.keys import AppKey, load_or_create_app_key
+from openwrtgui.store.keys import AppKeyRing
 from openwrtgui.store.routers import RouterRecord, RouterStore, router_key_paths
 from openwrtgui.store.settings import SettingsStore
 from openwrtgui.system.access_service import AccessService
@@ -69,7 +70,7 @@ class AppContext:
     data: DataDir
     settings: SettingsStore
     routers: RouterStore
-    app_key: AppKey
+    keys: AppKeyRing  # the app's key, and the next one while a rotation runs (v1.1b)
     host_keys: HostKeyStore
     pool: ConnectionPool
     guard: BenchGuard
@@ -97,6 +98,7 @@ class AppContext:
     lte_live: LteHub
     lte_setups: SetupStore  # saved good LTE setups (spec 4.4)
     lte_recover: LteRecover  # the Recover job (spec 4.2)
+    key_rotation: KeyRotation  # Settings › App SSH key › Rotate key (v1.1b)
     system: SystemService
     system_live: SystemHub
     access: AccessService
@@ -158,7 +160,7 @@ def build_context(
     settings = SettingsStore(data.settings_file)
     current = settings.load()
     routers = RouterStore(data.routers_file)
-    app_key = load_or_create_app_key(data.keys_dir)
+    keys = AppKeyRing(data.keys_dir)
     host_keys = HostKeyStore(data.known_hosts_file)
     audit = AuditLog(data.audit_dir)
     audit.prune(current.audit_retention_days, date.today())
@@ -178,7 +180,7 @@ def build_context(
                 rec.host,
                 rec.port,
                 password=None,
-                key_paths=router_key_paths(rec, app_key.private_path),
+                key_paths=router_key_paths(rec, keys.login_paths()),
                 username=rec.username,
             )
 
@@ -196,7 +198,7 @@ def build_context(
                 rec.port,
                 rec.username,
                 host_keys=host_keys,
-                key_paths=router_key_paths(rec, app_key.private_path),
+                key_paths=router_key_paths(rec, keys.login_paths()),
             )
 
         client_factory = _real_http_client
@@ -208,7 +210,7 @@ def build_context(
     onboard = OnboardService(
         connector=connector,
         host_keys=host_keys,
-        app_key=app_key,
+        keys=keys,
         routers=routers,
         guard=guard,
         audit=audit,
@@ -318,7 +320,7 @@ def build_context(
         audit=audit,
         runner=runner,
         settings=settings,
-        app_key=app_key,
+        keys=keys,
     )
     system = SystemService(
         pool=pool,
@@ -360,13 +362,27 @@ def build_context(
     def steps_or_recover(router_id: str) -> str | None:
         return steps.busy(router_id) or lte_recover.busy(router_id)
 
-    system.extra_busy = steps_or_recover
-    flash.extra_busy = steps_or_recover
+    def holding_the_router(router_id: str) -> str | None:  # System's jobs and Flash also wait for a key move
+        return steps_or_recover(router_id) or key_rotation.busy(router_id)
+
+    system.extra_busy = holding_the_router
+    flash.extra_busy = holding_the_router
+    # a router another job holds is left on the old key with that job's reason, for a Retry (D8)
+    key_rotation = KeyRotation(
+        keys=keys,
+        routers=routers,
+        pool=pool,
+        connector=connector,
+        guard=guard,
+        audit=audit,
+        busy=(system.busy, flashing, steps_or_recover),
+        hold=onboard.holding,
+    )
     return AppContext(
         data=data,
         settings=settings,
         routers=routers,
-        app_key=app_key,
+        keys=keys,
         host_keys=host_keys,
         pool=pool,
         guard=guard,
@@ -402,6 +418,7 @@ def build_context(
         lte_live=LteHub(pool=pool, routers=routers, locate=lte.modem_device),
         lte_setups=lte_setups,
         lte_recover=lte_recover,
+        key_rotation=key_rotation,
         system=system,
         system_live=SystemHub(pool=pool, routers=routers, busy=system.busy),
         access=access,

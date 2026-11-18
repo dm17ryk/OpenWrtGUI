@@ -83,6 +83,8 @@ def _running_on(ctx: AppContext, router_id: str) -> list[str]:
         found.append(capture)
     if ctx.lte_recover.busy(router_id) is not None:  # mid-rung the modem may be in low power (I5)
         found.append("LTE recovery runs")
+    if ctx.key_rotation.busy(router_id) is not None:  # mid-move the router may hold both key lines (v1.1b)
+        found.append("the app key is being moved")
     return found
 
 
@@ -98,4 +100,5 @@ async def remove_router(router_id: str, ctx: Ctx) -> Ok:
     ctx.discovery.summaries.pop(router_id, None)
     ctx.guard.forget_router(router_id)
     ctx.lte_setups.delete(router_id)  # its APN password and SIM PIN go with it (spec 4.4)
+    ctx.keys.unmark_moved(router_id)  # added again later, it gets the current key and must move again (v1.1b)
     return Ok()

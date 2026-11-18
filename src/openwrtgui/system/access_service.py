@@ -32,7 +32,7 @@ from openwrtgui.net.apply import (
 from openwrtgui.net.commands import INTERFACE_DUMP
 from openwrtgui.net.parse import parse_interface_dump
 from openwrtgui.probe.commands import ROOT_PASSWORD_STATE
-from openwrtgui.store.keys import AppKey
+from openwrtgui.store.keys import AppKeyRing
 from openwrtgui.store.routers import RouterRecord, RouterStore, router_key_paths
 from openwrtgui.store.settings import KnownKey, SettingsStore
 from openwrtgui.system import commands as s
@@ -196,7 +196,7 @@ class AccessService:
         audit: AuditLog,
         runner: ApplyRunner,
         settings: SettingsStore,
-        app_key: AppKey,
+        keys: AppKeyRing,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         self._sleep = sleep
@@ -206,7 +206,7 @@ class AccessService:
         self._audit = audit
         self._runner = runner
         self._settings = settings
-        self._app_key = app_key
+        self._keys = keys
 
     def _record(self, router_id: str) -> RouterRecord:
         rec = self._routers.get(router_id)
@@ -220,12 +220,12 @@ class AccessService:
 
     def app_fingerprints(self, rec: RouterRecord) -> set[str]:
         """The keys this app logs in to `rec` with: the router's own key file when it has one (the connection
-        offers only that key), else the app's key. Restore and key-removal checks trust nothing else."""
+        offers only that key), else the app's key (both keys during a rotation, v1.1b). Restore and
+        key-removal checks trust nothing else."""
+        if not rec.key_path:
+            return set(self._keys.fingerprints())
         found: set[str] = set()
-        for path in router_key_paths(rec, self._app_key.private_path):
-            if path == self._app_key.private_path:
-                found.add(self._app_key.fingerprint)
-                continue
+        for path in router_key_paths(rec, self._keys.login_paths()):
             fingerprint = _key_fingerprint(path)
             if fingerprint is not None:
                 found.add(fingerprint)
@@ -413,7 +413,7 @@ class AccessService:
             raise ValueError(f"{s.AUTHORIZED_KEYS} does not read: {result.stderr.strip()}")
         rows = self.key_rows(rec, result.stdout if result.ok else "")
         by_print = {r.fingerprint: r for r in rows if r.fingerprint}
-        unread = [p for p in router_key_paths(rec, self._app_key.private_path) if _key_fingerprint(p) is None]
+        unread = [p for p in router_key_paths(rec, self._keys.login_paths()) if _key_fingerprint(p) is None]
         if change.remove and unread:
             # the key the app logs in with may be labelled "other": a removal could lock the app out
             raise ValueError(

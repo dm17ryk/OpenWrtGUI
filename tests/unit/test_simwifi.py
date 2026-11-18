@@ -19,9 +19,13 @@ BEACON = (
 )
 
 
+RATES = (SIM_DIR / "rates" / "ht20.csv").read_text(encoding="utf-8")
+RC_STATS = "cat /sys/kernel/debug/ieee80211/phy0/netdev:phy0-ap0/stations/f4:12:fa:f3:57:68/rc_stats_csv"
+
+
 def _ap2() -> ReplayTransport:
     text = (SIM_DIR / "wifi" / "ap2.uci").read_text(encoding="utf-8")
-    return ReplayTransport({}, state=SimState(wifi=SimWifi(text, bssid="02:00:00:00:00:02")))
+    return ReplayTransport({}, state=SimState(wifi=SimWifi(text, bssid="02:00:00:00:00:02", rates_csv=RATES)))
 
 
 async def _apply(t: ReplayTransport, modes: ModeSelection, channels: ChannelSelection) -> None:
@@ -109,6 +113,28 @@ async def test_station_present_only_while_up_and_del_client_removes_it() -> None
     assert json.loads((await t.run(assoc)).stdout)["results"] == []
     hints = json.loads((await t.run("ubus call luci-rpc getHostHints")).stdout)
     assert hints["F4:12:FA:F3:57:68"]["name"] == "panel"
+
+
+async def test_rc_stats_csv_for_the_station_on_an_up_radio() -> None:
+    t = _ap2()
+    assert not (await t.run(RC_STATS)).ok  # parked: no interface, no station
+    await _apply(t, ModeSelection.auto(), ChannelSelection.of(6))
+    answer = await t.run(RC_STATS)
+    assert answer.ok and answer.stdout == RATES
+
+
+async def test_rc_stats_csv_for_a_station_that_is_away_fails() -> None:
+    t = _ap2()
+    await _apply(t, ModeSelection.auto(), ChannelSelection.of(6))
+    ban = (
+        "ubus call hostapd.phy0-ap0 del_client "
+        '\'{"addr":"f4:12:fa:f3:57:68","ban_time":60000,"deauth":true,"reason":3}\''
+    )
+    assert (await t.run(ban)).ok
+    gone = await t.run(RC_STATS)
+    assert gone.exit_status == 1 and "No such file or directory" in gone.stderr
+    other = await t.run(RC_STATS.replace("f4:12:fa:f3:57:68", "3c:84:6a:11:22:33"))
+    assert other.exit_status == 1 and "No such file or directory" in other.stderr
 
 
 async def test_sectioned_rf_command_is_answered_part_by_part() -> None:

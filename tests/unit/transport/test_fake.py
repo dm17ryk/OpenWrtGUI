@@ -11,11 +11,10 @@ LINE = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExample openwrtgui@TEST"
 
 
 def _install(line: str) -> str:
-    q = shlex.quote(line)
+    q, ak = shlex.quote(line), "/etc/dropbear/authorized_keys"
     return (
-        "mkdir -p /etc/dropbear && touch /etc/dropbear/authorized_keys && "
-        "chmod 600 /etc/dropbear/authorized_keys && "
-        f"(grep -qxF {q} /etc/dropbear/authorized_keys || echo {q} >> /etc/dropbear/authorized_keys)"
+        f"mkdir -p /etc/dropbear && touch {ak} && chmod 600 {ak} && "
+        f'(grep -qxF {q} {ak} || {{ [ -z "$(tail -c1 {ak})" ] || echo >> {ak}; echo {q} >> {ak}; }})'
     )
 
 
@@ -45,6 +44,20 @@ async def test_install_key_appends_once() -> None:
     assert (await t.run(_install(LINE))).ok
     assert (await t.run(_install(LINE))).ok
     assert state.authorized_keys == [LINE]
+
+
+async def test_remove_old_key_command_is_recognised_exactly() -> None:
+    from openwrtgui.onboard.rotate import remove_old_key_command
+
+    new, old = "ssh-ed25519 AAAAnew openwrtgui@pc", LINE
+    state = SimState(authorized_keys=["# kept", old, new])
+    t = ReplayTransport({}, state=state)
+    changed = remove_old_key_command(new, old).replace("chmod 600", "chmod 644")
+    refused = await t.run(changed)
+    assert (refused.exit_status, refused.stderr) == (1, "sim: unexpected key remove command")
+    assert state.authorized_keys == ["# kept", old, new]
+    assert (await t.run(remove_old_key_command(new, old))).ok
+    assert state.authorized_keys == ["# kept", new]
 
 
 async def test_passwd_sets_root_password() -> None:

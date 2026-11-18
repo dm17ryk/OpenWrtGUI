@@ -130,6 +130,7 @@ def _seed_key(state: SimState, key_paths: Sequence[Path]) -> None:
     for line in lines:
         if line not in state.authorized_keys:
             state.authorized_keys.insert(0, line)
+    state.key_seeded = True  # v1.1b R8: from now on the router checks every key, as dropbear does
 
 
 class SimConnector:
@@ -173,7 +174,9 @@ class SimConnector:
         last = int(str(entry["host"]).rsplit(".", 1)[1])
         if entry.get("wifi"):
             text = (self._sim_dir / "wifi" / entry["wifi"]).read_text(encoding="utf-8")
-            wifi = SimWifi(text, bssid=f"02:00:00:00:00:{last:02x}")
+            rates = self._sim_dir / "rates" / "ht20.csv"  # minstrel's view of the panel (v1.1b)
+            rates_csv = rates.read_text(encoding="utf-8") if rates.is_file() else ""
+            wifi = SimWifi(text, bssid=f"02:00:00:00:00:{last:02x}", rates_csv=rates_csv)
         if entry.get("net"):
             text = (self._sim_dir / "net" / entry["net"]).read_text(encoding="utf-8")
             leases = [tuple(lease) for lease in entry.get("leases", [])]
@@ -330,7 +333,9 @@ class SimConnector:
             if password != state.root_password:
                 raise AuthFailed(f"{host} refused the login")
         elif key_paths:
-            trusted = entry.get("auth") == "key" and self._generation(entry["id"]) == 0
+            trusted = (
+                entry.get("auth") == "key" and self._generation(entry["id"]) == 0 and not state.key_seeded
+            )
             if not trusted and not any(line in state.authorized_keys for line in _public_lines(key_paths)):
                 raise AuthFailed(f"{host} refused the key")
             if trusted:

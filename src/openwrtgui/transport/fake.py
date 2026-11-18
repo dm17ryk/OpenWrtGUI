@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from openwrtgui.simwifi import SimWifi
 
 INSTALL_KEY_PREFIX = "mkdir -p /etc/dropbear && "
+REMOVE_KEY_PREFIX = "grep -qxF "  # the key rotation's removal of the old line (v1.1b)
 ROOT_PASSWORD_PROBE = "/etc/shadow"
 
 
@@ -42,6 +43,7 @@ class SimState:
     system: SimSystem | None = None
     access: SimAccess | None = None  # v0.6c: dropbear, uhttpd, keys, LEDs, restore, reset
     generation_seen: int = 0  # the image's flash generation whose reset (keys, password) was applied
+    key_seeded: bool = False  # v1.1b R8: a router added with a key trusts only its first login
     air: SimAir | None = None  # v0.7: scans, every channel's survey, frame windows (made with the Wi-Fi)
     files: SimFiles | None = None  # v1.0a1: what LuCI's menu asks about (ls -ldL, ls -A)
     later: SimLater | None = None  # v1.0a2: a later image's block-mount, iptables, plugins, menu entries
@@ -174,6 +176,23 @@ class ReplayTransport:
         self._down()  # a timer may have started a flash
         return self._dispatch(command)
 
+    def _remove_old_key(self, command: str) -> CommandResult:
+        """The key rotation's removal (v1.1b R5): exact lines out, only if the new line is there."""
+        from openwrtgui.onboard.rotate import remove_old_key_command
+
+        assert self.state is not None  # noqa: S101 - only the simulator has state
+        tokens = shlex.split(command)
+        try:
+            new, old = tokens[2], tokens[tokens.index("-vxF") + 1]
+        except (IndexError, ValueError):
+            return CommandResult(command, "", "sim: unexpected key remove command", 1)
+        if command != remove_old_key_command(new, old):
+            return CommandResult(command, "", "sim: unexpected key remove command", 1)
+        if new not in self.state.authorized_keys:
+            return CommandResult(command, "", "", 1)  # grep -q found no new line: nothing is written
+        self.state.authorized_keys[:] = [line for line in self.state.authorized_keys if line != old]
+        return CommandResult(command, "", "", 0)
+
     def _dispatch(self, command: str) -> CommandResult | None:
         assert self.state is not None
         # A later image (v1.0a2) first: it overrides the bench image's reads it extends (menu, mounts).
@@ -214,6 +233,8 @@ class ReplayTransport:
             if line not in self.state.authorized_keys:
                 self.state.authorized_keys.append(line)
             return CommandResult(command, "", "", 0)
+        if command.startswith(REMOVE_KEY_PREFIX):
+            return self._remove_old_key(command)
         if command.startswith("awk -F:") and command.endswith(ROOT_PASSWORD_PROBE):
             return CommandResult(command, "set\n" if self.state.root_password else "none\n", "", 0)
         return None

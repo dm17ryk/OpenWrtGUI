@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import secrets
 import subprocess
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -27,6 +28,7 @@ from pathlib import Path
 
 import pytest
 from phone_state import PhoneState, as_found_problems, read_phone, start_problems
+from test_ap2_wifi import _recorder
 from test_ap2_wifi_faults import (
     LAB,
     TEST_SSID,
@@ -42,6 +44,7 @@ from conftest import FwWindow, wireless_snapshot
 from openwrtgui.guard.writes import run_audited
 from openwrtgui.rf.air import SCAN_IF
 from openwrtgui.rf.frames_service import FrameAnalyzer
+from openwrtgui.rf.sampler import RfSampler
 from openwrtgui.rf.scan_service import ScanService
 from openwrtgui.transport.base import CommandResult, ubus_call
 from openwrtgui.transport.ssh import SshTransport
@@ -332,3 +335,46 @@ async def test_frame_analysis_own_bss(air: AirWindow, phone: tuple[AdbStation, P
     rc = await air.t.run(f"cat /sys/kernel/debug/ieee80211/phy0/netdev:{bss}/stations/{mac}/rc_stats")
     print("rc_stats (O6):\n" + (rc.stdout if rc.ok else f"not readable: {rc.stderr.strip()}"))
     assert str(air.key) not in repr(published)  # the run's key is never published
+
+
+RATES_FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "ap2" / "rates.json"
+RATES_SETTLE_S = 10  # minstrel tries rates while the phone pings
+
+
+async def test_rates_for_the_phone(air: AirWindow, phone: tuple[AdbStation, PhoneState]) -> None:
+    """v1.1b (D7, D9 Part 1): with the phone on OwgTest and pinging AP2, RF live's rates for it, and AP2's
+    rc_stats_csv recorded, every MAC made private, for the contract test (plan ruling R3)."""
+    station, _found = phone
+    bss = await _owgtest_on_air(air)
+    await station.join(TEST_SSID, air.key)
+    mac = await _joined(air, station, bss)
+    ping = asyncio.create_task(
+        asyncio.to_thread(
+            subprocess.run,
+            ["adb", "-s", station.serial, "shell", PING],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+    )
+    try:
+        await asyncio.sleep(RATES_SETTLE_S)
+        sampler = RfSampler(AP2, "radio0", pool=air.w.pool, routers=air.w.routers)
+        rows = await sampler.rates(mac)
+        rf = _recorder()
+        recorded = rf.private_macs(await rf.run_set(air.t, await rf.rates_commands(air.t)))
+    finally:
+        await ping
+    print(
+        "\n"
+        + "\n".join(
+            f"{r.mode:9} {r.rate:7} {r.attempts:6} {r.success_pct:6.1f} %{' in use' if r.in_use else ''}"
+            for r in rows
+        )
+    )
+    assert rows and [r.in_use for r in rows].count(True) == 1, rows
+    assert all(0.0 <= r.success_pct <= 100.0 for r in rows)
+    assert any(c.endswith("/rc_stats_csv") for c in recorded) and mac not in repr(recorded)
+    RATES_FIXTURE.write_text(json.dumps(recorded, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    print(f"recorded {len(recorded)} commands to {RATES_FIXTURE}")

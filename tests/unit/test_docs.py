@@ -297,6 +297,7 @@ GUARDED = {  # each module that calls require_clear() -> the words "What is refu
     "guard/writes.py": "Apply",
     "lte/service.py": "LTE",
     "lte/recover.py": "Recover",
+    "onboard/rotate.py": "Rotate key",
     "net/apply.py": "rollback",
     "net/service.py": "Network",
     "rf/frames_service.py": "frame analysis",
@@ -338,6 +339,30 @@ def test_v1_0c_behaviour_is_documented() -> None:
     }
     missing = [(where, w) for where, words in wanted.items() for w in words if w not in _section(*where)]
     assert missing == []
+
+
+def test_key_rotation_is_documented() -> None:
+    """v1.1b D8: Settings explains Rotate key and Retry; Files and data names the rotation's files."""
+    key = _section("Settings", "App SSH key")
+    for words in ("**Rotate key**", "**Retry**", "does not answer", "harness run"):
+        assert words in key, words
+    # final review F1 and F3: the last check before the old key goes, and an old key kept in another line
+    for words in ("logs in to every moved router with the new key again", "still accepts the old key"):
+        assert words in key, words
+    files = _read(MANUAL / "Files-and-data.md")
+    assert "id_ed25519.next" in files and "rotation.json" in files
+
+
+def test_v1_1b_is_in_the_changelog() -> None:
+    unreleased = _read(ROOT / "CHANGELOG.md").split("## [Unreleased]", 1)[1].split("\n## [", 1)[0]
+    assert "Which rates reach the station" in unreleased and "**Rotate key**" in unreleased
+
+
+def test_rates_are_documented_as_read() -> None:
+    """v1.1b D7: the rates card is read every 5 s while it is open; the manual no longer says it is not."""
+    rates = _section("RF-live", "Which rates reach the station")
+    assert "not read in this version" not in rates
+    assert "**Show rates**" in rates and "every 5 seconds" in rates
 
 
 def test_flash_recovery_matches_the_app() -> None:

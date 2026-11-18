@@ -18,5 +18,14 @@ def test_every_data_folder_is_in_the_table() -> None:
 
 def test_known_limits_name_each_open_item() -> None:
     limits = SECURITY.split("## Known limits", 1)[1]
-    for item in ("Authenticode", "rotat", "HTTPS", "flash", "Bench Guard", "AP1", "GitHub Action"):
+    for item in ("Authenticode", "HTTPS", "flash", "Bench Guard", "AP1", "GitHub Action"):
         assert item in limits, item
+
+
+def test_key_rotation_is_described_and_no_longer_a_limit() -> None:
+    """v1.1b: the app key can be rotated, so it leaves Known limits and says how it is done safely."""
+    before, limits = SECURITY.split("## Known limits", 1)
+    assert "rotat" not in limits
+    rotation = before.split("## App key rotation", 1)[1].split("\n## ", 1)[0]
+    for words in ("proven", "exact", "Other lines", "deleted", "Bench Guard", "proves the new key again"):
+        assert words in rotation, words

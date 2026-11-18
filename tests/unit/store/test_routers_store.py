@@ -55,9 +55,16 @@ def test_key_path_defaults_to_the_app_key_and_survives_json(tmp_path: Path) -> N
 
 def test_router_key_paths_use_the_records_own_key(tmp_path: Path) -> None:
     app_key = tmp_path / "keys" / "id_ed25519"
-    assert router_key_paths(_rec("ap1", "192.168.1.1"), app_key) == [app_key]
+    assert router_key_paths(_rec("ap1", "192.168.1.1"), [app_key]) == [app_key]
     own = _rec("ap2", "192.168.1.2").model_copy(update={"key_path": str(tmp_path / "id_rsa")})
-    assert router_key_paths(own, app_key) == [tmp_path / "id_rsa"]
+    assert router_key_paths(own, [app_key]) == [tmp_path / "id_rsa"]
+
+
+def test_router_key_paths_offer_both_app_keys_during_a_rotation(tmp_path: Path) -> None:
+    current, nxt = tmp_path / "keys" / "id_ed25519", tmp_path / "keys" / "id_ed25519.next"
+    assert router_key_paths(_rec("ap1", "192.168.1.1"), [current, nxt]) == [current, nxt]
+    own = _rec("ap2", "192.168.1.2").model_copy(update={"key_path": str(tmp_path / "id_rsa")})
+    assert router_key_paths(own, [current, nxt]) == [tmp_path / "id_rsa"]
 
 
 def test_missing_file_is_empty(tmp_path: Path) -> None:

@@ -30,11 +30,18 @@ def test_rf_ws_streams_samples_and_records(ctx: AppContext) -> None:
         msg = ws.receive_json()
         while msg["type"] != "rates":
             msg = ws.receive_json()
-        assert msg == {
-            "type": "rates",
-            "mac": "f4:12:fa:f3:57:68",
-            "error": "Rate statistics are not read in this version",
-        }
+        assert msg["mac"] == "f4:12:fa:f3:57:68" and "error" not in msg
+        assert [r["rate"] for r in msg["rows"] if r["in_use"]] == ["MCS15"]
+        assert set(msg["rows"][0]) == {"rate", "mode", "attempts", "success_pct", "in_use"}
+
+
+def test_rf_ws_refuses_a_hostile_station_mac(ctx: AppContext) -> None:
+    with _client(ctx).websocket_connect(f"{WS}/ws/rf/ap1?radio=radio0&t={TOKEN}") as ws:
+        ws.send_json({"type": "rates", "mac": "../../x"})
+        msg = ws.receive_json()
+        while msg["type"] != "rates":
+            msg = ws.receive_json()
+        assert msg == {"type": "rates", "mac": "../../x", "error": "Not a station MAC: '../../x'"}
 
 
 def test_rf_ws_parked_radio_is_idle(ctx: AppContext) -> None:

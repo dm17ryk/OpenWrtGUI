@@ -57,7 +57,10 @@ def _fail(stderr: str, status: int = 1, command: str = "") -> CommandResult:
 
 
 class SimWifi:
-    def __init__(self, uci_text: str, *, phy: str = "phy0", bssid: str = "02:00:00:00:00:01") -> None:
+    def __init__(
+        self, uci_text: str, *, phy: str = "phy0", bssid: str = "02:00:00:00:00:01", rates_csv: str = ""
+    ) -> None:
+        self._rates_csv = rates_csv  # the station's minstrel rc_stats_csv; "" = a driver without minstrel
         self._committed = parse_uci_show(uci_text)
         self._staged = dict(self._committed)
         self._lists = _list_paths(uci_text)  # options that are uci lists (items space-joined in the dicts)
@@ -217,6 +220,12 @@ class SimWifi:
             return self._beacons(p)
         if p.startswith(f"cat /sys/kernel/debug/ieee80211/{self._phy}/statistics/dot11ACKFailureCount"):
             return _ok(f"{3 * self._tick}\n")
+        if m := re.fullmatch(
+            rf"cat /sys/kernel/debug/ieee80211/{re.escape(self._phy)}/netdev:(\S+)/stations/([0-9a-f:]{{17}})"
+            r"/rc_stats_csv",
+            p,
+        ):
+            return self._rc_stats(p, m.group(1), m.group(2))
         if m := re.fullmatch(r"hostapd_cli -i (\S+) (deny_acl|accept_acl) (ADD_MAC|DEL_MAC) (\S+)", p):
             return self._acl_change(m.group(1), m.group(2), m.group(3), m.group(4).lower())
         if m := re.fullmatch(r"hostapd_cli -i (\S+) (deny_acl|accept_acl) SHOW", p):
@@ -437,6 +446,12 @@ class SimWifi:
         if method == "assoclist":
             return _ok(json.dumps({"results": self._assoc(radio)}, indent="\t") + "\n")
         return None
+
+    def _rc_stats(self, path_cmd: str, ifname: str, mac: str) -> CommandResult:
+        """minstrel's rate statistics for the one station, while it is on an up AP interface (v1.1b)."""
+        if self._rates_csv and self._iface(ifname) is not None and mac == STATION_MAC and self._present():
+            return _ok(self._rates_csv)
+        return _fail(f"cat: can't open '{path_cmd[4:]}': No such file or directory\n")
 
     def _present(self) -> bool:
         if self._away > 0:

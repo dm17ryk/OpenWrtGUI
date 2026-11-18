@@ -109,6 +109,42 @@ async def test_restore_refuses_another_routers_backup(
         await ctx.system.check_restore("ap2", "../x.tar.gz")
 
 
+async def test_a_restore_waiting_for_the_router_is_checked_again_under_its_lock(ctx: AppContext) -> None:
+    """PR #89 review (P1): a restore accepted while a key rotation was pending, then kept waiting for AP2's
+    write lock while the rotation replaced the key, must not install a backup that holds only the old key."""
+    old = ctx.keys.current.public_line
+    ctx.keys.begin()
+    stale = await ctx.system.import_backup(
+        "ap2", _archive({"etc/dropbear/authorized_keys": old + "\n"}), "old.tar.gz"
+    )
+    plan = await ctx.system.plan_restore("ap2", stale.name)  # accepted: the old key is still the app's
+    t = await _sim(ctx)
+    held = ctx.pool.write_lock("ap2")
+    await held.acquire()
+    try:
+        start = asyncio.create_task(ctx.system.start_restore("ap2", stale.name, plan.digest))
+        await asyncio.sleep(0.1)  # it waits for AP2's write lock
+        ctx.keys.finish()  # the rotation ended meanwhile: only the new key is the app's
+    finally:
+        held.release()
+    with pytest.raises(ValueError, match="could not log in"):
+        await start
+    assert s.UPLOAD_RESTORE not in t.uploads
+
+
+async def test_a_key_rotation_on_the_router_holds_off_a_restore(
+    ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PR #89 review (P1): System's jobs check the rotation as they check a step-through."""
+    name = await _backup_then_rename(ctx)
+    plan = await ctx.system.plan_restore("ap2", name)
+    monkeypatch.setattr(
+        ctx.key_rotation, "busy", lambda router_id: "The app key is being replaced on this PC"
+    )
+    with pytest.raises(RebootBusy, match="The app key is being replaced on this PC"):
+        await ctx.system.start_restore("ap2", name, plan.digest)
+
+
 async def test_restore_upload_failure_leaves_nothing(ctx: AppContext) -> None:
     name = (await ctx.system.create_backup("ap2")).name
     t = await _sim(ctx)
