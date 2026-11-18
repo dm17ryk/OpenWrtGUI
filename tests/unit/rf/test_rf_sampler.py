@@ -8,9 +8,10 @@ from pathlib import Path
 import pytest
 
 from openwrtgui import paths
+from openwrtgui.rf.rates import parse_rc_stats_csv
 from openwrtgui.rf.recorder import COLUMNS, CsvRecorder
 from openwrtgui.rf.sample import RadioSample, RfSample, StationSample
-from openwrtgui.rf.sampler import RfSampler
+from openwrtgui.rf.sampler import RATES_RADIO_OFF, RATES_UNREADABLE, RfSampler
 from openwrtgui.simulator import SimConnector, seed_routers
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.transport.base import CommandResult, Transport, Unreachable
@@ -67,6 +68,36 @@ class _FailsOnce(_Count):
             _FailsOnce.failed = True
             raise Unreachable("192.168.1.1:22: connection lost")
         return await super().run(command, timeout=timeout)
+
+
+RATES_FIXTURE = SIM_DIR / "rates" / "ht20.csv"
+
+
+async def test_rates_for_the_simulated_station(tmp_path: Path) -> None:
+    sampler, _ = _sampler(tmp_path)
+    rows = await sampler.rates("F4:12:FA:F3:57:68")
+    assert rows == parse_rc_stats_csv(RATES_FIXTURE.read_text(encoding="utf-8"))
+    assert [r.rate for r in rows if r.in_use] == ["MCS15"]
+
+
+async def test_rates_for_an_unknown_station_say_unreadable(tmp_path: Path) -> None:
+    sampler, _ = _sampler(tmp_path)
+    with pytest.raises(ValueError, match=RATES_UNREADABLE):
+        await sampler.rates("3c:84:6a:11:22:33")
+
+
+async def test_rates_with_the_radio_off(tmp_path: Path) -> None:
+    sampler, _ = _sampler(tmp_path, router="ap2")  # radio0 is parked on the simulated AP2
+    with pytest.raises(ValueError, match=RATES_RADIO_OFF):
+        await sampler.rates("f4:12:fa:f3:57:68")
+
+
+async def test_a_hostile_mac_sends_nothing(tmp_path: Path) -> None:
+    sampler, calls = _sampler(tmp_path)
+    for bad in ("../../x", "f4:12:fa:f3:57:68; reboot"):
+        with pytest.raises(ValueError, match="Not a station MAC"):
+            await sampler.rates(bad)
+    assert calls == []
 
 
 async def test_tick_reads_the_radio_and_the_station(tmp_path: Path) -> None:

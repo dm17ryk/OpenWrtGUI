@@ -12,10 +12,11 @@ from typing import Any
 
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
-from openwrtgui.ifname import checked_radio
+from openwrtgui.ifname import checked_mac, checked_radio
 from openwrtgui.paths import documents_dir
 from openwrtgui.rf.frames_service import FrameAnalyzer
 from openwrtgui.rf.parse import current_survey, parse_station_dump, parse_survey, split_sections
+from openwrtgui.rf.rates import RateRow, parse_rc_stats_csv, rates_command
 from openwrtgui.rf.recorder import CsvRecorder
 from openwrtgui.rf.sample import RawTick, derive, rf_command
 from openwrtgui.store.routers import RouterStore
@@ -29,7 +30,8 @@ log = logging.getLogger(__name__)
 QUEUE_SIZE = 30
 STATUS_EVERY_TICKS = 10  # re-read which interface and phy the radio uses every 10 s
 NAMES_EVERY = timedelta(minutes=1)
-RATES_NOT_YET = "Rate statistics are not read in this version"
+RATES_RADIO_OFF = "The radio is off: no station to read rates for"
+RATES_UNREADABLE = "No rate statistics from the router for this station"
 
 Message = dict[str, Any]
 
@@ -188,8 +190,22 @@ class RfSampler:
         self._recorder = None
         return path
 
-    async def rates(self, mac: str) -> list[Any]:
-        raise NotImplementedError(RATES_NOT_YET)
+    async def rates(self, mac: str) -> list[RateRow]:
+        """Which rates reach one station (spec 7.3, D7): minstrel's `rc_stats_csv`, read when the screen asks.
+        The MAC is checked before anything is sent. Background read: not audited."""
+        station = checked_mac(mac)
+        rec = self._routers.get(self.router_id)
+        if rec is None:
+            raise ValueError(f"{self.router_id} was removed")
+        t = await self._pool.get(rec)
+        where = await self._locate(t)
+        if where is None:
+            raise ValueError(RATES_RADIO_OFF)
+        ifname, phy = where
+        answer = await t.run(rates_command(phy, ifname, station))
+        if not answer.ok:
+            raise ValueError(RATES_UNREADABLE)
+        return parse_rc_stats_csv(answer.stdout)
 
 
 class RfHub:

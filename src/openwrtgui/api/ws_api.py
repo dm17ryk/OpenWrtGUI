@@ -73,7 +73,7 @@ async def rf_live(ws: WebSocket, router_id: str) -> None:
                 mac = str(msg.get("mac", ""))
                 try:
                     await ws.send_json(wire({"type": "rates", "mac": mac, "rows": await sampler.rates(mac)}))
-                except (NotImplementedError, TransportError, ValueError) as exc:
+                except (TransportError, ValueError) as exc:
                     await ws.send_json({"type": "rates", "mac": mac, "error": str(exc)})
     except (WebSocketDisconnect, RuntimeError):
         pass

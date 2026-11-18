@@ -173,7 +173,9 @@ class SimConnector:
         last = int(str(entry["host"]).rsplit(".", 1)[1])
         if entry.get("wifi"):
             text = (self._sim_dir / "wifi" / entry["wifi"]).read_text(encoding="utf-8")
-            wifi = SimWifi(text, bssid=f"02:00:00:00:00:{last:02x}")
+            rates = self._sim_dir / "rates" / "ht20.csv"  # minstrel's view of the panel (v1.1b)
+            rates_csv = rates.read_text(encoding="utf-8") if rates.is_file() else ""
+            wifi = SimWifi(text, bssid=f"02:00:00:00:00:{last:02x}", rates_csv=rates_csv)
         if entry.get("net"):
             text = (self._sim_dir / "net" / entry["net"]).read_text(encoding="utf-8")
             leases = [tuple(lease) for lease in entry.get("leases", [])]
