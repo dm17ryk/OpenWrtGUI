@@ -36,7 +36,7 @@ from openwrtgui.luci_bridge.upstream import Upstream, ssh_upstream
 from openwrtgui.net.apply import ApplyRunner, NetApplyResult
 from openwrtgui.paths import DataDir
 from openwrtgui.probe.describe import SelfDescription
-from openwrtgui.store.keys import AppKey
+from openwrtgui.store.keys import AppKeyRing
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.store.settings import GuardWatchList, SettingsStore
 from openwrtgui.system import commands as s
@@ -156,15 +156,6 @@ class Window:
     raw: Callable[[], Awaitable[Transport]]  # a connection for the test's own setup and put-back steps
 
 
-def app_key_of(identity: Path) -> AppKey:
-    key = asyncssh.read_private_key(str(identity))
-    return AppKey(
-        private_path=identity,
-        public_line=key.export_public_key("openssh").decode("ascii").strip(),
-        fingerprint=key.get_fingerprint("sha256"),
-    )
-
-
 async def put_ssh_port_back(w: Window) -> None:
     """A failed port test can leave the app's instance on 2222 (confirmed): move it back to 22."""
     rec = w.routers.get("ap2")
@@ -199,7 +190,16 @@ async def window(
     data = DataDir.at(tmp_path / "data")
     routers = RouterStore(tmp_path / "routers.json")
     routers.upsert(
-        RouterRecord(id="ap2", name="AP2", host=AP2, port=APP_PORT, auth="key", added_at=datetime.now())
+        # the window logs in with the user's own key: as a router added with a PC key, that key is "the app's"
+        RouterRecord(
+            id="ap2",
+            name="AP2",
+            host=AP2,
+            port=APP_PORT,
+            auth="key",
+            key_path=str(identity),
+            added_at=datetime.now(),
+        )
     )
     guard = BenchGuard(GuardWatchList())
     guard.check_local()
@@ -213,7 +213,7 @@ async def window(
         audit=audit,
         runner=runner,
         settings=SettingsStore(tmp_path / "settings.json"),
-        app_key=app_key_of(identity),
+        keys=AppKeyRing(data.keys_dir),  # unused: AP2's record names its own key file
     )
     system = SystemService(
         pool=pool,

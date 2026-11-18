@@ -44,7 +44,7 @@ from openwrtgui.probe.status import RouterStatus
 from openwrtgui.rf.sampler import RfHub
 from openwrtgui.rf.scan_service import ScanService
 from openwrtgui.simulator import SimConnector, seed_routers, sim_http_client, sim_process_lister
-from openwrtgui.store.keys import AppKey, load_or_create_app_key
+from openwrtgui.store.keys import AppKeyRing
 from openwrtgui.store.routers import RouterRecord, RouterStore, router_key_paths
 from openwrtgui.store.settings import SettingsStore
 from openwrtgui.system.access_service import AccessService
@@ -69,7 +69,7 @@ class AppContext:
     data: DataDir
     settings: SettingsStore
     routers: RouterStore
-    app_key: AppKey
+    keys: AppKeyRing  # the app's key, and the next one while a rotation runs (v1.1b)
     host_keys: HostKeyStore
     pool: ConnectionPool
     guard: BenchGuard
@@ -158,7 +158,7 @@ def build_context(
     settings = SettingsStore(data.settings_file)
     current = settings.load()
     routers = RouterStore(data.routers_file)
-    app_key = load_or_create_app_key(data.keys_dir)
+    keys = AppKeyRing(data.keys_dir)
     host_keys = HostKeyStore(data.known_hosts_file)
     audit = AuditLog(data.audit_dir)
     audit.prune(current.audit_retention_days, date.today())
@@ -178,7 +178,7 @@ def build_context(
                 rec.host,
                 rec.port,
                 password=None,
-                key_paths=router_key_paths(rec, app_key.private_path),
+                key_paths=router_key_paths(rec, keys.login_paths()),
                 username=rec.username,
             )
 
@@ -196,7 +196,7 @@ def build_context(
                 rec.port,
                 rec.username,
                 host_keys=host_keys,
-                key_paths=router_key_paths(rec, app_key.private_path),
+                key_paths=router_key_paths(rec, keys.login_paths()),
             )
 
         client_factory = _real_http_client
@@ -208,7 +208,7 @@ def build_context(
     onboard = OnboardService(
         connector=connector,
         host_keys=host_keys,
-        app_key=app_key,
+        keys=keys,
         routers=routers,
         guard=guard,
         audit=audit,
@@ -318,7 +318,7 @@ def build_context(
         audit=audit,
         runner=runner,
         settings=settings,
-        app_key=app_key,
+        keys=keys,
     )
     system = SystemService(
         pool=pool,
@@ -366,7 +366,7 @@ def build_context(
         data=data,
         settings=settings,
         routers=routers,
-        app_key=app_key,
+        keys=keys,
         host_keys=host_keys,
         pool=pool,
         guard=guard,

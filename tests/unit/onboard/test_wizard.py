@@ -12,7 +12,7 @@ from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked, ProcessInfo
 from openwrtgui.onboard.wizard import OnboardService, Step, install_key_command
 from openwrtgui.simulator import SimConnector
 from openwrtgui.store import keys as keys_module
-from openwrtgui.store.keys import AppKey, load_or_create_app_key
+from openwrtgui.store.keys import AppKey, AppKeyRing, load_or_create_app_key
 from openwrtgui.store.routers import RouterStore
 from openwrtgui.store.settings import GuardWatchList
 from openwrtgui.transport.base import AuthFailed, Transport, Unreachable
@@ -68,7 +68,7 @@ def _service(
     return OnboardService(
         connector=connector,
         host_keys=HostKeyStore(tmp_path / "known_hosts"),
-        app_key=app_key,
+        keys=AppKeyRing(app_key.private_path.parent),
         routers=RouterStore(tmp_path / "routers.json"),
         guard=_guard(live),
         audit=AuditLog(tmp_path / "audit"),
@@ -251,6 +251,18 @@ async def test_auto_login_prefers_the_app_key(
     v = await service.identify(v.sid)
     rec = await service.finish(v.sid, "AP4", v.proposed_port_labels)
     assert rec.auth == "key" and rec.key_path is None
+
+
+async def test_during_a_rotation_the_login_offers_both_keys_and_installs_the_current_one(
+    tmp_path: Path, app_key: AppKey, connector: SimConnector, clock: Clock
+) -> None:
+    """R4: a router already moved to the new key still logs in; a new one gets the current key."""
+    nxt = AppKeyRing(app_key.private_path.parent).begin()
+    connector.state(NEW_HOST).authorized_keys.append(nxt.public_line)
+    service = _service(tmp_path, app_key, connector, clock)
+    v = await service.auto_login(await _trusted(service))
+    assert v.step == Step.IDENTIFY and v.login_method == "app_key"
+    assert service.install_key_preview(v.sid) == [install_key_command(app_key.public_line)]
 
 
 async def test_auto_login_falls_back_to_root_root(service: OnboardService, connector: SimConnector) -> None:

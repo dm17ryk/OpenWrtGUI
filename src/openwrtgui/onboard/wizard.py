@@ -28,7 +28,7 @@ from openwrtgui.probe.describe import (
     summarize,
 )
 from openwrtgui.probe.identity import parse_release
-from openwrtgui.store.keys import AppKey
+from openwrtgui.store.keys import AppKeyRing
 from openwrtgui.store.routers import RouterRecord, RouterStore, make_router_id
 from openwrtgui.transport.base import AuthFailed, HostKeyInfo, KeyFileError, Transport, TransportError
 from openwrtgui.transport.pool import ConnectionPool
@@ -205,7 +205,7 @@ class OnboardService:
         *,
         connector: Connector,
         host_keys: HostKeyStore,
-        app_key: AppKey,
+        keys: AppKeyRing,
         routers: RouterStore,
         guard: BenchGuard,
         audit: AuditLog,
@@ -217,7 +217,7 @@ class OnboardService:
         self._connector = connector
         self._pc_keys = pc_keys
         self._host_keys = host_keys
-        self._app_key = app_key
+        self._keys = keys  # read at each use: a finished rotation changes the current key (v1.1b)
         self._routers = routers
         self._guard = guard
         self._audit = audit
@@ -343,19 +343,20 @@ class OnboardService:
         """
         s = await self._get(sid)
         self._require_trusted(s)
-        app_key = self._app_key.private_path
-        tries: list[tuple[LoginMethod, str | None, Path | None]] = [("app_key", None, app_key)]
-        tries += [("pc_key", None, p) for p in self._pc_keys() if p != app_key]
-        tries.append(("default_password", DEFAULT_PASSWORD, None))
-        tries.append(("no_password", None, None))
-        for method, password, key in tries:
+        app_keys = self._keys.login_paths()  # both keys during a rotation (R4)
+        tries: list[tuple[LoginMethod, str | None, list[Path]]] = [("app_key", None, app_keys)]
+        tries += [("pc_key", None, [p]) for p in self._pc_keys() if p not in app_keys]
+        tries.append(("default_password", DEFAULT_PASSWORD, []))
+        tries.append(("no_password", None, []))
+        for method, password, key_paths in tries:
+            key = key_paths[0] if key_paths else None
             try:
                 transport = await self._connector.connect(
                     s.host,
                     s.port,
                     username=s.username,
                     password=password,
-                    key_paths=[key] if key else [],
+                    key_paths=key_paths,
                     prove=method != "no_password",
                 )
             except AuthFailed:
@@ -399,14 +400,14 @@ class OnboardService:
 
     def install_key_preview(self, sid: str) -> list[str]:
         self._sessions[sid].last_used = self._clock()
-        return [install_key_command(self._app_key.public_line)]
+        return [install_key_command(self._keys.current.public_line)]
 
     async def install_key(self, sid: str) -> SessionView:
         s = await self._get(sid)
         action = WriteAction(
             router_id=f"onboard:{s.sid}",
             screen=SCREEN,
-            commands=(install_key_command(self._app_key.public_line),),
+            commands=(install_key_command(self._keys.current.public_line),),
         )
         results = await perform_write(
             action,
@@ -452,7 +453,7 @@ class OnboardService:
     async def verify_key(self, sid: str) -> SessionView:
         s = await self._get(sid)
         t = await self._connector.connect(
-            s.host, s.port, username=s.username, password=None, key_paths=[self._app_key.private_path]
+            s.host, s.port, username=s.username, password=None, key_paths=[self._keys.current.private_path]
         )
         try:
             ok = (await t.run("true")).ok

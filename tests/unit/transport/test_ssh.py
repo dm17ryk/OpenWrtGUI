@@ -13,7 +13,7 @@ from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.onboard.wizard import OnboardService, SshConnector, Step
 from openwrtgui.store import keys as keys_module
-from openwrtgui.store.keys import load_or_create_app_key
+from openwrtgui.store.keys import AppKeyRing, load_or_create_app_key
 from openwrtgui.store.routers import RouterStore
 from openwrtgui.store.settings import GuardWatchList
 from openwrtgui.transport.base import (
@@ -235,7 +235,7 @@ def _wizard(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, pc_keys: list[Path]
     return OnboardService(
         connector=SshConnector(host_keys),
         host_keys=host_keys,
-        app_key=load_or_create_app_key(tmp_path / "keys", comment="openwrtgui@TEST"),
+        keys=AppKeyRing(tmp_path / "keys", comment="openwrtgui@TEST"),
         routers=RouterStore(tmp_path / "routers.json"),
         guard=BenchGuard(GuardWatchList(lock_files=[], processes=[]), lister=list),
         audit=AuditLog(tmp_path / "audit"),

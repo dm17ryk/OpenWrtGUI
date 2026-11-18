@@ -51,7 +51,7 @@ async def test_key_added_and_removed(ctx: AppContext) -> None:
 async def test_the_apps_key_cannot_be_removed(ctx: AppContext) -> None:
     await ctx.access.access("ap2")  # the simulated router has the app's key once the app logged in
     with pytest.raises(ValueError, match="The app logs in to AP2 . office with this key"):
-        await ctx.access.plan_keys("ap2", KeysChange(remove=(ctx.app_key.fingerprint,)))
+        await ctx.access.plan_keys("ap2", KeysChange(remove=(ctx.keys.current.fingerprint,)))
 
 
 async def test_harness_key_removal_warns(ctx: AppContext) -> None:
@@ -141,4 +141,8 @@ async def test_a_router_with_its_own_key_file_trusts_only_that_key(ctx: AppConte
     assert rec is not None
     with_file = rec.model_copy(update={"key_path": str(path)})
     assert ctx.access.app_fingerprints(with_file) == {own.get_fingerprint("sha256")}
-    assert ctx.access.app_fingerprints(rec) == {ctx.app_key.fingerprint}  # no key file: the app's own key
+    assert ctx.access.app_fingerprints(rec) == {
+        ctx.keys.current.fingerprint
+    }  # no key file: the app's own key
+    nxt = ctx.keys.begin()  # v1.1b: during a rotation both keys are the app's, so neither can be removed
+    assert ctx.access.app_fingerprints(rec) == {ctx.keys.current.fingerprint, nxt.fingerprint}

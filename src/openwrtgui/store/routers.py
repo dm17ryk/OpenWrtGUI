@@ -5,7 +5,7 @@ from __future__ import annotations
 import builtins
 import json
 import re
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
@@ -46,8 +46,9 @@ class RouterRecord(BaseModel):
 _LIST = TypeAdapter(list[RouterRecord])
 
 
-def router_key_paths(record: RouterRecord, app_key_path: Path) -> list[Path]:
-    return [Path(record.key_path)] if record.key_path else [app_key_path]
+def router_key_paths(record: RouterRecord, app_keys: Sequence[Path]) -> list[Path]:
+    """The keys a connection to `record` offers: its own key file, else the app's (both during a rotation)."""
+    return [Path(record.key_path)] if record.key_path else list(app_keys)
 
 
 def make_router_id(name: str, existing: Collection[str]) -> str:

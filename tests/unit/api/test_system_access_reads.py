@@ -41,7 +41,7 @@ async def test_access_of_ap2(ctx: AppContext) -> None:
     labels = {k.comment: k.label for k in a.keys if k.type}
     assert labels["bench@lab"] == "other"
     app = [k for k in a.keys if k.label == "app"]
-    assert len(app) == 1 and app[0].fingerprint == ctx.app_key.fingerprint
+    assert len(app) == 1 and app[0].fingerprint == ctx.keys.current.fingerprint
     assert a.http.luci_on_network is True and a.http.redirect_https is False
     assert a.https_served is False  # simulated AP2 as the real one: nothing listens on 443
     assert [(k.name, k.kind) for k in a.repo_keys] == [

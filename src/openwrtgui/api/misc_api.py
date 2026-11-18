@@ -46,13 +46,18 @@ async def put_settings(body: Settings, ctx: Ctx) -> Settings:
 
 @router.get("/app-key")
 async def app_key(ctx: Ctx) -> AppKeyOut:
-    return AppKeyOut(public_line=ctx.app_key.public_line, fingerprint=ctx.app_key.fingerprint)
+    nxt = ctx.keys.next
+    return AppKeyOut(
+        public_line=ctx.keys.current.public_line,
+        fingerprint=ctx.keys.current.fingerprint,
+        next_fingerprint=nxt.fingerprint if nxt else None,
+    )
 
 
 @router.get("/app-key/public", response_class=PlainTextResponse)
 async def app_key_public(ctx: Ctx) -> PlainTextResponse:
     return PlainTextResponse(
-        ctx.app_key.public_line + "\n",
+        ctx.keys.current.public_line + "\n",
         headers={"Content-Disposition": 'attachment; filename="openwrtgui.pub"'},
     )
 

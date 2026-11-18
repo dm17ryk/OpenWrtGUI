@@ -107,6 +107,7 @@ class UpdateOut(BaseModel):
 class AppKeyOut(BaseModel):
     public_line: str
     fingerprint: str
+    next_fingerprint: str | None = None  # the new key while a rotation runs (v1.1b)
 
 
 class Preview(BaseModel):

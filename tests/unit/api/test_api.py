@@ -64,7 +64,7 @@ async def test_onboard_flow_over_api(authed: httpx.AsyncClient, ctx: AppContext)
     v = (await authed.post(f"/api/onboard/{sid}/login", json={"password": "sim-password"})).json()
     assert v["step"] == "install_key"
     preview = (await authed.get(f"/api/onboard/{sid}/install-key/preview")).json()
-    assert preview == {"commands": [install_key_command(ctx.app_key.public_line)]}
+    assert preview == {"commands": [install_key_command(ctx.keys.current.public_line)]}
     assert (await authed.post(f"/api/onboard/{sid}/install-key")).status_code == 200
     assert (await authed.post(f"/api/onboard/{sid}/verify")).json()["key_installed"] is True
     v = (await authed.post(f"/api/onboard/{sid}/identify")).json()
@@ -154,9 +154,17 @@ async def test_audit_query_and_export(authed: httpx.AsyncClient, ctx: AppContext
 
 async def test_app_key_endpoints(authed: httpx.AsyncClient, ctx: AppContext) -> None:
     k = (await authed.get("/api/app-key")).json()
-    assert k["fingerprint"] == ctx.app_key.fingerprint
+    assert k["fingerprint"] == ctx.keys.current.fingerprint and k["next_fingerprint"] is None
     r = await authed.get("/api/app-key/public")
-    assert r.text.strip() == ctx.app_key.public_line and "attachment" in r.headers["content-disposition"]
+    assert r.text.strip() == ctx.keys.current.public_line and "attachment" in r.headers["content-disposition"]
+
+
+async def test_app_key_names_the_next_key_during_a_rotation(
+    authed: httpx.AsyncClient, ctx: AppContext
+) -> None:
+    nxt = ctx.keys.begin()
+    k = (await authed.get("/api/app-key")).json()
+    assert k["fingerprint"] == ctx.keys.current.fingerprint and k["next_fingerprint"] == nxt.fingerprint
 
 
 async def test_update_check_offers_fixture_release(
