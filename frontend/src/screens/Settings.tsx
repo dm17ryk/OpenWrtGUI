@@ -6,6 +6,7 @@ import { Help, HelpTip } from '../help/Help'
 import { HELP } from '../help/topics'
 import { ImageLibrarySection } from './ImageLibrarySection'
 import { ImagesSection } from './ImagesSection'
+import { KeyRotation } from './KeyRotation'
 
 type Progress = { version: string; done: number; total: number }
 type WatchKey = 'lock_files' | 'processes' | 'router_ssids'
@@ -410,12 +411,19 @@ export function SettingsScreen() {
             <dd className="mono" style={{ fontSize: 12 }}>
               {key.data?.public_line}
             </dd>
+            {key.data?.next_fingerprint && (
+              <>
+                <dt>New key</dt>
+                <dd className="mono">{key.data.next_fingerprint}</dd>
+              </>
+            )}
           </dl>
           <div>
             <button className="btn" type="button" onClick={() => void act(() => downloadFile('/api/app-key/public', 'openwrtgui.pub'))}>
               Export public key
             </button>
           </div>
+          <KeyRotation />
         </section>
         <section className="card stack" aria-labelledby="al-h">
           <div className="hrow">

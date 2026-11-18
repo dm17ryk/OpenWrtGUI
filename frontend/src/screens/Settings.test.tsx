@@ -70,6 +70,7 @@ function renderSettings(update: UpdateOut = UPDATE, settings: Settings = SETTING
   client.setQueryData(['update'], update)
   client.setQueryData(['app-info'], INFO)
   client.setQueryData(['app-key'], { public_line: 'ssh-ed25519 AAAA openwrtgui@PC', fingerprint: 'SHA256:appkey' })
+  client.setQueryData(['app-key-rotation'], null)
   render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
