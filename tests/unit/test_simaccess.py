@@ -9,6 +9,7 @@ import json
 import tarfile
 from pathlib import Path
 
+import asyncssh
 import pytest
 
 from openwrtgui.simulator import SimConnector, sim_commands
@@ -18,7 +19,7 @@ from openwrtgui.system.leds import parse_leds
 from openwrtgui.system.mounts import parse_df, parse_mounts
 from openwrtgui.system.parse import parse_board
 from openwrtgui.system.sshkeys import parse_authorized_keys
-from openwrtgui.transport.base import Unreachable
+from openwrtgui.transport.base import AuthFailed, Unreachable
 from openwrtgui.transport.fake import ReplayTransport
 
 SIM_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "sim"
@@ -86,6 +87,24 @@ async def test_sim_authorized_keys_round_trip() -> None:
     text = "# kept\n" + keys[0].text + "\n"
     assert (await t.run(s.write_file("/etc/dropbear/authorized_keys", text))).ok
     assert await _out(t, s.KEYS_READ) == text
+
+
+async def test_a_seeded_router_checks_keys_after_its_first_login(tmp_path: Path) -> None:
+    """v1.1b R8: a router added with a key trusts the first key it is offered (it seeds it, as onboarding put
+    it there), then checks every later login against its authorized_keys, like dropbear."""
+    a, b = _key(tmp_path / "a"), _key(tmp_path / "b")
+    connector, _ = _sim(Clock())
+    assert (await (await connector.connect(AP2, 22, password=None, key_paths=[a])).run("true")).ok
+    with pytest.raises(AuthFailed):
+        await connector.connect(AP2, 22, password=None, key_paths=[b])
+    assert (await (await connector.connect(AP2, 22, password=None, key_paths=[b, a])).run("true")).ok
+
+
+def _key(path: Path) -> Path:
+    key = asyncssh.generate_private_key("ssh-ed25519", comment=f"{path.name}@test")
+    key.write_private_key(str(path))
+    key.write_public_key(f"{path}.pub")
+    return path
 
 
 async def test_sim_led_restart_sets_the_trigger() -> None:

@@ -47,6 +47,20 @@ async def test_install_key_appends_once() -> None:
     assert state.authorized_keys == [LINE]
 
 
+async def test_remove_old_key_command_is_recognised_exactly() -> None:
+    from openwrtgui.onboard.rotate import remove_old_key_command
+
+    new, old = "ssh-ed25519 AAAAnew openwrtgui@pc", LINE
+    state = SimState(authorized_keys=["# kept", old, new])
+    t = ReplayTransport({}, state=state)
+    changed = remove_old_key_command(new, old).replace("chmod 600", "chmod 644")
+    refused = await t.run(changed)
+    assert (refused.exit_status, refused.stderr) == (1, "sim: unexpected key remove command")
+    assert state.authorized_keys == ["# kept", old, new]
+    assert (await t.run(remove_old_key_command(new, old))).ok
+    assert state.authorized_keys == ["# kept", new]
+
+
 async def test_passwd_sets_root_password() -> None:
     state = SimState()
     t = ReplayTransport({}, state=state)

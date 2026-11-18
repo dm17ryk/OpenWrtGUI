@@ -130,6 +130,7 @@ def _seed_key(state: SimState, key_paths: Sequence[Path]) -> None:
     for line in lines:
         if line not in state.authorized_keys:
             state.authorized_keys.insert(0, line)
+    state.key_seeded = True  # v1.1b R8: from now on the router checks every key, as dropbear does
 
 
 class SimConnector:
@@ -332,7 +333,9 @@ class SimConnector:
             if password != state.root_password:
                 raise AuthFailed(f"{host} refused the login")
         elif key_paths:
-            trusted = entry.get("auth") == "key" and self._generation(entry["id"]) == 0
+            trusted = (
+                entry.get("auth") == "key" and self._generation(entry["id"]) == 0 and not state.key_seeded
+            )
             if not trusted and not any(line in state.authorized_keys for line in _public_lines(key_paths)):
                 raise AuthFailed(f"{host} refused the key")
             if trusted:
