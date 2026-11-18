@@ -143,9 +143,9 @@ see [A radio was left at a step-through step](#a-radio-was-left-at-a-step-throug
 
 ## Wireshark does not start
 
-"Wireshark is not installed on this PC": a capture **to Wireshark** needs Wireshark. The app looks for
-`Wireshark\Wireshark.exe` in Program Files, then for `Wireshark` on the PATH. Install Wireshark, or capture **to a
-file** instead: the file goes to `Documents\OpenWrtGUI\captures` and opens in Wireshark later. See
+"Wireshark is not installed on this PC": **Live in Wireshark** needs Wireshark. The app looks for
+`Wireshark\Wireshark.exe` in Program Files, then for `Wireshark` on the PATH. Install Wireshark, or use **Save .pcap**
+instead: the file goes to `Documents\OpenWrtGUI\captures` and opens in Wireshark later. See
 [Faults and capture](Faults-and-capture#capture).
 
 ## LTE does not connect

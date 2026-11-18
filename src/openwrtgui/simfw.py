@@ -224,16 +224,16 @@ class SimFirewall:
 
     # ---------------------------------------------------------------- what the network asks
     def admits_ssh(self, pc_ip: str) -> bool:
-        """The PC's SSH reaches the router: the own zone (lan's) accepts it, and no runtime input chain
-        drops it."""
+        """The PC's SSH reaches the router: the first rule of the own zone (lan's) that matches it accepts
+        it, or none matches and the zone's input does; and no runtime input chain drops it. A user rule that
+        drops or rejects the PC cuts it off (#7, the v1.0 inventory)."""
         conf = firewall_conf(self._net.uci())
         zone = next((z for z in conf.zones if "lan" in z.networks), None)
-        if (
-            zone is not None
-            and zone.input != "ACCEPT"
-            and not any(_accepts_ssh(r, zone, pc_ip) for r in conf.rules)
-        ):
-            return False
+        if zone is not None:
+            first = next((r for r in conf.rules if _matches_ssh(r, zone, pc_ip)), None)
+            target = first.target if first is not None else zone.input
+            if target != "ACCEPT":
+                return False
         for table in self._tables:
             for c in table.chains:
                 hook = c.hook()
@@ -739,12 +739,13 @@ def _set(items: Sequence[str]) -> str:
     return quoted[0] if len(quoted) == 1 else "{ " + ", ".join(quoted) + " }"
 
 
-def _accepts_ssh(r: FwRuleConf, zone: ZoneConf, pc_ip: str) -> bool:
+def _matches_ssh(r: FwRuleConf, zone: ZoneConf, pc_ip: str) -> bool:
+    """An input rule of the zone that the PC's SSH hits, whatever its target (ACCEPT, DROP or REJECT)."""
     return (
         r.enabled
         and r.src == zone.name
         and r.dest is None
-        and r.target == "ACCEPT"
+        and r.target in ("ACCEPT", "DROP", "REJECT")
         and (r.proto is None or "tcp" in r.proto.split() or r.proto == "all")
         and (r.dest_port is None or str(SSH_PORT) in r.dest_port.split())
         and (not r.src_ip or pc_ip in r.src_ip)

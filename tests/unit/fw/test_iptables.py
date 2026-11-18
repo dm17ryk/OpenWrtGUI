@@ -122,22 +122,30 @@ def _state_text(raw_status: int = 0) -> str:
 
 def test_the_state_splits_per_program_and_table() -> None:
     """v1.0c Task 3: one command answers every table; presence and each table's exit come back with it."""
-    presence, tables = split_state(_state_text())
+    presence, tables, _ = split_state(_state_text())
     assert presence == IptablesPresence(iptables=True, ip6tables=False)
     assert tables[("iptables", "filter")] == (0, LATER["iptables"]["filter"])
     assert tables[("ip6tables", "filter")][0] == 127
 
 
 def test_a_table_that_fails_keeps_its_error_and_the_others_show() -> None:
-    _, tables = split_state(_state_text(raw_status=1))
+    _, tables, _ = split_state(_state_text(raw_status=1))
     assert tables[("iptables", "raw")] == (1, RAW_FAILED)
     assert tables[("iptables", "filter")][0] == 0
 
 
 def test_a_cut_off_answer_names_no_table_it_did_not_finish() -> None:
     text = _state_text()
-    _, tables = split_state(text[: text.index(f"{MARK} iptables nat") + 40])
+    _, tables, _ = split_state(text[: text.index(f"{MARK} iptables nat") + 40])
     assert ("iptables", "filter") in tables and ("iptables", "nat") not in tables
+
+
+def test_an_empty_or_cut_answer_says_which_programs_answered() -> None:
+    """#77 minor 6: no presence line is no answer, not "absent"."""
+    assert split_state("")[2] == frozenset()
+    text = _state_text()
+    assert split_state(text[: text.index(f"{MARK} ip6tables absent")])[2] == frozenset({"iptables"})
+    assert split_state(text)[2] == frozenset({"iptables", "ip6tables"})
 
 
 def test_the_state_read_is_one_read_only_command() -> None:

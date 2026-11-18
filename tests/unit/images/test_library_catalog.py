@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import json
 from collections.abc import Callable
@@ -12,6 +13,7 @@ from typing import Any
 import httpx
 import pytest
 
+from openwrtgui.images import library
 from openwrtgui.images.library import MAX_PROFILES, RELEASES_URL, LibraryError, fetch_catalog, parse_profiles
 from openwrtgui.version import APP_VERSION
 
@@ -286,6 +288,109 @@ async def test_a_failing_list_gives_the_http_status() -> None:
         with pytest.raises(LibraryError) as err:
             await fetch_catalog(client)
     assert str(err.value) == "The image library on GitHub could not be reached: HTTP 502."
+
+
+def test_a_profiles_json_without_a_revision_is_unreadable() -> None:
+    """The 0.8.2 ledger, Task 1: entries with an empty revision were listed, then refused at the download."""
+    doc = json.loads(PROFILES)
+    doc["version_code"] = ""
+    with pytest.raises(LibraryError, match="no revision"):
+        parse_profiles(json.dumps(doc).encode(), RELEASE)
+
+
+def test_an_untitled_entry_takes_its_board_as_title() -> None:
+    """The 0.8.2 ledger, Task 1: an empty title gave a blank line in Settings and "Image library: , …"."""
+    [e] = parse_profiles(_profiles(titles=[]), RELEASE)
+    assert e.title == "dlink,dwr-921-c3-uboot"
+
+
+def _asset(release: dict[str, Any], name: str) -> dict[str, Any]:
+    return next(a for a in release["assets"] if a["name"] == name)
+
+
+def test_an_image_link_that_is_not_https_leaves_the_entry_out() -> None:
+    """The 0.8.2 ledger (final review): only https links taken from GitHub are followed."""
+    release = copy.deepcopy(RELEASE)
+    _asset(release, IMAGE)["browser_download_url"] = "http://dl.test/x.bin"
+    assert parse_profiles(PROFILES, release) == []
+
+
+def test_an_image_whose_asset_size_disagrees_is_left_out() -> None:
+    """The 0.8.2 ledger, Task 1: the asset's size must be the size profiles.json gives."""
+    release = copy.deepcopy(RELEASE)
+    _asset(release, IMAGE)["size"] = 11272478 + 1
+    assert parse_profiles(PROFILES, release) == []
+
+
+async def test_a_profiles_link_that_is_not_https_is_skipped_counted_and_not_asked() -> None:
+    plain = _newer()
+    _asset(plain["release"], "profiles.json")["browser_download_url"] = (
+        "http://dl.test/v25.12.6/profiles.json"
+    )
+    seen: list[httpx.Request] = []
+    async with _client([_bench(), plain], seen=seen) as client:
+        entries, skipped = await fetch_catalog(client)
+    assert ([e.release_tag for e in entries], skipped) == (["v25.12.5"], 1)
+    assert not any(r.url.scheme == "http" for r in seen)
+
+
+async def test_a_profiles_json_without_a_link_is_counted() -> None:
+    """The 0.8.2 ledger, Task 2: it was skipped silently."""
+    broken = _newer()
+    del _asset(broken["release"], "profiles.json")["browser_download_url"]
+    async with _client([_bench(), broken]) as client:
+        entries, skipped = await fetch_catalog(client)
+    assert ([e.release_tag for e in entries], skipped) == (["v25.12.5"], 1)
+
+
+async def test_a_releases_list_nested_too_deep_is_the_reads_error() -> None:
+    """The 0.8.2 final review: a RecursionError on the releases list escaped as a 500."""
+    deep = b"[" * 200000 + b"]" * 200000
+    async with _client([], list_handler=lambda _: httpx.Response(200, content=deep)) as client:
+        with pytest.raises(LibraryError, match="could not be reached"):
+            await fetch_catalog(client)
+
+
+def _three() -> list[Served]:
+    return [_bench(), _newer(), _newer(tag="v25.12.7", published="2026-11-02T10:00:00Z", sha="cd" * 32)]
+
+
+async def test_the_profiles_json_files_are_asked_at_once() -> None:
+    """The 0.8.2 final review: one by one under the lock, up to 20 s each."""
+    served = _three()
+    by_url = {_profiles_url(s["release"]["tag_name"]): s["profiles"] for s in served}
+    asked: set[str] = set()
+    all_asked = asyncio.Event()
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url).startswith(RELEASES_URL):
+            return httpx.Response(200, json=[s["release"] for s in served])
+        asked.add(str(request.url))
+        if len(asked) == len(served):
+            all_asked.set()
+        await asyncio.wait_for(all_asked.wait(), 2.0)  # answers only once every file was asked
+        return httpx.Response(200, content=by_url[str(request.url)])
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        entries, skipped = await fetch_catalog(client)
+    assert ([e.release_tag for e in entries], skipped) == (["v25.12.7", "v25.12.6", "v25.12.5"], 0)
+
+
+async def test_a_hanging_profiles_json_ends_at_the_deadline(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(library, "CATALOG_DEADLINE_S", 0.2)
+    served = _three()
+    by_url = {_profiles_url(s["release"]["tag_name"]): s["profiles"] for s in served}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if str(request.url).startswith(RELEASES_URL):
+            return httpx.Response(200, json=[s["release"] for s in served])
+        if "v25.12.6" in str(request.url):
+            await asyncio.sleep(10)  # never answers in time
+        return httpx.Response(200, content=by_url[str(request.url)])
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        entries, skipped = await asyncio.wait_for(fetch_catalog(client), 5.0)
+    assert ([e.release_tag for e in entries], skipped) == (["v25.12.7", "v25.12.5"], 1)
 
 
 async def test_the_request_carries_the_updater_headers() -> None:

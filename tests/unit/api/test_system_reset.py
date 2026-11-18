@@ -60,6 +60,15 @@ async def test_reset_takes_the_router_away_and_marks_it(ctx: AppContext) -> None
     assert s.firstboot_command() in [e.command for e in ctx.audit.query()]
 
 
+async def test_reset_takes_the_name_trimmed_and_in_any_case(ctx: AppContext) -> None:
+    """#36: the router's full name, but not its exact spaces and capitals (R4); "AP2" alone stays refused."""
+    ctx.system.every_s = 0.2
+    plan = await ctx.system.plan_reset("ap2")
+    job = await ctx.system.start_reset("ap2", plan.digest, "  ap2 · OFFICE ", True)
+    assert (job.kind, job.phase) == ("reset", "armed")
+    assert (await wait_job(ctx)).phase == "reset"
+
+
 async def test_reset_that_does_not_go_down(ctx: AppContext, monkeypatch: pytest.MonkeyPatch) -> None:
     t = await ctx.pool.get(ctx.routers.get("ap2"))  # type: ignore[arg-type]
     assert isinstance(t, ReplayTransport) and t.state is not None and t.state.access is not None

@@ -17,6 +17,7 @@
   --warn: #9a5a00;
   --warn-soft: #fbefd9;
   --bad: #b3361a;
+  --bad-ink: #ffffff; /* text on --bad */
   --bad-soft: #fbe7e1;
   --neu-soft: #eceeea;
   --har: #5a3ebf;
@@ -53,6 +54,7 @@
   --warn: #e2a54a;
   --warn-soft: #33260f;
   --bad: #f08a6c;
+  --bad-ink: #0b0d10; /* white on this lighter red fails WCAG AA (the axe check) */
   --bad-soft: #3a1e16;
   --neu-soft: #262a30;
   --har: #b7a6f2;

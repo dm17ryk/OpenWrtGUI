@@ -112,7 +112,7 @@ class ScanService:
             raise ValueError(f"{radio} is not a radio of {rec.name}")
         t = await self._pool.get(rec)
         phy = (await ubus_call(t, "iwinfo", "phyname", {"section": radio}) or {}).get("phyname", "phy0")
-        leftover = self._ap(found) is None and (await t.run(SCAN_INFO)).ok  # only a temporary scan adds it
+        leftover = (await t.run(SCAN_INFO)).ok  # left by a temporary scan, whatever the radio does now
         return rec, t, found, checked_ifname(str(phy)), leftover
 
     @staticmethod
@@ -122,17 +122,23 @@ class ScanService:
         return None
 
     def _plan(self, rec: RouterRecord, radio: RadioState, phy: str, *, leftover: bool) -> ScanPlan:
+        # a scan whose cleanup ran over a dead connection left it (v1.0c Task 10): removed first, on air too
+        # (#77 minor 9)
+        first = (SCAN_DEL,) if leftover else ()
+        left = (
+            (f"{SCAN_IF} is left from an earlier scan on {rec.name}: it is removed first.",)
+            if leftover
+            else ()
+        )
         ap = self._ap(radio)
         if ap is not None:
             names = ", ".join(s.ssid for s in radio.ssids) or radio.name
             warning = f"Stations on {names} may miss up to about 2 s of traffic during the scan."
-            return ScanPlan(rec.id, radio.name, "ap", (scan_command(ap, on_ap=True),), (warning,))
+            return ScanPlan(
+                rec.id, radio.name, "ap", (*first, scan_command(ap, on_ap=True)), (*left, warning)
+            )
         lines = (scan_add(phy), scan_command(SCAN_IF, on_ap=False), SCAN_DEL)
-        if not leftover:
-            return ScanPlan(rec.id, radio.name, "temporary", lines, ())
-        # a scan whose cleanup ran over a dead connection left it (v1.0c Task 10): removed first
-        left = f"{SCAN_IF} is left from an earlier scan on {rec.name}: it is removed first."
-        return ScanPlan(rec.id, radio.name, "temporary", (SCAN_DEL, *lines), (left,))
+        return ScanPlan(rec.id, radio.name, "temporary", (*first, *lines), left)
 
     async def preview(self, router_id: str, radio: str) -> ScanPlan:
         rec, _t, found, phy, leftover = await self._where(router_id, radio)
@@ -177,9 +183,9 @@ class ScanService:
         started = self._monotonic()
         iface = self._ap(found) or SCAN_IF
         async with self._pool.write_lock(rec.id):
+            if leftover:
+                await self._remove_leftover(t, rec)
             if plan.via == "temporary":
-                if leftover:
-                    await self._remove_leftover(t, rec)
                 try:
                     added = await self._run(t, rec, scan_add(phy))
                 except TransportError:  # made before the connection dropped? remove it (v1.0b2 D8)

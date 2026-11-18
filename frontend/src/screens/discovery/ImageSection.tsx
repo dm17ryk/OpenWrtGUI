@@ -1,9 +1,10 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { ApiError, postJson } from '../../api/client'
-import type { DiscoveryState, FirmwareCheck, ProfileOut } from '../../api/types'
+import { ApiError, apiFetch, postJson } from '../../api/client'
+import type { DiscoveryState, FirmwareCheck, GuardOut, ProfileOut } from '../../api/types'
 import { Help, HelpTip } from '../../help/Help'
 import { HELP } from '../../help/topics'
+import { guardReasonText } from '../../shell/guardText'
 import { ImportImage } from '../ImagesSection'
 import { LibraryOffer } from './LibraryOffer'
 
@@ -12,6 +13,9 @@ type Props = { routerId: string; state: DiscoveryState; onFlash: () => void }
 /** The image this router matches, the firmware check, and the way to Flash (decision D11). */
 export function ImageSection({ routerId, state, onFlash }: Props) {
   const client = useQueryClient()
+  // the firmware check reads the whole flash: not during a harness run (#21, as Flash in FlashDialog)
+  const guard = useQuery({ queryKey: ['guard'], queryFn: () => apiFetch<GuardOut>('/api/guard') })
+  const runLive = guard.data?.live ?? false
   const [check, setCheck] = useState<FirmwareCheck | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isBusy, setBusy] = useState(false)
@@ -58,7 +62,7 @@ export function ImageSection({ routerId, state, onFlash }: Props) {
             </span>
             <span className="spacer" />
             <HelpTip topic={HELP.firmwareCheck}>
-              <button className="btn" type="button" disabled={isBusy || !fromImage} onClick={() => void checkFirmware()}>
+              <button className="btn" type="button" disabled={isBusy || !fromImage || runLive} onClick={() => void checkFirmware()}>
                 Check firmware
               </button>
             </HelpTip>
@@ -68,6 +72,7 @@ export function ImageSection({ routerId, state, onFlash }: Props) {
               </button>
             </HelpTip>
           </div>
+          {fromImage && runLive && guard.data && <div className="note w">{`Bench Guard: ${guardReasonText(guard.data)}`}</div>}
           {!fromImage && offer}
         </>
       ) : (

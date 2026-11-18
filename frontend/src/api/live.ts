@@ -1,6 +1,7 @@
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { openSocket } from './client'
+import { parseFrame } from './frames'
 import type { LiveMessage, RouterItem } from './types'
 
 const RECONNECT_MS = 2000
@@ -40,7 +41,10 @@ export function useLive(): void {
     let closed = false
     const connect = (): void => {
       socket = openSocket('/ws/live')
-      socket.onmessage = (event: MessageEvent<string>) => applyLive(client, JSON.parse(event.data) as LiveMessage)
+      socket.onmessage = (event: MessageEvent<string>) => {
+        const msg = parseFrame<LiveMessage>(event.data)
+        if (msg !== null) applyLive(client, msg)
+      }
       socket.onclose = () => {
         if (!closed) timer = setTimeout(connect, RECONNECT_MS)
       }

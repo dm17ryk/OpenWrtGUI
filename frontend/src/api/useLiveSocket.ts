@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { openSocket } from './client'
+import { parseFrame } from './frames'
 
 /** Waits before each reconnect; after the last step, every 15 s while the screen stays open (v1.0c D7). */
 export const RECONNECT_MS = [1000, 2000, 4000, 8000, 15000] as const
@@ -67,7 +68,8 @@ export function useLiveSocket<T>(
       ws.onmessage = (ev: MessageEvent<string>) => {
         attempt = 0
         setKept((k) => (k.key === ownKey && k.state.phase === 'open' && k.state.attempt === 0 ? k : { key: ownKey, state: { phase: 'open', attempt: 0, reason: null } }))
-        handler.current(JSON.parse(ev.data) as T)
+        const msg = parseFrame<T>(ev.data)
+        if (msg !== null) handler.current(msg)
       }
       ws.onclose = (ev: CloseEvent) => {
         socket.current = null

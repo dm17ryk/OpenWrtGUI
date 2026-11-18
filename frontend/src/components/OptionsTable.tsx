@@ -5,6 +5,11 @@ import { optionKey } from './options'
 const SHOWN = 40
 type Filter = 'set' | 'all' | 'writer'
 
+/** Where a row is set: a field above on this screen, or another screen that keeps it locked (#30). */
+function controlNote(control: string): string {
+  return control.endsWith(' screen') ? `kept by the ${control}` : `set above: ${control}`
+}
+
 function valueText(v: OptionRow['value']): string {
   return Array.isArray(v) ? v.join(' ') : (v ?? '')
 }
@@ -97,7 +102,7 @@ export function OptionsTable({ rows, edits, onEdit, lead }: Props) {
                 </td>
                 <td>
                   <span className="row" style={{ gap: 6 }}>
-                    {r.control && <span className="muted">set above: {r.control}</span>}
+                    {r.control && <span className="muted">{controlNote(r.control)}</span>}
                     {r.writer && <span className="b har">set by {r.writer}</span>}
                     {optionKey(r) in edits && <span className="b park">changed, not applied</span>}
                   </span>

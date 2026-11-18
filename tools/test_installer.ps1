@@ -48,6 +48,13 @@ function Check([bool]$Ok, [string]$What) {
     Write-Host "    ok: $What"
 }
 
+# Every file under a folder, by its path relative to the folder and its hash: a file moved, renamed or changed
+# in a subfolder changes the snapshot (the v1.0d final review: top-level files only, hashes without names).
+function Snapshot([string]$Dir) {
+    $files = Get-ChildItem $Dir -File -Recurse | Sort-Object FullName
+    return ($files | ForEach-Object { "$($_.FullName.Substring($Dir.Length)):$((Get-FileHash $_.FullName).Hash)" }) -join ","
+}
+
 # 1. A data folder shared with other files is refused, and nothing is installed or deleted.
 $Shared = Join-Path $Work "shared"
 New-Item -ItemType Directory (Join-Path $Shared "logs") | Out-Null
@@ -93,12 +100,12 @@ if ($Previous) {
         New-Item -ItemType Directory -Force $DataU | Out-Null
         Set-Content (Join-Path $DataU "routers.json") "[]" -NoNewline
         Set-Content (Join-Path $DataU "keep-me.txt") "user data"
-        $before = (Get-ChildItem $DataU -File | Get-FileHash | ForEach-Object Hash) -join ","
+        $before = Snapshot $DataU
         $p = Start-Process -FilePath $Installer -Wait -PassThru -ArgumentList @(
             "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=$AppU", "/RELAUNCH=0", "/LOG=$AppU-update.log"
         )
         Check ($p.ExitCode -eq 0) "the update installs over it (exit $($p.ExitCode))"
-        $after = (Get-ChildItem $DataU -File | Get-FileHash | ForEach-Object Hash) -join ","
+        $after = Snapshot $DataU
         Check ($after -eq $before) "the update keeps the data folder"
         Check ((Get-ItemProperty "HKCU:\Software\OpenWrtGUI").DataDir -eq $DataU) "the data-folder setting is kept"
         $want = [regex]::Match((Split-Path $Installer -Leaf), "OpenWrtGUI-Setup-(.+)\.exe").Groups[1].Value

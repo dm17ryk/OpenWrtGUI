@@ -219,6 +219,19 @@ async def _record(ctx: AppContext, monkeypatch: pytest.MonkeyPatch) -> list[str]
     return sent
 
 
+def _write_lines(commands: list[str]) -> set[str]:
+    """Every line of the commands, trimmed: a write sent as a multi-line script still meets its preview line
+    (the v1.0b2 final review: whole strings were compared). `set -e` alone says nothing."""
+    return {s for c in commands for line in c.splitlines() if (s := line.strip()) and s != "set -e"}
+
+
+def test_the_sweep_compares_line_by_line() -> None:
+    writes = ["set -e", "uci set network.lan.ipaddr='10.0.0.1'"]
+    sent = ["uci show network", "set -e\n  uci set network.lan.ipaddr='10.0.0.1'\nuci commit network"]
+    assert not set(sent) & set(writes)  # what the whole-string compare saw
+    assert _write_lines(sent) & _write_lines(writes) == {"uci set network.lan.ipaddr='10.0.0.1'"}
+
+
 async def _previewed(
     write: Write, ctx: AppContext, authed: httpx.AsyncClient
 ) -> tuple[dict[str, object], list[str]]:
@@ -246,7 +259,7 @@ async def test_a_previewed_write_is_refused_once_a_run_starts(
     if write.first:
         assert sent == [], sent  # the guard came first: the router heard nothing at all
     else:  # it reads before its guard (the network state, the tool card): never one of the preview's writes
-        assert writes and not set(sent) & set(writes), sent
+        assert writes and not _write_lines(sent) & _write_lines(writes), sent
 
 
 @pytest.mark.parametrize("write", [*RUNNER, *V10A2], ids=lambda w: f"{w.router}/{w.apply}")

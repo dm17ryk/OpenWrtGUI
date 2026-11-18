@@ -439,6 +439,44 @@ async def test_a_write_during_a_read_is_not_kept(env: Env, monkeypatch: pytest.M
     assert _ls(env) - before == 1  # read again: the overtaken read was not kept
 
 
+def _with_sqm(env: Env) -> None:
+    """A newer description of ap1: one page more, SQM, readable by its own ACL."""
+    desc = env.descriptions["ap1"]
+    assert desc.luci is not None
+    sqm = LuciPage(
+        "admin/services/sqm",
+        "SQM QoS",
+        "luci-app-sqm",
+        ("luci-app-sqm",),
+        ("sqm",),
+        (),
+        "Services",
+        ({"acl": ["luci-app-sqm"]},),
+    )
+    acl = {**desc.luci.acl, "luci-app-sqm": {"read": {"uci": ["sqm"]}}}
+    env.descriptions["ap1"] = replace(desc, luci=replace(desc.luci, pages=(*desc.luci.pages, sqm), acl=acl))
+
+
+async def test_a_newer_description_does_not_join_an_old_read(
+    env: Env, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#77 minor 7: a read made for the old page list is neither shared with nor cached for the new one."""
+    held = await _held(env, monkeypatch)
+    before = _ls(env)
+    first = asyncio.create_task(env.service.pages("ap1"))
+    await held.reached.wait()
+    _with_sqm(env)
+    second = asyncio.create_task(env.service.pages("ap1"))
+    await _let_others_arrive()
+    held.release.set()
+    await first
+    pages = {p.path: p for p in await second}
+    assert _ls(env) - before == 2  # the newer caller read its own facts
+    assert pages["admin/services/sqm"].available is True
+    await env.service.pages("ap1")
+    assert _ls(env) - before == 2  # and that read was kept for the minute
+
+
 async def test_a_failed_shared_read_reaches_both_callers_and_is_tried_again(
     env: Env, monkeypatch: pytest.MonkeyPatch
 ) -> None:

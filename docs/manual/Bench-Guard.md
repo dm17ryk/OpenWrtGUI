@@ -69,7 +69,7 @@ router. In detail:
   - Run --help;
   - a tool card's command that writes;
   - starting or stopping a custom service;
-  - copying files to another router.
+  - copying files to a router.
 - A flash or a firmware check.
 - Arming a fault, and a capture on `mon0`.
 - RF live's channel scan and frame analysis (each adds an interface on the radio).

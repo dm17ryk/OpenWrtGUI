@@ -82,6 +82,12 @@ def capture_command(req: CaptureRequest, pc_ip: str | None, ssh_port: int, devic
     return f"timeout {req.duration_s} tcpdump -i {device} -U -s 0 -w - {shell_quote(expr)}"
 
 
+async def _close(t: Transport) -> None:
+    """Close a capture's own connection; one already gone is closed."""
+    with contextlib.suppress(TransportError, OSError):
+        await t.close()
+
+
 def _size(n: int) -> str:
     return f"{n // 2**20} MB" if n >= 2**20 and n % 2**20 == 0 else f"{n} B"
 
@@ -153,6 +159,13 @@ class CaptureService:
                 out.append(f"Capture on {rec.name if rec else view.router_id} {view.device}")
         return out
 
+    def running_on(self, router_id: str) -> str | None:
+        """What capture holds the router now, for Remove from the app (#77 minor 10); None when none does."""
+        if router_id not in self._running:
+            return None
+        view = self._views.get(self._running[router_id])
+        return f"a capture on {view.device} runs" if view is not None else "a capture is starting"
+
     async def stop_all(self) -> None:
         for view in builtins.list(self._views.values()):
             if view.running:
@@ -204,6 +217,23 @@ class CaptureService:
             return f"{MONITOR} is still on {rec.name}: {reason}"
         return None
 
+    async def _mon0_gone(self, rec: RouterRecord, capture_id: str) -> str | None:
+        """At a capture's end: let go of the monitor over the pooled connection as it is then, taken under the
+        write lock (a reconnect while it waited is seen). A router that does not answer still loses this
+        holder, so a later holder's end removes the monitor (the v1.1a final review)."""
+        holder = f"capture {capture_id}"
+        try:
+            async with self._pool.write_lock(rec.id):
+                t = await self._pool.get(rec)
+                removed = await self._monitors.release(rec.id, holder, self._run_fn(rec, t), t)
+        except TransportError as exc:
+            await self._monitors.forget(rec.id, holder)
+            return f"{MONITOR} may still be on {rec.name}: {exc}"
+        if removed is not None and not removed.ok:
+            reason = (removed.stderr or removed.stdout).strip() or f"exit {removed.exit_status}"
+            return f"{MONITOR} is still on {rec.name}: {reason}"
+        return None
+
     async def start(self, router_id: str, req: CaptureRequest) -> CaptureView:
         rec = self._record(router_id)
         if router_id in self._running:
@@ -232,6 +262,7 @@ class CaptureService:
             await self._monitor(rec, t, capture_id)
         sink: Sink | None = None
         path: Path | None = None
+        own: Transport | None = None
         try:  # nothing is left behind when the capture cannot start: no monitor interface, no file
             if exe is not None:
                 sink = open_live(exe)
@@ -241,12 +272,17 @@ class CaptureService:
                 # the id too: a second capture in the same second must not overwrite the first
                 path = folder / f"{rec.id}-{req.device}-{self._clock():%Y%m%d-%H%M%S}-{capture_id}.pcap"
                 sink = path.open("xb")
-            stream = await t.stream(command)  # type: ignore[attr-defined]
+            # its own connection: a change with rollback reconnects the pooled one, which would end the
+            # stream (#3, the 1.x proposal's D5); mon0's writes stay on the pooled one, under the write lock
+            own = await self._pool.fresh(rec)
+            stream = await own.stream(command)  # type: ignore[attr-defined]
         except BaseException:
             if sink is not None:
                 sink.close()
             if path is not None:
                 path.unlink(missing_ok=True)
+            if own is not None:
+                await _close(own)
             if mon0:
                 await self._monitor_gone(rec, t, capture_id)
             raise
@@ -273,14 +309,16 @@ class CaptureService:
         self._views[view.id] = view
         self._streams[view.id] = stream
         self._running[rec.id] = view.id
-        task = asyncio.create_task(self._pump(rec, t, view.id, stream, sink, mon0))
+        task = asyncio.create_task(self._pump(rec, own, view.id, stream, sink, mon0))
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
         return view
 
     async def _pump(
-        self, rec: RouterRecord, t: Transport, capture_id: str, stream: ByteStream, sink: Sink, mon0: bool
+        self, rec: RouterRecord, own: Transport, capture_id: str, stream: ByteStream, sink: Sink, mon0: bool
     ) -> None:
+        """Feed the sink until the stream ends; then close the capture's own connection, and remove mon0 over
+        the pooled one, taken again: the one the capture started with may have been reconnected since."""
         total = 0
         error: str | None = None
         try:
@@ -297,6 +335,7 @@ class CaptureService:
         finally:
             with contextlib.suppress(TransportError, OSError):
                 await stream.close()
+            await _close(own)
             await asyncio.to_thread(sink.close)  # a Wireshark behind never holds the loop (the final review)
             failed = stream.exit_status not in (0, 124, None) and capture_id not in self._stop_asked
             if error is None and failed and not total:
@@ -312,7 +351,7 @@ class CaptureService:
                 exit_status=stream.exit_status,
                 source="app",
             )
-            if mon0 and (left := await self._monitor_gone(rec, t, capture_id)) is not None:
+            if mon0 and (left := await self._mon0_gone(rec, capture_id)) is not None:
                 error = f"{error}; {left}" if error else left
             self._views[capture_id] = replace(
                 self._views[capture_id], bytes=total, running=False, error=error

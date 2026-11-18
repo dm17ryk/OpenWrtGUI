@@ -19,9 +19,32 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - LTE › Status says when the session is up but has no packet-data handle (it carries no data).
 - LTE › AT console: `AT&F`, `AT&W` and `AT+CFUN=` get a stronger question, since they can erase the modem's
   profiles or leave it unusable until a power cycle.
+- **Wiki** in the top bar, beside the theme button, opens the manual on the project wiki in your browser.
+- An accessibility check (axe) of every screen in the browser tests, in both themes; serious and critical findings
+  fail it. The one it found, the dark theme's "Block all" text contrast, is fixed.
 
 ### Fixed
 
+- Reads: an empty iptables answer is an error, a newer page list reads its own facts, a scan interface left behind
+  is removed before an on-air scan too, the app's own ingress shows as the app's, a numeric operator code is
+  labelled, and OWE networks are labelled OWE.
+- A refused firewall change names the include file it left; a kept path outside /etc is saved with a warning that
+  restore puts back /etc only; Reset takes the router's name in any case.
+- Remove from the app refuses while faults are armed, a step-through runs or waits for its restore, a flash runs or
+  a capture runs, and names what runs.
+- A capture runs on its own SSH connection, so a change with rollback no longer ends it.
+- A malformed live message is dropped instead of breaking the screen; an unexpected error's traceback is logged
+  once.
+- Pins not yet on the router say this change adds them; Check firmware is greyed during a harness run; options
+  locked by the LTE screen say so; Frame analysis no longer shows a stale Off after Start; new VLAN rows in the
+  switch matrix keep unique keys.
+- Image library: only https links are followed, a malformed answer or an image whose size disagrees is left out or
+  counted, the release files are read in parallel within a minute, and the download is hashed as it arrives.
+- Image library: a release file without a revision is counted as unreadable, an untitled entry shows its board, a
+  clock set back does not keep a failed read, screen readers hear the notes, the origin link names its release,
+  and Import image… looks disabled during a download.
+- The simulator cuts the PC off when a firewall rule drops its SSH, as a router does; Discovery's service read is
+  in the read-only grammar; tests check the frontend's copies of the server's AT and signal tables.
 - **Reboot modem** no longer leaves the modem in low power when a harness run starts mid-way: it sets it online
   and brings LTE up again (two lines past Bench Guard, marked in the audit log), then stops and says so.
 

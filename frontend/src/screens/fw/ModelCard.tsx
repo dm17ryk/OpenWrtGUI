@@ -145,6 +145,7 @@ export function ModelCard({ routerId, routerName, short, state, onApplied }: Pro
                     <strong>{p.name}</strong>
                     <span className="mono muted small">{p.match}</span>
                     <span className="muted small">{p.why}</span>
+                    {!p.present && !gone && <span className="b">added with this change</span>}
                     <span className="spacer" />
                     {gone ? (
                       <>

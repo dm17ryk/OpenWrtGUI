@@ -82,6 +82,17 @@ def check_kept(text: str) -> str:
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
+def kept_warnings(text: str) -> list[str]:
+    """#35: a kept path outside /etc is kept by sysupgrade but not put back by this app's restore (R3)."""
+    out = []
+    for line in text.splitlines():
+        item = line.strip()
+        if item.startswith("/") and item != "/etc" and not item.startswith("/etc/"):
+            restore = "this app's backup restore puts back files under /etc only."
+            out.append(f"A firmware upgrade keeps {item}, but {restore}")
+    return out
+
+
 async def save_upload(path: Path, data: bytes) -> None:
     """An imported archive into the data folder, user-only before a byte lands (no half file stays)."""
     path.parent.mkdir(parents=True, exist_ok=True)

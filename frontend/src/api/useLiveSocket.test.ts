@@ -26,7 +26,18 @@ class FakeSocket {
   fireMessage(msg: unknown): void {
     act(() => this.onmessage?.({ data: JSON.stringify(msg) }))
   }
+  fireRaw(data: string): void {
+    act(() => this.onmessage?.({ data }))
+  }
 }
+
+test('a frame that is not JSON is dropped and the next one still arrives (#77 minor 11)', () => {
+  const seen: unknown[] = []
+  renderHook(() => useLiveSocket('/ws/lte/ap1', undefined, (msg: unknown) => seen.push(msg)))
+  expect(() => FakeSocket.last().fireRaw('{not json')).not.toThrow()
+  FakeSocket.last().fireMessage({ type: 'state' })
+  expect(seen).toEqual([{ type: 'state' }])
+})
 
 beforeEach(() => {
   FakeSocket.all = []

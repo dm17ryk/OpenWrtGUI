@@ -5,7 +5,7 @@ import { beforeEach, expect, test, vi } from 'vitest'
 import { ApiError } from '../api/client'
 import type { ProfileOut } from '../api/types'
 import { MINI_PROFILE } from '../testing/discovery'
-import { ImagesSection } from './ImagesSection'
+import { ImagesSection, ImportImage } from './ImagesSection'
 
 const calls: Array<{ path: string; init?: RequestInit; name?: string }> = []
 let images: ProfileOut[] = []
@@ -55,13 +55,30 @@ test('imports an image and lists it', async () => {
   expect(calls.find((c) => c.name)).toEqual({ path: '/api/images', name: 'mini-r35692.bin' })
 })
 
-test('links an image from the library to its release', async () => {
-  images = [{ ...MINI_PROFILE, origin: 'https://github.com/dm17ryk/openwrt/releases/tag/x' }]
+test('links an image from the library to its release, named (0.8.2 ledger, Task 7)', async () => {
+  images = [{ ...MINI_PROFILE, origin: 'https://github.com/dm17ryk/openwrt/releases/tag/v25.12.5' }]
   renderImages()
-  expect(await screen.findByRole('link', { name: 'from the image library' })).toHaveAttribute(
+  expect(await screen.findByRole('link', { name: 'from the image library (v25.12.5)' })).toHaveAttribute(
     'href',
-    'https://github.com/dm17ryk/openwrt/releases/tag/x',
+    'https://github.com/dm17ryk/openwrt/releases/tag/v25.12.5',
   )
+})
+
+test('an origin without a release tag keeps the plain link text', async () => {
+  images = [{ ...MINI_PROFILE, origin: 'https://github.com/dm17ryk/openwrt/releases' }]
+  renderImages()
+  expect(await screen.findByRole('link', { name: 'from the image library' })).toBeVisible()
+})
+
+test('Import image… looks disabled while it is off (0.8.2 final review)', async () => {
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <ImportImage onImported={() => {}} disabled />
+    </QueryClientProvider>,
+  )
+  const label = screen.getByText('Import image…').closest('label') as HTMLElement
+  expect(label).toHaveAttribute('aria-disabled', 'true')
+  expect(label).toHaveClass('disabled')
 })
 
 test('shows no library link for a hand-imported image', async () => {

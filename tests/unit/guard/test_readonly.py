@@ -138,6 +138,20 @@ def _access_reads() -> list[str]:
     ]
 
 
+def test_the_service_enabled_read_passes_and_nothing_like_it_does() -> None:
+    """#22 (the v1.0 inventory): Discovery's `enabled; echo $?` read was not in the read-only grammar."""
+    from openwrtgui.discovery.services import enabled_command
+
+    assert is_read_only_command(enabled_command("dropbear"))
+    for cmd in (
+        "/etc/init.d/dropbear enabled; reboot",
+        "/etc/init.d/dropbear start; echo $?",
+        "/etc/init.d/../../sbin/reboot enabled; echo $?",
+        "/etc/init.d/dropbear enabled; echo $?; reboot",
+    ):
+        assert not is_read_only_command(cmd), cmd
+
+
 def test_access_reads_pass_the_read_only_check() -> None:
     for cmd in _access_reads():
         assert is_read_only_command(cmd), cmd
