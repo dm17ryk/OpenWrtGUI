@@ -81,14 +81,14 @@ def _running_on(ctx: AppContext, router_id: str) -> list[str]:
         found.append("a flash runs")
     if (capture := ctx.captures.running_on(router_id)) is not None:
         found.append(capture)
+    if ctx.lte_recover.busy(router_id) is not None:  # mid-rung the modem may be in low power (I5)
+        found.append("LTE recovery runs")
     return found
 
 
 @router.delete("/{router_id}")
 async def remove_router(router_id: str, ctx: Ctx) -> Ok:
     rec = _record(ctx, router_id)
-    if (why := ctx.lte_recover.busy(router_id)) is not None:  # mid-rung the modem may be in low power
-        raise RouterBusy(why)
     if found := _running_on(ctx, router_id):
         raise RouterBusy(f"{rec.name} is not removed: {'; '.join(found)}. Stop or clear them first.")
     ctx.routers.remove(router_id)

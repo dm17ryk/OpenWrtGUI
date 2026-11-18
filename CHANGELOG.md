@@ -30,8 +30,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   labelled, and OWE networks are labelled OWE.
 - A refused firewall change names the include file it left; a kept path outside /etc is saved with a warning that
   restore puts back /etc only; Reset takes the router's name in any case.
-- Remove from the app refuses while faults are armed, a step-through runs or waits for its restore, a flash runs or
-  a capture runs, and names what runs.
+- Remove from the app refuses while faults are armed, a step-through runs or waits for its restore, a flash runs,
+  a capture runs or LTE Recover runs, and names what runs.
 - A capture runs on its own SSH connection, so a change with rollback no longer ends it.
 - A malformed live message is dropped instead of breaking the screen; an unexpected error's traceback is logged
   once.

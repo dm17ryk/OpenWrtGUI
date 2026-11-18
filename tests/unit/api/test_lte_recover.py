@@ -442,7 +442,10 @@ async def test_remove_waits_for_the_job(ctx: AppContext, authed: httpx.AsyncClie
     gate = await _held(ctx)
     try:
         refused = await authed.delete("/api/routers/ap2")
-        assert (refused.status_code, refused.json()["detail"]) == (409, "LTE recovery runs on AP2 · office")
+        assert (refused.status_code, refused.json()["detail"]) == (
+            409,
+            "AP2 · office is not removed: LTE recovery runs. Stop or clear them first.",
+        )
         assert ctx.routers.get("ap2") is not None
     finally:
         gate.set()

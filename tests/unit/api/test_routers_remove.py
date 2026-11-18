@@ -109,6 +109,20 @@ async def test_two_at_once_are_both_named(authed: httpx.AsyncClient, ctx: AppCon
     )
 
 
+async def test_a_running_recover_is_named_with_the_rest(
+    authed: httpx.AsyncClient, ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """PR #82 after #81: LTE Recover joins the D4 list, so a Remove names it beside what else runs."""
+    ctx.statuses["ap2"] = _status(1)
+    monkeypatch.setattr(ctx.lte_recover, "busy", lambda router_id: "LTE recovery runs on AP2 · office")
+    r = await _remove(authed)
+    assert (r.status_code, r.json()["detail"]) == (
+        409,
+        "AP2 · office is not removed: 1 fault armed; LTE recovery runs. Stop or clear them first.",
+    )
+    assert ctx.routers.get("ap2") is not None
+
+
 async def test_nothing_running_and_no_status_removes(authed: httpx.AsyncClient, ctx: AppContext) -> None:
     """An unreachable router with no status is removable, as before."""
     ctx.statuses.pop("ap2", None)
