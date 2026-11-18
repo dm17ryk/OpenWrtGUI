@@ -75,6 +75,8 @@ router. In detail:
 - RF live's channel scan and frame analysis (each adds an interface on the radio).
 - Starting a step-through, or its **Restore**.
 - Installing the app key, and setting a root password in the wizard.
+- Settings › **Rotate key**: starting it, a Retry, and its next router. A router it was moving keeps the old key
+  and is listed with Retry.
 - Terminal commands that change something.
 
 **Clear everything** on the Faults screen still works: it only removes what this app armed.

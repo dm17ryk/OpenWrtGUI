@@ -110,6 +110,24 @@ async def test_shutdown_stops_a_mon0_capture(ctx: AppContext, monkeypatch: pytes
     assert "iw dev owgmon0 del" in commands
 
 
+async def test_install_asks_first_while_the_app_key_rotates(
+    authed: httpx.AsyncClient, ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """v1.1b: a rotation stops between routers; the update names it before stopping it."""
+    monkeypatch.setattr(ctx.updater, "install", _installed)
+    monkeypatch.setattr(ctx.key_rotation, "live", lambda: ["App key rotation"])
+    stopped: list[float] = []
+
+    async def stop_all(limit_s: float) -> None:
+        stopped.append(limit_s)
+
+    monkeypatch.setattr(ctx.key_rotation, "stop_all", stop_all)
+    r = await authed.post(INSTALL, json={"version": "0.7.0"})
+    assert r.status_code == 409 and r.json()["live"] == ["App key rotation"]
+    r = await authed.post(INSTALL, json={"version": "0.7.0", "force": True})
+    assert r.status_code == 202 and stopped
+
+
 async def test_install_with_nothing_live_goes_ahead(
     authed: httpx.AsyncClient, ctx: AppContext, monkeypatch: pytest.MonkeyPatch
 ) -> None:

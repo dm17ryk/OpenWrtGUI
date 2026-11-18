@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import datetime
 from pathlib import Path
 
@@ -10,7 +10,14 @@ import pytest
 
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked, ProcessInfo
-from openwrtgui.onboard.rotate import MoveFailed, move_router, remove_old_key_command
+from openwrtgui.onboard.rotate import (
+    KeyRotation,
+    MoveFailed,
+    RotationBusy,
+    RotationJob,
+    move_router,
+    remove_old_key_command,
+)
 from openwrtgui.simulator import SimConnector, seed_routers
 from openwrtgui.store import keys as keys_module
 from openwrtgui.store.keys import AppKeyRing
@@ -19,6 +26,7 @@ from openwrtgui.store.settings import GuardWatchList
 from openwrtgui.transport.base import AuthFailed, Transport, Unreachable
 from openwrtgui.transport.fake import SimState
 from openwrtgui.transport.pool import ConnectionPool
+from openwrtgui.wifi.service import PreviewChanged
 
 SIM_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "sim"
 AP2 = "192.168.1.2"
@@ -209,6 +217,169 @@ async def test_a_harness_run_stops_the_move(bench: Bench) -> None:
         )
     assert old in bench.state().authorized_keys and nxt.public_line in bench.state().authorized_keys
     assert bench.keys.moved() == frozenset()
+
+
+# ---------------------------------------------------------------- the rotation job (Task 6)
+
+TARGETS = ("ap1", "ap2")  # the seeded routers on the app's key; ap3 has none installed
+
+
+def _rotation(bench: Bench, busy: Sequence[Callable[[str], str | None]] = ()) -> KeyRotation:
+    return KeyRotation(
+        keys=bench.keys,
+        routers=bench.routers,
+        pool=bench.pool,
+        connector=bench.sim,
+        guard=bench.guard,
+        audit=bench.audit,
+        busy=busy,
+    )
+
+
+def _rows(job: RotationJob | None) -> dict[str, tuple[str, str | None]]:
+    assert job is not None
+    return {r.router_id: (r.state, r.detail) for r in job.routers}
+
+
+async def _run(rotation: KeyRotation) -> RotationJob:
+    await rotation.start(rotation.preview().digest)
+    job = await rotation.finished()
+    assert job is not None
+    return job
+
+
+async def test_three_routers_move_and_the_key_is_replaced(bench: Bench) -> None:
+    old_fingerprint = bench.keys.current.fingerprint
+    job = await _run(_rotation(bench))
+    assert job.phase == "done" and job.old_fingerprint == old_fingerprint
+    assert _rows(job) == {rid: ("moved", None) for rid in TARGETS}
+    assert bench.keys.next is None and bench.keys.current.fingerprint == job.new_fingerprint
+    assert not (bench.tmp_path / "keys" / "id_ed25519.next").exists()
+    for rid in TARGETS:  # every router still logs in, now with the new key only
+        await bench.pool.drop(rid)
+        rec = bench.routers.get(rid)
+        assert rec is not None and (await (await bench.pool.get(rec)).run("true")).ok
+    assert "replace the app key on this PC" in bench.audit_text()
+
+
+async def test_a_router_that_is_off_stays_on_the_old_key(bench: Bench) -> None:
+    """Review Focus 1."""
+    bench.offline.add("ap1")
+    rotation = _rotation(bench)
+    job = await _run(rotation)
+    assert job.phase == "pending"
+    assert _rows(job)["ap1"] == ("failed", "AP1 · bench did not answer: it stays on the old key")
+    assert _rows(job)["ap2"] == ("moved", None)
+    assert (bench.tmp_path / "keys" / "id_ed25519.next").exists() and bench.keys.next is not None
+    bench.offline.clear()
+    await rotation.retry("ap1")
+    job = await rotation.finished()
+    assert job is not None and job.phase == "done" and bench.keys.next is None
+
+
+async def test_a_rotation_continues_after_a_restart(bench: Bench) -> None:
+    """Review Focus 2: the app stops with one router moved; a new ring and job on the same folder go on."""
+    bench.offline.add("ap1")
+    first = await _run(_rotation(bench))
+    assert first.phase == "pending" and _rows(first)["ap2"] == ("moved", None)
+    bench.keys = AppKeyRing(bench.tmp_path / "keys")  # the app restarted
+    bench.offline.clear()
+    rotation = _rotation(bench)
+    found = rotation.job()
+    assert found is not None and found.phase == "pending" and found.started_at is None
+    assert _rows(found) == {"ap1": ("waiting", None), "ap2": ("moved", None)}
+    assert rotation.preview().lines[0] == "Continue: 1 router(s) still on the old key."
+    job = await _run(rotation)
+    assert job.phase == "done" and bench.keys.next is None
+
+
+async def test_start_twice_gives_409(bench: Bench) -> None:
+    rotation = _rotation(bench)
+    digest = rotation.preview().digest
+    await rotation.start(digest)
+    with pytest.raises(RotationBusy, match="App key rotation already runs"):
+        await rotation.start(digest)
+    await rotation.finished()
+
+
+async def test_a_changed_router_list_needs_a_new_preview(bench: Bench) -> None:
+    rotation = _rotation(bench)
+    digest = rotation.preview().digest
+    bench.routers.remove("ap1")
+    with pytest.raises(PreviewChanged):
+        await rotation.start(digest)
+    assert bench.keys.next is None
+
+
+async def test_refused_during_a_harness_run(bench: Bench) -> None:
+    rotation = _rotation(bench)
+    digest = rotation.preview().digest
+    bench.go_live()
+    with pytest.raises(GuardLocked):
+        await rotation.start(digest)
+    assert bench.keys.next is None
+
+
+async def test_a_harness_run_during_the_job_leaves_the_rest_waiting(bench: Bench) -> None:
+    def starts_a_run(router_id: str) -> str | None:
+        if router_id == "ap2":
+            bench.go_live()  # a harness run starts while AP1 has just moved
+        return None
+
+    job = await _run(_rotation(bench, busy=[starts_a_run]))
+    assert (job.phase, job.detail) == ("pending", "A harness run started: the rest stay on the old key")
+    assert _rows(job) == {"ap1": ("moved", None), "ap2": ("waiting", None)}  # seen before its first step
+    assert bench.keys.next is not None  # the old key stays on this PC
+
+
+async def test_a_router_busy_with_a_flash_is_failed_with_that_reason(bench: Bench) -> None:
+    def flashing(router_id: str) -> str | None:
+        return "A flash runs on AP1 · bench" if router_id == "ap1" else None
+
+    job = await _run(_rotation(bench, busy=[flashing]))
+    assert job.phase == "pending" and _rows(job)["ap1"] == ("failed", "A flash runs on AP1 · bench")
+    assert _rows(job)["ap2"] == ("moved", None)
+
+
+async def test_skipped_routers_are_named_in_the_preview(bench: Bench, tmp_path: Path) -> None:
+    ap1 = bench.routers.get("ap1")
+    assert ap1 is not None
+    bench.routers.upsert(ap1.model_copy(update={"key_path": str(tmp_path / "id_rsa")}))
+    lines = _rotation(bench).preview().lines
+    assert lines[0] == (
+        "Make a new app key, then for each router: add the new key, log in with it, "
+        "remove the old key's line. Other lines in authorized_keys are not changed."
+    )
+    assert "AP2 · office (192.168.1.2): moves to the new key" in lines
+    assert "AP1 · bench: skipped, it logs in with your own key" in lines
+    assert "AP3 · QA stands: skipped, the app key is not installed on it" in lines
+
+
+async def test_busy_and_live_name_the_move(bench: Bench) -> None:
+    seen: list[tuple[str | None, str | None, list[str]]] = []
+    holder: list[KeyRotation] = []
+
+    class Watching:
+        """Looks at the job while AP2's proof login runs."""
+
+        async def connect(self, host: str, port: int, **kw: object) -> Transport:
+            if host == AP2:
+                seen.append((holder[0].busy("ap2"), holder[0].busy("ap1"), holder[0].live()))
+            return await bench.sim.connect(host, port, **kw)  # type: ignore[arg-type]
+
+    rotation = KeyRotation(
+        keys=bench.keys,
+        routers=bench.routers,
+        pool=bench.pool,
+        connector=Watching(),  # type: ignore[arg-type]
+        guard=bench.guard,
+        audit=bench.audit,
+        busy=(),
+    )
+    holder.append(rotation)
+    await _run(rotation)
+    assert seen == [("The app key is being moved on AP2 · office", None, ["App key rotation"])]
+    assert rotation.busy("ap2") is None and rotation.live() == []
 
 
 def test_remove_old_key_command_checks_the_new_line_first() -> None:

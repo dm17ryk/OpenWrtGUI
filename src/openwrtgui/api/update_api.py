@@ -60,7 +60,13 @@ async def skip(body: VersionIn, ctx: Ctx) -> UpdateOut:
 
 def _live(ctx: AppContext) -> list[str]:
     """Work the update would stop (spec 9.3): step-throughs, LTE recoveries, captures and frame analysis."""
-    return [*ctx.steps.live(), *ctx.lte_recover.live(), *ctx.captures.live(), *ctx.rf.live_frames()]
+    return [
+        *ctx.steps.live(),
+        *ctx.lte_recover.live(),
+        *ctx.key_rotation.live(),
+        *ctx.captures.live(),
+        *ctx.rf.live_frames(),
+    ]
 
 
 async def _stop_live(ctx: AppContext) -> None:
@@ -68,6 +74,7 @@ async def _stop_live(ctx: AppContext) -> None:
     recovery puts back what its running step took down (spec 4.2)."""
     await ctx.steps.stop_all(limit_s=STOP_LIMIT_S)
     await ctx.lte_recover.stop_all(limit_s=STOP_LIMIT_S)
+    await ctx.key_rotation.stop_all(limit_s=STOP_LIMIT_S)  # between routers (v1.1b)
     await ctx.captures.stop_all()
     await ctx.rf.stop_frames()
 

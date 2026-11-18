@@ -38,6 +38,84 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/app-key/rotation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Rotation Job */
+        get: operations["rotation_job_api_app_key_rotation_get"];
+        put?: never;
+        /**
+         * Rotation Start
+         * @description 409 while it runs or when the router list changed since the preview; 423 during a harness run.
+         */
+        post: operations["rotation_start_api_app_key_rotation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/app-key/rotation/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotation Preview
+         * @description What the rotation would do, router by router; reads only.
+         */
+        post: operations["rotation_preview_api_app_key_rotation_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/app-key/rotation/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotation Stop
+         * @description Stops between routers: each router is left on one key or both, never on none.
+         */
+        post: operations["rotation_stop_api_app_key_rotation_stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/app-key/rotation/{router_id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rotation Retry */
+        post: operations["rotation_retry_api_app_key_rotation__router_id__retry_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/app/info": {
         parameters: {
             query?: never;
@@ -3777,6 +3855,8 @@ export interface components {
         AppKeyOut: {
             /** Fingerprint */
             fingerprint: string;
+            /** Next Fingerprint */
+            next_fingerprint?: string | null;
             /** Public Line */
             public_line: string;
         };
@@ -7461,6 +7541,38 @@ export interface components {
             /** Name */
             name: string;
         };
+        /**
+         * RotationJob
+         * @description The rotation as Settings shows it. `started_at` is None for a rotation found on disk after a restart.
+         */
+        RotationJob: {
+            /** Detail */
+            detail: string | null;
+            /** Ended At */
+            ended_at: string | null;
+            /** New Fingerprint */
+            new_fingerprint: string;
+            /** Old Fingerprint */
+            old_fingerprint: string;
+            /**
+             * Phase
+             * @enum {string}
+             */
+            phase: "running" | "pending" | "done";
+            /** Routers */
+            routers: components["schemas"]["RouterMove"][];
+            /** Started At */
+            started_at: string | null;
+        };
+        /** RotationPreview */
+        RotationPreview: {
+            /** Digest */
+            digest: string;
+            /** Lines */
+            lines: string[];
+            /** Warnings */
+            warnings: string[];
+        };
         /** RouteConf */
         RouteConf: {
             /** Disabled */
@@ -7540,6 +7652,20 @@ export interface components {
             record: components["schemas"]["RouterRecord"];
             status: components["schemas"]["RouterStatus"] | null;
             summary: components["schemas"]["DescriptionSummary"] | null;
+        };
+        /** RouterMove */
+        RouterMove: {
+            /** Detail */
+            detail?: string | null;
+            /** Name */
+            name: string;
+            /** Router Id */
+            router_id: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "waiting" | "adding" | "proving" | "removing" | "moved" | "failed";
         };
         /**
          * RouterPasswordIn
@@ -9087,6 +9213,130 @@ export interface operations {
                 };
                 content: {
                     "text/plain": string;
+                };
+            };
+        };
+    };
+    rotation_job_api_app_key_rotation_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RotationJob"] | null;
+                };
+            };
+        };
+    };
+    rotation_start_api_app_key_rotation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Digest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RotationJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rotation_preview_api_app_key_rotation_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RotationPreview"];
+                };
+            };
+        };
+    };
+    rotation_stop_api_app_key_rotation_stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ok"];
+                };
+            };
+        };
+    };
+    rotation_retry_api_app_key_rotation__router_id__retry_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RotationJob"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

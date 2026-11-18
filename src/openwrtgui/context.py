@@ -34,6 +34,7 @@ from openwrtgui.luci_bridge.upstream import Upstream, sim_upstream, ssh_upstream
 from openwrtgui.net.apply import ApplyRunner
 from openwrtgui.net.service import NetworkService
 from openwrtgui.onboard.pc_keys import find_pc_keys, ssh_dirs
+from openwrtgui.onboard.rotate import KeyRotation
 from openwrtgui.onboard.wizard import Connector, OnboardService, SshConnector
 from openwrtgui.paths import DataDir, documents_dir
 from openwrtgui.poller import StatusPoller
@@ -97,6 +98,7 @@ class AppContext:
     lte_live: LteHub
     lte_setups: SetupStore  # saved good LTE setups (spec 4.4)
     lte_recover: LteRecover  # the Recover job (spec 4.2)
+    key_rotation: KeyRotation  # Settings › App SSH key › Rotate key (v1.1b)
     system: SystemService
     system_live: SystemHub
     access: AccessService
@@ -362,6 +364,16 @@ def build_context(
 
     system.extra_busy = steps_or_recover
     flash.extra_busy = steps_or_recover
+    # a router another job holds is left on the old key with that job's reason, for a Retry (D8)
+    key_rotation = KeyRotation(
+        keys=keys,
+        routers=routers,
+        pool=pool,
+        connector=connector,
+        guard=guard,
+        audit=audit,
+        busy=(system.busy, flashing, steps_or_recover),
+    )
     return AppContext(
         data=data,
         settings=settings,
@@ -402,6 +414,7 @@ def build_context(
         lte_live=LteHub(pool=pool, routers=routers, locate=lte.modem_device),
         lte_setups=lte_setups,
         lte_recover=lte_recover,
+        key_rotation=key_rotation,
         system=system,
         system_live=SystemHub(pool=pool, routers=routers, busy=system.busy),
         access=access,

@@ -83,6 +83,8 @@ def _running_on(ctx: AppContext, router_id: str) -> list[str]:
         found.append(capture)
     if ctx.lte_recover.busy(router_id) is not None:  # mid-rung the modem may be in low power (I5)
         found.append("LTE recovery runs")
+    if ctx.key_rotation.busy(router_id) is not None:  # mid-move the router may hold both key lines (v1.1b)
+        found.append("the app key is being moved")
     return found
 
 

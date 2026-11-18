@@ -297,6 +297,7 @@ GUARDED = {  # each module that calls require_clear() -> the words "What is refu
     "guard/writes.py": "Apply",
     "lte/service.py": "LTE",
     "lte/recover.py": "Recover",
+    "onboard/rotate.py": "Rotate key",
     "net/apply.py": "rollback",
     "net/service.py": "Network",
     "rf/frames_service.py": "frame analysis",
