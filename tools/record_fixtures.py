@@ -41,6 +41,7 @@ from openwrtgui.lte.at import IDENTITY, find_at_port
 from openwrtgui.net.commands import INTERFACE_DUMP, network_reads
 from openwrtgui.probe.commands import DESCRIBE_COMMANDS, FAULT_RECORDS, STATUS_COMMANDS, wireless_validate
 from openwrtgui.rf.parse import parse_station_dump
+from openwrtgui.rf.rates import rates_command
 from openwrtgui.system import commands as sc
 from openwrtgui.transport.base import CommandResult
 from openwrtgui.transport.ssh import HostKeyStore, SshTransport
@@ -106,6 +107,7 @@ FILES = {
     "probe": "commands.json",
     "wifi-parked": "wifi_parked.json",
     "wifi-on": "wifi_on.json",
+    "rates": "rates.json",  # v1.1b: minstrel's rc_stats_csv of each station (radio on air, a station on it)
     "network": "network.json",
     "firewall": "firewall.json",
     "discovery": "discovery.json",
@@ -324,24 +326,50 @@ def sanitize_air(
     )
 
 
-async def wifi_on_commands(t: Runner) -> tuple[str, ...]:
-    """The radio-on set: built from the AP interface on phy0 and the stations on it now."""
+async def _ap_and_stations(t: Runner, set_name: str) -> tuple[str, list[str]]:
+    """The AP interface on phy0 and the MACs of the stations on it now."""
     ap = next(
         (i for i in parse_iw_dev((await t.run("iw dev")).stdout) if i.phy == 0 and i.type == "AP"), None
     )
     if ap is None:
-        raise RuntimeError(f"no AP interface on {PHY}: the radio must be on air for --set wifi-on")
+        raise RuntimeError(f"no AP interface on {PHY}: the radio must be on air for --set {set_name}")
     stations = parse_station_dump((await t.run(f"iw dev {ap.ifname} station dump")).stdout)
+    return ap.ifname, [s.mac for s in stations]
+
+
+async def wifi_on_commands(t: Runner) -> tuple[str, ...]:
+    """The radio-on set: built from the AP interface on phy0 and the stations on it now."""
+    ifname, macs = await _ap_and_stations(t, "wifi-on")
     debug = f"/sys/kernel/debug/ieee80211/{PHY}"
     return (
-        f"iw dev {ap.ifname} info",
-        f"iw dev {ap.ifname} station dump",
-        f"iw dev {ap.ifname} survey dump",
+        f"iw dev {ifname} info",
+        f"iw dev {ifname} station dump",
+        f"iw dev {ifname} survey dump",
         f"cat {debug}/statistics/dot11ACKFailureCount",
         f"iw phy {PHY} info",
         "ubus -v list 'hostapd.*'",
-        *(f"cat {debug}/netdev:{ap.ifname}/stations/{s.mac}/rc_stats_csv" for s in stations),
+        *(rates_command(PHY, ifname, mac) for mac in macs),
     )
+
+
+async def rates_commands(t: Runner) -> tuple[str, ...]:
+    """The rates set (v1.1b): the stations, then minstrel's rc_stats_csv of each, as RF live reads it."""
+    ifname, macs = await _ap_and_stations(t, "rates")
+    return (f"iw dev {ifname} station dump", *(rates_command(PHY, ifname, mac) for mac in macs))
+
+
+def private_macs(recorded: dict[str, dict[str, object]]) -> dict[str, dict[str, object]]:
+    """A station's MAC is in the rates command itself: every MAC, in the commands and their output, becomes
+    the recorder's placeholder, the same one throughout the file."""
+    names: dict[str, str] = {}
+
+    def private(text: str) -> str:
+        return sanitize_air(text, (), (), names)
+
+    return {
+        private(command): {k: private(v) if isinstance(v, str) else v for k, v in entry.items()}
+        for command, entry in recorded.items()
+    }
 
 
 async def discovery_commands(t: Runner) -> tuple[str, ...]:
@@ -407,6 +435,8 @@ async def record(host: str, identity: Path, known_hosts: Path, name: str) -> dic
             commands = await lte_commands(t)
             slow = frozenset(c for c in commands if "microcom" in c)
             return await run_set(t, commands, timed=slow)
+        if name == "rates":  # the station's MAC is in the command: kept out of the file (v1.1b)
+            return private_macs(await run_set(t, await rates_commands(t)))
         commands = await wifi_on_commands(t) if name == "wifi-on" else SETS[name]
         return await run_set(t, commands)
     finally:

@@ -123,6 +123,35 @@ async def test_wifi_on_commands_follow_the_ap_interface_and_its_stations() -> No
     )
 
 
+async def test_rates_commands_follow_the_ap_and_its_stations() -> None:
+    t = Replay({"iw dev": IW_DEV, "iw dev phy0-ap0 station dump": STATIONS})
+    assert await rf.rates_commands(t) == (
+        "iw dev phy0-ap0 station dump",
+        *(
+            f"cat /sys/kernel/debug/ieee80211/phy0/netdev:phy0-ap0/stations/{mac}/rc_stats_csv"
+            for mac in ("f4:12:fa:f3:57:68", "3c:84:6a:11:22:33")
+        ),
+    )
+    assert rf.FILES["rates"] == "rates.json"
+
+
+def test_a_rates_recording_keeps_no_station_mac() -> None:
+    """v1.1b: the station's MAC is in the rates command itself, so the keys are made private too, with the
+    same placeholder as in the station dump."""
+    cmd = "cat /sys/kernel/debug/ieee80211/phy0/netdev:phy0-ap0/stations/3c:84:6a:11:22:33/rc_stats_csv"
+    recorded = {
+        "iw dev phy0-ap0 station dump": {"stdout": "Station 3c:84:6a:11:22:33 (on phy0-ap0)\n", "exit": 0},
+        cmd: {"stdout": "HT20,LGI,1,A,MCS7 ,7,166,41.6,33.3,80.0,4,2,2,20,25,4200,310,1.0\n", "exit": 0},
+    }
+    private = rf.private_macs(recorded)
+    text = repr(private)
+    assert "3c:84:6a:11:22:33" not in text
+    placeholder = cmd.replace("3c:84:6a:11:22:33", "02:00:00:00:00:01")
+    assert placeholder in private and "Station 02:00:00:00:00:01" in str(
+        private["iw dev phy0-ap0 station dump"]
+    )
+
+
 async def test_wifi_on_needs_a_radio_on_air() -> None:
     t = Replay({"iw dev": "phy#0\n"})
     try:
