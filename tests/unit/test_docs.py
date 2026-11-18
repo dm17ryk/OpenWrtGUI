@@ -341,6 +341,20 @@ def test_v1_0c_behaviour_is_documented() -> None:
     assert missing == []
 
 
+def test_key_rotation_is_documented() -> None:
+    """v1.1b D8: Settings explains Rotate key and Retry; Files and data names the rotation's files."""
+    key = _section("Settings", "App SSH key")
+    for words in ("**Rotate key**", "**Retry**", "does not answer", "harness run"):
+        assert words in key, words
+    files = _read(MANUAL / "Files-and-data.md")
+    assert "id_ed25519.next" in files and "rotation.json" in files
+
+
+def test_v1_1b_is_in_the_changelog() -> None:
+    unreleased = _read(ROOT / "CHANGELOG.md").split("## [Unreleased]", 1)[1].split("\n## [", 1)[0]
+    assert "Which rates reach the station" in unreleased and "**Rotate key**" in unreleased
+
+
 def test_rates_are_documented_as_read() -> None:
     """v1.1b D7: the rates card is read every 5 s while it is open; the manual no longer says it is not."""
     rates = _section("RF-live", "Which rates reach the station")

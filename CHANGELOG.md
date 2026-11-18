@@ -19,6 +19,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - LTE › Status says when the session is up but has no packet-data handle (it carries no data).
 - LTE › AT console: `AT&F`, `AT&W` and `AT+CFUN=` get a stronger question, since they can erase the modem's
   profiles or leave it unusable until a power cycle.
+- RF live › Which rates reach the station: minstrel's rate statistics for the selected station (each rate tried,
+  its attempts and the share acknowledged, and the rate in use), read every 5 s while the card is open.
+- Settings › App SSH key › **Rotate key**: a new key is added to each router, proven with a new login, and the
+  old key's line removed; routers that are off stay on the old key and can be retried. The old private key is
+  deleted once every router has moved.
 - **Wiki** in the top bar, beside the theme button, opens the manual on the project wiki in your browser.
 - An accessibility check (axe) of every screen in the browser tests, in both themes; serious and critical findings
   fail it. The one it found, the dark theme's "Block all" text contrast, is fixed.

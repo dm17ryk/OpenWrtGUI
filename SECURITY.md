@@ -41,6 +41,21 @@ what uninstall removes.
 The app **never stores router passwords**. The root password you type in the Add-router wizard is used
 for that one login, to install the app key, and is then discarded.
 
+## App key rotation
+
+Settings › App SSH key › **Rotate key** replaces the app's key on every router that logs in with it, one router at
+a time:
+
+- The new private key is made in `keys\` and restricted to your Windows user before anything uses it.
+- On each router the new key's line is added, then a login with the new key alone is proven over a new
+  connection that refuses a router letting anyone in. Only then is the old key's exact line removed, by one
+  command that first checks the new line is there and replaces `authorized_keys` in one rename. Other lines
+  are never changed, and the file is read back.
+- A router that fails keeps the old key. Until every router has moved, the old private key stays and the app
+  offers both keys.
+- When the last router has moved, the new key replaces the old one, whose private key is deleted.
+- A rotation is refused while Bench Guard sees a harness run, and every step is in the audit log.
+
 ## What the app exposes
 
 The UI and the local API listen on `127.0.0.1` only, on a random port, and every request needs a token
@@ -76,7 +91,6 @@ installer runs. The installer is not Authenticode-signed yet.
 
 - **Signing:** the installer is not Authenticode-signed yet; SmartScreen and endpoint protection may warn.
   Updates are checked against the release's `SHA256SUMS.txt` instead.
-- **App key rotation:** the app's SSH key is not rotated; replacing it is planned after 1.0.
 - **LuCI over HTTPS:** the LuCI bridge supports a router that serves LuCI over HTTPS, but no bench router does,
   so it is untested on hardware.
 - **Flashing from the app:** refused on a router without enough free RAM for the image plus 4 MiB (a router

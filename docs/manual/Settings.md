@@ -70,6 +70,24 @@ The app's own key (ed25519), created on first start. Shown with its fingerprint;
 saves `openwrtgui.pub`, for example to add it to a router by hand. The private key never leaves the data
 folder and is readable by your Windows user only.
 
+**Rotate key** replaces the key on every router that logs in with it. It first shows what it will do: each router
+that moves, and each one it skips (a router added with your own key, or one without the app key). **Start** makes
+a new key, then takes the routers one at a time, in three steps:
+
+1. adds the new key's line to the router's `/etc/dropbear/authorized_keys`;
+2. logs in with the new key alone, over a new connection;
+3. removes the old key's line, only that exact line, and reads the file back. Other lines are not changed.
+
+A router that does not answer, refuses the new key, or is busy with another job (a flash, a step-through, LTE
+Recover, a System job) stays on the old key and is listed with the reason and **Retry**. Until every router has
+moved, the app logs in with either key and keeps the old private key; the card shows the new key's fingerprint
+too. When the last router has moved, the new key replaces the old one, which is deleted from this PC. The
+rotation survives closing the app: open Settings again and **Retry** or **Rotate key** continues it.
+
+**Stop** ends it between two routers; no router is left without a key the app holds. A rotation is refused while
+Bench Guard sees a harness run, and one that sees a run start stops before the next router. Every step is in the
+audit log.
+
 ## Audit log
 
 How long to keep the [audit log](Terminal-and-audit-log): **30 days**, **90 days** (default),
