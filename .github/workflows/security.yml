@@ -2,12 +2,14 @@ name: Security audit
 
 # Known advisories in the packages the app ships block a pull request; advisories in build and test tools only
 # warn. Not part of ci.yml, which release.yml calls: an advisory published overnight must not stop a release
-# that is otherwise ready (v1.0b1 D10).
+# that is otherwise ready (v1.0b1 D10). A pull request that changes only Markdown or docs/ changes no package,
+# and a pull request runs on its own event only (a push to its branch would audit it a second time).
 
 on:
   push:
-    branches: ["**"]
+    branches: [master]
   pull_request:
+    paths-ignore: ["**.md", "docs/**"]
   schedule:
     - cron: "41 4 * * 1"
 

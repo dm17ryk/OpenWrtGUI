@@ -1,8 +1,13 @@
 name: CI
 
+# A pull request runs on its own event only (a push to its branch would run everything a second time).
+# It runs the jobs its files need (tools/ci_scope.py): text only, the Python job, whose tests read CHANGELOG,
+# README and SECURITY.md; docs/manual, the frontend job too, as the app bundles the manual as its help;
+# anything else, every job. A push to master and a release (workflow_call) run every job.
+
 on:
   push:
-    branches: ["**"]
+    branches: [master]
   pull_request:
   workflow_call:
 
@@ -14,6 +19,28 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      scope: ${{ steps.scope.outputs.scope }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - name: Which jobs this change needs
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+        # a pull request's checkout is its merge commit: the first parent is the base it merges into
+        run: |
+          if [ "$EVENT" = pull_request ] &&
+            files="$(git -c core.quotePath=false diff --no-renames --name-only HEAD^1 HEAD)"; then
+            scope="$(printf '%s\n' "$files" | python3 -I tools/ci_scope.py)"
+          else
+            scope=full
+          fi
+          echo "scope=$scope" | tee -a "$GITHUB_OUTPUT"
+
   python:
     runs-on: ubuntu-latest
     steps:
@@ -40,7 +67,8 @@ jobs:
           if-no-files-found: error
 
   frontend:
-    needs: python
+    needs: [changes, python]
+    if: needs.changes.outputs.scope != 'text'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -67,7 +95,8 @@ jobs:
       - run: npm run build
 
   e2e:
-    needs: [python, frontend]
+    needs: [changes, python, frontend]
+    if: needs.changes.outputs.scope == 'full'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -102,7 +131,8 @@ jobs:
           path: frontend/playwright-report
 
   windows:
-    needs: [python, frontend]
+    needs: [changes, python, frontend]
+    if: needs.changes.outputs.scope == 'full'
     runs-on: windows-latest
     defaults:
       run:

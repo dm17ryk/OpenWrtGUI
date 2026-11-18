@@ -1,10 +1,14 @@
 name: CodeQL
 
+# A pull request that changes only Markdown or docs/ changes no code to analyse. Every push to master is
+# analysed, unfiltered: CodeQL compares a pull request with master's latest analysis.
+
 on:
   push:
     branches: [master]
   pull_request:
     branches: [master]
+    paths-ignore: ["**.md", "docs/**"]
   schedule:
     - cron: "23 4 * * 1"
 
