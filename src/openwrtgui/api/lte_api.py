@@ -15,7 +15,14 @@ from openwrtgui.context import AppContext
 from openwrtgui.forms import OptionEdit, OptionRow
 from openwrtgui.lte.at import AtResult
 from openwrtgui.lte.recover import LteRecoverJob
-from openwrtgui.lte.service import AtNeedsConfirm, LteAction, LteBusy, SetupMissing
+from openwrtgui.lte.service import (
+    NEEDS_CONFIRM,
+    AtNeedsConfirm,
+    AtNeedsRiskyConfirm,
+    LteAction,
+    LteBusy,
+    SetupMissing,
+)
 from openwrtgui.lte.settings import METRIC_MAX, Auth, LteSettings, PdpType
 from openwrtgui.lte.setups import LteSetupSummary
 from openwrtgui.lte.state import LteState
@@ -116,14 +123,21 @@ async def settings_apply(router_id: str, body: LteSettingsApplyIn, ctx: Ctx) -> 
     return await ctx.lte.apply_settings(_known(ctx, router_id), body.to_domain(), body.digest)
 
 
+def _confirm_first(*, risky: bool) -> JSONResponse:
+    """The 428 from the server's own question: no text of the exception reaches the person (PR #82 CodeQL)."""
+    return JSONResponse(status_code=428, content={"detail": NEEDS_CONFIRM, "risky": risky})
+
+
 @router.post(
     "/at", response_model=AtResult, responses={428: {"description": "Confirm first: {detail, risky}"}}
 )
 async def at_command(router_id: str, body: AtIn, ctx: Ctx) -> AtResult | JSONResponse:
     try:
         return await ctx.lte.at_command(_known(ctx, router_id), body.command, body.confirmed)
-    except AtNeedsConfirm as exc:  # spec 4.5: the console asks the stronger question when risky
-        return JSONResponse(status_code=428, content={"detail": str(exc), "risky": exc.risky})
+    except AtNeedsRiskyConfirm:  # spec 4.5: the console asks the stronger question
+        return _confirm_first(risky=True)
+    except AtNeedsConfirm:
+        return _confirm_first(risky=False)
     except LteBusy as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 

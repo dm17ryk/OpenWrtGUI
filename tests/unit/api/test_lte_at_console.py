@@ -10,8 +10,9 @@ import pytest
 
 from openwrtgui.context import AppContext
 from openwrtgui.guard.bench_guard import GuardLocked
+from openwrtgui.lte.at import AtResult
 from openwrtgui.lte.commands import AT_MESSAGE
-from openwrtgui.lte.service import AtNeedsConfirm
+from openwrtgui.lte.service import NEEDS_CONFIRM, AtNeedsConfirm, AtNeedsRiskyConfirm
 from openwrtgui.transport.base import CommandResult
 from openwrtgui.transport.fake import ReplayTransport
 
@@ -198,3 +199,22 @@ async def test_the_428_says_whether_the_command_is_risky(authed: httpx.AsyncClie
     plain = await authed.post("/api/routers/ap2/lte/at", json={"command": "AT+COPS=0"})
     assert (plain.status_code, plain.json()["risky"]) == (428, False)
     assert plain.json()["detail"] == "This command may change the modem; send it again with confirm"
+
+
+@pytest.mark.parametrize(("raised", "risky"), [(AtNeedsConfirm, False), (AtNeedsRiskyConfirm, True)])
+async def test_the_428_shows_only_the_fixed_question(
+    authed: httpx.AsyncClient,
+    ctx: AppContext,
+    monkeypatch: pytest.MonkeyPatch,
+    raised: type[AtNeedsConfirm],
+    risky: bool,
+) -> None:
+    """PR #82 CodeQL (information exposure): the 428 body is the server's own question and flag, never the
+    exception's text."""
+
+    async def refuses(router_id: str, text: str, confirmed: bool) -> AtResult:
+        raise raised("Traceback (most recent call last): internal")
+
+    monkeypatch.setattr(ctx.lte, "at_command", refuses)
+    answer = await authed.post("/api/routers/ap2/lte/at", json={"command": "AT+CFUN=1"})
+    assert (answer.status_code, answer.json()) == (428, {"detail": NEEDS_CONFIRM, "risky": risky})

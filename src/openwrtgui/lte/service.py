@@ -65,12 +65,12 @@ class LteBusy(RouterBusy):
 
 
 class AtNeedsConfirm(Exception):
-    """D5: an AT command that is not a query runs only once the person confirms it (428). `risky`: one that
-    can erase the modem's profiles or wedge it (spec 4.5), so the console asks a stronger question."""
+    """D5: an AT command that is not a query runs only once the person confirms it (428)."""
 
-    def __init__(self, message: str, *, risky: bool = False) -> None:
-        super().__init__(message)
-        self.risky = risky
+
+class AtNeedsRiskyConfirm(AtNeedsConfirm):
+    """Spec 4.5: one that can erase the modem's profiles or wedge it, so the console asks a stronger question.
+    A type, not a flag: the 428 is built from the server's own text, nothing read from the exception."""
 
 
 class LteNotWorking(ValueError):
@@ -533,7 +533,7 @@ class LteService:
             self._guard.require_clear()
             self._refuse_if_busy(rec.id)
             if not confirmed:
-                raise AtNeedsConfirm(NEEDS_CONFIRM, risky=is_risky(command))
+                raise (AtNeedsRiskyConfirm if is_risky(command) else AtNeedsConfirm)(NEEDS_CONFIRM)
         t = await self._pool.get(rec)
         if query:
             async with self._at_lock(rec.id):
