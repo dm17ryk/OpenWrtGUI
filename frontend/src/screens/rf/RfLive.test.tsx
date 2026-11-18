@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
@@ -116,10 +116,40 @@ test('an idle radio says why', async () => {
   expect(screen.getByRole('status')).toHaveTextContent('radio0 is parked')
 })
 
-test('rates that are not available yet say so', async () => {
+const ratesAsked = (): number => FakeSocket.last?.sent.filter((m) => (m as { type?: string }).type === 'rates').length ?? 0
+
+test('rates are not asked while the card is closed', async () => {
   renderRf('/routers/ap1/rf?station=f4:12:fa:f3:57:68')
   await screen.findByRole('heading', { name: 'RF live', level: 1 })
   FakeSocket.last?.emit({ type: 'rf', sample: sample(0) })
-  FakeSocket.last?.emit({ type: 'rates', mac: 'f4:12:fa:f3:57:68', error: 'Rate statistics are not read in this version' })
-  expect(screen.getByText('Rate statistics are not read in this version')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Show rates' })).toHaveAttribute('aria-expanded', 'false')
+  expect(ratesAsked()).toBe(0)
+})
+
+test('opening the card asks at once and every 5 s; closing stops it', async () => {
+  renderRf('/routers/ap1/rf?station=f4:12:fa:f3:57:68')
+  await screen.findByRole('heading', { name: 'RF live', level: 1 })
+  vi.useFakeTimers()
+  try {
+    FakeSocket.last?.emit({ type: 'rf', sample: sample(0) })
+    fireEvent.click(screen.getByRole('button', { name: 'Show rates' }))
+    expect(ratesAsked()).toBe(1)
+    act(() => vi.advanceTimersByTime(5000))
+    expect(ratesAsked()).toBe(2)
+    fireEvent.click(screen.getByRole('button', { name: 'Hide rates' }))
+    act(() => vi.advanceTimersByTime(10000))
+    expect(ratesAsked()).toBe(2)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+test('a rates error is shown', async () => {
+  const user = userEvent.setup()
+  renderRf('/routers/ap1/rf?station=f4:12:fa:f3:57:68')
+  await screen.findByRole('heading', { name: 'RF live', level: 1 })
+  FakeSocket.last?.emit({ type: 'rf', sample: sample(0) })
+  await user.click(screen.getByRole('button', { name: 'Show rates' }))
+  FakeSocket.last?.emit({ type: 'rates', mac: 'f4:12:fa:f3:57:68', error: 'No rate statistics from the router for this station' })
+  expect(screen.getByText('No rate statistics from the router for this station')).toBeInTheDocument()
 })

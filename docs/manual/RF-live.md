@@ -39,9 +39,18 @@ open. The charts keep their samples and go on once the connection is back.
 
 ## Which rates reach the station
 
-From the router's rate control (minstrel): for each rate, how often the AP tried it, how many frames the
-station acknowledged, and which rate is in use now. It needs a station on the radio. Rate statistics are not read
-in this version; the table says so.
+From the router's rate control (minstrel), for the selected station, AP to station. Open the card with
+**Show rates**: the app then asks the router every 5 seconds, and only while the card is open (**Hide rates**
+stops it). It needs a station on the radio.
+
+- **Rate** and **Mode**: the rate (MCS index, or the legacy rate in Mb/s) and its mode, for example "HT20 SGI"
+  (20 MHz, short guard interval) or "CCK LP" (802.11b, long preamble).
+- **Attempts**: how often the AP tried the rate since the station joined.
+- **Success**: the share of those frames the station acknowledged.
+- **in use**: minstrel's first choice now.
+
+Only rates tried at least once are listed, plus the one in use. If the radio is off or the station has left, the
+card says so.
 
 ## Record to CSV
 

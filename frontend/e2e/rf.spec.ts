@@ -10,6 +10,14 @@ test('RF live shows the station, both charts and what the driver does not report
   await noHorizontalScroll(page)
 })
 
+test('the rates card shows the simulated station\'s rates', async ({ page }) => {
+  await open(page, '/routers/ap1/rf')
+  await page.getByRole('button', { name: 'Show rates', exact: true }).click()
+  const table = page.getByRole('table', { name: 'Rates' })
+  await expect(table.getByRole('row').filter({ hasText: 'MCS15' }).filter({ hasText: 'in use' })).toHaveCount(1)
+  await noHorizontalScroll(page)
+})
+
 test('recording writes a CSV and says where', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop-light', 'one project records')
   await open(page, '/routers/ap1/rf')

@@ -72,6 +72,7 @@ export function RfLive() {
   const [chosen, setChosen] = useState<string | null>(params.get('station'))
   const [recording, setRecording] = useState<string | null>(null)
   const [rates, setRates] = useState<{ mac: string; rows?: RateRow[]; error?: string } | null>(null)
+  const [ratesShown, setRatesShown] = useState(false) // D7: the router is asked only while the card is open
   const [frames, setFrames] = useState<FrameState | null>(null)
   const pausedRef = useRef(paused)
   useEffect(() => {
@@ -114,12 +115,13 @@ export function RfLive() {
 
   const station = chosen ?? latest?.stations[0]?.mac ?? Object.keys(lastSeen)[0] ?? null
   useEffect(() => {
-    if (!station || !isOpen) return undefined // asked again once the socket is (re)opened
+    // asked only while the card is open (D7), and again once the socket is (re)opened
+    if (!station || !isOpen || !ratesShown) return undefined
     const ask = (): void => send(JSON.stringify({ type: 'rates', mac: station }))
     ask()
     const timer = setInterval(ask, RATES_EVERY_MS)
     return () => clearInterval(timer)
-  }, [station, isOpen, send])
+  }, [station, isOpen, ratesShown, send])
 
   const name = detail.data?.record.name ?? id
   const short = name.split(' · ')[0] || id
@@ -269,7 +271,16 @@ export function RfLive() {
           <Help topic={HELP.rfRates} />
         </div>
         <span className="muted">AP → station, from the router's rate control (minstrel). Success = frames the station acknowledged.</span>
-        <RatesTable rows={rates?.mac === station ? rates.rows : undefined} error={rates?.mac === station ? rates.error : undefined} />
+        <div>
+          <button className="btn" type="button" aria-expanded={ratesShown} aria-controls="rates-body" onClick={() => setRatesShown((v) => !v)}>
+            {ratesShown ? 'Hide rates' : 'Show rates'}
+          </button>
+        </div>
+        {ratesShown && (
+          <div id="rates-body">
+            <RatesTable rows={rates?.mac === station ? rates.rows : undefined} error={rates?.mac === station ? rates.error : undefined} />
+          </div>
+        )}
       </section>
       <FrameAnalysis routerId={id} radio={radio} live={frames} retryPct={s?.retry_pct ?? null} />
       <ChannelAnalysis routerId={id} radio={radio} />

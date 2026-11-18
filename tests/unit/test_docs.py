@@ -340,6 +340,13 @@ def test_v1_0c_behaviour_is_documented() -> None:
     assert missing == []
 
 
+def test_rates_are_documented_as_read() -> None:
+    """v1.1b D7: the rates card is read every 5 s while it is open; the manual no longer says it is not."""
+    rates = _section("RF-live", "Which rates reach the station")
+    assert "not read in this version" not in rates
+    assert "**Show rates**" in rates and "every 5 seconds" in rates
+
+
 def test_flash_recovery_matches_the_app() -> None:
     """The final review: the manual said to power-cycle a flash after 5 minutes, while the app waits 10 and
     says not to power off a router that may still be writing flash."""
