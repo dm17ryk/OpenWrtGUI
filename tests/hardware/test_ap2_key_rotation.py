@@ -5,8 +5,8 @@
 
 Run it only in a window Dmitry OK'd at the time, Bench Guard clear, the txctl session told. No password is
 used: the window logs in with --identity, installs a throwaway app key made in a temporary folder, rotates it
-with the app's own KeyRotation (an app whose data holds AP2 only), and in the end removes both throwaway lines,
-so AP2's /etc/dropbear/authorized_keys is exactly as found. No other line of that file is ever changed.
+with the app's own KeyRotation (an app whose data holds AP2 only), and in the end removes both throwaway
+lines, so AP2's /etc/dropbear/authorized_keys is exactly as found. No other line of that file is ever changed.
 """
 
 from __future__ import annotations
