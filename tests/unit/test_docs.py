@@ -346,6 +346,9 @@ def test_key_rotation_is_documented() -> None:
     key = _section("Settings", "App SSH key")
     for words in ("**Rotate key**", "**Retry**", "does not answer", "harness run"):
         assert words in key, words
+    # final review F1 and F3: the last check before the old key goes, and an old key kept in another line
+    for words in ("logs in to every moved router with the new key again", "still accepts the old key"):
+        assert words in key, words
     files = _read(MANUAL / "Files-and-data.md")
     assert "id_ed25519.next" in files and "rotation.json" in files
 

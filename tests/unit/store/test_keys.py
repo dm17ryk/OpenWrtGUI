@@ -119,6 +119,38 @@ def test_a_finish_cut_after_the_replace_is_completed_on_load(tmp_path: Path) -> 
     assert (tmp_path / "id_ed25519.pub").read_text(encoding="utf-8").strip() == nxt.public_line
 
 
+def test_unmark_moved_forgets_a_router(tmp_path: Path) -> None:
+    """Final review F1: a router given the old key again (re-added, removed) must move again."""
+    ring = AppKeyRing(tmp_path)
+    ring.begin()
+    ring.mark_moved("ap2")
+    ring.unmark_moved("ap2")
+    ring.unmark_moved("never-moved")  # nothing to forget: no error
+    assert ring.moved() == frozenset() and AppKeyRing(tmp_path).moved() == frozenset()
+
+
+def test_a_finish_whose_pub_write_fails_still_leaves_one_usable_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Final review F4: after the replace, the ring holds the new key even if the .pub cannot be written; a
+    later load completes the rest."""
+    ring = AppKeyRing(tmp_path)
+    nxt = ring.begin()
+
+    def full_disk(path: Path, text: str) -> None:
+        raise OSError("No space left on device")
+
+    monkeypatch.setattr(keys, "write_atomic", full_disk)
+    new = ring.finish()
+    assert new.fingerprint == nxt.fingerprint and ring.next is None
+    assert ring.login_paths() == [tmp_path / "id_ed25519"] and (tmp_path / "id_ed25519").exists()
+    monkeypatch.undo()
+    monkeypatch.setattr(keys, "restrict_to_user", lambda path: None)
+    again = AppKeyRing(tmp_path)
+    assert again.current.fingerprint == nxt.fingerprint and again.next is None
+    assert _names(tmp_path) == ["id_ed25519", "id_ed25519.pub"]
+
+
 def test_a_next_key_left_without_its_rotation_is_dropped(tmp_path: Path) -> None:
     ring = AppKeyRing(tmp_path)
     ring.begin()

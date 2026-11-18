@@ -28,6 +28,7 @@ from openwrtgui.guard.writes import run_audited
 from openwrtgui.onboard.wizard import AUTHORIZED_KEYS, Connector, install_key_command
 from openwrtgui.store.keys import AppKeyRing
 from openwrtgui.store.routers import RouterRecord, RouterStore
+from openwrtgui.system.sshkeys import parse_authorized_keys
 from openwrtgui.transport.base import AuthFailed, Transport, TransportError
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.wifi.service import PreviewChanged
@@ -54,10 +55,25 @@ class MoveFailed(Exception):
 
 
 def remove_old_key_command(new_line: str, old_line: str) -> str:
-    """Remove every line exactly equal to `old_line`, only if `new_line` is there; atomic on the router."""
+    """Remove every line exactly equal to `old_line`, only if `new_line` is there; atomic on the router. The
+    temp file is checked before the rename (it holds the new line and every kept line: a full overlay can cut
+    it short) and removed when anything fails (final review F2)."""
     new, old, ak = shlex.quote(new_line), shlex.quote(old_line), AUTHORIZED_KEYS
     tmp = f"{ak}.owg"
-    return f"grep -qxF {new} {ak} && grep -vxF {old} {ak} > {tmp} && chmod 600 {tmp} && mv -f {tmp} {ak}"
+    checked = (
+        f"grep -vxF {old} {ak} > {tmp} && grep -qxF {new} {tmp} && "
+        f'[ "$(grep -cvxF {old} {ak})" = "$(grep -c \'\' {tmp})" ] && chmod 600 {tmp} && mv -f {tmp} {ak}'
+    )
+    return f"grep -qxF {new} {ak} && {{ {checked} || {{ rm -f {tmp}; false; }}; }}"
+
+
+def _still_accepted(lines: list[str], fingerprint: str) -> int:
+    """How many lines still carry a key (another comment, options, a CR): exact removal leaves them."""
+    return sum(
+        1
+        for k in parse_authorized_keys("".join(f"{line}\n" for line in lines))
+        if k.fingerprint == fingerprint
+    )
 
 
 def _lines(text: str) -> list[str]:
@@ -97,8 +113,9 @@ async def move_router(
     guard: BenchGuard,
     audit: AuditLog,
     on_step: Callable[[str], None],
-) -> None:
-    """Move one router to the next key (D8). Raises MoveFailed with the row's detail; GuardLocked passes."""
+) -> str | None:
+    """Move one router to the next key (D8). Raises MoveFailed with the row's detail; GuardLocked passes.
+    Returns a warning when the old key is still accepted by another line, which exact removal leaves (F3)."""
     nxt = keys.next
     if nxt is None:
         raise ValueError("No key rotation is under way")
@@ -142,16 +159,20 @@ async def move_router(
         if not removed.ok or after != expected or nxt.public_line not in after:
             raise MoveFailed(f"authorized_keys on {rec.name} is not as expected: check it on System › Access")
         n = len(before) - len(expected)
+        kept = _still_accepted(after, keys.current.fingerprint)
+        lines = f"{kept} other line{'s' if kept != 1 else ''}"
         audit.record(
             router=rec.id,
             screen=SCREEN,
             command="check authorized_keys",
             exit_status=0,
-            verify=f"new key logs in; {n} old line(s) removed; other lines unchanged",
+            verify=f"new key logs in; {n} old line(s) removed; other lines unchanged"
+            + (f"; old key still accepted by {lines}" if kept else ""),
             source="user",
         )
         keys.mark_moved(rec.id)
     await pool.drop(rec.id)
+    return f"the old key is still accepted by {lines}: remove it on System › Access" if kept else None
 
 
 # ---------------------------------------------------------------- the job (Settings › App SSH key)
@@ -208,6 +229,7 @@ class KeyRotation:
         guard: BenchGuard,
         audit: AuditLog,
         busy: Sequence[Callable[[str], str | None]] = (),
+        hold: Callable[[], str | None] = lambda: None,
         clock: Callable[[], datetime] = datetime.now,
     ) -> None:
         self._keys = keys
@@ -217,6 +239,7 @@ class KeyRotation:
         self._guard = guard
         self._audit = audit
         self._busy = busy
+        self._hold = hold  # e.g. Add router installed the old key and is not finished: do not delete it yet
         self._clock = clock
         self._job: RotationJob | None = None
         self._task: asyncio.Task[None] | None = None
@@ -400,10 +423,17 @@ class KeyRotation:
                     break
                 finally:
                     self._moving = None
-            self._end(detail)
-        except Exception as exc:  # never leave the job "running"
+            await self._end(detail)
+        except Exception as exc:  # never leave the job "running" (final review F4)
             log.exception("App key rotation stopped")
-            self._end(f"The rotation stopped: {exc}")
+            if self._job is not None:
+                self._job = self._job.model_copy(
+                    update={
+                        "phase": "pending",
+                        "ended_at": self._clock(),
+                        "detail": f"The rotation stopped: {exc}",
+                    }
+                )
 
     async def _move(self, rec: RouterRecord) -> None:
         def step(state: str) -> None:
@@ -414,7 +444,7 @@ class KeyRotation:
                 rec.id
             )  # a router that failed before is tried at once, not after its backoff
         try:
-            await move_router(
+            warning = await move_router(
                 rec,
                 keys=self._keys,
                 pool=self._pool,
@@ -426,23 +456,48 @@ class KeyRotation:
         except MoveFailed as exc:
             self._row(rec.id, "failed", str(exc))
             return
-        self._row(rec.id, "moved")
+        self._row(rec.id, "moved", warning)
 
-    def _end(self, detail: str | None) -> None:
+    async def _confirm_moved(self) -> bool:
+        """Before the old key is deleted, every router marked moved proves the new key again: one reflashed
+        and added again, restored, or edited by hand since must move again, not be locked out (F1)."""
+        confirmed = True
+        for rec in self._targets():
+            if rec.id not in self._keys.moved():
+                continue
+            try:
+                await _prove(rec, self._keys, self._connector)
+            except AuthFailed:
+                detail = f"{rec.name} no longer accepts the new key: it moves again on Retry"
+            except TransportError:
+                detail = f"{rec.name} did not answer the final check: Retry when it answers"
+            else:
+                continue
+            self._keys.unmark_moved(rec.id)
+            self._row(rec.id, "failed", detail)
+            confirmed = False
+        return confirmed
+
+    async def _end(self, detail: str | None) -> None:
         assert self._job is not None  # noqa: S101 - _launch set it
-        fields: dict[str, Any] = {"ended_at": self._clock(), "detail": detail}
+        fields: dict[str, Any] = {"ended_at": self._clock(), "detail": detail, "phase": "pending"}
         if self._keys.next is not None and not self._waiting():
-            old = self._keys.current.fingerprint
-            new = self._keys.finish()
-            self._audit.record(
-                router=None,
-                screen=SCREEN,
-                command="replace the app key on this PC",
-                exit_status=0,
-                verify=f"{old} -> {new.fingerprint}",
-                source="user",
-            )
-            fields["phase"] = "done"
-        else:
-            fields["phase"] = "pending"
+            if (held := self._hold()) is not None:
+                fields["detail"] = held
+            elif await self._confirm_moved():
+                old = self._keys.current.fingerprint
+                try:
+                    new = self._keys.finish()
+                except (OSError, ValueError) as exc:
+                    fields["detail"] = f"Replacing the key on this PC failed: {exc}"
+                else:
+                    self._audit.record(
+                        router=None,
+                        screen=SCREEN,
+                        command="replace the app key on this PC",
+                        exit_status=0,
+                        verify=f"{old} -> {new.fingerprint}",
+                        source="user",
+                    )
+                    fields["phase"] = "done"
         self._job = self._job.model_copy(update=fields)

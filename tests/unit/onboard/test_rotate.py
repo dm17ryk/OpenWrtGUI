@@ -149,6 +149,26 @@ async def test_every_other_line_is_kept_byte_for_byte(bench: Bench) -> None:
     assert "2 old line(s) removed" in bench.audit_text()
 
 
+async def test_an_old_key_kept_by_another_line_is_named(bench: Bench) -> None:
+    """Final review F3: only exact old lines go, but a copy of the old key in another form is reported."""
+    await _seeded(bench)
+    old = bench.keys.current.public_line
+    bench.state().authorized_keys[:] = [f"no-pty {old}", old]
+    bench.keys.begin()
+    warning = await move_router(
+        bench.ap2(),
+        keys=bench.keys,
+        pool=bench.pool,
+        connector=bench.sim,
+        guard=bench.guard,
+        audit=bench.audit,
+        on_step=lambda step: None,
+    )
+    assert warning == "the old key is still accepted by 1 other line: remove it on System › Access"
+    assert bench.keys.moved() == frozenset({"ap2"})
+    assert "old key still accepted by 1 other line" in bench.audit_text()
+
+
 async def test_a_router_that_refuses_the_new_key_keeps_the_old_line(bench: Bench) -> None:
     await _seeded(bench)
     old = bench.keys.current.public_line
@@ -302,6 +322,62 @@ async def test_start_twice_gives_409(bench: Bench) -> None:
     await rotation.finished()
 
 
+async def test_a_moved_router_given_the_old_key_again_moves_again(bench: Bench) -> None:
+    """Final review F1: AP2 moved, then was reflashed and added again with the old key while AP1 waited. The
+    final check before the old key is deleted finds it, so AP2 moves again instead of being locked out."""
+    bench.offline.add("ap1")
+    rotation = _rotation(bench)
+    first = await _run(rotation)
+    assert _rows(first)["ap2"] == ("moved", None)
+    old = bench.keys.current.public_line
+    bench.state().authorized_keys[:] = [
+        old
+    ]  # reflashed without settings, then Add router installed the old key
+    await bench.pool.drop("ap2")
+    bench.offline.clear()
+    await rotation.retry("ap1")
+    job = await rotation.finished()
+    assert job is not None and job.phase == "pending" and bench.keys.next is not None
+    assert _rows(job)["ap2"] == (
+        "failed",
+        "AP2 · office no longer accepts the new key: it moves again on Retry",
+    )
+    assert bench.keys.moved() == frozenset({"ap1"})
+    await rotation.retry("ap2")
+    job = await rotation.finished()
+    assert job is not None and job.phase == "done"
+
+
+async def test_an_open_add_router_holds_the_finish(bench: Bench) -> None:
+    """Final review F1: a wizard that installed the old key and is not finished keeps the old key alive."""
+    holding = "Add router has installed the app key on 192.168.1.4 and is not finished"
+    rotation = KeyRotation(
+        keys=bench.keys,
+        routers=bench.routers,
+        pool=bench.pool,
+        connector=bench.sim,
+        guard=bench.guard,
+        audit=bench.audit,
+        hold=lambda: holding,
+    )
+    job = await _run(rotation)
+    assert (job.phase, job.detail) == ("pending", holding) and bench.keys.next is not None
+
+
+async def test_a_failed_replace_on_this_pc_ends_the_job(
+    bench: Bench, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Final review F4: the job never stays "running" when replacing the key on this PC fails."""
+
+    def fails() -> object:
+        raise OSError("The process cannot access the file")
+
+    monkeypatch.setattr(bench.keys, "finish", fails)
+    job = await _run(_rotation(bench))
+    assert job.phase == "pending"
+    assert job.detail == "Replacing the key on this PC failed: The process cannot access the file"
+
+
 async def test_a_changed_router_list_needs_a_new_preview(bench: Bench) -> None:
     rotation = _rotation(bench)
     digest = rotation.preview().digest
@@ -378,14 +454,21 @@ async def test_busy_and_live_name_the_move(bench: Bench) -> None:
     )
     holder.append(rotation)
     await _run(rotation)
-    assert seen == [("The app key is being moved on AP2 · office", None, ["App key rotation"])]
+    assert seen == [
+        ("The app key is being moved on AP2 · office", None, ["App key rotation"]),  # AP2's proof login
+        (None, None, ["App key rotation"]),  # the final check before the old key is deleted (F1)
+    ]
     assert rotation.busy("ap2") is None and rotation.live() == []
 
 
 def test_remove_old_key_command_checks_the_new_line_first() -> None:
+    """Final review F2: the temp file is checked (the new line and every kept line in it) before the rename,
+    and removed when anything fails, so a full overlay never installs a cut-off authorized_keys."""
+    new, old = "'ssh-ed25519 AAAAnew openwrtgui@pc'", "'ssh-ed25519 AAAAold openwrtgui@pc'"
     cmd = remove_old_key_command("ssh-ed25519 AAAAnew openwrtgui@pc", "ssh-ed25519 AAAAold openwrtgui@pc")
+    tmp = f"{AK}.owg"
     assert cmd == (
-        f"grep -qxF 'ssh-ed25519 AAAAnew openwrtgui@pc' {AK} && "
-        f"grep -vxF 'ssh-ed25519 AAAAold openwrtgui@pc' {AK} > {AK}.owg && "
-        f"chmod 600 {AK}.owg && mv -f {AK}.owg {AK}"
+        f"grep -qxF {new} {AK} && {{ grep -vxF {old} {AK} > {tmp} && grep -qxF {new} {tmp} && "
+        f'[ "$(grep -cvxF {old} {AK})" = "$(grep -c \'\' {tmp})" ] && chmod 600 {tmp} && mv -f {tmp} {AK} '
+        f"|| {{ rm -f {tmp}; false; }}; }}"
     )

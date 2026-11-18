@@ -143,6 +143,13 @@ class AppKeyRing:
         self._moved.add(router_id)
         self._save_rotation()
 
+    def unmark_moved(self, router_id: str) -> None:
+        """The router has the current key again (added again, removed, restored): it must move again."""
+        if self._next is None or router_id not in self._moved:
+            return
+        self._moved.discard(router_id)
+        self._save_rotation()
+
     def finish(self) -> AppKey:
         """The next key becomes the current one. Its private file replaces the old one first (the old private
         key is gone from then on), then the .pub, then the rotation's own files."""
@@ -153,9 +160,15 @@ class AppKeyRing:
         new = AppKey(
             private_path=private_path, public_line=self._next.public_line, fingerprint=self._next.fingerprint
         )
-        write_atomic(self._dir / (PRIVATE_NAME + ".pub"), new.public_line + "\n")
-        self._drop_rotation_files()
+        # from the replace on, only the new key exists: the ring says so before anything else can fail
         self._current, self._next, self._moved = new, None, set()
+        try:
+            write_atomic(self._dir / (PRIVATE_NAME + ".pub"), new.public_line + "\n")
+            self._drop_rotation_files()
+        except OSError:  # the next start completes it (a finish cut short after its replace)
+            log.warning(
+                "The new app key is in place; its .pub or the rotation files were not updated", exc_info=True
+            )
         return new
 
     def _save_rotation(self) -> None:

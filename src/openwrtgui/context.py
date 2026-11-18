@@ -373,6 +373,7 @@ def build_context(
         guard=guard,
         audit=audit,
         busy=(system.busy, flashing, steps_or_recover),
+        hold=onboard.holding,
     )
     return AppContext(
         data=data,

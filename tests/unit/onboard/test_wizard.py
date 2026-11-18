@@ -265,6 +265,33 @@ async def test_during_a_rotation_the_login_offers_both_keys_and_installs_the_cur
     assert service.install_key_preview(v.sid) == [install_key_command(app_key.public_line)]
 
 
+async def test_adding_a_router_again_forgets_that_it_moved(
+    tmp_path: Path, app_key: AppKey, connector: SimConnector, clock: Clock
+) -> None:
+    """Final review F1: a router added (again) during a rotation got the current key: it must move again."""
+    ring = AppKeyRing(app_key.private_path.parent)
+    ring.begin()
+    ring.mark_moved("ap4")
+    connector.state(NEW_HOST).authorized_keys.append(app_key.public_line)
+    service = _service(tmp_path, app_key, connector, clock)
+    v = await service.auto_login(await _trusted(service))
+    v = await service.identify(v.sid)
+    rec = await service.finish(v.sid, "AP4", v.proposed_port_labels)
+    assert rec.id == "ap4" and AppKeyRing(app_key.private_path.parent).moved() == frozenset()
+
+
+async def test_an_install_not_finished_holds_a_rotation(
+    tmp_path: Path, app_key: AppKey, connector: SimConnector, clock: Clock
+) -> None:
+    service = _service(tmp_path, app_key, connector, clock)
+    assert service.holding() is None
+    connector.state(NEW_HOST).authorized_keys.append(app_key.public_line)
+    v = await service.auto_login(await _trusted(service))
+    assert service.holding() == f"Add router has installed the app key on {NEW_HOST} and is not finished"
+    await service.cancel(v.sid)
+    assert service.holding() is None
+
+
 async def test_auto_login_falls_back_to_root_root(service: OnboardService, connector: SimConnector) -> None:
     connector.state(NEW_HOST).root_password = "root"
     v = await service.auto_login(await _trusted(service))

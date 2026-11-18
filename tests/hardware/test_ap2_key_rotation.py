@@ -53,6 +53,8 @@ async def test_a_throwaway_app_key_rotates_on_ap2(
     snapshot = await _keys_text(ap2_rw)
     keep = next((line for line in snapshot.splitlines() if line.strip()), None)
     assert keep is not None, "AP2's authorized_keys must hold the window's own key"
+    # `echo >>` would glue a line onto an unterminated last line, and the cleanup could not undo that
+    assert snapshot.endswith("\n"), "AP2's authorized_keys has no final newline: stop, nothing was written"
     host_keys = HostKeyStore(tmp_path / "known_hosts")
     shutil.copyfile(request.config.getoption("--known-hosts"), host_keys.path)
     ring = AppKeyRing(tmp_path / "keys", comment="owg-rotation-test@pc")
@@ -70,7 +72,6 @@ async def test_a_throwaway_app_key_rotates_on_ap2(
     pool = ConnectionPool(factory)
     guard = BenchGuard(GuardWatchList())
     guard.check_local()
-    new_line: str | None = None
     try:
         assert (await ap2_rw.run(install_key_command(old_line))).ok  # as Add router does
         rotation = KeyRotation(
@@ -83,17 +84,18 @@ async def test_a_throwaway_app_key_rotates_on_ap2(
         )
         await rotation.start(rotation.preview().digest)
         job = await rotation.finished()
-        new_line = ring.current.public_line
         print(f"\n{job}")
         assert job is not None and job.phase == "done", job
         await _login(host_keys, ring.current.private_path)
         with pytest.raises(AuthFailed):
             await _login(host_keys, old_private)
         after = await _keys_text(ap2_rw)
-        assert after.splitlines() == [*snapshot.splitlines(), new_line]
+        assert after.splitlines() == [*snapshot.splitlines(), ring.current.public_line]
     finally:
         await pool.close_all()
-        for line in (old_line, new_line):
-            if line is not None:
-                await ap2_rw.run(remove_old_key_command(keep, line))
+        # every line this test may have put on AP2, whatever step failed (final review F5): the throwaway old
+        # key, and the new key whether or not the rotation finished
+        added = {old_line, ring.current.public_line, *([ring.next.public_line] if ring.next else [])}
+        for line in sorted(added):
+            await ap2_rw.run(remove_old_key_command(keep, line))
         assert await _keys_text(ap2_rw) == snapshot, "AP2's authorized_keys is not as found"

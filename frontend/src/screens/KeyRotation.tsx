@@ -18,7 +18,13 @@ const STATE: Record<RouterMove['state'], string> = {
 function status(job: RotationJob): string {
   const moved = job.routers.filter((r) => r.state === 'moved').length
   if (job.phase === 'running') return `Moving the app key: ${moved} of ${job.routers.length} routers done.`
-  if (job.phase === 'done') return 'Rotated: every router logs in with the new key. The old private key is deleted.'
+  if (job.phase === 'done') {
+    const done = 'Rotated: every router logs in with the new key. The old private key is deleted.'
+    // the old key in another form (options, another comment) is not removed: say where (final review F3)
+    const still = job.routers.filter((r) => r.state === 'moved' && r.detail).map((r) => r.name)
+    if (still.length === 0) return done
+    return `${done} ${still.join(', ')} still ${still.length === 1 ? 'accepts' : 'accept'} the old key in another line: see below.`
+  }
   return `${job.routers.length - moved} router(s) still on the old key. The old key stays on this PC until every router has the new one.`
 }
 

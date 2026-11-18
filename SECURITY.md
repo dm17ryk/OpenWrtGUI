@@ -53,7 +53,9 @@ a time:
   are never changed, and the file is read back.
 - A router that fails keeps the old key. Until every router has moved, the old private key stays and the app
   offers both keys.
-- When the last router has moved, the new key replaces the old one, whose private key is deleted.
+- When the last router has moved, the app proves the new key again on every moved router (one reflashed or
+  restored since moves again), then the new key replaces the old one, whose private key is deleted.
+- A copy of the old key in another form (options, another comment) is not removed; its router's row names it.
 - A rotation is refused while Bench Guard sees a harness run, and every step is in the audit log.
 
 ## What the app exposes

@@ -102,6 +102,18 @@ test('a job that ends done says so and refreshes the key', async () => {
   await vi.waitFor(() => expect(spy).toHaveBeenCalledWith({ queryKey: ['app-key'] }))
 })
 
+test('a done job names routers that still accept the old key', () => {
+  renderRotation(
+    job('done', [
+      { router_id: 'ap1', name: 'AP1 · bench', state: 'moved', detail: null },
+      { router_id: 'ap2', name: 'AP2 · office', state: 'moved', detail: 'the old key is still accepted by 1 other line: remove it on System › Access' },
+    ]),
+  )
+  expect(screen.getByRole('status')).toHaveTextContent(
+    'Rotated: every router logs in with the new key. The old private key is deleted. AP2 · office still accepts the old key in another line: see below.',
+  )
+})
+
 test('a harness run shows the guard text', async () => {
   const user = userEvent.setup()
   vi.mocked(postJson)

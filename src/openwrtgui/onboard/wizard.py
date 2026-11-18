@@ -490,10 +490,22 @@ class OnboardService:
             added_at=self._clock(),
         )
         self._routers.upsert(record)
+        if record.auth == "key" and record.key_path is None:
+            self._keys.unmark_moved(
+                record.id
+            )  # it got the current key: during a rotation it moves again (F1)
         await self._pool.drop(record.id)
         s.step = Step.DONE
         await self.cancel(sid)
         return record
+
+    def holding(self) -> str | None:
+        """A key rotation must not delete the current key while a wizard has installed it and is not finished:
+        the router it adds would hold only a key that no longer exists (final review F1)."""
+        for s in self._sessions.values():
+            if s.key_installed:
+                return f"Add router has installed the app key on {s.host} and is not finished"
+        return None
 
     async def cancel(self, sid: str) -> None:
         s = self._sessions.pop(sid, None)

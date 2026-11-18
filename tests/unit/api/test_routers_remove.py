@@ -138,6 +138,16 @@ async def test_a_move_in_progress_is_named_with_the_rest(
     assert ctx.routers.get("ap2") is not None
 
 
+async def test_a_removed_router_is_no_longer_counted_as_moved(
+    authed: httpx.AsyncClient, ctx: AppContext
+) -> None:
+    """Final review F1: added again later under the same id, it gets the current key and must move again."""
+    ctx.keys.begin()
+    ctx.keys.mark_moved("ap2")
+    assert (await _remove(authed)).status_code == 200
+    assert ctx.keys.moved() == frozenset()
+
+
 async def test_nothing_running_and_no_status_removes(authed: httpx.AsyncClient, ctx: AppContext) -> None:
     """An unreachable router with no status is removable, as before."""
     ctx.statuses.pop("ap2", None)

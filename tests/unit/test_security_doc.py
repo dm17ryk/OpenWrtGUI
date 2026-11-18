@@ -27,5 +27,5 @@ def test_key_rotation_is_described_and_no_longer_a_limit() -> None:
     before, limits = SECURITY.split("## Known limits", 1)
     assert "rotat" not in limits
     rotation = before.split("## App key rotation", 1)[1].split("\n## ", 1)[0]
-    for words in ("proven", "exact", "Other lines", "deleted", "Bench Guard"):
+    for words in ("proven", "exact", "Other lines", "deleted", "Bench Guard", "proves the new key again"):
         assert words in rotation, words
