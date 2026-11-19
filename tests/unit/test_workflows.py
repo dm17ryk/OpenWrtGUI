@@ -113,6 +113,28 @@ def test_prerelease_orders_ci_builds_by_run_number() -> None:
         assert "createdAt" not in run
 
 
+def test_prerelease_runs_the_tools_of_its_own_revision() -> None:
+    """A re-run of a master build from before a tool was added still finds it (PR #91 review): the tools come
+    from the workflow's own checkout, master's tip; the build's commit is checked out only for its version."""
+    jobs = _load(WORKFLOWS / "prerelease.yml")["jobs"]
+    ships_checkout = jobs["ships"]["steps"][0]
+    assert ships_checkout["uses"].startswith("actions/checkout@")
+    assert "ref" not in ships_checkout["with"]  # compares commits by SHA: no build checkout needed
+    steps = jobs["prerelease"]["steps"]
+    own, build = steps[0], steps[1]
+    assert own["uses"].startswith("actions/checkout@") and "ref" not in own.get("with", {})
+    assert build["with"] == {"ref": "${{ github.event.workflow_run.head_sha }}", "path": "build"}
+    create = next(s["run"] for s in steps if s.get("name") == "Create the pre-release")
+    assert "PYTHONPATH=build/src" in create
+
+
+def test_prerelease_publishes_one_build_at_a_time() -> None:
+    """Each compares with the build the one before it published (PR #91 review): never two at once, and a
+    queued one is not cancelled by a running one."""
+    pre = _load(WORKFLOWS / "prerelease.yml")
+    assert pre["concurrency"] == {"group": "prerelease", "cancel-in-progress": False}
+
+
 def test_release_runs_on_version_tags_after_tests() -> None:
     release = _load(WORKFLOWS / "release.yml")
     assert _on(release)["push"]["tags"] == ["v[0-9]+.[0-9]+.[0-9]+"]

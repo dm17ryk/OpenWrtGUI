@@ -14,6 +14,11 @@ permissions:
   contents: write
   actions: read
 
+# One at a time, in the order CI finished: each compares with the build the one before it published.
+concurrency:
+  group: prerelease
+  cancel-in-progress: false
+
 env:
   GH_TOKEN: ${{ github.token }}
   GH_REPO: ${{ github.repository }}
@@ -27,9 +32,10 @@ jobs:
     outputs:
       ships: ${{ steps.ships.outputs.ships }}
     steps:
+      # The workflow's own revision, master's tip: its tools, even when CI re-ran an older build, and every
+      # commit and tag, so the build is compared by its SHA.
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
       - name: Does anything that ships differ from the last CI pre-release?
         id: ships
@@ -52,9 +58,12 @@ jobs:
     if: needs.ships.outputs.ships == 'true'
     runs-on: ubuntu-latest
     steps:
+      # the workflow's own revision for its tools; the build's commit only for its version
+      - uses: actions/checkout@v7
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
+          path: build
       - uses: actions/download-artifact@v8
         with:
           name: installer
@@ -66,13 +75,15 @@ jobs:
         run: sha256sum OpenWrtGUI-Setup-*.exe > SHA256SUMS.txt
       - name: Create the pre-release
         run: |
-          BASE="$(PYTHONPATH=src python3 -c 'from openwrtgui.version import BASE_VERSION as v; print(v)')"
+          BASE="$(PYTHONPATH=build/src python3 -c 'from openwrtgui.version import BASE_VERSION as v; print(v)')"
           VERSION="${BASE}-ci.${RUN}"
           gh release create "v${VERSION}" --prerelease --target "${HEAD_SHA}" \
             --title "OpenWrtGUI ${VERSION}" --notes "CI build of ${HEAD_SHA}" \
             dist/OpenWrtGUI-Setup-*.exe dist/SHA256SUMS.txt
       - name: Keep the newest 10 CI pre-releases
         run: |
+          # a list it cannot read fails the step, so pre-releases cannot pile up unseen
+          set -o pipefail
           gh release list --limit 200 --json tagName,isPrerelease | python3 -I tools/ci_prereleases.py beyond 10 |
           while read -r tag; do
             gh release delete "${tag}" --cleanup-tag -y
