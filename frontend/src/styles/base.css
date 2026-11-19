@@ -250,6 +250,17 @@ a.b {
 a.b:hover {
   text-decoration: underline;
 }
+/* a counter that should be zero and is not (Tools › Port statistics) */
+td.warn {
+  color: var(--warn);
+  font-weight: 600;
+}
+/* the detail row under a table row (Tools › Port statistics' All counters) */
+tr.sub td {
+  padding-top: 0;
+  border-top: none;
+  font-size: 12px;
+}
 .chips {
   display: flex;
   flex-wrap: wrap;
