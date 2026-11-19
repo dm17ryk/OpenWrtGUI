@@ -99,6 +99,20 @@ def test_prerelease_skips_a_merge_of_text_only() -> None:
     assert jobs["prerelease"]["if"] == "needs.ships.outputs.ships == 'true'"
 
 
+def test_prerelease_orders_ci_builds_by_run_number() -> None:
+    """A re-run of an older master run can publish after a newer one, so GitHub's creation time is not the
+    build order: the last build compared against and the ten kept are picked by the run number in the tag."""
+    jobs = _load(WORKFLOWS / "prerelease.yml")["jobs"]
+    compare = next(s["run"] for s in jobs["ships"]["steps"] if s.get("id") == "ships")
+    keep = next(
+        s["run"] for s in jobs["prerelease"]["steps"] if s.get("name") == "Keep the newest 10 CI pre-releases"
+    )
+    assert "tools/ci_prereleases.py newest" in compare
+    assert "tools/ci_prereleases.py beyond 10" in keep
+    for run in (compare, keep):
+        assert "createdAt" not in run
+
+
 def test_release_runs_on_version_tags_after_tests() -> None:
     release = _load(WORKFLOWS / "release.yml")
     assert _on(release)["push"]["tags"] == ["v[0-9]+.[0-9]+.[0-9]+"]
