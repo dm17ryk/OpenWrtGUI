@@ -38,11 +38,41 @@ def test_workflow_parses_with_jobs(name: str) -> None:
 def test_ci_jobs_and_triggers() -> None:
     ci = _load(WORKFLOWS / "ci.yml")
     assert ci["name"] == "CI"
-    assert set(ci["jobs"]) == {"python", "frontend", "e2e", "windows", "actionlint"}
-    assert {"push", "pull_request", "workflow_call"} <= set(_on(ci))
+    assert set(ci["jobs"]) == {"changes", "python", "frontend", "e2e", "windows", "actionlint"}
+    on = _on(ci)
+    assert {"push", "pull_request", "workflow_call"} <= set(on)
+    # a pull request runs once, on its own event, not again for the push to its branch
+    assert on["push"]["branches"] == ["master"]
     assert ci["concurrency"]["cancel-in-progress"] is True
-    assert set(ci["jobs"]["e2e"]["needs"]) == {"python", "frontend"}
-    assert set(ci["jobs"]["windows"]["needs"]) == {"python", "frontend"}
+    assert set(ci["jobs"]["e2e"]["needs"]) == {"changes", "python", "frontend"}
+    assert set(ci["jobs"]["windows"]["needs"]) == {"changes", "python", "frontend"}
+
+
+def test_ci_runs_the_jobs_a_pull_request_needs() -> None:
+    """Text only: the Python job (its tests read CHANGELOG, README and SECURITY.md). docs/manual: the frontend
+    job too, since the app bundles the manual as its help. Anything else, a push or a release: every job."""
+    jobs = _load(WORKFLOWS / "ci.yml")["jobs"]
+    assert "needs" not in jobs["python"] and "if" not in jobs["python"]
+    assert "if" not in jobs["actionlint"]
+    assert set(jobs["frontend"]["needs"]) == {"changes", "python"}
+    assert jobs["frontend"]["if"] == "needs.changes.outputs.scope != 'text'"
+    for name in ("e2e", "windows"):
+        assert jobs[name]["if"] == "needs.changes.outputs.scope == 'full'"
+    changes = jobs["changes"]
+    assert changes["outputs"]["scope"] == "${{ steps.scope.outputs.scope }}"
+    assert changes["steps"][0]["with"]["fetch-depth"] == 2  # the pull request's merge commit and its base
+    run = next(s["run"] for s in changes["steps"] if s.get("id") == "scope")
+    assert "tools/ci_scope.py" in run
+    assert "--no-renames" in run  # a file moved out of src/ lists its old path too
+    assert "pull_request" in run and "scope=full" in run
+
+
+def test_text_only_pull_requests_skip_the_audits_and_codeql() -> None:
+    for name in ("security.yml", "codeql.yml"):
+        on = _on(_load(WORKFLOWS / name))
+        assert on["pull_request"]["paths-ignore"] == ["**.md", "docs/**"]
+        # CodeQL compares a pull request with master's analysis, so every push to master is analysed
+        assert on["push"]["branches"] == ["master"] and "paths-ignore" not in on["push"]
 
 
 def test_prerelease_follows_successful_ci_on_master() -> None:
@@ -52,6 +82,21 @@ def test_prerelease_follows_successful_ci_on_master() -> None:
     assert run["types"] == ["completed"]
     assert run["branches"] == ["master"]
     assert pre["permissions"]["contents"] == "write"
+    condition = pre["jobs"]["ships"]["if"]
+    assert "conclusion == 'success'" in condition and "event == 'push'" in condition
+
+
+def test_prerelease_skips_a_merge_of_text_only() -> None:
+    """A merge that changes only text the app never ships publishes no CI build: the Pre-release channel would
+    offer an update that changes nothing, and push an older build out of the ten kept."""
+    jobs = _load(WORKFLOWS / "prerelease.yml")["jobs"]
+    ships = jobs["ships"]
+    assert ships["outputs"]["ships"] == "${{ steps.ships.outputs.ships }}"
+    assert ships["steps"][0]["with"]["fetch-depth"] == 0  # the last CI pre-release's commit and its tag
+    run = next(s["run"] for s in ships["steps"] if s.get("id") == "ships")
+    assert "tools/ci_scope.py" in run and "--no-renames" in run
+    assert jobs["prerelease"]["needs"] == "ships"
+    assert jobs["prerelease"]["if"] == "needs.ships.outputs.ships == 'true'"
 
 
 def test_release_runs_on_version_tags_after_tests() -> None:

@@ -73,13 +73,21 @@ The bench routers carry other people's tests. These rules are not optional:
   `test:`, `chore:`, `perf:`, `ci:`, `build:`.
 - One topic per pull request. Fill in the template's checklist: tests, screenshots for UI changes (light
   and dark), docs and `CHANGELOG.md` under `[Unreleased]`.
+- CI runs on the pull request, with the jobs its files need (`tools/ci_scope.py`):
+  - **Text only** (Markdown at the top level or under `.github/`, and `docs/` outside `docs/manual`): the Python
+    job, whose tests read `CHANGELOG.md`, `README.md` and `SECURITY.md`. CodeQL and the audits do not run.
+  - **`docs/manual`**: the frontend job too, since the app bundles the manual as its in-app help.
+  - **Anything else**: every job.
+
+  A push to `master` and a release run every job.
 - By contributing you agree that your contribution is licensed under GPL-3.0.
 
 ## Versions and releases
 
 `BASE_VERSION` in `src/openwrtgui/version.py` is the version being worked on. Every green build of
-`master` is published as the pre-release `BASE_VERSION-ci.N`, and pushing the tag `vBASE_VERSION`
-publishes the stable release.
+`master` is published as the pre-release `BASE_VERSION-ci.N`, unless only text changed since the last one (a
+pre-release that changes nothing would be offered as an update). Pushing the tag `vBASE_VERSION` publishes the
+stable release.
 
 1. Give the `[Unreleased]` section of `CHANGELOG.md` its version and date, merge that, then tag the merge
    commit `vX.Y.Z` and push the tag.

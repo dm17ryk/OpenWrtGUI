@@ -1,7 +1,8 @@
 name: Pre-release
 
 # Every green CI run of a push to master becomes a "vX.Y.Z-ci.N" pre-release, which the app's
-# Pre-release update channel offers. Only the newest 10 are kept.
+# Pre-release update channel offers, unless nothing the app ships changed since the last one: a merge of
+# text only (tools/ci_scope.py) would be offered as an update that changes nothing. Only the newest 10 are kept.
 
 on:
   workflow_run:
@@ -13,15 +14,43 @@ permissions:
   contents: write
   actions: read
 
+env:
+  GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
+  RUN: ${{ github.event.workflow_run.run_number }}
+  HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+
 jobs:
-  prerelease:
+  ships:
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
     runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
-      RUN: ${{ github.event.workflow_run.run_number }}
-      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+    outputs:
+      ships: ${{ steps.ships.outputs.ships }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - name: Does anything that ships differ from the last CI pre-release?
+        id: ships
+        run: |
+          last="$(gh release list --limit 200 --json tagName,isPrerelease,createdAt \
+            --jq '[.[] | select(.isPrerelease and (.tagName | test("-ci\\.[0-9]+$")))] | sort_by(.createdAt) | last | .tagName // ""')" ||
+            last=""
+          # whatever cannot be read publishes, as before
+          scope=full
+          if [ -n "${last}" ] && base="$(git rev-list -n 1 "refs/tags/${last}")" &&
+            files="$(git -c core.quotePath=false diff --no-renames --name-only "${base}" "${HEAD_SHA}")"; then
+            scope="$(printf '%s\n' "${files}" | python3 -I tools/ci_scope.py)"
+          fi
+          echo "since ${last:-no CI pre-release}: ${scope}"
+          if [ "${scope}" = text ]; then ships=false; else ships=true; fi
+          echo "ships=${ships}" >> "$GITHUB_OUTPUT"
+
+  prerelease:
+    needs: ships
+    if: needs.ships.outputs.ships == 'true'
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
