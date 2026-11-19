@@ -1,0 +1,19 @@
+{
+  "ifdown lte": {
+    "stdout": "",
+    "exit": 0
+  },
+  "uqmi -s -d /dev/cdc-wdm0 -t 5000 --sync": {
+    "stdout": "",
+    "exit": 0,
+    "seconds": 0.15
+  },
+  "ifup lte": {
+    "stdout": "",
+    "exit": 0
+  },
+  "ubus call network.interface.lte status": {
+    "stdout": "{\n\t\"up\": true,\n\t\"pending\": false,\n\t\"available\": true,\n\t\"autostart\": true,\n\t\"dynamic\": false,\n\t\"uptime\": 3,\n\t\"l3_device\": \"wwan0\",\n\t\"proto\": \"qmi\",\n\t\"updated\": [\n\t\t\"data\"\n\t],\n\t\"metric\": 20,\n\t\"dns_metric\": 0,\n\t\"delegation\": true,\n\t\"ipv4-address\": [\n\t\t\n\t],\n\t\"ipv6-address\": [\n\t\t\n\t],\n\t\"ipv6-prefix\": [\n\t\t\n\t],\n\t\"ipv6-prefix-assignment\": [\n\t\t\n\t],\n\t\"route\": [\n\t\t\n\t],\n\t\"dns-server\": [\n\t\t\n\t],\n\t\"dns-search\": [\n\t\t\n\t],\n\t\"neighbors\": [\n\t\t\n\t],\n\t\"inactive\": {\n\t\t\"ipv4-address\": [\n\t\t\t\n\t\t],\n\t\t\"ipv6-address\": [\n\t\t\t\n\t\t],\n\t\t\"route\": [\n\t\t\t\n\t\t],\n\t\t\"dns-server\": [\n\t\t\t\n\t\t],\n\t\t\"dns-search\": [\n\t\t\t\n\t\t],\n\t\t\"neighbors\": [\n\t\t\t\n\t\t]\n\t},\n\t\"data\": {\n\t\t\"cid_4\": \"26\",\n\t\t\"pdh_4\": \"89983344\"\n\t}\n}\n",
+    "exit": 0
+  }
+}
