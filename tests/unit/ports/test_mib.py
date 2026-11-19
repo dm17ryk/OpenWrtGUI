@@ -93,6 +93,38 @@ def test_port_stats_from_one_show() -> None:
     assert (stats.ports[2].totals.rx_bytes, stats.ports[2].totals.tx_packets) == (2151276205, 58138)
 
 
+def test_each_counter_says_its_width_and_column() -> None:
+    """The mt7620 counts packets and errors in 16 bits (AP2: 1.4 GB over 58138 packets is impossible else)
+    and octets in 32: the page needs each width to tell a wrap from a reset (final review C1)."""
+    stats = port_stats("switch0", BOARD, {}, CommandResult("swconfig dev switch0 show", SHOW, "", 0), 1.0)
+    cpu = stats.ports[2]
+    assert {n: cpu.bits[n] for n in ("TxGPC", "TxGOC", "TxBOC", "TxEPC", "RxGPC", "RxGOC", "RxEPC1")} == {
+        "TxGPC": 16,
+        "TxGOC": 32,
+        "TxBOC": 32,
+        "TxEPC": 16,
+        "RxGPC": 16,
+        "RxGOC": 32,
+        "RxEPC1": 16,
+    }
+    assert cpu.columns == {
+        "TxGPC": "tx_packets",
+        "TxGOC": "tx_bytes",
+        "TxEPC": "tx_errors",
+        "RxGPC": "rx_packets",
+        "RxGOC": "rx_bytes",
+        "RxEPC1": "rx_errors",
+    }  # the bad-octet counters are in no column
+    other = port_stats(
+        "switch0",
+        (SwitchPort(num=0, role="lan", label="LAN1", cpu=False, device=None),),
+        {},
+        CommandResult("", "Port 0:\n\tmib: Port 0 MIB counters\nFoo : 3\n\n", "", 0),
+        1.0,
+    ).ports[0]
+    assert (other.bits, other.columns) == ({"Foo": 32}, {})  # another driver's counter: 32-bit, no column
+
+
 def test_port_stats_notes() -> None:
     assert port_stats(None, (), {}, None, 1.0).note == NO_SWITCH
     failed = CommandResult("swconfig dev switch0 show", "", "swconfig: no such device\nmore\n", 1)

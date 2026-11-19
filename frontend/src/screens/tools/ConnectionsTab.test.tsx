@@ -66,10 +66,16 @@ test('the summary, the SIP ALG badge and a Helper column', async () => {
   expect(screen.getByText('udp 2 · tcp 1')).toBeInTheDocument()
 })
 
-test('more entries than read says so', async () => {
-  table = { ...table, total: 1200 }
+test('a count read a moment after the table does not claim the table was cut', async () => {
+  table = { ...table, total: 5 }
   show()
-  expect(await screen.findByText('1200 connections of 16384, showing the first 3')).toBeInTheDocument()
+  expect(await screen.findByText('5 connections of 16384')).toBeInTheDocument()
+})
+
+test('a table cut at 500 entries says so', async () => {
+  table = { ...table, rows: Array.from({ length: 500 }, () => ROWS[1]), total: 1200 }
+  show()
+  expect(await screen.findByText('1200 connections of 16384, showing the first 500')).toBeInTheDocument()
 })
 
 test('SIP ALG off and unknown', async () => {

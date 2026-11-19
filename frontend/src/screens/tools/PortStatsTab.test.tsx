@@ -35,7 +35,16 @@ function read(at: number, rxBytes: number, txBytes: number, rxErrors = 0): PortS
         link: true,
         speed_mbps: 100,
         totals: { rx_packets: 100, rx_bytes: rxBytes, rx_errors: rxErrors, tx_packets: 50, tx_bytes: txBytes, tx_errors: 0 },
-        raw: { RxGOC: rxBytes, TxGOC: txBytes, RxEPC1: rxErrors },
+        raw: { RxGPC: 100, RxGOC: rxBytes, RxEPC1: rxErrors, TxGPC: 50, TxGOC: txBytes, TxEPC: 0 },
+        bits: { RxGPC: 16, RxGOC: 32, RxEPC1: 16, TxGPC: 16, TxGOC: 32, TxEPC: 16 },
+        columns: {
+          RxGPC: 'rx_packets',
+          RxGOC: 'rx_bytes',
+          RxEPC1: 'rx_errors',
+          TxGPC: 'tx_packets',
+          TxGOC: 'tx_bytes',
+          TxEPC: 'tx_errors',
+        },
       },
     ],
   }
@@ -50,13 +59,33 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-function show() {
-  render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+function show(client = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
+  return render(
+    <QueryClientProvider client={client}>
       <PortStatsTab routerId="ap1" />
     </QueryClientProvider>,
   )
 }
+
+test('the table wears the app table style and scrolls on its own', async () => {
+  reads = [read(T0, 1_000_000, 500)]
+  show()
+  const table = await screen.findByRole('table')
+  expect(table).toHaveClass('tbl')
+  expect(table.parentElement).toHaveClass('scroll-x')
+})
+
+test('coming back to the tab starts counting from a fresh read, not a cached one', async () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  reads = [read(T0, 1_000_000, 500)]
+  const first = show(client)
+  await screen.findByText('Since 12:03:04')
+  first.unmount()
+  reads = [read(T0 + 60, 9_000_000, 900)]
+  show(client)
+  expect(await screen.findByText('Since 12:04:04')).toBeInTheDocument()
+  expect(screen.queryByText('Since 12:03:04')).toBeNull()
+})
 
 test('the columns, counted since the tab opened', async () => {
   reads = [read(T0, 1_000_000, 500)]

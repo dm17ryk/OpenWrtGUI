@@ -7135,6 +7135,14 @@ export interface components {
         };
         /** PortCounters */
         PortCounters: {
+            /** Bits */
+            bits: {
+                [key: string]: number;
+            };
+            /** Columns */
+            columns: {
+                [key: string]: string;
+            };
             /** Label */
             label: string;
             /** Link */

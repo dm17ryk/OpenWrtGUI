@@ -16,9 +16,11 @@ The numbers count from the moment the tab opened (**Since** shows the time); **S
 from now. The router's own counters are never cleared: nothing is sent to the router but the read. **Rx rate** and
 **Tx rate** come from the last two reads, in bits per second.
 
-The counters are 32-bit, so a busy port wraps around after about 4 GB; a wrap is counted correctly. A counter that
-goes down for any other reason, such as a router reboot, shows **reset** instead of a rate. Errors above zero are
-marked. **All counters** under a port lists every counter the switch printed, under the switch's own names (on the
+The switch's counters wrap around: on the bench routers the byte counters after about 4 GB, the packet and error
+counters after 65,536. The page reads them often enough to see each wrap, and adds up every step, so the counts
+since the start stay right however many times a counter wraps. A counter that goes down for any other reason, or
+jumps faster than the port's link could carry, was reset (a router reboot, for example): the rate shows **reset**
+for that read, and the counts go on from the counter's new value. Errors above zero are marked. **All counters** under a port lists every counter the switch printed, under the switch's own names (on the
 bench routers `TxGPC`, `TxGOC`, `RxEPC1` and so on), so a switch with other names still shows its numbers.
 
 A router without a swconfig switch (a DSA router) says so: its ports have their own network devices, and their

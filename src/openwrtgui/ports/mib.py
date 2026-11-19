@@ -26,6 +26,22 @@ KNOWN: Mapping[str, tuple[Direction, Kind]] = {
     "TxEPC": ("tx", "errors"),
 }
 
+# Bits per counter, so the page tells a wrap from a reset (final review C1). The mt7620 counts packets and
+# errors in 16 bits: AP2's port 6 showed 58138 packets beside 1448000972 octets (~25 KB a packet otherwise).
+# Octets are
+# 32-bit. Any other counter is taken as 32-bit.
+WIDTH: Mapping[str, int] = {
+    "RxGPC": 16,
+    "TxGPC": 16,
+    "RxEPC1": 16,
+    "RxEPC2": 16,
+    "TxEPC": 16,
+    "RxGOC": 32,
+    "TxGOC": 32,
+    "RxBOC": 32,
+    "TxBOC": 32,
+}
+
 NO_SWITCH = "This router has no swconfig switch, so it has no port counters here."
 READ_FAILED = "Could not read the switch counters: {detail}"
 
@@ -50,6 +66,8 @@ class PortCounters(BaseModel):
     speed_mbps: int | None
     totals: PortTotals
     raw: dict[str, int]
+    bits: dict[str, int]  # each raw counter's width: 16 or 32
+    columns: dict[str, str]  # raw counter → the column it adds to (rx_packets, …); unknown names are in none
 
 
 class PortStats(BaseModel):
@@ -114,6 +132,8 @@ def port_stats(
                 speed_mbps=state.speed_mbps if state else None,
                 totals=totals(raw),
                 raw=raw,
+                bits={name: WIDTH.get(name, 32) for name in raw},
+                columns={name: "_".join(KNOWN[name]) for name in raw if name in KNOWN},
             )
         )
     return PortStats(switch=switch, read_at=read_at, ports=rows)

@@ -7,6 +7,7 @@ import { HELP } from '../../help/topics'
 import { type ConnectionFilter, type Proto, byProtocol, matches } from './connectionFilter'
 
 const POLL_MS = 5000
+const READ_CAP = 500 // `head -n 500 /proc/net/nf_conntrack`
 
 function sipText(sip: SipAlg): string {
   if (sip.state === 'unknown') return 'SIP ALG unknown: this router has no fw4 ruleset'
@@ -18,8 +19,9 @@ function sipText(sip: SipAlg): string {
 
 function summary(c: Connections): string | null {
   if (c.total == null || c.limit == null) return null
-  // the router sends at most 500 entries (AP2 has ~7 MB free RAM): say how many of them were read
-  const capped = c.total > c.rows.length ? `, showing the first ${c.rows.length}` : ''
+  // the router sends at most 500 entries (AP2 has ~7 MB free RAM); the count is read a moment after the table, so
+  // only a full read means the table was cut (final review I3)
+  const capped = c.rows.length >= READ_CAP && c.total > c.rows.length ? `, showing the first ${READ_CAP}` : ''
   return `${c.total} connections of ${c.limit}${capped}`
 }
 

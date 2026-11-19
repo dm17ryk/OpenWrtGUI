@@ -4,11 +4,14 @@ import { ApiError, apiFetch } from '../../api/client'
 import type { PortCounters, PortStats } from '../../api/types'
 import { Help } from '../../help/Help'
 import { HELP } from '../../help/topics'
-import { type Column, formatBits, formatBytes, rate, sinceBaseline } from './portRates'
+import { type Column, type Since, accumulate, emptySince, formatBits, formatBytes, rate } from './portRates'
 
 const POLL_MS = 5000
 
-type Reads = { base: PortStats | null; prev: PortStats | null; last: PortStats | null }
+/** The baseline's time, the last two reads (for the rates), and the counts added up since the baseline. */
+type Reads = { base: PortStats | null; prev: PortStats | null; last: PortStats | null; since: Since }
+
+const NONE: Reads = { base: null, prev: null, last: null, since: {} }
 
 function clock(readAt: number): string {
   return new Date(readAt * 1000).toLocaleTimeString('en-GB', { hour12: false })
@@ -19,13 +22,12 @@ function linkText(p: PortCounters): string {
   return p.speed_mbps === null ? 'up' : `${p.speed_mbps} Mbit/s`
 }
 
-function since(reads: Reads, num: number, column: Column): number | 'reset' | null {
-  return reads.base && reads.last ? sinceBaseline(reads.base, reads.last, num, column) : null
+function since(reads: Reads, num: number, column: Column): number | null {
+  return reads.since[num]?.[column] ?? null
 }
 
-function countText(v: number | 'reset' | null, bytes = false): string {
+function countText(v: number | null, bytes = false): string {
   if (v === null) return '—'
-  if (v === 'reset') return 'reset'
   return bytes ? formatBytes(v) : String(v)
 }
 
@@ -36,7 +38,7 @@ function rateText(reads: Reads, num: number, column: Column, isStale: boolean): 
   return r === 'reset' ? 'reset' : formatBits(r * 8)
 }
 
-function ErrorsCell({ value }: { value: number | 'reset' | null }) {
+function ErrorsCell({ value }: { value: number | null }) {
   return <td className={typeof value === 'number' && value > 0 ? 'warn' : undefined}>{countText(value)}</td>
 }
 
@@ -51,11 +53,17 @@ export function PortStatsTab({ routerId }: { routerId: string }) {
     refetchInterval: POLL_MS,
     refetchIntervalInBackground: false,
   })
-  const [reads, setReads] = useState<Reads>({ base: null, prev: null, last: null })
-  const data = query.data
+  const [reads, setReads] = useState<Reads>(NONE)
+  // coming back to the tab starts from a fresh read, never the cached one of the last visit (final review M2)
+  const data = query.isFetchedAfterMount ? query.data : undefined
   if (data && reads.last !== data) {
-    // a new read: keep the one before it for the rates (React's "adjust state while rendering" pattern)
-    setReads({ base: reads.base ?? data, prev: reads.last, last: data })
+    // a new read (React's "adjust state while rendering" pattern): the first is the baseline; each later one
+    // adds its step to the counts, so any number of wraps add up
+    setReads(
+      reads.last === null
+        ? { base: data, prev: null, last: data, since: emptySince(data) }
+        : { base: reads.base, prev: reads.last, last: data, since: accumulate(reads.since, reads.last, data) },
+    )
   }
   const last = reads.last
   const isStale = query.isError
@@ -68,7 +76,11 @@ export function PortStatsTab({ routerId }: { routerId: string }) {
         {reads.base && last && !last.note && (
           <>
             <span className="muted">Since {clock(reads.base.read_at)}</span>
-            <button className="btn" type="button" onClick={() => setReads((r) => ({ ...r, base: r.last }))}>
+            <button
+              className="btn"
+              type="button"
+              onClick={() => setReads((r) => (r.last ? { ...r, base: r.last, since: emptySince(r.last) } : r))}
+            >
               Start over
             </button>
           </>
@@ -80,8 +92,8 @@ export function PortStatsTab({ routerId }: { routerId: string }) {
       )}
       {last?.note && <div className="note">{last.note}</div>}
       {last && !last.note && (
-        <div style={{ overflowX: 'auto' }}>
-          <table>
+        <div className="scroll-x">
+          <table className="tbl">
             <thead>
               <tr>
                 <th>Port</th>
