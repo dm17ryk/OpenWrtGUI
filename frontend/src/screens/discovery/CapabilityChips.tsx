@@ -1,5 +1,7 @@
 import { Link } from 'react-router'
 import type { CapabilityRow } from '../../api/types'
+import { Help } from '../../help/Help'
+import { HELP } from '../../help/topics'
 import { capabilityLink } from './capabilityLinks'
 
 const STYLE: Record<CapabilityRow['state'], string> = {
@@ -21,7 +23,10 @@ function chipText(row: CapabilityRow): string {
 export function CapabilityChips({ routerId, rows }: { routerId: string; rows: readonly CapabilityRow[] }) {
   return (
     <section className="card stack" aria-labelledby="caps-h">
-      <h2 id="caps-h">Capabilities</h2>
+      <div className="hrow">
+        <h2 id="caps-h">Capabilities</h2>
+        <Help topic={HELP.discoveryCapabilities} />
+      </div>
       <ul className="chips">
         {rows.map((row) => {
           const to = capabilityLink(routerId, row.name)
