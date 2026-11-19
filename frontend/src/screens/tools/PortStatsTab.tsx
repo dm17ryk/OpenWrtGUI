@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { ApiError, apiFetch } from '../../api/client'
 import type { PortCounters, PortStats } from '../../api/types'
 import { Help } from '../../help/Help'
@@ -52,11 +52,11 @@ export function PortStatsTab({ routerId }: { routerId: string }) {
     refetchIntervalInBackground: false,
   })
   const [reads, setReads] = useState<Reads>({ base: null, prev: null, last: null })
-  useEffect(() => {
-    const data = query.data
-    if (!data) return
-    setReads((r) => (r.last === data ? r : { base: r.base ?? data, prev: r.last, last: data }))
-  }, [query.data])
+  const data = query.data
+  if (data && reads.last !== data) {
+    // a new read: keep the one before it for the rates (React's "adjust state while rendering" pattern)
+    setReads({ base: reads.base ?? data, prev: reads.last, last: data })
+  }
   const last = reads.last
   const isStale = query.isError
   return (
