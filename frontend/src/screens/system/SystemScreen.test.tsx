@@ -114,3 +114,11 @@ test('the connection table opens on request', async () => {
   expect(within(table).getAllByRole('row')).toHaveLength(AP2_CONNECTIONS.rows.length + 1)
   expect(table).toHaveTextContent('ESTABLISHED')
 })
+
+test('the connection card links to all connections on Tools', async () => {
+  renderSystem()
+  expect(await screen.findByRole('link', { name: 'All connections' })).toHaveAttribute(
+    'href',
+    '/routers/ap2/tools/connections',
+  )
+})
