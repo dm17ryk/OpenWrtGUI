@@ -7,6 +7,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-19
+
+Leftovers from the 1.0 reviews, an accessibility check, LTE Recover, rate statistics and app key rotation.
+
 ### Added
 
 - LTE › **Recover**: finds what is wrong with the modem, then tries one step at a time until LTE works: put back
@@ -503,7 +507,8 @@ The foundation: install, update, add routers, see them, and stay out of a runnin
 - Router simulator built from recorded router output, used for e2e tests, screenshots and demos.
 - CI, pre-release and release workflows, wiki sync, CodeQL and Dependabot.
 
-[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v1.1.0
 [1.0.1]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v1.0.1
 [1.0.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v1.0.0
 [0.8.2]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v0.8.2

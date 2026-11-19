@@ -354,8 +354,8 @@ def test_key_rotation_is_documented() -> None:
 
 
 def test_v1_1b_is_in_the_changelog() -> None:
-    unreleased = _read(ROOT / "CHANGELOG.md").split("## [Unreleased]", 1)[1].split("\n## [", 1)[0]
-    assert "Which rates reach the station" in unreleased and "**Rotate key**" in unreleased
+    released = _read(ROOT / "CHANGELOG.md").split("## [1.1.0]", 1)[1].split("\n## [", 1)[0]
+    assert "Which rates reach the station" in released and "**Rotate key**" in released
 
 
 def test_rates_are_documented_as_read() -> None:
