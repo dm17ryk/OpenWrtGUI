@@ -176,6 +176,14 @@ class LteService:
             return False
         return await self._address(t) is not None
 
+    async def down_now(self, t: Transport) -> bool:
+        """lte is down and its teardown is over: netifd reports it neither up nor pending, and no uqmi runs.
+        netifd's `ifdown lte` returns before qmi.sh's teardown ends (AP2, 2026-11-19 window)."""
+        status = await self._status(t, "lte")
+        if status is None or status.get("up") is not False or status.get("pending") is not False:
+            return False
+        return (await t.run(c.UQMI_RUNNING)).stdout.strip() == "0"
+
     async def pause(self) -> None:
         await self._sleep(self.poll_s)
 

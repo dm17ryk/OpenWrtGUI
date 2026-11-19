@@ -127,11 +127,18 @@ its own saved setup (4.4), if there is one.
 |---|---|---|---|
 | 1 | Put back the saved setup (only if a setup is chosen and differs) | the settings change of 4.4, with rollback and confirm | wait for "works", up to `CONNECT_S` |
 | 2 | Reconnect | `ifdown lte`, `ifup lte` | wait for "works", up to `CONNECT_S` |
-| 3 | Clear QMI state | `ifdown lte`, `uqmi -s -d DEV -t 5000 --sync`, `ifup lte` | wait for "works", up to `CONNECT_S` |
-| 4 | Turn off the modem's autoconnect (4.9) | `ifdown lte`, `uqmi -s -d DEV -t 5000 --set-autoconnect disabled` (sent up to 10 times, 1 s apart, until it exits 0), `ifup lte` | wait for "works", up to `CONNECT_S` |
+| 3 | Clear QMI state | `ifdown lte`, wait until lte is down and no uqmi runs (up to `DISCONNECT_S`), `uqmi -s -d DEV -t 5000 --sync`, `ifup lte` | wait for "works", up to `CONNECT_S` |
+| 4 | Turn off the modem's autoconnect (4.9) | `ifdown lte`, `uqmi -s -d DEV -t 5000 --set-autoconnect disabled` (sent up to 10 times, 1 s apart, until it exits 0 or answers "No effect": already off), `ifup lte` | wait for "works", up to `CONNECT_S` |
 | 5 | Restart the modem | `ifdown lte`, then the Reboot modem sequence (`low_power`, readback, `online`, readback, `ifup lte`) | wait for "works", up to `CONNECT_S` |
 
-- `--sync` comes only after `ifdown lte`, so it cannot release the client id of a live session.
+- `--sync` comes only after `ifdown lte`, so it cannot release the client id of a live session. **AP2 window,
+  2026-11-19:** `ifdown lte` returns before qmi.sh's teardown ends. Sent right after it, `--sync` took the
+  modem's QMI service down ("Failed to connect to service"), and LTE stayed down through a modem restart until a
+  router reboot. So rung 3 first waits until netifd reports lte neither up nor pending and no uqmi runs
+  (`ps w | grep -c '[u]qmi '` is 0), up to `DISCONNECT_S`. If lte is not down by then, `--sync` is not sent:
+  the rung records "failed: ... not sent: lte was not down after 20 s" and still runs `ifup lte`.
+- **AP2 window, 2026-11-19:** AP2's qmi.sh turns the modem's autoconnect off at every connect, so rung 4's
+  command answers "No effect" (exit 1). That is the rung's aim reached: it counts as done, not as a failure.
 - **A failed command in rungs 1-4 does not end the job (my call).** A stuck modem is exactly when `--sync`,
   `--set-autoconnect` or `ifup` may fail. The rung records "failed: <command>: <reason>" (a non-zero exit or no
   answer within the timeout), still runs its `ifup lte` if it ran `ifdown lte`, and the job goes on to the next

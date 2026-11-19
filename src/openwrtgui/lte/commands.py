@@ -60,6 +60,15 @@ def autoconnect_off(device: str) -> str:
     return uqmi(device, "--set-autoconnect", "disabled", timeout_ms=5000)
 
 
+# uqmi's answer (exit 1) when QMI says the request changes nothing: for `autoconnect_off`, it is already off
+# (AP2's BM806C, 2026-11-19 window: its qmi.sh turns autoconnect off at every connect)
+NO_EFFECT = '"No effect"'
+
+# How many uqmi processes run: qmi.sh's teardown releases its client with uqmi, and netifd's `ifdown lte`
+# returns before it ends (AP2, 2026-11-19 window). `[u]` keeps grep from counting its own command line.
+UQMI_RUNNING = "ps w | grep -c '[u]qmi '"
+
+
 def iface_status(name: str) -> str:
     return f"ubus call network.interface.{_checked(IFACE, name, 'an interface name')} status"
 

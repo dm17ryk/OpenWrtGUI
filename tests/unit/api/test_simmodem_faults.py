@@ -15,6 +15,7 @@ ONLINE = f"uqmi -s -d {DEV} -t 3000 --set-device-operating-mode online"
 SYNC = f"uqmi -s -d {DEV} -t 5000 --sync"
 AUTOCONNECT_OFF = f"uqmi -s -d {DEV} -t 5000 --set-autoconnect disabled"
 STATUS = "ubus call network.interface.lte status"
+UQMI_RUNNING = "ps w | grep -c '[u]qmi '"
 
 
 async def _transport(ctx: AppContext) -> ReplayTransport:
@@ -76,6 +77,39 @@ async def test_modem_autoconnect_blocks_ifup_until_turned_off(ctx: AppContext) -
     assert (taken.exit_status, taken.stdout) == (0, "")
     await t.run("ifup lte")
     assert (await _status(t))["up"] is True
+
+
+async def test_autoconnect_already_off_answers_no_effect(ctx: AppContext) -> None:
+    """AP2's BM806C, 2026-11-19 window: its qmi.sh turns autoconnect off at every connect, so the modem
+    answers a `--set-autoconnect disabled` with QMI's "No effect" and exit 1."""
+    t = await _transport(ctx)
+    assert t.state.modem.autoconnect_on is False  # type: ignore[union-attr]
+    answer = await t.run(AUTOCONNECT_OFF)
+    assert (answer.exit_status, answer.stdout, answer.stderr) == (1, '"No effect"\n', "")
+
+
+async def test_ifdown_returns_before_the_teardown_ends(ctx: AppContext) -> None:
+    """AP2, 2026-11-19 window: netifd's `ifdown lte` returns while qmi.sh's teardown still runs uqmi."""
+    t = await _transport(ctx)
+    modem = t.state.modem  # type: ignore[union-attr]
+    modem.teardown_reads = 2
+    assert (await t.run("ifdown lte")).ok
+    reads = [(await t.run(UQMI_RUNNING)).stdout for _ in range(3)]
+    assert reads == ["1\n", "1\n", "0\n"]
+
+
+async def test_a_sync_during_the_teardown_leaves_the_session_down(ctx: AppContext) -> None:
+    """AP2, 2026-11-19 window: a `--sync` sent while the teardown ran took the modem's QMI service down, and
+    nothing short of a router reboot brought LTE back (a modem restart did not)."""
+    t = await _transport(ctx)
+    modem = t.state.modem  # type: ignore[union-attr]
+    modem.teardown_reads = 2
+    await t.run("ifdown lte")
+    await t.run(SYNC)
+    assert modem.sync_raced is True
+    for line in (LOW, ONLINE, "ifup lte"):
+        await t.run(line)
+    assert (await _status(t))["up"] is False
 
 
 async def test_a_healthy_session_has_the_ap2_handle(ctx: AppContext) -> None:

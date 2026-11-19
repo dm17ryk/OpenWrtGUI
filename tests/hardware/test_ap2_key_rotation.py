@@ -33,6 +33,14 @@ pytestmark = pytest.mark.hardware
 AP2 = "192.168.1.2"
 
 
+def kept_line(snapshot: str) -> str | None:
+    """The first line of AP2's authorized_keys, which the cleanup's removals need still there, as `grep -x`
+    on the router sees it: split on newlines only, like the app's own reads (rotate._lines), so a CR ending
+    the line stays in it. AP2's first line ends in a CR: with `splitlines()` every removal found no kept line,
+    did nothing and still exited 0 (2026-11-19 window)."""
+    return next((line for line in snapshot.split("\n") if line.strip()), None)
+
+
 async def _keys_text(t: Transport) -> str:
     result = await t.run(KEYS_READ)
     assert result.ok, f"AP2's authorized_keys does not read (exit {result.exit_status})"
@@ -51,7 +59,7 @@ async def test_a_throwaway_app_key_rotates_on_ap2(
     ap2_rw: SshTransport, request: pytest.FixtureRequest, tmp_path: Path
 ) -> None:
     snapshot = await _keys_text(ap2_rw)
-    keep = next((line for line in snapshot.splitlines() if line.strip()), None)
+    keep = kept_line(snapshot)
     assert keep is not None, "AP2's authorized_keys must hold the window's own key"
     # `echo >>` would glue a line onto an unterminated last line, and the cleanup could not undo that
     assert snapshot.endswith("\n"), "AP2's authorized_keys has no final newline: stop, nothing was written"
@@ -90,12 +98,13 @@ async def test_a_throwaway_app_key_rotates_on_ap2(
         with pytest.raises(AuthFailed):
             await _login(host_keys, old_private)
         after = await _keys_text(ap2_rw)
-        assert after.splitlines() == [*snapshot.splitlines(), ring.current.public_line]
+        assert after == f"{snapshot}{ring.current.public_line}\n"  # exact: a CR or a lost byte shows
     finally:
         await pool.close_all()
         # every line this test may have put on AP2, whatever step failed (final review F5): the throwaway old
         # key, and the new key whether or not the rotation finished
         added = {old_line, ring.current.public_line, *([ring.next.public_line] if ring.next else [])}
-        for line in sorted(added):
-            await ap2_rw.run(remove_old_key_command(keep, line))
-        assert await _keys_text(ap2_rw) == snapshot, "AP2's authorized_keys is not as found"
+        exits = [(await ap2_rw.run(remove_old_key_command(keep, line))).exit_status for line in sorted(added)]
+        assert await _keys_text(ap2_rw) == snapshot, (
+            f"AP2's authorized_keys is not as found (removals: {exits})"
+        )

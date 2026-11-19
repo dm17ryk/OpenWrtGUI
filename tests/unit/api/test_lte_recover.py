@@ -161,6 +161,40 @@ async def test_autoconnect_that_never_takes_goes_on_to_the_restart(ctx: AppConte
     assert job.rungs[4].outcome is not None and LOW in _calls(ctx)
 
 
+async def test_clear_qmi_sends_sync_only_once_the_teardown_is_over(ctx: AppContext) -> None:
+    """2026-11-19 AP2 window: `ifdown lte` returns before qmi.sh's teardown ends, and a `--sync` sent then
+    took the modem's QMI service down until a router reboot. Clear QMI state waits until lte is down and no
+    uqmi runs (spec 4.2)."""
+    modem = await _modem(ctx)
+    modem.connected, modem.stale_qmi, modem.teardown_reads = False, True, 3
+    job = await _recover(ctx)
+    assert modem.sync_raced is False
+    assert (job.phase, job.detail) == ("recovered", "LTE works again after: Clear QMI state.")
+
+
+async def test_clear_qmi_skips_sync_when_lte_never_goes_down(ctx: AppContext) -> None:
+    modem = await _modem(ctx)
+    modem.connected, modem.stale_qmi, modem.teardown_reads = False, True, 1000
+    job = await _recover(ctx)
+    rung = job.rungs[2]
+    assert rung.outcome == "failed"
+    assert rung.detail == f"{SYNC} not sent: lte was not down after 20 s"
+    calls = _calls(ctx)
+    assert SYNC not in calls and modem.sync_raced is False
+    assert calls.count("ifup lte") >= 2  # rung 3 still puts lte back up
+
+
+async def test_autoconnect_already_off_counts_as_done(ctx: AppContext) -> None:
+    """2026-11-19 AP2 window: the BM806C answers "No effect" when autoconnect is already off. That is the
+    rung's aim reached: one try, no failure, and the ladder goes on to the restart."""
+    (await _modem(ctx)).wedged = True
+    job = await _recover(ctx)
+    rung = job.rungs[3]
+    assert (rung.outcome, rung.detail) == ("not yet", None)
+    assert _calls(ctx).count(AUTOCONNECT_OFF) == 1
+    assert (job.phase, job.detail) == ("recovered", "LTE works again after: Restart the modem.")
+
+
 async def test_a_wedged_modem_needs_the_restart_rung(ctx: AppContext) -> None:
     (await _modem(ctx)).wedged = True
     job = await _recover(ctx)
