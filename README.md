@@ -14,7 +14,10 @@ is connected, and how each router describes itself. It never disturbs a test run
 
 ![Dashboard: three routers, the 2.4 GHz air map and one station](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/dashboard.png)
 
-> v1.0 adds the complete manual, with How changes work, Files and data and a Glossary, and the hardening for
+> v1.1 adds LTE Recover, which finds what is wrong with the modem and tries one step at a time until LTE works,
+> with saved good setups to reconfigure from; which rates reach a station, on RF live; app key rotation; and the
+> 1.0 reviews' leftovers, with an accessibility check of every screen in both themes.
+> v1.0 added the complete manual, with How changes work, Files and data and a Glossary, and the hardening for
 > 1.0: refreshes send fewer commands (the LTE screen asks the modem once instead of five times, Legacy iptables
 > reads every table in one command instead of nine), LTE, RF live and System status reconnect by themselves
 > after a lost connection, Discovery, Plugins and LuCI change lists hide every secret option, and CI runs
@@ -38,6 +41,19 @@ is connected, and how each router describes itself. It never disturbs a test run
 > a router-side rollback, DHCP, DNS, routes, ports and VLANs); v0.2 Wi-Fi with proof on air, RF live and the
 > LuCI fallback; v0.1 the foundation: install, update, add routers, the dashboard, Bench Guard, the terminal
 > and the audit log. What comes next is in the [roadmap](ROADMAP.md).
+
+## What v1.1 adds
+
+| Screen | What you get |
+|---|---|
+| **LTE** | **Recover** finds what is wrong with the modem, then tries one step at a time until LTE works: put back the saved good setup, reconnect, clear the modem's QMI state, turn off the modem's autoconnect, restart the modem. Live progress, **Stop**, and a plain answer when nothing helped; it never reboots the router. **Save good setup** and **Reconfigure** from this router's setup or another router's, with the usual preview and rollback. Status says when the session carries no data, and the AT console asks more firmly before `AT&F`, `AT&W` and `AT+CFUN=`. |
+| **RF live** | **Which rates reach the station**: each rate tried for the selected station, its attempts, the share acknowledged and the rate in use, read every 5 s while the card is open. |
+| **Settings › App SSH key** | **Rotate key**: a new key goes to each router, proven with a new login, and the old key's line is removed. Routers that are off stay on the old key and can be retried. |
+| **Top bar** | **Wiki** opens the manual on the project wiki in your browser. |
+| **Accessibility** | The browser tests check every screen with axe, in both themes; the dark theme's "Block all" contrast is fixed. |
+| **Fixes** | The 1.0 reviews' leftovers: reads, Remove from the app, captures, the image library, and Reboot modem when a harness run starts: the full list is in the [changelog](CHANGELOG.md). |
+
+LTE Recover, the rate statistics and key rotation were proven on a bench router.
 
 ## What v1.0 adds
 
