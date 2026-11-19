@@ -3253,6 +3253,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/system/sip-alg": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sip Alg
+         * @description Whether fw4 hands SIP to the `sip` conntrack helper (Tools › Connections): read only.
+         */
+        get: operations["sip_alg_api_routers__router_id__system_sip_alg_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/system/ssh-keys/apply": {
         parameters: {
             query?: never;
@@ -4339,6 +4359,8 @@ export interface components {
             dport: number | null;
             /** Dst */
             dst: string | null;
+            /** Helper */
+            helper?: string | null;
             /** Proto */
             proto: string;
             /** Sport */
@@ -4350,10 +4372,14 @@ export interface components {
         };
         /** Connections */
         Connections: {
+            /** Limit */
+            limit?: number | null;
             /** Note */
             note?: string | null;
             /** Rows */
             rows: components["schemas"]["Connection"][];
+            /** Total */
+            total?: number | null;
         };
         /** CopyApplyIn */
         CopyApplyIn: {
@@ -8203,6 +8229,21 @@ export interface components {
         SetupSourceIn: {
             /** Source */
             source: string;
+        };
+        /**
+         * SipAlg
+         * @description Whether fw4 hands SIP to the `sip` conntrack helper (v1.2a R9), on which zones and UDP ports.
+         */
+        SipAlg: {
+            /** Ports */
+            ports: number[];
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "on" | "off" | "unknown";
+            /** Zones */
+            zones: string[];
         };
         /** SshApplyIn */
         SshApplyIn: {
@@ -15530,6 +15571,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sip_alg_api_routers__router_id__system_sip_alg_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SipAlg"];
                 };
             };
             /** @description Validation Error */

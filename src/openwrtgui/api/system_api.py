@@ -27,6 +27,7 @@ from openwrtgui.system.state import (
     LogEntry,
     LogKind,
     ProcessList,
+    SipAlg,
     SystemOverview,
     TimeZones,
 )
@@ -321,6 +322,12 @@ async def diagnose(router_id: str, body: DiagnoseIn, ctx: Ctx) -> DiagResult:
 @router.get("/connections")
 async def connections(router_id: str, ctx: Ctx) -> Connections:
     return await ctx.system.connections(_known(ctx, router_id))
+
+
+@router.get("/sip-alg")
+async def sip_alg(router_id: str, ctx: Ctx) -> SipAlg:
+    """Whether fw4 hands SIP to the `sip` conntrack helper (Tools › Connections): read only."""
+    return await ctx.system.sip_alg(_known(ctx, router_id))
 
 
 @router.get("/timezones")

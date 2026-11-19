@@ -94,7 +94,28 @@ async def test_connections_capped_and_missing_table(authed: httpx.AsyncClient, c
     assert missing == {
         "rows": [],
         "note": "The connection table is not available: nf_conntrack is not loaded",
+        "total": None,
+        "limit": None,
     }
+
+
+async def test_connections_size_helper_and_sip_alg(authed: httpx.AsyncClient, ctx: AppContext) -> None:
+    body = (await authed.get("/api/routers/ap2/system/connections")).json()
+    assert (body["total"], body["limit"]) == (len(body["rows"]), 16384)
+    assert [r["dport"] for r in body["rows"] if r["helper"] == "sip"] == [5060]
+    sip = (await authed.get("/api/routers/ap2/system/sip-alg")).json()
+    assert sip == {"state": "on", "zones": ["lan"], "ports": [5060]}
+    sim = await _system(ctx)
+    real = sim.answer
+
+    def no_size(command: str) -> CommandResult | None:
+        if command == s.CONNTRACK_SIZE:
+            return CommandResult(command, "", "cat: can't open\n", 1)
+        return real(command)
+
+    sim.answer = no_size  # type: ignore[method-assign]
+    sized = (await authed.get("/api/routers/ap2/system/connections")).json()
+    assert (sized["total"], sized["limit"]) == (None, None) and sized["rows"]
 
 
 def test_system_ws_streams_samples(ctx: AppContext) -> None:

@@ -7,7 +7,9 @@ import contextlib
 import json
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict
 
 LOAD_SCALE = 65536  # `ubus call system info` gives load averages times 65536
 
@@ -94,6 +96,17 @@ class Connection:
     dport: int | None
     state: str | None
     bytes: int
+    helper: str | None = None  # the conntrack helper on the entry (`helper=sip`: the SIP ALG handles it)
+
+
+class SipAlg(BaseModel):
+    """Whether fw4 hands SIP to the `sip` conntrack helper (v1.2a R9), on which zones and UDP ports."""
+
+    model_config = ConfigDict(frozen=True)
+
+    state: Literal["on", "off", "unknown"]
+    zones: list[str]
+    ports: list[int]
 
 
 def _object(text: str) -> dict[str, Any] | None:
@@ -356,6 +369,49 @@ def parse_conntrack(text: str) -> list[Connection]:
                 dport=int(fields["dport"]) if fields.get("dport", "").isdigit() else None,
                 state=state,
                 bytes=total,
+                helper=fields.get("helper"),
             )
         )
     return out
+
+
+def parse_conntrack_size(text: str) -> tuple[int | None, int | None]:
+    """`nf_conntrack_count` then `nf_conntrack_max`; anything but two numbers gives neither."""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if len(lines) != 2 or not all(v.isdigit() for v in lines):
+        return None, None
+    return int(lines[0]), int(lines[1])
+
+
+_FW4 = re.compile(r"^table inet fw4\b")
+_CHAIN = re.compile(r"^\s*chain (\S+)")
+_SIP_RULE = re.compile(r'ct helper set "sip"')
+_UDP_DPORT = re.compile(r"\budp dport (\d+)")
+
+
+def parse_sip_alg(nft_text: str) -> SipAlg:
+    """`nft -a list ruleset`: on when a rule in `table inet fw4` sets the `sip` helper. The zone comes from
+    the chain's name (`helper_<zone>`), the port from `udp dport <n>`; no fw4 table gives unknown."""
+    in_fw4 = False
+    seen_fw4 = False
+    chain = ""
+    zones: set[str] = set()
+    ports: set[int] = set()
+    for line in nft_text.splitlines():
+        if line.startswith("table "):
+            in_fw4 = bool(_FW4.match(line))
+            seen_fw4 = seen_fw4 or in_fw4
+            continue
+        if not in_fw4:
+            continue
+        if m := _CHAIN.match(line):
+            chain = m.group(1)
+        elif _SIP_RULE.search(line):
+            zones.add(chain.removeprefix("helper_") if chain.startswith("helper_") else chain)
+            if port := _UDP_DPORT.search(line):
+                ports.add(int(port.group(1)))
+    if not seen_fw4:
+        return SipAlg(state="unknown", zones=[], ports=[])
+    if not zones:
+        return SipAlg(state="off", zones=[], ports=[])
+    return SipAlg(state="on", zones=sorted(zones), ports=sorted(ports))

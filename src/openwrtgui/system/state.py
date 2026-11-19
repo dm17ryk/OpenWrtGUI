@@ -12,6 +12,7 @@ from openwrtgui.system import commands as s
 from openwrtgui.system.parse import (
     Connection,
     ProcessRow,
+    SipAlg,
     parse_board,
     parse_dmesg,
     parse_info,
@@ -140,6 +141,11 @@ class Connections(BaseModel):
 
     rows: list[Connection]  # at most 500 (AP2 has ~7 MB free RAM)
     note: str | None = None
+    total: int | None = None  # nf_conntrack_count: entries in the whole table
+    limit: int | None = None  # nf_conntrack_max
+
+
+__all__ = ["SipAlg"]  # defined beside the parsers, which this module imports (no cycle)
 
 
 class TimeZones(BaseModel):
