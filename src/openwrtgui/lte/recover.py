@@ -20,7 +20,7 @@ from pydantic import BaseModel, ConfigDict
 from openwrtgui.busy import RouterBusy
 from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked
 from openwrtgui.lte import commands as c
-from openwrtgui.lte.service import DROPS, HARNESS_STOPPED, LteService
+from openwrtgui.lte.service import DISCONNECT_S, DROPS, HARNESS_STOPPED, LteService
 from openwrtgui.lte.setups import SetupStore, SetupUnreadable, setup_change
 from openwrtgui.lte.state import LteState, lte_works
 from openwrtgui.net.apply import NOTHING
@@ -52,6 +52,8 @@ NOT_RECOVERED = (
 )
 FAILED = "{command}: {reason}; the modem was left {where}."
 NO_ANSWER = "{command}: {name} did not answer."
+NOT_DOWN = "{command} not sent: lte was not down after {s:g} s"
+SYNC_WAITS = "{rung} sends --sync only once lte is down and no uqmi runs (up to {s:g} s); else it skips it."
 
 
 class RungResult(BaseModel):
@@ -231,6 +233,7 @@ class LteRecover:
         ]
         warnings = [
             DROPS.format(name=rec.name),
+            SYNC_WAITS.format(rung=RUNGS[2], s=DISCONNECT_S),
             f"{RUNGS[3]} sends its command up to {AUTOCONNECT_TRIES} times, {AUTOCONNECT_GAP_S:g} s apart.",
             *notes,
         ]
@@ -476,6 +479,8 @@ class LteRecover:
 
     async def _clear_qmi(self, run: _Run) -> str | None:
         async def sync() -> str | None:
+            if not await self._wait_down(run):  # --sync would release the client of a teardown still running
+                return NOT_DOWN.format(command=c.sync(run.device), s=DISCONNECT_S)
             done = await self._send(run, c.sync(run.device))
             return None if done.ok else f"{c.sync(run.device)}: {_reason(done)}"
 
@@ -490,9 +495,9 @@ class LteRecover:
                 if attempt:
                     await self._sleep(self.autoconnect_gap_s)
                 done = await self._send(run, line)
-                if done.ok:
-                    return None
                 reason = _reason(done)
+                if done.ok or reason == c.NO_EFFECT:  # "No effect": autoconnect is already off
+                    return None
             return f"{line}: {reason} ({AUTOCONNECT_TRIES} tries)"
 
         return await self._cycle(run, turn_off)
@@ -549,6 +554,16 @@ class LteRecover:
                 break
             run.pending.pop(key)
         raise _Failed(FAILED.format(command=line, reason=reason, where=where))
+
+    async def _wait_down(self, run: _Run) -> bool:
+        """After `ifdown lte`: until lte is down and qmi.sh's teardown is over, up to DISCONNECT_S."""
+        for attempt in range(max(1, int(DISCONNECT_S / self._lte.nominal_poll_s))):
+            self._check(run)
+            if attempt:
+                await self._lte.pause()
+            if await self._lte.down_now(run.t):
+                return True
+        return False
 
     async def _wait_works(self, run: _Run) -> bool:
         limit = max(1, int(self._lte.connect_s / self._lte.nominal_poll_s))

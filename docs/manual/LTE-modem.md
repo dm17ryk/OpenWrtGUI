@@ -117,7 +117,9 @@ Reconfigure for that). Otherwise it tries these steps in order, and stops as soo
 1. **Put back the saved setup**: only if this router has a saved good setup and its settings differ.
 2. **Reconnect**: `ifdown lte`, then `ifup lte`.
 3. **Clear QMI state**: `ifdown lte`, then `uqmi --sync` (it frees what the modem still holds of an old
-   session), then `ifup lte`.
+   session), then `ifup lte`. `ifdown lte` returns before the router has finished closing the session, so it
+   first waits, up to 20 seconds, until `lte` is down and no `uqmi` runs. If `lte` is not down by then, it
+   skips `uqmi --sync`, says so, and still runs `ifup lte`.
 4. **Turn off the modem's autoconnect**: `ifdown lte`, then `uqmi --set-autoconnect disabled`, up to 10 times
    one second apart, then `ifup lte`. This is what the stock firmware's "Restore modem defaults" does.
 5. **Restart the modem**: `ifdown lte`, then Reboot modem's low power and online.

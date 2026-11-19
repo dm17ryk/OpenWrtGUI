@@ -71,15 +71,26 @@ class SimModem:
         # ifup did not take); `--set-autoconnect disabled` clears it after `autoconnect_refusals` failures
         self.autoconnect_on = False
         self.autoconnect_refusals = 0
+        # tests: netifd's `ifdown lte` returns while qmi.sh's teardown still runs uqmi (AP2, 2026-11-19): the
+        # next `teardown_reads` reads of the running uqmi count show one. A `--sync` sent meanwhile takes the
+        # modem's QMI service down: no session starts again, a modem restart does not help (sync_raced).
+        self.teardown_reads = 0
+        self._tearing = 0
+        self.sync_raced = False
         self._low_power_seen = False
         self.rx_bytes = 1_204_331
         self.tx_bytes = 3_876_002
 
     def answer(self, command: str) -> CommandResult | None:
         if command in (c.IFUP_LTE, c.IFDOWN_LTE):
-            blocked = self.stale_qmi or self.autoconnect_on
+            blocked = self.stale_qmi or self.autoconnect_on or self.sync_raced
             self.connected = command == c.IFUP_LTE and not blocked  # netifd's ifup exits 0 either way
+            self._tearing = self.teardown_reads if command == c.IFDOWN_LTE else 0
             return _ok()
+        if command == c.UQMI_RUNNING:
+            running = 1 if self._tearing > 0 else 0
+            self._tearing = max(0, self._tearing - 1)
+            return CommandResult("", f"{running}\n", "", 0 if running else 1)  # grep -c exits 1 on none
         if command == c.TTY_LIST:
             if not self.plugged:
                 return _fail("ls: /dev/ttyUSB*: No such file or directory\n")
@@ -106,12 +117,15 @@ class SimModem:
         if command == c.IMEI(DEVICE):
             return _ok(json.dumps(IMEI) + "\n")
         if command == _SYNC:
+            self.sync_raced = self.sync_raced or self._tearing > 0
             self.stale_qmi = False
             return _ok()
         if command == _AUTOCONNECT_OFF:
             if self.autoconnect_refusals > 0:
                 self.autoconnect_refusals -= 1
                 return _fail("Request failed\n")
+            if not self.autoconnect_on:  # AP2's BM806C, 2026-11-19: the setting is already off
+                return CommandResult("", f"{c.NO_EFFECT}\n", "", 1)
             self.autoconnect_on = False
             return _ok()
         if (m := _SET_OPMODE.fullmatch(command)) is not None:
