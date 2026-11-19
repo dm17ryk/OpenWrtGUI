@@ -6,6 +6,8 @@ read the router, so they keep working while [Bench Guard](Bench-Guard) shows a h
 
 ## Port statistics
 
+![Port statistics: each switch port's packets, bytes, errors and rates](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/tools-port-stats.png)
+
 Each switch port's packets, bytes and errors, received and sent, from the switch's own counters: the MIB
 counters that `swconfig dev switch0 show` prints, the same command the [Ports](Ports-and-VLANs) screen reads.
 The tab reads them every 5 seconds while it is open and the window is in front, and stops when you leave it.
@@ -23,6 +25,8 @@ A router without a swconfig switch (a DSA router) says so: its ports have their 
 counters come with the DSA backend.
 
 ## Connections
+
+![Connections: the SIP ALG badge, the filters and the connection table with its helpers](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/tools-connections.png)
 
 The router's connection tracking table: protocol, source and destination with ports, state, bytes, and the
 conntrack helper that handles the connection (`sip` for a SIP call the router translates). The table is read every

@@ -401,6 +401,7 @@ SCREEN_PAGES = (
     "Firewall",
     "Faults-and-capture",
     "System",
+    "Tools",
     "LuCI-pages",
     "Bench-Guard",
     "Terminal-and-audit-log",
