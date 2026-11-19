@@ -48,14 +48,17 @@ def _recover(service: LteService, tmp_path: Path) -> LteRecover:
 
 def _not_settled_for(recover: LteRecover, rungs: int) -> None:
     """The LTE plan's test hook (Task 13 Step 4): the first `rungs` rungs do not count as settled, so Recover
-    climbs to the next one and that one runs on the real modem."""
+    climbs to the next one and that one runs on the real modem. Each still waits for LTE first, as real
+    Recover does (2026-11-19 window: skipping the wait cut netifd's connect script off mid-setup, and LTE
+    stayed down until a router reboot)."""
     real: Callable[..., Awaitable[bool]] = recover._wait_works  # noqa: SLF001
     calls = 0
 
     async def wait(run: object) -> bool:
         nonlocal calls
         calls += 1
-        return False if calls <= rungs else await real(run)
+        works = await real(run)
+        return works and calls > rungs
 
     recover._wait_works = wait  # type: ignore[method-assign] # noqa: SLF001
 
