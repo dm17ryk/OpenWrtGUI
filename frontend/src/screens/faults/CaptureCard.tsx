@@ -39,7 +39,7 @@ export function CaptureCard({ routerId }: { routerId: string }) {
     run(() => postJson<CaptureView>(`/api/routers/${routerId}/captures`, { device: chosen, filter, duration_s: Number(duration) || 60, output }))
   const busy = list.data?.some((c) => c.running) ?? false
   return (
-    <section className="card stack" aria-labelledby="capture-h">
+    <section className="card stack" id="capture" aria-labelledby="capture-h">
       <div className="hrow">
         <h2 id="capture-h">Capture</h2>
         <Help topic={HELP.capture} />

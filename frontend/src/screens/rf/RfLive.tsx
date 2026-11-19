@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useParams, useSearchParams } from 'react-router'
+import { useScrollToHash } from '../../shell/useScrollToHash'
 import { apiFetch } from '../../api/client'
 import type { Bitrate, FrameState, RateRow, RfMessage, RfSample, RouterDetail, StationSample, WifiState } from '../../api/types'
 import { reconnectText, useLiveSocket } from '../../api/useLiveSocket'
@@ -59,6 +60,7 @@ function Kv({ rows }: { rows: ReadonlyArray<readonly [string, string]> }) {
 
 export function RfLive() {
   const { id = '' } = useParams()
+  useScrollToHash() // #channel-analysis and #frame-analysis from Discovery's chips
   const [params] = useSearchParams()
   const radio = params.get('radio') ?? 'radio0'
   const detail = useQuery({ queryKey: ['router', id], queryFn: () => apiFetch<RouterDetail>(`/api/routers/${id}`) })

@@ -57,7 +57,7 @@ export function ChannelAnalysis({ routerId, radio }: { routerId: string; radio: 
     })
 
   return (
-    <section className="card stack" aria-labelledby="channels-scan-h">
+    <section className="card stack" id="channel-analysis" aria-labelledby="channels-scan-h">
       <div className="hrow">
         <h2 id="channels-scan-h">Channel analysis</h2>
         <Help topic={HELP.rfChannels} />

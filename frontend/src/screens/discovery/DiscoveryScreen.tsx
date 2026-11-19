@@ -6,6 +6,7 @@ import type { DiscoveryState, RouterDetail } from '../../api/types'
 import { Help, HelpTip } from '../../help/Help'
 import { HELP } from '../../help/topics'
 import { RouterSections } from '../../shell/RouterSections'
+import { CapabilityChips } from './CapabilityChips'
 import { ConfigSection } from './ConfigSection'
 import { CustomSection } from './CustomSection'
 import { FlashDialog } from './FlashDialog'
@@ -54,6 +55,7 @@ export function DiscoveryScreen() {
         <div className="note x">{discovery.error instanceof ApiError ? discovery.error.detail : String(discovery.error)}</div>
       )}
       {state && <ImageSection routerId={id} state={state} onFlash={() => setFlashing(true)} />}
+      {state?.profile && <CapabilityChips routerId={id} rows={state.capabilities} />}
       {state?.profile && <OverlaySection routerId={id} state={state} />}
       {state?.profile && <ConfigSection state={state} />}
       {state?.profile && <CustomSection routerId={id} state={state} />}
