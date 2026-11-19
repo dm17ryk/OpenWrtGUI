@@ -96,6 +96,31 @@ def parse_swconfig_show(name: str, text: str) -> SwitchLive:
     return SwitchLive(name, enable_vlan, monitor, tuple(ports), tuple(vlans))
 
 
+_COUNTER = re.compile(r"^(\w+)\s*:\s*(\S+)\s*$")
+
+
+def parse_port_mib(text: str) -> dict[int, dict[str, int]]:
+    """Port number → counter → value, from the untabbed lines after a port's `\\tmib:` line in `show` (AP2's
+    mt7620: `TxGPC      : 58138`). A blank line or the next tab-indented attribute ends the list; a value that
+    is not a number (`???`) is left out. A port without `mib:` is absent."""
+    out: dict[int, dict[str, int]] = {}
+    port: int | None = None
+    counting = False
+    for line in text.splitlines():
+        head = _BLOCK.match(line.strip()) if not line.startswith("\t") else None
+        if head:
+            port, counting = (int(head.group(2)) if head.group(2) else None), False
+        elif line.startswith("\t"):
+            counting = port is not None and line.strip().startswith("mib:")
+            if counting and port is not None:
+                out.setdefault(port, {})
+        elif not line.strip():
+            counting = False
+        elif counting and port is not None and (m := _COUNTER.match(line)) and m.group(2).isdigit():
+            out[port][m.group(1)] = int(m.group(2))
+    return out
+
+
 def parse_swconfig_help(text: str) -> SwitchHelp:
     head = _HEAD.search(text)
     port_attrs: set[str] = set()

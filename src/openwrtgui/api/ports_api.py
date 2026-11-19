@@ -12,6 +12,7 @@ from openwrtgui.api.net_api import Digest, NetPlanOut
 from openwrtgui.context import AppContext
 from openwrtgui.net.apply import NetApplyResult
 from openwrtgui.ports.compile import MirrorRequest, VlanRequest
+from openwrtgui.ports.mib import PortStats
 from openwrtgui.ports.state import PortsState
 
 router = APIRouter(
@@ -75,6 +76,12 @@ def _known(ctx: AppContext, router_id: str) -> str:
 @router.get("")
 async def ports_state(router_id: str, ctx: Ctx) -> PortsState:
     return await ctx.ports.state(_known(ctx, router_id))
+
+
+@router.get("/stats")
+async def ports_stats(router_id: str, ctx: Ctx) -> PortStats:
+    """Port statistics (v1.2a): each switch port's counters from one read; the router keeps its counts."""
+    return await ctx.ports.stats(_known(ctx, router_id))
 
 
 @router.post("/enable/preview")

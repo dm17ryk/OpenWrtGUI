@@ -20,6 +20,14 @@ async def test_ports_state_and_enable(authed: httpx.AsyncClient) -> None:
     assert result["verified"]
 
 
+async def test_stats_route(authed: httpx.AsyncClient) -> None:
+    body = (await authed.get(f"{PORTS}/stats")).json()
+    assert (body["switch"], body["note"]) == ("switch0", None)
+    assert body["ports"][0]["label"] == "LAN1" and body["ports"][-1]["label"] == "CPU"
+    pc = next(p for p in body["ports"] if p["num"] == 3)
+    assert pc["link"] and pc["totals"]["rx_bytes"] is not None and "RxGOC" in pc["raw"]
+
+
 async def test_own_port_refused(authed: httpx.AsyncClient) -> None:
     r = await authed.post(f"{PORTS}/enable/preview", json={"port": 3, "on": False})
     assert r.status_code == 422 and "carries this app's SSH" in r.json()["detail"]

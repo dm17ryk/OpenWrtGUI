@@ -2155,6 +2155,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/ports/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ports Stats
+         * @description Port statistics (v1.2a): each switch port's counters from one read; the router keeps its counts.
+         */
+        get: operations["ports_stats_api_routers__router_id__ports_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/ports/vlans/apply": {
         parameters: {
             query?: never;
@@ -7087,6 +7107,22 @@ export interface components {
              */
             uc_lc: boolean;
         };
+        /** PortCounters */
+        PortCounters: {
+            /** Label */
+            label: string;
+            /** Link */
+            link: boolean;
+            /** Num */
+            num: number;
+            /** Raw */
+            raw: {
+                [key: string]: number;
+            };
+            /** Speed Mbps */
+            speed_mbps: number | null;
+            totals: components["schemas"]["PortTotals"];
+        };
         /** PortEnableApplyIn */
         PortEnableApplyIn: {
             /**
@@ -7112,6 +7148,32 @@ export interface components {
             on?: boolean | null;
             /** Port */
             port?: number | null;
+        };
+        /** PortStats */
+        PortStats: {
+            /** Note */
+            note?: string | null;
+            /** Ports */
+            ports: components["schemas"]["PortCounters"][];
+            /** Read At */
+            read_at: number;
+            /** Switch */
+            switch: string | null;
+        };
+        /** PortTotals */
+        PortTotals: {
+            /** Rx Bytes */
+            rx_bytes: number | null;
+            /** Rx Errors */
+            rx_errors: number | null;
+            /** Rx Packets */
+            rx_packets: number | null;
+            /** Tx Bytes */
+            tx_bytes: number | null;
+            /** Tx Errors */
+            tx_errors: number | null;
+            /** Tx Packets */
+            tx_packets: number | null;
         };
         /** PortView */
         PortView: {
@@ -13302,6 +13364,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ports_stats_api_routers__router_id__ports_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PortStats"];
                 };
             };
             /** @description Validation Error */

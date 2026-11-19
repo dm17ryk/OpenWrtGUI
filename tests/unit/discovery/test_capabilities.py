@@ -1,4 +1,4 @@
-"""The capability map's needs (v1.2a Task 1): Air survey and Port statistics, and Connections needs the table."""
+"""The capability map's needs (v1.2a Task 1): Air survey, Port statistics, and Connections needs the table."""
 
 from __future__ import annotations
 
@@ -41,5 +41,8 @@ def test_connections_needs_the_module_not_the_program() -> None:
     assert rows["Connections"].state == "in image"
     assert rows["Air survey"].state == "in image"
     missing = {r.name: r for r in capability_map(_profile(()), NONE_ADDED)}
-    assert (missing["Connections"].state, missing["Connections"].reason) == ("missing", "needs nf_conntrack.ko")
+    assert (missing["Connections"].state, missing["Connections"].reason) == (
+        "missing",
+        "needs nf_conntrack.ko",
+    )
     assert missing["Port statistics"].reason == "needs swconfig"
