@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import socket
 from pathlib import Path
 
@@ -107,3 +108,11 @@ def test_the_recording_leaves_out_the_cookie_and_system_info() -> None:
     clean = json.loads(sanitize_iperf3_line(json.dumps(start)))
     assert clean == {"event": "start", "data": {"version": "iperf 3.21"}}
     assert sanitize_iperf3_line("plain text") == "plain text"
+
+
+def test_the_recording_rounds_long_fractions() -> None:
+    """AP2 window: iperf3's `"end": 10.003430962562561` tripped the IMEI check (15 digits in a row)."""
+    line = json.dumps({"event": "interval", "data": {"sum": {"end": 10.003430962562561, "bytes": 123}}})
+    clean = sanitize_iperf3_line(line)
+    assert json.loads(clean) == {"event": "interval", "data": {"sum": {"end": 10.003431, "bytes": 123}}}
+    assert not re.search(r"\d{15}", clean)

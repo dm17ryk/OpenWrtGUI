@@ -127,13 +127,24 @@ def sent_bytes(lines: Sequence[str]) -> int:
     return 0
 
 
+def _rounded(value: object) -> object:
+    """Floats to 6 decimals: iperf3's long fractions read as 15-digit numbers to the IMEI check."""
+    if isinstance(value, float):
+        return round(value, 6)
+    if isinstance(value, dict):
+        return {k: _rounded(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_rounded(v) for v in value]
+    return value
+
+
 def sanitize_iperf3_line(line: str) -> str:
     """One iperf3 JSON line for the public recording: its cookie and system_info (the router's kernel and
-    host name) left out."""
+    host name) left out, and its floats rounded."""
     try:
         obj = json.loads(line)
     except ValueError:
         return line
     if isinstance(obj, dict) and isinstance(obj.get("data"), dict):
         obj["data"] = {k: v for k, v in obj["data"].items() if k not in DROPPED_KEYS}
-    return json.dumps(obj, separators=(",", ":"))
+    return json.dumps(_rounded(obj), separators=(",", ":"))

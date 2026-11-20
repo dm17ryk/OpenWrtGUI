@@ -19,6 +19,7 @@ import socket
 from pathlib import Path
 
 import pytest
+from test_ap2_wifi import _recorder
 from tools_window import (
     PcListener,
     Proto,
@@ -161,8 +162,10 @@ async def test_port_counters_are_16_bit(ap2_rw: SshTransport, request: pytest.Fi
     first = (await ap2_rw.run(SHOW)).stdout
     lines = await _client_run(ap2_rw, exe, ThroughputRequest(mode="client", host=pc, duration_s=60))
     second = (await ap2_rw.run(SHOW)).stdout
-    _record(MIB_JSON, "before", first)
-    _record(MIB_JSON, "after", second)
+    rf = _recorder()
+    names: dict[str, str] = {}  # `show` lists the switch's learned addresses: every MAC made private
+    _record(MIB_JSON, "before", rf.sanitize_air(first, (), (), names))
+    _record(MIB_JSON, "after", rf.sanitize_air(second, (), (), names))
     verdict = sixteen_bit_verdict(
         parse_port_mib(first)[CPU_PORT], parse_port_mib(second)[CPU_PORT], sent_bytes(lines)
     )
