@@ -1,6 +1,6 @@
 /**
- * Where each capability on Discovery leads (spec 7.8 Phase 2, v1.2a R3): the screen or card that uses it. A
- * capability without a page here (Throughput and Traffic generator until 1.2b) leads nowhere.
+ * Where each capability on Discovery leads (spec 7.8 Phase 2, v1.2a R3, v1.2b R11): the screen, card or Tools
+ * page that uses it. A capability without a page here leads nowhere.
  */
 const PATHS: Readonly<Record<string, string>> = {
   Switch: 'ports',
@@ -12,6 +12,9 @@ const PATHS: Readonly<Record<string, string>> = {
   'Air survey': 'rf#channel-analysis',
   'Port statistics': 'tools/port-stats',
   Connections: 'tools/connections',
+  Throughput: 'tools/throughput',
+  'Traffic generator': 'tools/traffic',
+  'Station management': 'tools/stations',
 }
 
 export function capabilityLink(routerId: string, name: string): string | null {

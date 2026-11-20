@@ -18,6 +18,11 @@ vi.mock('../../api/client', async (orig) => {
 
 vi.mock('./PortStatsTab', () => ({ PortStatsTab: () => <p>port stats tab</p> }))
 vi.mock('./ConnectionsTab', () => ({ ConnectionsTab: () => <p>connections tab</p> }))
+vi.mock('./ThroughputTab', () => ({ ThroughputTab: () => <p>throughput tab</p> }))
+vi.mock('./TrafficTab', () => ({ TrafficTab: () => <p>traffic tab</p> }))
+vi.mock('./StationsTab', () => ({ StationsTab: () => <p>stations tab</p> }))
+
+const TABS = ['Port statistics', 'Connections', 'Throughput', 'Traffic generator', 'Station management']
 
 function Where() {
   return <output aria-label="path">{useLocation().pathname}</output>
@@ -42,7 +47,7 @@ function show(entry: string) {
 test('Tools is its own section with a tab per tool page', async () => {
   show('/routers/ap1/tools/port-stats')
   expect(await screen.findByRole('link', { name: 'Tools' })).toHaveAttribute('aria-current', 'page')
-  expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Port statistics', 'Connections'])
+  expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(TABS)
   expect(screen.getByRole('tab', { name: 'Port statistics' })).toHaveAttribute('aria-selected', 'true')
   expect(screen.getByText('port stats tab')).toBeInTheDocument()
 })
@@ -63,5 +68,15 @@ test('a tab opens its page', async () => {
 test('an unknown tool page says so and keeps the tabs', async () => {
   show('/routers/ap1/tools/nope')
   expect(await screen.findByText('No tool page called nope.')).toBeInTheDocument()
-  expect(screen.getAllByRole('tab')).toHaveLength(2)
+  expect(screen.getAllByRole('tab')).toHaveLength(TABS.length)
+})
+
+test('the active pages have their own tabs (v1.2b)', async () => {
+  const user = show('/routers/ap1/tools/throughput')
+  expect(await screen.findByText('throughput tab')).toBeInTheDocument()
+  await user.click(screen.getByRole('tab', { name: 'Traffic generator' }))
+  expect(screen.getByText('traffic tab')).toBeInTheDocument()
+  expect(screen.getByRole('status', { name: 'path' })).toHaveTextContent('/routers/ap1/tools/traffic')
+  await user.click(screen.getByRole('tab', { name: 'Station management' }))
+  expect(screen.getByText('stations tab')).toBeInTheDocument()
 })

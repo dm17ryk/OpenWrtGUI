@@ -18,6 +18,7 @@ ORDER = [
     "Traffic generator",
     "Connections",
     "Port statistics",
+    "Station management",
 ]
 
 
@@ -46,3 +47,12 @@ def test_connections_needs_the_module_not_the_program() -> None:
         "needs nf_conntrack.ko",
     )
     assert missing["Port statistics"].reason == "needs swconfig"
+
+
+def test_station_management_needs_hostapd() -> None:
+    """v1.2b R11: wpad provides hostapd; whether its build has each method is read at runtime."""
+    assert {n.name: n for n in CAPABILITIES}["Station management"].programs == ("hostapd",)
+    rows = {r.name: r for r in capability_map(_profile(("/usr/sbin/hostapd",)), NONE_ADDED)}
+    assert rows["Station management"].state == "in image"
+    missing = {r.name: r for r in capability_map(_profile(()), NONE_ADDED)}
+    assert missing["Station management"].reason == "needs hostapd"

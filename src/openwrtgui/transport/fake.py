@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from openwrtgui.simmodem import SimModem
     from openwrtgui.simnet import SimNetwork
     from openwrtgui.simsystem import SimSystem
+    from openwrtgui.simtools import SimTools
     from openwrtgui.simwifi import SimWifi
 
 INSTALL_KEY_PREFIX = "mkdir -p /etc/dropbear && "
@@ -47,6 +48,7 @@ class SimState:
     air: SimAir | None = None  # v0.7: scans, every channel's survey, frame windows (made with the Wi-Fi)
     files: SimFiles | None = None  # v1.0a1: what LuCI's menu asks about (ls -ldL, ls -A)
     later: SimLater | None = None  # v1.0a2: a later image's block-mount, iptables, plugins, menu entries
+    tools: SimTools | None = None  # v1.2b: iperf3 and socat sessions, and the kill that stops them
 
     def __post_init__(self) -> None:
         if self.wifi is not None and self.air is None:
@@ -82,6 +84,31 @@ class BytesStream:
     async def close(self) -> None:
         self._closed = True
         self.exit_status, self.stderr = self._final
+
+
+class LazyStream:
+    """A stream whose bytes come from a callable at its first read (the simulator's `ubus subscribe`): one
+    opened before a request still sees what the request makes. `timeout -s KILL` ends it."""
+
+    def __init__(self, source: Callable[[], bytes], exit_status: int = 137) -> None:
+        self._source = source
+        self._data: bytes | None = None
+        self._closed = False
+        self._final = exit_status
+        self.exit_status: int | None = None
+        self.stderr = ""
+
+    async def read(self, n: int = 65536) -> bytes:
+        if self._closed:
+            return b""
+        if self._data is None:
+            self._data = self._source()
+        chunk, self._data = self._data[:n], self._data[n:]
+        return chunk
+
+    async def close(self) -> None:
+        self._closed = True
+        self.exit_status = self._final
 
 
 class ReplayTransport:
@@ -141,9 +168,17 @@ class ReplayTransport:
     async def open_shell(self, cols: int, rows: int) -> ShellChannel:
         raise NotImplementedError("simulator has no shell")
 
-    async def stream(self, command: str) -> BytesStream:
+    async def stream(self, command: str) -> BytesStream | LazyStream:
         self.calls.append(command)
         self._down()
+        if self.state is not None and self.state.wifi is not None:
+            subscribed = self.state.wifi.subscribe(command)
+            if subscribed is not None:
+                return LazyStream(subscribed)
+        if self.state is not None and self.state.tools is not None:
+            session = self.state.tools.stream(command)
+            if session is not None:
+                return BytesStream(*session)
         if self.state is not None and self.state.image is not None:
             read = self.state.image.stream(command)
             if read is not None:
@@ -200,6 +235,8 @@ class ReplayTransport:
         # system; then the network, the air and the Wi-Fi, which answer only commands they know whole; the
         # firewall last, since it splits compound commands and hands their parts back here.
         if self.state.later is not None and (answered := self.state.later.answer(command)) is not None:
+            return answered
+        if self.state.tools is not None and (answered := self.state.tools.answer(command)) is not None:
             return answered
         if self.state.files is not None and (answered := self.state.files.answer(command)) is not None:
             return answered

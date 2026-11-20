@@ -7,7 +7,10 @@ import { HELP } from '../../help/topics'
 import { RouterSections } from '../../shell/RouterSections'
 import { ConnectionsTab } from './ConnectionsTab'
 import { PortStatsTab } from './PortStatsTab'
+import { StationsTab } from './StationsTab'
+import { ThroughputTab } from './ThroughputTab'
 import { TOOL_PAGES, toolPage } from './toolPages'
+import { TrafficTab } from './TrafficTab'
 
 /**
  * Tools (spec 7.8 Phase 2, v1.2a R2): one tab per tool page; Discovery's capability chips open them. A page
@@ -48,7 +51,10 @@ export function ToolsScreen() {
       </div>
       {page === null && <div className="note x">No tool page called {tool}.</div>}
       {page === 'port-stats' && <PortStatsTab routerId={id} />}
-      {page === 'connections' && <ConnectionsTab routerId={id} />}
+      {page === 'connections' && <ConnectionsTab routerId={id} routerName={name} />}
+      {page === 'throughput' && <ThroughputTab routerId={id} />}
+      {page === 'traffic' && <TrafficTab routerId={id} />}
+      {page === 'stations' && <StationsTab routerId={id} />}
     </main>
   )
 }

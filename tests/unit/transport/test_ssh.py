@@ -26,7 +26,7 @@ from openwrtgui.transport.base import (
     Unreachable,
 )
 from openwrtgui.transport.pool import ConnectionPool
-from openwrtgui.transport.ssh import HostKeyStore, SshTransport, fetch_host_key
+from openwrtgui.transport.ssh import HostKeyStore, SshTransport, _ByteStream, fetch_host_key
 
 
 async def _pinned(srv: SshServer, tmp_path: Path) -> HostKeyStore:
@@ -413,3 +413,60 @@ async def test_stream_reads_bytes_and_exit_status(ssh_server: SshServer, tmp_pat
         assert failed.exit_status == 127 and "unknown" in failed.stderr
     finally:
         await t.close()
+
+
+class _LostOut:
+    async def read(self, n: int) -> bytes:
+        raise asyncssh.ConnectionLost("Connection lost")
+
+
+class _LostProcess:
+    """An exec channel whose connection went: asyncssh raises its own error, not an OSError."""
+
+    exit_status = None
+    stdout = _LostOut()
+
+    def close(self) -> None:
+        return None
+
+    async def wait(self, check: bool = False) -> None:
+        raise asyncssh.ConnectionLost("Connection lost")
+
+
+class _Done:
+    def __init__(self, status: int, signal: tuple[str, bool, str, str] | None) -> None:
+        self.exit_status = status
+        self.exit_signal = signal
+        self.stderr = b""
+
+
+class _KilledProcess:
+    """A command `exec`ed under `timeout -s KILL`: SSH reports the signal; asyncssh gives exit status -1."""
+
+    def __init__(self, signal: str) -> None:
+        self.exit_status = None
+        self._signal = signal
+
+    def close(self) -> None:
+        return None
+
+    async def wait(self, check: bool = False) -> _Done:
+        return _Done(-1, (self._signal, False, "", ""))
+
+
+async def test_a_killed_command_ends_with_the_shells_status() -> None:
+    """AP2 window (2026-11-20): a Listen ended by its limit came back as -1; it must read as a shell's 137, or
+    the session engine reports the normal end as a failure."""
+    for signal, status in (("KILL", 137), ("TERM", 143)):
+        stream = _ByteStream(_KilledProcess(signal))  # type: ignore[arg-type]
+        await stream.close()
+        assert stream.exit_status == status
+
+
+async def test_a_lost_connection_is_unreachable_on_a_stream() -> None:
+    """Final review (I1): a tool session or a capture must see a dropped router as a TransportError."""
+    stream = _ByteStream(_LostProcess())  # type: ignore[arg-type]
+    with pytest.raises(Unreachable, match="Connection lost"):
+        await stream.read()
+    await stream.close()  # closing a stream whose connection went does not raise
+    assert stream.exit_status is None

@@ -1,8 +1,10 @@
 # Tools
 
 **Tools** holds the tool pages, one tab each. The chips under **Capabilities** on [Discovery](Discovery) open
-them. A page opens even on a router that lacks what it needs; it then says what is missing. Both pages here only
-read the router, so they keep working while [Bench Guard](Bench-Guard) shows a harness run.
+them. A page opens even on a router that lacks what it needs; it then says what is missing. **Port statistics** and
+**Connections** only read the router, so they keep working while [Bench Guard](Bench-Guard) shows a harness run.
+**Throughput** and the **Traffic generator** send traffic, so they are refused during a run, and one that is
+running stops within a second when a run starts.
 
 ## Port statistics
 
@@ -45,4 +47,76 @@ The badge above the table says whether the router's SIP ALG is on: whether its f
 the `sip` conntrack helper, which rewrites the addresses inside SIP messages. **SIP ALG on** names the zones and
 the UDP port (5060 on the bench routers, zone lan); **SIP ALG off** means no zone uses the helper; **SIP ALG
 unknown** means the router has no fw4 ruleset to read. The state is read from the firewall's ruleset when the tab
-opens and on **Refresh**, not every 5 seconds. This page does not change it.
+opens and on **Refresh**, not every 5 seconds. Under the badge you can switch it per zone (see the next section).
+
+## Switching SIP ALG
+
+Each firewall zone that runs conntrack helpers has a row, **Zone lan · SIP ALG on** for example, and a button that
+turns SIP ALG off or on in that zone. Turn it off when a SIP phone or panel misbehaves behind the router's NAT, to
+see whether the helper's rewriting is the cause.
+
+The change is a firewall change, shown in full before you apply it, and it applies with the firewall's 60-second
+rollback. **Off** keeps the zone's other helpers: on a zone that uses fw4's default helpers, the app sets
+`auto_helper '0'` and lists the other helpers; on a zone with its own helper list, it takes `sip` out of the list.
+**On** puts back what Off replaced. The result proves it in fw4's ruleset: the zone's helper chain has, or no
+longer has, `sip`, and its other helpers are all still there. Connections set up before the change keep their
+helper until they end. A router without fw4 has nothing to switch, and a run on the bench refuses the change.
+
+## Throughput
+
+![Throughput: the router as client or server, the preview, and the rate each second](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/tools-throughput.png)
+
+Measures how fast data goes between the router and another machine, with `iperf3` on the router. The results
+come in each second while the test runs, and **Stop** ends it on the router. iperf3 must be on the router (the
+**Throughput** chip on Discovery says so). Choose what the router does:
+
+- **connects to a host**: the router runs the iperf3 client against a host you name (an IPv4 address or a name),
+  over TCP or UDP, for 1 to 60 seconds. **Router sends** measures what the router can send; **Router receives**
+  asks the other side to send (`-R`). UDP sends at the **UDP rate** you set, 1 to 1000 Mb/s. The other machine must
+  run `iperf3 -s`.
+- **waits for a client**: the router runs one iperf3 server test (`iperf3 -s -1`) and waits up to 5 minutes for
+  your PC's iperf3 to connect. The preview shows the command to run on your PC.
+
+The preview shows the exact command. **Start** runs it on its own connection to the router, and the table fills in
+each second: the rate, and the retransmits (TCP) or the jitter and loss (UDP). The totals and the router's CPU use
+follow at the end. **Stop** ends it on the router. iperf3 runs on the router's CPU: on a small router the result is
+often the CPU's limit, not the link's. Only one Throughput or Traffic generator listen runs on a router at a time.
+
+## Traffic generator
+
+![Traffic generator: Listen with its peers, and Send](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/tools-traffic.png)
+
+Sends or takes simple traffic with `socat` on the router, to check that a port is open, that a device answers, or
+what a device sends to the router. **Listen** waits for peers; **Send** sends zeros or a line of text. socat must be
+on the router (the **Traffic generator** chip on Discovery says so).
+
+**Listen** waits on a TCP or UDP port for 10 to 300 seconds. Each peer that connects or sends is listed with its
+address and port, the bytes it sent, and its first 64 bytes in hex. The router shows the bytes in blocks of up to
+4 KB, and in full when the peer closes; a UDP sender counts as gone 2 seconds after its last datagram. A listen
+stops by itself at 50 MB.
+
+**Send** sends a number of zero bytes (up to 10,000,000), or one line of printable text, to a host and port over
+TCP or UDP, for at most 30 seconds. The result says what was sent, or socat's own error (for example **Connection
+refused** when nothing listens on that port).
+
+## Station management
+
+![Station management: an SSID's stations with their requests, and the neighbour report](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/tools-stations.png)
+
+Asks a Wi-Fi station to do something, through the router's `hostapd` (802.11v and 802.11k). Each SSID on air is a
+section with its stations; each request shows the exact command before it is sent, and a request that waits for
+the station's answer listens 10 seconds for it.
+
+- **BSS transition request** (802.11v): asks the station to move to another access point, one of the candidates:
+  this router's SSIDs and those of the other routers in the app. The station answers with a status code (0 means
+  it accepts).
+- **Beacon report request** (802.11k): asks the station which access points it hears on this channel, and how
+  well. The answer is a table of BSSID, channel, signal and signal-to-noise.
+- **Neighbour report** (802.11k): the list of nearby access points the router tells stations about. **Set from the
+  routers in this app** fills it from the candidates; **Clear** empties it. It is kept until the next Wi-Fi reload:
+  hostapd does not save it.
+
+A station must support the request. hostapd must also have it switched on for the SSID: when it says **Not
+supported**, the page names the option to turn on in Wi-Fi › All options (`bss_transition` for 802.11v,
+`ieee80211k` for 802.11k). The app does not turn them on by itself, since that reloads the Wi-Fi. A router whose
+wpad build lacks a method says so in place of that request.

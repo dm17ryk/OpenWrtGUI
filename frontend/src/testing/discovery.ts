@@ -557,6 +557,11 @@ export const AP1_DISCOVERY: DiscoveryState = {
       "name": "Port statistics",
       "state": "in image",
       "reason": null
+    },
+    {
+      "name": "Station management",
+      "state": "missing",
+      "reason": "needs hostapd"
     }
   ]
 }

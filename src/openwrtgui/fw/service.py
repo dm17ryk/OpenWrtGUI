@@ -28,6 +28,15 @@ from openwrtgui.fw.nft import (
     zone_tail,
 )
 from openwrtgui.fw.sections import Kind, SectionRequest, compile_sections, expectations
+from openwrtgui.fw.sip import (
+    CONNECTIONS_WARNING,
+    SIP,
+    SipAlgRequest,
+    SipAlgZones,
+    SipZone,
+    sip_alg_zones,
+    sip_ops,
+)
 from openwrtgui.fw.state import PIN_DHCP, PIN_SSH, FirewallState, read_firewall
 from openwrtgui.fw.tables import TableChange, TableRequest, heredoc, owner_text, table_change
 from openwrtgui.guard.audit import AuditLog
@@ -47,6 +56,7 @@ from openwrtgui.net.state import NetworkState, read_network
 from openwrtgui.probe.describe import SelfDescription, describe_router
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.store.settings import SettingsStore
+from openwrtgui.system.parse import zone_helpers
 from openwrtgui.transport.base import Transport
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.uci import UciOp, parse_uci_show
@@ -294,6 +304,71 @@ class FirewallService:
             return Planned(plan, self._verifier(plan, uci, [], rules, sets), firewall_snapshot(uci))
 
         return await self._runner.run_planned(rec, make, digest)
+
+    # ---------------------------------------------------------------- the SIP ALG switch (v1.2b R7)
+    async def _sip_read(self, rec: RouterRecord, t: Transport) -> tuple[dict[str, str], str]:
+        _, uci, _, _ = await self._read_on(rec, t)
+        return uci, (await t.run(c.NFT_TEXT)).stdout
+
+    async def sip_zones(self, router_id: str) -> SipAlgZones:
+        rec = self._record(router_id)
+        return sip_alg_zones(*await self._sip_read(rec, await self._pool.get(rec)))
+
+    def _sip_plan(
+        self, rec: RouterRecord, uci: Mapping[str, str], text: str, req: SipAlgRequest
+    ) -> tuple[SipZone, NetPlan]:
+        zone, ops = sip_ops(uci, text, req)
+        return zone, self._plan(rec, uci, ops, [CONNECTIONS_WARNING])
+
+    async def plan_sip_alg(self, router_id: str, req: SipAlgRequest) -> NetPlan:
+        rec = self._record(router_id)
+        uci, text = await self._sip_read(rec, await self._pool.get(rec))
+        return self._sip_plan(rec, uci, text, req)[1]
+
+    async def apply_sip_alg(
+        self, router_id: str, req: SipAlgRequest, digest: str | None = None
+    ) -> NetApplyResult:
+        rec = self._record(router_id)
+
+        async def make(t: Transport) -> Planned:
+            uci, text = await self._sip_read(rec, t)
+            zone, plan = self._sip_plan(rec, uci, text, req)
+            return Planned(plan, self._sip_verifier(plan, uci, zone, req.on), firewall_snapshot(uci))
+
+        return await self._runner.run_planned(rec, make, digest)
+
+    def _sip_verifier(
+        self, plan: NetPlan, uci: Mapping[str, str], zone: SipZone, on: bool
+    ) -> Callable[[Transport], Awaitable[list[NetCheck]]]:
+        """Proof by effect: the zone's helper chain has, or lacks, `sip`, and its other helpers stay."""
+        before = sorted(h for h in zone.helpers if h != SIP)
+
+        def checks(text: str) -> list[NetCheck]:
+            now = zone_helpers(text).get(zone.zone, [])
+            seen = SIP in now
+            kept = sorted(h for h in now if h != SIP)
+            others = (
+                f"{len(kept)} kept"
+                if kept == before
+                else f"was {', '.join(before) or 'none'}; now {', '.join(kept) or 'none'}"
+            )
+            return [
+                NetCheck(
+                    f"SIP ALG zone {zone.zone}", seen == on, f"{'on' if seen else 'off'} in fw4's ruleset"
+                ),
+                NetCheck(f"other helpers zone {zone.zone}", kept == before, others),
+            ]
+
+        async def verify(t: Transport) -> list[NetCheck]:
+            found = checks((await t.run(c.NFT_TEXT)).stdout)
+            for _ in range(int(self._settle_s / self._poll_s)):
+                if all(ch.ok for ch in found):
+                    break
+                await self._sleep(self._poll_s)
+                found = checks((await t.run(c.NFT_TEXT)).stdout)
+            return [*found, await saved_check(t, c.UCI_FIREWALL, plan.ops, uci)]
+
+        return verify
 
     # ---------------------------------------------------------------- other nftables tables
     def _table_change(

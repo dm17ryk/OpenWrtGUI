@@ -232,6 +232,10 @@ class SimConnector:
 
             spec = json.loads((self._sim_dir / "later" / entry["later"]).read_text("utf-8"))
             state.later = SimLater(spec, sim_commands(self._sim_dir, entry["id"]))
+        if net is not None:  # the tools (v1.2b): iperf3 and socat on routers with a network
+            from openwrtgui.simtools import SimTools
+
+            state.tools = SimTools()
         if net is not None:  # the Access side (v0.6c), as the System side: routers with a network
             state.access = SimAccess(
                 net=net,

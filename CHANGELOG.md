@@ -15,6 +15,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   rates, read every 5 s while the tab is open; the router's counters are never cleared.
 - **Tools** › Connections: the connection table with filters, each entry's conntrack helper, and whether SIP ALG
   is on.
+- **Tools** › Throughput: iperf3 on the router, to a host or waiting for your PC's iperf3, over TCP or UDP, with
+  the rate each second, then the totals and the router's CPU; Stop ends it on the router.
+- **Tools** › Traffic generator: socat on the router listens on a port and lists each peer's bytes, or sends
+  zeros or a line of text to a host and port.
+- **Tools** › Station management: BSS transition request, beacon report request and the neighbour report over
+  hostapd (802.11v and 802.11k), with the station's answer.
+- **Tools** › Connections can switch SIP ALG off or on per firewall zone, with the 60 s rollback, proven in fw4's
+  ruleset.
 
 ## [1.1.0] - 2026-11-19
 

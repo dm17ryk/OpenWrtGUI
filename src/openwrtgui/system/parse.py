@@ -415,3 +415,38 @@ def parse_sip_alg(nft_text: str) -> SipAlg:
     if not zones:
         return SipAlg(state="off", zones=[], ports=[])
     return SipAlg(state="on", zones=sorted(zones), ports=sorted(ports))
+
+
+_HELPER_OBJECT = re.compile(r"^\s*ct helper (\S+) \{")
+_HELPER_SET = re.compile(r'ct helper set "([^"]+)"')
+
+
+def _fw4_lines(nft_text: str) -> list[str]:
+    out: list[str] = []
+    in_fw4 = False
+    for line in nft_text.splitlines():
+        if line.startswith("table "):
+            in_fw4 = bool(_FW4.match(line))
+        elif in_fw4:
+            out.append(line)
+    return out
+
+
+def available_helpers(nft_text: str) -> list[str]:
+    """The conntrack helpers fw4 declares (`ct helper <name> {` in `table inet fw4`), in order (v1.2b R7)."""
+    return [m.group(1) for line in _fw4_lines(nft_text) if (m := _HELPER_OBJECT.match(line))]
+
+
+def zone_helpers(nft_text: str) -> dict[str, list[str]]:
+    """Each zone's helpers: the `ct helper set "<name>"` rules in its `chain helper_<zone>`, in order."""
+    out: dict[str, list[str]] = {}
+    zone: str | None = None
+    for line in _fw4_lines(nft_text):
+        if m := _CHAIN.match(line):
+            name = m.group(1)
+            zone = name.removeprefix("helper_") if name.startswith("helper_") else None
+            if zone is not None:
+                out.setdefault(zone, [])
+        elif zone is not None and (m := _HELPER_SET.search(line)):
+            out[zone].append(m.group(1))
+    return out

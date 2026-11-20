@@ -45,12 +45,20 @@ test('a missing capability with a page still links, and says what it needs', () 
   expect(chip).toHaveClass('missing')
 })
 
-test('a capability without a page is not a link', () => {
+test('the active tool pages are links too (v1.2b)', () => {
   show()
-  expect(screen.queryByRole('link', { name: /Throughput/ })).toBeNull()
-  const missing = screen.getByText('Traffic generator · missing: needs socat')
-  expect(missing.closest('a')).toBeNull()
+  expect(screen.getByRole('link', { name: 'Throughput · in image' })).toHaveAttribute(
+    'href',
+    '/routers/ap1/tools/throughput',
+  )
+  const missing = screen.getByRole('link', { name: 'Traffic generator · missing: needs socat' })
+  expect(missing).toHaveAttribute('href', '/routers/ap1/tools/traffic')
   expect(missing).toHaveClass('missing')
+})
+
+test('a capability without a page is not a link', () => {
+  show([{ name: 'Nope', state: 'in image', reason: null }])
+  expect(screen.getByText('Nope · in image').closest('a')).toBeNull()
 })
 
 test('every link the chips know', () => {
@@ -67,6 +75,7 @@ test('every link the chips know', () => {
       'Connections',
       'Throughput',
       'Traffic generator',
+      'Station management',
       'Nope',
     ].map((n) => [n, capabilityLink('ap1', n)]),
   )
@@ -80,8 +89,9 @@ test('every link the chips know', () => {
     'Air survey': '/routers/ap1/rf#channel-analysis',
     'Port statistics': '/routers/ap1/tools/port-stats',
     Connections: '/routers/ap1/tools/connections',
-    Throughput: null,
-    'Traffic generator': null,
+    Throughput: '/routers/ap1/tools/throughput',
+    'Traffic generator': '/routers/ap1/tools/traffic',
+    'Station management': '/routers/ap1/tools/stations',
     Nope: null,
   })
 })

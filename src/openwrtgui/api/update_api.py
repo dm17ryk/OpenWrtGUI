@@ -66,6 +66,7 @@ def _live(ctx: AppContext) -> list[str]:
         *ctx.key_rotation.live(),
         *ctx.captures.live(),
         *ctx.rf.live_frames(),
+        *ctx.tool_sessions.live(),
     ]
 
 
@@ -77,6 +78,7 @@ async def _stop_live(ctx: AppContext) -> None:
     await ctx.key_rotation.stop_all(limit_s=STOP_LIMIT_S)  # between routers (v1.1b)
     await ctx.captures.stop_all()
     await ctx.rf.stop_frames()
+    await ctx.tool_sessions.stop_all()
 
 
 def _ask_first(ctx: AppContext, force: bool) -> JSONResponse | None:

@@ -1258,6 +1258,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/firewall/sip-alg": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sip Alg
+         * @description The SIP ALG per zone (v1.2b R7): which zones run conntrack helpers, and whether `sip` is one.
+         */
+        get: operations["sip_alg_api_routers__router_id__firewall_sip_alg_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/sip-alg/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sip Alg Apply */
+        post: operations["sip_alg_apply_api_routers__router_id__firewall_sip_alg_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/sip-alg/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sip Alg Preview */
+        post: operations["sip_alg_preview_api_routers__router_id__firewall_sip_alg_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/firewall/tables/apply": {
         parameters: {
             query?: never;
@@ -3378,6 +3432,193 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/tools/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sessions */
+        get: operations["sessions_api_routers__router_id__tools_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/tools/sessions/{session_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop Session */
+        post: operations["stop_session_api_routers__router_id__tools_sessions__session_id__stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/tools/stations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stations */
+        get: operations["stations_api_routers__router_id__tools_stations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/tools/stations/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Station Apply */
+        post: operations["station_apply_api_routers__router_id__tools_stations_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/tools/stations/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Station Preview */
+        post: operations["station_preview_api_routers__router_id__tools_stations_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/tools/throughput/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Throughput Preview */
+        post: operations["throughput_preview_api_routers__router_id__tools_throughput_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/tools/throughput/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Throughput Start */
+        post: operations["throughput_start_api_routers__router_id__tools_throughput_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/tools/traffic/listen/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Listen Preview */
+        post: operations["listen_preview_api_routers__router_id__tools_traffic_listen_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/tools/traffic/listen/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Listen Start */
+        post: operations["listen_start_api_routers__router_id__tools_traffic_listen_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/tools/traffic/send/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Apply */
+        post: operations["send_apply_api_routers__router_id__tools_traffic_send_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/tools/traffic/send/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Preview */
+        post: operations["send_preview_api_routers__router_id__tools_traffic_send_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/wifi": {
         parameters: {
             query?: never;
@@ -3873,12 +4114,41 @@ export interface components {
              */
             action: "connect" | "disconnect" | "reboot";
         };
+        /** ActionResult */
+        ActionResult: {
+            /** Beacons */
+            beacons: components["schemas"]["BeaconRow"][];
+            /** Detail */
+            detail: string;
+            /** Events */
+            events: components["schemas"]["HostapdEvent"][];
+            /** Ok */
+            ok: boolean;
+            /** Status Code */
+            status_code: number | null;
+        };
         /** Address */
         Address: {
             /** Ip */
             ip: string;
             /** Prefix */
             prefix: number;
+        };
+        /** ApStations */
+        ApStations: {
+            /** Channel */
+            channel: number | null;
+            /** Ifname */
+            ifname: string;
+            /** Methods */
+            methods: string[];
+            /** Neighbours */
+            neighbours: components["schemas"]["NeighbourEntry"][];
+            own: components["schemas"]["NeighbourEntry"] | null;
+            /** Ssid */
+            ssid: string;
+            /** Stations */
+            stations: components["schemas"]["StationRow"][];
         };
         /** AppInfo */
         AppInfo: {
@@ -4002,6 +4272,17 @@ export interface components {
             name: string;
             /** Size */
             size: number;
+        };
+        /** BeaconRow */
+        BeaconRow: {
+            /** Bssid */
+            bssid: string | null;
+            /** Channel */
+            channel: number | null;
+            /** Rcpi Dbm */
+            rcpi_dbm: number | null;
+            /** Rsni */
+            rsni: number | null;
         };
         /** BlockDevice */
         BlockDevice: {
@@ -5423,6 +5704,15 @@ export interface components {
             /** Type */
             type: string;
         };
+        /** HostapdEvent */
+        HostapdEvent: {
+            /** Fields */
+            fields: {
+                [key: string]: string | number | boolean | null;
+            };
+            /** Type */
+            type: string;
+        };
         /** HostsApplyIn */
         HostsApplyIn: {
             /**
@@ -5645,6 +5935,21 @@ export interface components {
             live: components["schemas"]["InterfaceLive"] | null;
             /** Own */
             own: boolean;
+        };
+        /** Interval */
+        Interval: {
+            /** End S */
+            end_s: number;
+            /** Jitter Ms */
+            jitter_ms?: number | null;
+            /** Lost Pct */
+            lost_pct?: number | null;
+            /** Mbps */
+            mbps: number;
+            /** Retransmits */
+            retransmits?: number | null;
+            /** Start S */
+            start_s: number;
         };
         /** IpsetConf */
         IpsetConf: {
@@ -6079,6 +6384,38 @@ export interface components {
             read_at: string | null;
             /** Skipped */
             skipped: number;
+        };
+        /** ListenRequest */
+        ListenRequest: {
+            /**
+             * Duration S
+             * @default 60
+             */
+            duration_s: number;
+            /** Port */
+            port: number;
+            /**
+             * Protocol
+             * @enum {string}
+             */
+            protocol: "tcp" | "udp";
+        };
+        /** ListenStart */
+        ListenStart: {
+            /** Digest */
+            digest: string;
+            /**
+             * Duration S
+             * @default 60
+             */
+            duration_s: number;
+            /** Port */
+            port: number;
+            /**
+             * Protocol
+             * @enum {string}
+             */
+            protocol: "tcp" | "udp";
         };
         /** LiveRoute */
         LiveRoute: {
@@ -6571,6 +6908,17 @@ export interface components {
              */
             upserts: components["schemas"]["NatIn"][];
         };
+        /** NeighbourEntry */
+        NeighbourEntry: {
+            /** Bssid */
+            bssid: string;
+            /** Nr */
+            nr: string;
+            /** Source */
+            source: string;
+            /** Ssid */
+            ssid: string;
+        };
         /** NetApplyResult */
         NetApplyResult: {
             /** Applied */
@@ -6927,6 +7275,17 @@ export interface components {
              * @default false
              */
             uc_lc: boolean;
+        };
+        /** Peer */
+        Peer: {
+            /** Address */
+            address: string;
+            /** Bytes */
+            bytes: number;
+            /** First Hex */
+            first_hex: string;
+            /** Port */
+            port: number;
         };
         /** PendingRestore */
         PendingRestore: {
@@ -8043,6 +8402,69 @@ export interface components {
              */
             via: "ap" | "temporary";
         };
+        /** SendApply */
+        SendApply: {
+            /**
+             * Count
+             * @default 1000
+             */
+            count: number;
+            /** Digest */
+            digest: string;
+            /** Host */
+            host: string;
+            /** Port */
+            port: number;
+            /**
+             * Protocol
+             * @enum {string}
+             */
+            protocol: "tcp" | "udp";
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+            /**
+             * What
+             * @enum {string}
+             */
+            what: "bytes" | "text";
+        };
+        /** SendRequest */
+        SendRequest: {
+            /**
+             * Count
+             * @default 1000
+             */
+            count: number;
+            /** Host */
+            host: string;
+            /** Port */
+            port: number;
+            /**
+             * Protocol
+             * @enum {string}
+             */
+            protocol: "tcp" | "udp";
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+            /**
+             * What
+             * @enum {string}
+             */
+            what: "bytes" | "text";
+        };
+        /** SendResult */
+        SendResult: {
+            /** Detail */
+            detail: string;
+            /** Ok */
+            ok: boolean;
+        };
         /** ServiceApplyIn */
         ServiceApplyIn: {
             /**
@@ -8253,6 +8675,45 @@ export interface components {
             /** Zones */
             zones: string[];
         };
+        /** SipAlgApply */
+        SipAlgApply: {
+            /** Digest */
+            digest: string;
+            /** On */
+            on: boolean;
+            /** Zone */
+            zone: string;
+        };
+        /** SipAlgRequest */
+        SipAlgRequest: {
+            /** On */
+            on: boolean;
+            /** Zone */
+            zone: string;
+        };
+        /** SipAlgZones */
+        SipAlgZones: {
+            /** Available */
+            available: string[];
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "on" | "off" | "unknown";
+            /** Zones */
+            zones: components["schemas"]["SipZone"][];
+        };
+        /** SipZone */
+        SipZone: {
+            /** Helpers */
+            helpers: string[];
+            /** Section */
+            section: string;
+            /** Sip */
+            sip: boolean;
+            /** Zone */
+            zone: string;
+        };
         /** SshApplyIn */
         SshApplyIn: {
             /** Digest */
@@ -8428,6 +8889,46 @@ export interface components {
             /** Tx Mcs */
             tx_mcs: number | null;
         };
+        /** StationAction */
+        StationAction: {
+            /** Ifname */
+            ifname: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "transition" | "beacon" | "neighbours";
+            /** Mac */
+            mac?: string | null;
+            /**
+             * Neighbours
+             * @default []
+             */
+            neighbours: string[];
+            /** Target */
+            target?: string | null;
+        };
+        /** StationApply */
+        StationApply: {
+            /** Digest */
+            digest: string;
+            /** Ifname */
+            ifname: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "transition" | "beacon" | "neighbours";
+            /** Mac */
+            mac?: string | null;
+            /**
+             * Neighbours
+             * @default []
+             */
+            neighbours: string[];
+            /** Target */
+            target?: string | null;
+        };
         /** StationInfo */
         StationInfo: {
             /** Connected S */
@@ -8440,6 +8941,26 @@ export interface components {
             signal_dbm: number;
             /** Tx Mbps */
             tx_mbps: number;
+        };
+        /** StationRow */
+        StationRow: {
+            /** Ip */
+            ip: string | null;
+            /** Mac */
+            mac: string;
+            /** Name */
+            name: string | null;
+            /** Signal Dbm */
+            signal_dbm: number | null;
+        };
+        /** StationsView */
+        StationsView: {
+            /** Aps */
+            aps: components["schemas"]["ApStations"][];
+            /** Candidates */
+            candidates: components["schemas"]["NeighbourEntry"][];
+            /** Notes */
+            notes: string[];
         };
         /** StepJob */
         StepJob: {
@@ -8832,6 +9353,95 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** ThroughputRequest */
+        ThroughputRequest: {
+            /**
+             * Duration S
+             * @default 10
+             */
+            duration_s: number;
+            /** Host */
+            host?: string | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "client" | "server";
+            /**
+             * Port
+             * @default 5201
+             */
+            port: number;
+            /**
+             * Protocol
+             * @default tcp
+             * @enum {string}
+             */
+            protocol: "tcp" | "udp";
+            /**
+             * Reverse
+             * @default false
+             */
+            reverse: boolean;
+            /**
+             * Udp Mbps
+             * @default 10
+             */
+            udp_mbps: number;
+        };
+        /** ThroughputStart */
+        ThroughputStart: {
+            /** Digest */
+            digest: string;
+            /**
+             * Duration S
+             * @default 10
+             */
+            duration_s: number;
+            /** Host */
+            host?: string | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "client" | "server";
+            /**
+             * Port
+             * @default 5201
+             */
+            port: number;
+            /**
+             * Protocol
+             * @default tcp
+             * @enum {string}
+             */
+            protocol: "tcp" | "udp";
+            /**
+             * Reverse
+             * @default false
+             */
+            reverse: boolean;
+            /**
+             * Udp Mbps
+             * @default 10
+             */
+            udp_mbps: number;
+        };
+        /** ThroughputSummary */
+        ThroughputSummary: {
+            /** Cpu Pct */
+            cpu_pct?: number | null;
+            /** Jitter Ms */
+            jitter_ms?: number | null;
+            /** Lost Pct */
+            lost_pct?: number | null;
+            /** Received Mbps */
+            received_mbps?: number | null;
+            /** Retransmits */
+            retransmits?: number | null;
+            /** Sent Mbps */
+            sent_mbps?: number | null;
+        };
         /** TimeZones */
         TimeZones: {
             /** Note */
@@ -8914,6 +9524,55 @@ export interface components {
             name: string;
             /** Pattern */
             pattern?: string | null;
+        };
+        /** ToolPlan */
+        ToolPlan: {
+            /** Digest */
+            digest: string;
+            /** Lines */
+            lines: string[];
+            /** Warnings */
+            warnings: string[];
+        };
+        /** ToolSessionView */
+        ToolSessionView: {
+            /** Command */
+            command: string;
+            /** Ends At */
+            ends_at: number;
+            /** Error */
+            error?: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Intervals
+             * @default []
+             */
+            intervals: components["schemas"]["Interval"][];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "throughput" | "listen";
+            /**
+             * Notes
+             * @default []
+             */
+            notes: string[];
+            /**
+             * Peers
+             * @default []
+             */
+            peers: components["schemas"]["Peer"][];
+            /** Router Id */
+            router_id: string;
+            /** Running */
+            running: boolean;
+            /** Started At */
+            started_at: number;
+            summary?: components["schemas"]["ThroughputSummary"] | null;
+            /** Title */
+            title: string;
         };
         /** TrafficRuleIn */
         TrafficRuleIn: {
@@ -11627,6 +12286,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RulesetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sip_alg_api_routers__router_id__firewall_sip_alg_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SipAlgZones"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sip_alg_apply_api_routers__router_id__firewall_sip_alg_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SipAlgApply"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sip_alg_preview_api_routers__router_id__firewall_sip_alg_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SipAlgRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
                 };
             };
             /** @description Validation Error */
@@ -15816,6 +16576,380 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TimeZones"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sessions_api_routers__router_id__tools_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolSessionView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_session_api_routers__router_id__tools_sessions__session_id__stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolSessionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stations_api_routers__router_id__tools_stations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationsView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    station_apply_api_routers__router_id__tools_stations_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StationApply"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    station_preview_api_routers__router_id__tools_stations_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StationAction"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolPlan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    throughput_preview_api_routers__router_id__tools_throughput_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThroughputRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolPlan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    throughput_start_api_routers__router_id__tools_throughput_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThroughputStart"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolSessionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listen_preview_api_routers__router_id__tools_traffic_listen_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolPlan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listen_start_api_routers__router_id__tools_traffic_listen_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListenStart"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolSessionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_apply_api_routers__router_id__tools_traffic_send_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendApply"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SendResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_preview_api_routers__router_id__tools_traffic_send_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolPlan"];
                 };
             };
             /** @description Validation Error */
