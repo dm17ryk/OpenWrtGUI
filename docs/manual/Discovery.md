@@ -81,12 +81,14 @@ from the terminal.
 ## Capabilities
 
 What this router can do, one chip each: the switch, LTE, capture, netem, the firewall, monitor mode, the air
-survey, throughput tests, the traffic generator, connection tracking and port statistics. Each chip says whether
-the router has what it needs **in image**, **added after flashing**, or **missing**, with what is missing (for
-example "missing: needs socat"). The state is read from the image and the files added since, not by running
-anything. A chip opens the screen that uses it: the switch opens Ports, the air survey opens the channel analysis
-on RF live, port statistics and connections open their pages on [Tools](Tools). A missing one opens it too, and
-that screen says what it needs.
+survey, throughput tests, the traffic generator, connection tracking, port statistics and station management.
+Each chip says whether the router has what it needs **in image**, **added after flashing**, or **missing**, with
+what is missing (for example "missing: needs socat"). The state is read from the image and the files added since,
+not by running anything. A chip opens the screen that uses it: the switch opens Ports, the air survey opens the
+channel analysis on RF live, and port statistics, connections, throughput, the traffic generator and station
+management open their pages on [Tools](Tools). A missing one opens it too, and that screen says what it needs.
+Station management needs `hostapd` (wpad provides it); whether the router's wpad build has each request shows on
+its page.
 
 ## Added after flashing
 

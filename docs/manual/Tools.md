@@ -64,6 +64,8 @@ helper until they end. A router without fw4 has nothing to switch, and a run on 
 
 ## Throughput
 
+![Throughput: the router as client or server, the preview, and the rate each second](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/tools-throughput.png)
+
 Measures how fast data goes between the router and another machine, with `iperf3` on the router. The results
 come in each second while the test runs, and **Stop** ends it on the router. iperf3 must be on the router (the
 **Throughput** chip on Discovery says so). Choose what the router does:
@@ -82,6 +84,8 @@ often the CPU's limit, not the link's. Only one Throughput or Traffic generator 
 
 ## Traffic generator
 
+![Traffic generator: Listen with its peers, and Send](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/tools-traffic.png)
+
 Sends or takes simple traffic with `socat` on the router, to check that a port is open, that a device answers, or
 what a device sends to the router. **Listen** waits for peers; **Send** sends zeros or a line of text. socat must be
 on the router (the **Traffic generator** chip on Discovery says so).
@@ -96,6 +100,8 @@ TCP or UDP, for at most 30 seconds. The result says what was sent, or socat's ow
 refused** when nothing listens on that port).
 
 ## Station management
+
+![Station management: an SSID's stations with their requests, and the neighbour report](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/tools-stations.png)
 
 Asks a Wi-Fi station to do something, through the router's `hostapd` (802.11v and 802.11k). Each SSID on air is a
 section with its stations; each request shows the exact command before it is sent, and a request that waits for
