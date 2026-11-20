@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import socket
 from pathlib import Path
 
 import pytest
@@ -34,7 +35,7 @@ from openwrtgui.fw.commands import NFT_TEXT
 from openwrtgui.fw.sip import SipAlgRequest
 from openwrtgui.ports.parse import parse_port_mib
 from openwrtgui.system.parse import zone_helpers
-from openwrtgui.tools.sessions import ToolSessionView
+from openwrtgui.tools.sessions import ToolSessions, ToolSessionView
 from openwrtgui.tools.throughput import ThroughputRequest, iperf3_command, parse_iperf3_line
 from openwrtgui.tools.traffic import ListenRequest, SendRequest, listen_command, listen_parser, send_command
 from openwrtgui.transport.ssh import SshTransport
@@ -201,6 +202,54 @@ async def test_traffic_both_ways(ap2_rw: SshTransport) -> None:
             assert (await ap2_rw.run(send_command(text), timeout=40)).ok
             await asyncio.sleep(1)
             assert listener.received == b"owg-line\n"
+
+
+async def _running(w: FwWindow, program: str) -> str:
+    t = await w.connect()
+    try:
+        return (await t.run(f"pidof {program}")).stdout.strip()
+    finally:
+        await t.close()
+
+
+async def test_the_engine_stops_a_session_on_ap2(fw_window: FwWindow) -> None:
+    """Final review I3: the app's ToolSessions on AP2. Stop's `kill <pid>` ends a waiting iperf3 server
+    (BusyBox `timeout` keeps the pid, R2) with no error. A Listen stopped while a peer holds its connection
+    open ends its listener at once, and the peer's child by the listen's own limit (the security review's
+    per-child limit)."""
+    w = fw_window
+    sessions = ToolSessions(pool=w.pool, routers=w.routers, guard=w.guard, audit=w.audit)
+    command, limit = iperf3_command(ThroughputRequest(mode="server"))
+    view = await sessions.start(
+        AP2_ID, kind="throughput", title="Throughput", command=command, limit_s=limit, parse=parse_iperf3_line
+    )
+    await asyncio.sleep(3)
+    assert await _running(w, "iperf3"), "iperf3 -s did not start"
+    done = await sessions.stop(view.id)
+    print(f"\nthroughput stopped: error={done.error} notes={done.notes}")
+    assert done.running is False and done.error is None, done
+    await asyncio.sleep(1)
+    assert await _running(w, "iperf3") == "", "iperf3 is still running after Stop"
+
+    listen_s = 20
+    command, limit = listen_command(ListenRequest(protocol="tcp", port=LISTEN_PORT, duration_s=listen_s))
+    view = await sessions.start(
+        AP2_ID, kind="listen", title="Traffic listen", command=command, limit_s=limit, parse=listen_parser()
+    )
+    started = asyncio.get_running_loop().time()
+    await asyncio.sleep(3)
+    held = await asyncio.to_thread(socket.create_connection, (AP2, LISTEN_PORT), 10)
+    try:
+        held.sendall(OWG_TEST)
+        await asyncio.sleep(2)
+        done = await sessions.stop(view.id)
+        print(f"listen stopped: error={done.error} peers={done.peers} socat={await _running(w, 'socat')}")
+        assert done.running is False and done.error is None, done
+        left = listen_s + 5 - (asyncio.get_running_loop().time() - started)
+        await asyncio.sleep(max(0.0, left))
+        assert await _running(w, "socat") == "", "a peer's socat child outlived the listen's limit"
+    finally:
+        held.close()
 
 
 async def test_sip_alg_off_and_on(fw_window: FwWindow) -> None:

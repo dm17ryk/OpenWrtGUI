@@ -108,7 +108,9 @@ class StationTools:
         """This router's APs, then each other router's APs on air (R8): their own neighbour reports."""
         out = list(own)
         for other in self._routers.list():
-            if other.id == rec.id:
+            # only routers the app reaches now: an unreachable one would add a connect wait to every view,
+            # preview and apply (final review I4)
+            if other.id == rec.id or not self._pool.health(other.id).online:
                 continue
             try:
                 t = await self._pool.get(other)

@@ -26,7 +26,7 @@ from openwrtgui.transport.base import (
     Unreachable,
 )
 from openwrtgui.transport.pool import ConnectionPool
-from openwrtgui.transport.ssh import HostKeyStore, SshTransport, fetch_host_key
+from openwrtgui.transport.ssh import HostKeyStore, SshTransport, _ByteStream, fetch_host_key
 
 
 async def _pinned(srv: SshServer, tmp_path: Path) -> HostKeyStore:
@@ -413,3 +413,30 @@ async def test_stream_reads_bytes_and_exit_status(ssh_server: SshServer, tmp_pat
         assert failed.exit_status == 127 and "unknown" in failed.stderr
     finally:
         await t.close()
+
+
+class _LostOut:
+    async def read(self, n: int) -> bytes:
+        raise asyncssh.ConnectionLost("Connection lost")
+
+
+class _LostProcess:
+    """An exec channel whose connection went: asyncssh raises its own error, not an OSError."""
+
+    exit_status = None
+    stdout = _LostOut()
+
+    def close(self) -> None:
+        return None
+
+    async def wait(self, check: bool = False) -> None:
+        raise asyncssh.ConnectionLost("Connection lost")
+
+
+async def test_a_lost_connection_is_unreachable_on_a_stream() -> None:
+    """Final review (I1): a tool session or a capture must see a dropped router as a TransportError."""
+    stream = _ByteStream(_LostProcess())  # type: ignore[arg-type]
+    with pytest.raises(Unreachable, match="Connection lost"):
+        await stream.read()
+    await stream.close()  # closing a stream whose connection went does not raise
+    assert stream.exit_status is None

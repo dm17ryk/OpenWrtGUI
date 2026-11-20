@@ -153,12 +153,18 @@ class _ByteStream:
         self.stderr = ""
 
     async def read(self, n: int = 65536) -> bytes:
-        return await self._process.stdout.read(n)
+        try:
+            return await self._process.stdout.read(n)
+        except (OSError, asyncssh.Error) as exc:  # a router that went: asyncssh's own error is no OSError
+            raise Unreachable(str(exc).strip() or type(exc).__name__) from exc
 
     async def close(self) -> None:
-        if self._process.exit_status is None:
-            self._process.close()  # stops the command (tcpdump gets SIGPIPE / the channel goes)
-        done = await self._process.wait(check=False)
+        try:
+            if self._process.exit_status is None:
+                self._process.close()  # stops the command (tcpdump gets SIGPIPE / the channel goes)
+            done = await self._process.wait(check=False)
+        except (OSError, asyncssh.Error):
+            return  # the connection went: no exit status to read
         self.exit_status = done.exit_status
         err = done.stderr or b""
         self.stderr = err.decode(errors="replace") if isinstance(err, bytes) else str(err)

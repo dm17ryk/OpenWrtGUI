@@ -14,8 +14,13 @@ from openwrtgui.tools.throughput import check_host
 from openwrtgui.transport.base import CommandResult
 from openwrtgui.uci import shell_quote
 
-# no commas, quotes or spaces inside the sed expression: socat's address parser keeps it whole
-PER_PEER = "exec 1>&2; echo C$$ $SOCAT_PEERADDR $SOCAT_PEERPORT; hexdump -v -C | sed s/^/D$$=/"
+# No commas, colons or quotes, and no spaces inside the sed expression: socat's address parser keeps it whole.
+# The parent's `timeout` and Stop reach only the listener: each peer's child carries the same limit itself.
+PER_PEER = (
+    "exec 1>&2; echo C$$ $SOCAT_PEERADDR $SOCAT_PEERPORT; "
+    "timeout -s KILL {limit} hexdump -v -C | sed s/^/D$$=/"
+)
+MAX_CHILDREN = 16  # a flood of peers must not fork a small router out of memory
 SIZE_CAP = 50 * 2**20
 SIZE_CAP_TEXT = "Stopped at the size cap (50 MB)"
 FIRST_HEX = 128  # the first 64 bytes
@@ -61,11 +66,12 @@ class SendResult(BaseModel):
 
 def listen_command(req: ListenRequest) -> tuple[str, int]:
     """The session's command and its limit in seconds."""
-    child = f"SYSTEM:{shell_quote(PER_PEER)}"
+    child = f"SYSTEM:{shell_quote(PER_PEER.format(limit=req.duration_s))}"
+    fork = f"fork,max-children={MAX_CHILDREN}"
     if req.protocol == "tcp":
-        program = f"socat TCP-LISTEN:{req.port},reuseaddr,fork {child}"
+        program = f"socat TCP-LISTEN:{req.port},reuseaddr,{fork} {child}"
     else:
-        program = f"socat -T {UDP_IDLE_S} UDP-RECVFROM:{req.port},fork {child}"
+        program = f"socat -T {UDP_IDLE_S} UDP-RECVFROM:{req.port},{fork} {child}"
     return session_command(req.duration_s, program), req.duration_s
 
 

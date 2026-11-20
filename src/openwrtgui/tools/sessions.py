@@ -223,7 +223,12 @@ class ToolSessions:
         if session_id not in self._pids and (m := _PID.fullmatch(line)):
             self._pids[session_id] = int(m.group(1))
             return
-        self._views[session_id] = parse(self._views[session_id], line)
+        view = self._views[session_id]
+        parsed = parse(view, line)
+        if session_id in self._halted and parsed.error != view.error:
+            # the tool's own word on the kill that ended it (iperf3's `interrupt`): Stop's result stands
+            parsed = add_note(parsed.model_copy(update={"error": view.error}), parsed.error or "")
+        self._views[session_id] = parsed
 
     async def _pump(
         self, rec: RouterRecord, own: Transport, session_id: str, stream: ByteStream, parse: LineParser
@@ -241,12 +246,12 @@ class ToolSessions:
                         )  # the parser saw the tool fail: end it on the router
             if buf:
                 self._line(session_id, buf.decode(errors="replace").rstrip("\r"), parse)
-        except (TransportError, OSError) as exc:
+        except Exception as exc:  # noqa: BLE001 - any stream failure ends the session and frees the router
             if session_id not in self._halted:
                 error = f"The router stopped answering: {exc}"
         finally:
             self._streams.pop(session_id, None)
-            with contextlib.suppress(TransportError, OSError):
+            with contextlib.suppress(Exception):
                 await stream.close()
             await _close(own)
             self._audit.record(

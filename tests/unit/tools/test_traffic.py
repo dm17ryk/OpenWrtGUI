@@ -45,10 +45,13 @@ def _feed(*lines: str) -> ToolSessionView:
 
 
 def test_tcp_listen_command() -> None:
+    """Final review (security, Important): each peer's child is bounded by the listen's limit too, and at most
+    16 run at once; the parent's `timeout` and Stop reach only the listener."""
     command, limit = listen_command(ListenRequest(protocol="tcp", port=9100, duration_s=60))
     assert command == (
-        'echo "OWG-PID $$"; exec timeout -s KILL 60 socat TCP-LISTEN:9100,reuseaddr,fork '
-        "SYSTEM:'exec 1>&2; echo C$$ $SOCAT_PEERADDR $SOCAT_PEERPORT; hexdump -v -C | sed s/^/D$$=/' 2>&1"
+        'echo "OWG-PID $$"; exec timeout -s KILL 60 socat TCP-LISTEN:9100,reuseaddr,fork,max-children=16 '
+        "SYSTEM:'exec 1>&2; echo C$$ $SOCAT_PEERADDR $SOCAT_PEERPORT; "
+        "timeout -s KILL 60 hexdump -v -C | sed s/^/D$$=/' 2>&1"
     )
     assert limit == 60
     assert not is_read_only_command(command)
@@ -56,8 +59,19 @@ def test_tcp_listen_command() -> None:
 
 def test_udp_listen_command() -> None:
     command, _limit = listen_command(ListenRequest(protocol="udp", port=9100, duration_s=20))
-    assert command.startswith('echo "OWG-PID $$"; exec timeout -s KILL 20 socat -T 2 UDP-RECVFROM:9100,fork ')
+    assert command.startswith(
+        'echo "OWG-PID $$"; exec timeout -s KILL 20 socat -T 2 UDP-RECVFROM:9100,fork,max-children=16 '
+    )
+    assert "timeout -s KILL 20 hexdump -v -C" in command
     assert not is_read_only_command(command)
+
+
+def test_the_per_peer_text_stays_one_socat_address() -> None:
+    """socat's address parser splits on commas and colons and reads quotes: the SYSTEM text has none."""
+    for duration in (10, 60, 300):
+        command, _ = listen_command(ListenRequest(protocol="tcp", port=9100, duration_s=duration))
+        child = command.split("SYSTEM:'", 1)[1].rsplit("' 2>&1", 1)[0]
+        assert not set(child) & set(",:'\"\\[]!")
 
 
 def test_listen_limits() -> None:

@@ -69,9 +69,12 @@ class PooledTransport:
     def __init__(self) -> None:
         self.ran: list[str] = []
         self.fail: Exception | None = None
+        self.gate: asyncio.Event | None = None  # holds a command until the test lets it answer
 
     async def run(self, command: str, *, timeout: float = 15.0) -> CommandResult:
         self.ran.append(command)
+        if self.gate is not None:
+            await self.gate.wait()
         if self.fail is not None:
             raise self.fail
         return CommandResult(command, "", "", 0)
@@ -150,6 +153,10 @@ def _fails(view: ToolSessionView, line: str) -> ToolSessionView:
     return view.model_copy(update={"error": "x"})
 
 
+def _fails_after_stop(view: ToolSessionView, line: str) -> ToolSessionView:
+    return view.model_copy(update={"error": "x"}) if line == "interrupt" else view
+
+
 @pytest.fixture
 def env(tmp_path: Path) -> Env:
     return Env(tmp_path)
@@ -219,6 +226,35 @@ async def test_router_drop_ends_it(env: Env) -> None:
     done = await env.ended(view.id)
     assert done.error == "The router stopped answering: gone"
     assert env.pool.pooled.ran == []
+
+
+async def test_any_stream_failure_ends_it_with_an_error(env: Env) -> None:
+    """Final review (I1): an error the transport did not translate still ends the session, says why, and frees
+    the router."""
+    view = await env.start()
+    env.pool.held.feed("OWG-PID 4242")
+    env.pool.held.queue.put_nowait(RuntimeError("Connection lost"))
+    done = await env.ended(view.id)
+    assert done.error == "The router stopped answering: Connection lost"
+    assert env.sessions.running_on("ap2") is None
+
+
+async def test_the_tools_own_error_after_stop_is_a_note(env: Env) -> None:
+    """Final review (I2): iperf3 reports `interrupt` when Stop's kill reaches it; Stop's own result stands."""
+    view = await env.sessions.start(
+        "ap2", kind="throughput", title="Throughput", command=COMMAND, limit_s=70, parse=_fails_after_stop
+    )
+    env.pool.held.feed("OWG-PID 4242")
+    await asyncio.sleep(0.05)
+    env.pool.pooled.gate = asyncio.Event()
+    halted = asyncio.create_task(env.sessions.stop(view.id))
+    await asyncio.sleep(0.05)
+    env.pool.held.feed("interrupt")  # iperf3 answers the kill before the stream closes
+    await asyncio.sleep(0.05)
+    env.pool.pooled.gate.set()
+    done = await halted
+    assert done.error is None and done.running is False
+    assert done.notes[-1] == "x"
 
 
 async def test_limit_end_is_no_error(env: Env) -> None:

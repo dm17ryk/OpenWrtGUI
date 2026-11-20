@@ -191,6 +191,25 @@ async def test_stations_view(authed: httpx.AsyncClient, ctx: AppContext) -> None
     assert sources == {AP1_OWN: "AP1 · bench · OpenWrt", AP2_OWN: "AP2 · office · OpenWrt"}
 
 
+async def test_candidates_come_only_from_routers_online(
+    authed: httpx.AsyncClient, ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Final review (I4): a router the app has not reached is not connected to for its candidates (each
+    unreachable one would add a connect wait to the view, the preview and the apply)."""
+    await _ap2_on_air(ctx)
+    asked: list[str] = []
+    real_get = ctx.pool.get
+
+    async def get(rec: Any, *, token: object | None = None) -> Any:
+        asked.append(rec.id)
+        return await real_get(rec, token=token)
+
+    monkeypatch.setattr(ctx.pool, "get", get)
+    view = (await authed.get(f"{TOOLS}/stations")).json()
+    assert set(asked) == {"ap1", "ap2"}, asked
+    assert AP2_OWN in {c["bssid"] for c in view["candidates"]}
+
+
 async def test_neighbours_set_and_clear(authed: httpx.AsyncClient, ctx: AppContext) -> None:
     await _ap2_on_air(ctx)
     body = {"kind": "neighbours", "ifname": "phy0-ap0", "neighbours": [AP2_OWN]}
