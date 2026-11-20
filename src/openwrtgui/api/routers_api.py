@@ -81,6 +81,8 @@ def _running_on(ctx: AppContext, router_id: str) -> list[str]:
         found.append("a flash runs")
     if (capture := ctx.captures.running_on(router_id)) is not None:
         found.append(capture)
+    if (session := ctx.tool_sessions.running_on(router_id)) is not None:
+        found.append(session)
     if ctx.lte_recover.busy(router_id) is not None:  # mid-rung the modem may be in low power (I5)
         found.append("LTE recovery runs")
     if ctx.key_rotation.busy(router_id) is not None:  # mid-move the router may hold both key lines (v1.1b)

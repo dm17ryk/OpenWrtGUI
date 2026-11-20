@@ -93,6 +93,8 @@ def create_app(ctx: AppContext) -> FastAPI:
                 await ctx.rf.stop_frames()
             with contextlib.suppress(Exception):  # a capture closes its file; on mon0 it removes owgmon0
                 await ctx.captures.stop_all()
+            with contextlib.suppress(Exception):  # Throughput or Traffic listen: kill it on the router
+                await ctx.tool_sessions.stop_all()
             ctx.rf.close_all()
             ctx.lte_live.close_all()
             ctx.system_live.close_all()

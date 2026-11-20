@@ -10,6 +10,7 @@ import pytest
 from openwrtgui.app import create_app
 from openwrtgui.capture.service import CaptureRequest
 from openwrtgui.context import AppContext
+from openwrtgui.tools.sessions import add_note, session_command
 from openwrtgui.transport.fake import ReplayTransport
 from openwrtgui.wifi.steps import StepRequest
 
@@ -108,6 +109,42 @@ async def test_shutdown_stops_a_mon0_capture(ctx: AppContext, monkeypatch: pytes
     assert not done.running
     commands = [e.command for e in ctx.audit.query()]
     assert "iw dev owgmon0 del" in commands
+
+
+async def _tool_session(ctx: AppContext, monkeypatch: pytest.MonkeyPatch) -> str:
+    async def stream(self: ReplayTransport, command: str) -> _HeldStream:
+        return _HeldStream()
+
+    monkeypatch.setattr(ReplayTransport, "stream", stream)
+    view = await ctx.tool_sessions.start(
+        "ap2",
+        kind="throughput",
+        title="Throughput",
+        command=session_command(70, "iperf3 -s"),
+        limit_s=70,
+        parse=add_note,
+    )
+    return view.id
+
+
+async def test_install_asks_first_while_a_tool_session_runs(
+    authed: httpx.AsyncClient, ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """v1.2b R3: a Throughput or Traffic listen session on a router is live work the update names."""
+    monkeypatch.setattr(ctx.updater, "install", _installed)
+    session_id = await _tool_session(ctx, monkeypatch)
+    r = await authed.post(INSTALL, json={"version": "0.7.0"})
+    assert r.status_code == 409 and r.json()["live"] == ["Throughput on AP2 · office"]
+    r = await authed.post(INSTALL, json={"version": "0.7.0", "force": True})
+    assert r.status_code == 202 and not ctx.tool_sessions.get(session_id).running
+
+
+async def test_shutdown_stops_a_tool_session(ctx: AppContext, monkeypatch: pytest.MonkeyPatch) -> None:
+    session_id = await _tool_session(ctx, monkeypatch)
+    app = create_app(ctx)
+    async with app.router.lifespan_context(app):
+        pass
+    assert not ctx.tool_sessions.get(session_id).running
 
 
 async def test_install_asks_first_while_the_app_key_rotates(

@@ -54,6 +54,7 @@ from openwrtgui.system.plugins_service import PluginsService
 from openwrtgui.system.sampler import SystemHub
 from openwrtgui.system.service import SystemService
 from openwrtgui.terminal import TerminalSession
+from openwrtgui.tools.sessions import ToolSessions
 from openwrtgui.transport.base import Transport
 from openwrtgui.transport.pool import ConnectionPool
 from openwrtgui.transport.ssh import HostKeyStore, SshTransport
@@ -90,6 +91,7 @@ class AppContext:
     fw: FirewallService
     faults: FaultsService
     captures: CaptureService
+    tool_sessions: ToolSessions  # v1.2b: Throughput and Traffic listen, streamed on their own connection
     profiles: ProfileStore
     library: ImageLibrary  # v0.8.2: the firmware releases on GitHub
     discovery: DiscoveryService
@@ -410,6 +412,7 @@ def build_context(
         fw=fw,
         faults=faults,
         captures=captures,
+        tool_sessions=ToolSessions(pool=pool, routers=routers, guard=guard, audit=audit),
         profiles=profiles,
         library=ImageLibrary(profiles, client_factory),
         discovery=discovery,

@@ -99,6 +99,16 @@ async def test_a_running_capture_refuses_the_remove(
     assert "a capture on br-lan runs" in r.json()["detail"]
 
 
+async def test_a_running_tool_session_refuses_the_remove(
+    authed: httpx.AsyncClient, ctx: AppContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """v1.2b R3: a Throughput or Traffic listen session runs on the router."""
+    monkeypatch.setattr(ctx.tool_sessions, "running_on", lambda router_id: "throughput runs")
+    r = await _remove(authed)
+    assert r.status_code == 409
+    assert "throughput runs" in r.json()["detail"]
+
+
 async def test_two_at_once_are_both_named(authed: httpx.AsyncClient, ctx: AppContext) -> None:
     ctx.statuses["ap2"] = _status(1)
     await _pending(ctx)
