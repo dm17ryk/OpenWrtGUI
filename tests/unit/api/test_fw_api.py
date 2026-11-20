@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+import re
+from typing import Any
+
 import httpx
+
+from openwrtgui.context import AppContext
+from openwrtgui.fw.commands import UCI_FIREWALL
 
 FW = "/api/routers/{}/firewall"
 
@@ -50,6 +56,62 @@ async def test_rules_and_zones_preview(authed: httpx.AsyncClient) -> None:
     ).status_code == 200
     custom = {"name": "20-owg", "content": "# nothing yet"}
     assert (await authed.post(f"{FW.format('ap2')}/custom/preview", json=custom)).status_code == 200
+
+
+SIP_TEN = ["amanda", "RAS", "Q.931", "irc", "netbios-ns", "pptp", "sane", "sip", "snmp", "tftp"]
+
+
+async def _uci_firewall(ctx: AppContext) -> str:
+    """`uci -X show firewall`, the anonymous sections' names masked: the simulator names an edited section
+    anew from its content, as libuci does, and the recorded names are not its hashes."""
+    rec = ctx.routers.get("ap1")
+    assert rec is not None
+    return re.sub(r"cfg[0-9a-f]{6}", "cfg", (await (await ctx.pool.get(rec)).run(UCI_FIREWALL)).stdout)
+
+
+async def _sip(authed: httpx.AsyncClient, on: bool) -> dict[str, Any]:
+    body = {"zone": "lan", "on": on}
+    preview = (await authed.post(f"{FW.format('ap1')}/sip-alg/preview", json=body)).json()
+    assert preview["rollback"]
+    assert "Connections set up before the change keep their helper until they end." in preview["warnings"]
+    r = await authed.post(f"{FW.format('ap1')}/sip-alg/apply", json={**body, "digest": preview["digest"]})
+    assert r.status_code == 200, r.text
+    return dict(r.json())
+
+
+async def test_sip_alg_off_and_on(authed: httpx.AsyncClient, ctx: AppContext) -> None:
+    zones = (await authed.get(f"{FW.format('ap1')}/sip-alg")).json()
+    assert zones["state"] == "on" and zones["available"] == SIP_TEN
+    assert zones["zones"] == [{"zone": "lan", "section": "cfg02dc81", "sip": True, "helpers": SIP_TEN}]
+    before = await _uci_firewall(ctx)
+    off = await _sip(authed, False)
+    assert off["applied"] and off["verified"], off
+    details = {c["name"]: c["detail"] for c in off["checks"]}
+    assert details["SIP ALG zone lan"] == "off in fw4's ruleset"
+    assert details["other helpers zone lan"] == "9 kept"
+    zones = (await authed.get(f"{FW.format('ap1')}/sip-alg")).json()
+    assert zones["state"] == "off" and zones["zones"][0]["helpers"] == [h for h in SIP_TEN if h != "sip"]
+    on = await _sip(authed, True)
+    assert on["applied"] and on["verified"], on
+    assert {c["name"]: c["detail"] for c in on["checks"]}["SIP ALG zone lan"] == "on in fw4's ruleset"
+    assert (await authed.get(f"{FW.format('ap1')}/sip-alg")).json()["zones"][0]["helpers"] == SIP_TEN
+    assert await _uci_firewall(ctx) == before
+
+
+async def test_sip_alg_refusals(authed: httpx.AsyncClient) -> None:
+    r = await authed.post(f"{FW.format('ap1')}/sip-alg/preview", json={"zone": "lan", "on": True})
+    assert r.status_code == 422 and r.json()["detail"] == "SIP ALG is already on in zone lan."
+    r = await authed.post(f"{FW.format('ap1')}/sip-alg/preview", json={"zone": "wan", "on": False})
+    assert r.json()["detail"] == "Zone wan runs no conntrack helpers, so it has no SIP ALG to switch."
+
+
+async def test_sip_alg_423_while_the_guard_is_live(authed_guard_live: httpx.AsyncClient) -> None:
+    body = {"zone": "lan", "on": False}
+    preview = (await authed_guard_live.post(f"{FW.format('ap1')}/sip-alg/preview", json=body)).json()
+    r = await authed_guard_live.post(
+        f"{FW.format('ap1')}/sip-alg/apply", json={**body, "digest": preview["digest"]}
+    )
+    assert r.status_code == 423
 
 
 async def test_locked_table_422_without_override(authed: httpx.AsyncClient) -> None:

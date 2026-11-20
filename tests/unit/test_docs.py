@@ -305,6 +305,8 @@ GUARDED = {  # each module that calls require_clear() -> the words "What is refu
     "system/access_service.py": "router password",
     "system/jobs.py": "reboot",
     "system/service.py": "diagnostics",
+    "tools/service.py": "Traffic generator",
+    "tools/sessions.py": "Throughput",
     "wifi/step_service.py": "step-through",
 }
 

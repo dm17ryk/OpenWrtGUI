@@ -74,6 +74,9 @@ router. In detail:
 - Arming a fault, and a capture on `mon0`.
 - RF live's channel scan and frame analysis (each adds an interface on the radio).
 - Starting a step-through, or its **Restore**.
+- On the Tools screen: starting **Throughput** or a **Traffic generator** listen, the Traffic generator's
+  **Send**, and Station management's requests. A Throughput or listen that is running stops within a second
+  of a run starting, and says "Stopped by Bench Guard".
 - Installing the app key, and setting a root password in the wizard.
 - Settings › **Rotate key**: starting it, a Retry, and its next router. A router it was moving keeps the old key
   and is listed with Retry.

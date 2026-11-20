@@ -13,6 +13,7 @@ from openwrtgui.context import AppContext
 from openwrtgui.fw.compile import ForwardingRequest, ModelRequest, ZoneRequest
 from openwrtgui.fw.custom import CustomRequest
 from openwrtgui.fw.sections import ForwardRequest, IpsetRequest, Kind, NatRequest, RuleRequest, SectionRequest
+from openwrtgui.fw.sip import SipAlgApply, SipAlgRequest, SipAlgZones
 from openwrtgui.fw.state import FirewallState
 from openwrtgui.fw.tables import ChainEdit, TableRequest
 from openwrtgui.net.apply import NetApplyResult
@@ -301,6 +302,23 @@ async def firewall_state(router_id: str, ctx: Ctx) -> FirewallState:
 @router.get("/ruleset")
 async def ruleset(router_id: str, ctx: Ctx) -> RulesetOut:
     return RulesetOut(text=await ctx.fw.ruleset_text(_known(ctx, router_id)))
+
+
+@router.get("/sip-alg")
+async def sip_alg(router_id: str, ctx: Ctx) -> SipAlgZones:
+    """The SIP ALG per zone (v1.2b R7): which zones run conntrack helpers, and whether `sip` is one."""
+    return await ctx.fw.sip_zones(_known(ctx, router_id))
+
+
+@router.post("/sip-alg/preview")
+async def sip_alg_preview(router_id: str, body: SipAlgRequest, ctx: Ctx) -> NetPlanOut:
+    return NetPlanOut.of(await ctx.fw.plan_sip_alg(_known(ctx, router_id), body))
+
+
+@router.post("/sip-alg/apply")
+async def sip_alg_apply(router_id: str, body: SipAlgApply, ctx: Ctx) -> NetApplyResult:
+    req = SipAlgRequest(zone=body.zone, on=body.on)
+    return await ctx.fw.apply_sip_alg(_known(ctx, router_id), req, body.digest)
 
 
 @router.post("/model/preview")

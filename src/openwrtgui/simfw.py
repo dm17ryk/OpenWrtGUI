@@ -35,6 +35,19 @@ OWNED = ("/tmp/", "/etc/nftables.d/", "/etc/owg/")  # files this simulator keeps
 NO_SUCH = "Error: Could not process rule: No such file or directory\n"
 GATED = frozenset({"netdev", "bridge"})  # families a router may lack (kmod-nft-netdev, kmod-nft-bridge)
 DEVICES = ("lo", "eth0", "eth0.1", "eth0.2", "br-lan", "phy0-ap0", "wwan0")
+# fw4's conntrack helpers as AP2 declares them, in its order: (name, protocol, match, comment)
+FW4_HELPERS = (
+    ("amanda", "udp", "udp dport 10080", "Amanda backup and archiving proto"),
+    ("RAS", "udp", "udp dport 1719", "RAS proto tracking"),
+    ("Q.931", "tcp", "tcp dport 1720", "Q.931 proto tracking"),
+    ("irc", "tcp", "meta nfproto ipv4 tcp dport 6667", "IRC DCC connection tracking"),
+    ("netbios-ns", "udp", "meta nfproto ipv4 udp dport 137", "NetBIOS name service broadcast tracking"),
+    ("pptp", "tcp", "meta nfproto ipv4 tcp dport 1723", "PPTP VPN connection tracking"),
+    ("sane", "tcp", "tcp dport 6566", "SANE scanner connection tracking"),
+    ("sip", "udp", "udp dport 5060", "SIP VoIP connection tracking"),
+    ("snmp", "udp", "meta nfproto ipv4 udp dport 161", "SNMP monitoring connection tracking"),
+    ("tftp", "udp", "udp dport 69", "TFTP connection tracking"),
+)
 DEFAULT_ROOT = {"eth0": ("fq_codel", "limit 10240p flows 1024 quantum 1514 target 5ms interval 100ms")}
 IMAGE_CUSTOM = {
     "/etc/nftables.d/10-custom-filter-chains.nft": (
@@ -114,6 +127,7 @@ class _Table:
     name: str
     sets: list[str] = field(default_factory=list)  # raw blocks, one statement per line
     chains: list[_Chain] = field(default_factory=list)
+    helpers: list[str] = field(default_factory=list)  # fw4's `ct helper <name>` objects (v1.2b)
 
     def chain(self, name: str) -> _Chain | None:
         return next((c for c in self.chains if c.name == name), None)
@@ -583,17 +597,10 @@ class SimFirewall:
             for w in ("from", "to")
             for p in ("accept", "reject", "drop")
         ]
-        # fw4's automatic conntrack helpers, as on AP2: the SIP helper on each zone without masquerading
-        # (AP2: `chain helper_lan { udp dport 5060 ct helper set "sip" ... }`)
-        t.chains += [
-            _Chain(
-                f"helper_{z.name}",
-                None,
-                [_Rule('udp dport 5060 ct helper set "sip" comment "!fw4: SIP VoIP connection tracking"')],
-            )
-            for z in conf.zones
-            if not z.masq
-        ]
+        # fw4's conntrack helpers, as on AP2 (v1.2b R7): the ten helper objects, and per zone a helper chain
+        # with its `helper` list, or with all ten when auto_helper is on and the zone does not masquerade
+        t.helpers = [name for name, *_ in FW4_HELPERS]
+        t.chains += [chain for z in conf.zones if (chain := _helper_chain(z)) is not None]
         t.chains.append(
             _Chain("dstnat", "type nat hook prerouting priority dstnat; policy accept;", _redirects(conf))
         )
@@ -811,6 +818,20 @@ def _zone_chains(conf: FirewallConf, z: ZoneConf) -> list[_Chain]:
     ]
 
 
+def _helper_chain(z: ZoneConf) -> _Chain | None:
+    listed = z.others.get("helper", "").split()
+    if listed:
+        names = listed
+    elif z.others.get("auto_helper", "1") != "0" and not z.masq:
+        names = [name for name, *_ in FW4_HELPERS]
+    else:
+        return None
+    rules = {
+        name: f'{match} ct helper set "{name}" comment "!fw4: {text}"' for name, _, match, text in FW4_HELPERS
+    }
+    return _Chain(f"helper_{z.name}", None, [_Rule(rules[n]) for n in names if n in rules])
+
+
 def _redirects(conf: FirewallConf) -> list[_Rule]:
     return [
         _Rule(
@@ -849,6 +870,15 @@ def _text(t: _Table, *, handles: bool) -> str:
         return f" # handle {next(h)}" if handles else ""
 
     lines = [f"table {t.family} {t.name} {{{tag()}"]
+    protocols = {name: proto for name, proto, *_ in FW4_HELPERS}
+    for name in t.helpers:
+        lines += [
+            f"\tct helper {name} {{{tag()}",
+            f'\t\ttype "{name}" protocol {protocols.get(name, "udp")}',
+            "\t\tl3proto inet",
+            "\t}",
+            "",
+        ]
     for block in t.sets:
         first, *rest = block.split("\n")
         lines += [first + tag(), *rest]
@@ -870,6 +900,9 @@ def _json(tables: Sequence[_Table]) -> list[dict[str, Any]]:
     for t in tables:
         handle += 1
         out.append({"table": {"family": t.family, "name": t.name, "handle": handle}})
+        for name in t.helpers:
+            handle += 1
+            out.append({"ct helper": {"family": t.family, "name": name, "table": t.name, "handle": handle}})
         for block in t.sets:
             name = block.split()[1]
             handle += 1

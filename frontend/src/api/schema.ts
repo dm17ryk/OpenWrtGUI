@@ -1258,6 +1258,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/firewall/sip-alg": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sip Alg
+         * @description The SIP ALG per zone (v1.2b R7): which zones run conntrack helpers, and whether `sip` is one.
+         */
+        get: operations["sip_alg_api_routers__router_id__firewall_sip_alg_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/sip-alg/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sip Alg Apply */
+        post: operations["sip_alg_apply_api_routers__router_id__firewall_sip_alg_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/firewall/sip-alg/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sip Alg Preview */
+        post: operations["sip_alg_preview_api_routers__router_id__firewall_sip_alg_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/firewall/tables/apply": {
         parameters: {
             query?: never;
@@ -8473,6 +8527,45 @@ export interface components {
             /** Zones */
             zones: string[];
         };
+        /** SipAlgApply */
+        SipAlgApply: {
+            /** Digest */
+            digest: string;
+            /** On */
+            on: boolean;
+            /** Zone */
+            zone: string;
+        };
+        /** SipAlgRequest */
+        SipAlgRequest: {
+            /** On */
+            on: boolean;
+            /** Zone */
+            zone: string;
+        };
+        /** SipAlgZones */
+        SipAlgZones: {
+            /** Available */
+            available: string[];
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "on" | "off" | "unknown";
+            /** Zones */
+            zones: components["schemas"]["SipZone"][];
+        };
+        /** SipZone */
+        SipZone: {
+            /** Helpers */
+            helpers: string[];
+            /** Section */
+            section: string;
+            /** Sip */
+            sip: boolean;
+            /** Zone */
+            zone: string;
+        };
         /** SshApplyIn */
         SshApplyIn: {
             /** Digest */
@@ -12022,6 +12115,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RulesetOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sip_alg_api_routers__router_id__firewall_sip_alg_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SipAlgZones"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sip_alg_apply_api_routers__router_id__firewall_sip_alg_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SipAlgApply"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetApplyResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sip_alg_preview_api_routers__router_id__firewall_sip_alg_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SipAlgRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
                 };
             };
             /** @description Validation Error */
