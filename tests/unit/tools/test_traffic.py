@@ -59,9 +59,9 @@ def test_tcp_listen_command() -> None:
 
 def test_udp_listen_command() -> None:
     command, _limit = listen_command(ListenRequest(protocol="udp", port=9100, duration_s=20))
-    assert command.startswith(
-        'echo "OWG-PID $$"; exec timeout -s KILL 20 socat -T 2 UDP-RECVFROM:9100,fork,max-children=16 '
-    )
+    # AP2 window: socat 1.8.1.1 refuses max-children on UDP-RECVFROM ("option(s) remained unused")
+    assert command.startswith('echo "OWG-PID $$"; exec timeout -s KILL 20 socat -T 2 UDP-RECVFROM:9100,fork ')
+    assert "max-children" not in command
     assert "timeout -s KILL 20 hexdump -v -C" in command
     assert not is_read_only_command(command)
 

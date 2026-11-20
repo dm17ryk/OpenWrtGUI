@@ -40,9 +40,7 @@ def _iperf3_lines(seconds: int, mbps: float, udp: bool) -> str:
     out = _event("start", {"version": "iperf 3.21", "test_start": {"duration": seconds}})
     for i in range(seconds):
         total: dict[str, object] = {"start": i, "end": i + 1, "seconds": 1, "bits_per_second": mbps * 1e6}
-        if udp:
-            total |= {"jitter_ms": UDP_JITTER_MS, "lost_percent": 0}
-        else:
+        if not udp:  # as on AP2: a UDP sender's seconds carry no jitter or loss, only the end's totals do
             total |= {"retransmits": 0}
         out += _event("interval", {"streams": [], "sum": total})
     if udp:

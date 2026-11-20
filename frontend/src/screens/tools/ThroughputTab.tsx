@@ -46,7 +46,8 @@ function summaryText(s: NonNullable<ToolSessionView['summary']>): string {
 }
 
 function Results({ session }: { session: ToolSessionView }) {
-  const udp = session.intervals.some((i) => i.jitter_ms != null || i.lost_pct != null)
+  // A UDP sender's seconds carry no jitter (AP2 window): its command says UDP; a server's seconds do.
+  const udp = / -u /.test(session.command) || session.intervals.some((i) => i.jitter_ms != null || i.lost_pct != null)
   return (
     <>
       {session.intervals.length > 0 && (

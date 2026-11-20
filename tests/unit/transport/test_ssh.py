@@ -433,6 +433,36 @@ class _LostProcess:
         raise asyncssh.ConnectionLost("Connection lost")
 
 
+class _Done:
+    def __init__(self, status: int, signal: tuple[str, bool, str, str] | None) -> None:
+        self.exit_status = status
+        self.exit_signal = signal
+        self.stderr = b""
+
+
+class _KilledProcess:
+    """A command `exec`ed under `timeout -s KILL`: SSH reports the signal; asyncssh gives exit status -1."""
+
+    def __init__(self, signal: str) -> None:
+        self.exit_status = None
+        self._signal = signal
+
+    def close(self) -> None:
+        return None
+
+    async def wait(self, check: bool = False) -> _Done:
+        return _Done(-1, (self._signal, False, "", ""))
+
+
+async def test_a_killed_command_ends_with_the_shells_status() -> None:
+    """AP2 window (2026-11-20): a Listen ended by its limit came back as -1; it must read as a shell's 137, or
+    the session engine reports the normal end as a failure."""
+    for signal, status in (("KILL", 137), ("TERM", 143)):
+        stream = _ByteStream(_KilledProcess(signal))  # type: ignore[arg-type]
+        await stream.close()
+        assert stream.exit_status == status
+
+
 async def test_a_lost_connection_is_unreachable_on_a_stream() -> None:
     """Final review (I1): a tool session or a capture must see a dropped router as a TransportError."""
     stream = _ByteStream(_LostProcess())  # type: ignore[arg-type]

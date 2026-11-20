@@ -155,6 +155,25 @@ test('a UDP run shows jitter and loss', async () => {
   ])
 })
 
+test('a UDP run the router sends shows UDP columns although its seconds carry no jitter (AP2 window)', async () => {
+  sessions = [
+    session({
+      command: 'echo "OWG-PID $$"; exec timeout -s KILL 20 iperf3 -c 192.168.1.10 -p 5201 -t 5 -u -b 10M -J --json-stream --forceflush 2>&1',
+      intervals: [{ start_s: 0, end_s: 1, mbps: 10.0, retransmits: null, jitter_ms: null, lost_pct: null }],
+      summary: { sent_mbps: 10.0, received_mbps: 10.0, retransmits: null, jitter_ms: 0.05, lost_pct: 0.0, cpu_pct: 17.1 },
+    }),
+  ]
+  show()
+  const table = await screen.findByRole('table', { name: 'Throughput' })
+  expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual([
+    'Time',
+    'Mb/s',
+    'Jitter (ms)',
+    'Lost (%)',
+  ])
+  expect(screen.getByText('Sent 10.0 Mb/s · received 10.0 Mb/s · jitter 0.05 ms · lost 0.0 % · router CPU 17 %')).toBeInTheDocument()
+})
+
 test('Stop asks the router to end the running one', async () => {
   sessions = [session({ running: true, summary: null })]
   const user = show()

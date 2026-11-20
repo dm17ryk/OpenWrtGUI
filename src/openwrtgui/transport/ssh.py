@@ -144,6 +144,9 @@ class _Shell:
         await self._process.wait_closed()
 
 
+_SIGNALS = {"HUP": 1, "INT": 2, "KILL": 9, "PIPE": 13, "TERM": 15}  # SSH's exit-signal names (RFC 4254)
+
+
 class _ByteStream:
     """A binary exec channel (tcpdump -w -): bytes as they come; exit status and stderr after close."""
 
@@ -166,6 +169,11 @@ class _ByteStream:
         except (OSError, asyncssh.Error):
             return  # the connection went: no exit status to read
         self.exit_status = done.exit_status
+        signal = getattr(done, "exit_signal", None)
+        if done.exit_status in (None, -1) and signal and signal[0] in _SIGNALS:
+            # a command `exec`ed under `timeout -s KILL` ends by a signal, which SSH reports as such and
+            # asyncssh as -1: read it as a shell would (KILL 137), so a session's normal end is no failure
+            self.exit_status = 128 + _SIGNALS[signal[0]]
         err = done.stderr or b""
         self.stderr = err.decode(errors="replace") if isinstance(err, bytes) else str(err)
 

@@ -62,7 +62,9 @@ async def test_udp_throughput_at_the_asked_rate(authed: httpx.AsyncClient) -> No
     body = {"mode": "client", "host": "pc.lan", "protocol": "udp", "udp_mbps": 20, "duration_s": 3}
     done = await _throughput(authed, body)
     assert [i["mbps"] for i in done["intervals"]] == [20.0, 20.0, 20.0]
-    assert done["intervals"][0]["jitter_ms"] == 0.05 and done["intervals"][0]["lost_pct"] == 0
+    # as on AP2: the sender's seconds carry no jitter or loss, the totals do
+    assert done["intervals"][0]["jitter_ms"] is None and done["intervals"][0]["lost_pct"] is None
+    assert done["summary"]["jitter_ms"] == 0.05 and done["summary"]["lost_pct"] == 0
 
 
 async def test_server_gets_one_test(authed: httpx.AsyncClient) -> None:
@@ -227,8 +229,8 @@ async def test_neighbours_set_and_clear(authed: httpx.AsyncClient, ctx: AppConte
 
 
 async def test_an_ap_is_not_its_own_neighbour(authed: httpx.AsyncClient) -> None:
-    """AP2 window (2026-11-20): hostapd keeps an AP's own report out of its neighbour list, so setting it there
-    would show nothing; the request is refused before anything is sent."""
+    """AP2 window (2026-11-20): hostapd keeps an AP's own report out of its neighbour list, so setting it
+    there would show nothing; the request is refused before anything is sent."""
     body = {"kind": "neighbours", "ifname": "phy0-ap0", "neighbours": [AP1_OWN]}
     r = await authed.post(f"{TOOLS}/stations/preview", json=body)
     assert r.status_code == 422
