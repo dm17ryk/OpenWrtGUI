@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { ApiError, apiFetch } from '../../api/client'
-import type { Connections, SipAlg } from '../../api/types'
+import type { Connections, SipAlg, SipAlgZones } from '../../api/types'
 import { Help } from '../../help/Help'
 import { HELP } from '../../help/topics'
 import { type ConnectionFilter, type Proto, byProtocol, matches } from './connectionFilter'
+import { SipSwitch } from './SipSwitch'
 
 const POLL_MS = 5000
 const READ_CAP = 500 // `head -n 500 /proc/net/nf_conntrack`
@@ -31,9 +32,10 @@ function errorText(e: unknown): string {
 
 /**
  * Connections (spec 7.8 Phase 2, v1.2a R8-R9): the conntrack table every 5 s while the tab is open, filtered in
- * the page, and whether SIP ALG is on, read when the tab opens and on Refresh. Nothing here writes.
+ * the page, and whether SIP ALG is on, read when the tab opens and on Refresh. SIP ALG switches per zone, through
+ * the firewall's rollback (v1.2b R7); the table itself only reads.
  */
-export function ConnectionsTab({ routerId }: { routerId: string }) {
+export function ConnectionsTab({ routerId, routerName = routerId }: { routerId: string; routerName?: string }) {
   const conns = useQuery({
     queryKey: ['tool-connections', routerId],
     queryFn: () => apiFetch<Connections>(`/api/routers/${routerId}/system/connections`),
@@ -43,6 +45,10 @@ export function ConnectionsTab({ routerId }: { routerId: string }) {
   const sip = useQuery({
     queryKey: ['sip-alg', routerId],
     queryFn: () => apiFetch<SipAlg>(`/api/routers/${routerId}/system/sip-alg`),
+  })
+  const sipZones = useQuery({
+    queryKey: ['sip-zones', routerId],
+    queryFn: () => apiFetch<SipAlgZones>(`/api/routers/${routerId}/firewall/sip-alg`),
   })
   const [filter, setFilter] = useState<ConnectionFilter>({ text: '', proto: 'all', sipOnly: false })
   const data = conns.data
@@ -66,6 +72,7 @@ export function ConnectionsTab({ routerId }: { routerId: string }) {
           disabled={sip.isFetching || conns.isFetching}
           onClick={() => {
             void sip.refetch()
+            void sipZones.refetch()
             void conns.refetch()
           }}
         >
@@ -74,6 +81,7 @@ export function ConnectionsTab({ routerId }: { routerId: string }) {
       </div>
       {conns.error && <div className="note x">{errorText(conns.error)}</div>}
       {sip.error && <div className="note x">{errorText(sip.error)}</div>}
+      {sipZones.data && <SipSwitch routerId={routerId} zones={sipZones.data} routerName={routerName} />}
       {conns.isPending && <div className="muted">Reading the connection table…</div>}
       {data?.note && <div className="note">{data.note}</div>}
       {data && !data.note && (

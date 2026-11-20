@@ -69,6 +69,8 @@ export const HELP = {
   toolsSipAlg: 'Tools#sip-alg',
   toolsThroughput: 'Tools#throughput',
   toolsTraffic: 'Tools#traffic-generator',
+  toolsStations: 'Tools#station-management',
+  toolsSipSwitch: 'Tools#switching-sip-alg',
   discoveryCapabilities: 'Discovery#capabilities',
   system: 'System',
   systemOverview: 'System#overview',

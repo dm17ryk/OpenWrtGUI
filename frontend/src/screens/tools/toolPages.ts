@@ -4,6 +4,7 @@ export const TOOL_PAGES = [
   { key: 'connections', label: 'Connections' },
   { key: 'throughput', label: 'Throughput' },
   { key: 'traffic', label: 'Traffic generator' },
+  { key: 'stations', label: 'Station management' },
 ] as const
 
 export type ToolKey = (typeof TOOL_PAGES)[number]['key']

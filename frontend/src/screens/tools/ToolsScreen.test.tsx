@@ -20,8 +20,9 @@ vi.mock('./PortStatsTab', () => ({ PortStatsTab: () => <p>port stats tab</p> }))
 vi.mock('./ConnectionsTab', () => ({ ConnectionsTab: () => <p>connections tab</p> }))
 vi.mock('./ThroughputTab', () => ({ ThroughputTab: () => <p>throughput tab</p> }))
 vi.mock('./TrafficTab', () => ({ TrafficTab: () => <p>traffic tab</p> }))
+vi.mock('./StationsTab', () => ({ StationsTab: () => <p>stations tab</p> }))
 
-const TABS = ['Port statistics', 'Connections', 'Throughput', 'Traffic generator']
+const TABS = ['Port statistics', 'Connections', 'Throughput', 'Traffic generator', 'Station management']
 
 function Where() {
   return <output aria-label="path">{useLocation().pathname}</output>
@@ -76,4 +77,6 @@ test('the active pages have their own tabs (v1.2b)', async () => {
   await user.click(screen.getByRole('tab', { name: 'Traffic generator' }))
   expect(screen.getByText('traffic tab')).toBeInTheDocument()
   expect(screen.getByRole('status', { name: 'path' })).toHaveTextContent('/routers/ap1/tools/traffic')
+  await user.click(screen.getByRole('tab', { name: 'Station management' }))
+  expect(screen.getByText('stations tab')).toBeInTheDocument()
 })

@@ -47,7 +47,20 @@ The badge above the table says whether the router's SIP ALG is on: whether its f
 the `sip` conntrack helper, which rewrites the addresses inside SIP messages. **SIP ALG on** names the zones and
 the UDP port (5060 on the bench routers, zone lan); **SIP ALG off** means no zone uses the helper; **SIP ALG
 unknown** means the router has no fw4 ruleset to read. The state is read from the firewall's ruleset when the tab
-opens and on **Refresh**, not every 5 seconds. This page does not change it.
+opens and on **Refresh**, not every 5 seconds. Under the badge you can switch it per zone (see the next section).
+
+## Switching SIP ALG
+
+Each firewall zone that runs conntrack helpers has a row, **Zone lan · SIP ALG on** for example, and a button that
+turns SIP ALG off or on in that zone. Turn it off when a SIP phone or panel misbehaves behind the router's NAT, to
+see whether the helper's rewriting is the cause.
+
+The change is a firewall change, shown in full before you apply it, and it applies with the firewall's 60-second
+rollback. **Off** keeps the zone's other helpers: on a zone that uses fw4's default helpers, the app sets
+`auto_helper '0'` and lists the other helpers; on a zone with its own helper list, it takes `sip` out of the list.
+**On** puts back what Off replaced. The result proves it in fw4's ruleset: the zone's helper chain has, or no
+longer has, `sip`, and its other helpers are all still there. Connections set up before the change keep their
+helper until they end. A router without fw4 has nothing to switch, and a run on the bench refuses the change.
 
 ## Throughput
 
@@ -81,3 +94,23 @@ stops by itself at 50 MB.
 **Send** sends a number of zero bytes (up to 10,000,000), or one line of printable text, to a host and port over
 TCP or UDP, for at most 30 seconds. The result says what was sent, or socat's own error (for example **Connection
 refused** when nothing listens on that port).
+
+## Station management
+
+Asks a Wi-Fi station to do something, through the router's `hostapd` (802.11v and 802.11k). Each SSID on air is a
+section with its stations; each request shows the exact command before it is sent, and a request that waits for
+the station's answer listens 10 seconds for it.
+
+- **BSS transition request** (802.11v): asks the station to move to another access point, one of the candidates:
+  this router's SSIDs and those of the other routers in the app. The station answers with a status code (0 means
+  it accepts).
+- **Beacon report request** (802.11k): asks the station which access points it hears on this channel, and how
+  well. The answer is a table of BSSID, channel, signal and signal-to-noise.
+- **Neighbour report** (802.11k): the list of nearby access points the router tells stations about. **Set from the
+  routers in this app** fills it from the candidates; **Clear** empties it. It is kept until the next Wi-Fi reload:
+  hostapd does not save it.
+
+A station must support the request. hostapd must also have it switched on for the SSID: when it says **Not
+supported**, the page names the option to turn on in Wi-Fi › All options (`bss_transition` for 802.11v,
+`ieee80211k` for 802.11k). The app does not turn them on by itself, since that reloads the Wi-Fi. A router whose
+wpad build lacks a method says so in place of that request.
