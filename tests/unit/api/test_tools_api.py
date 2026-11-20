@@ -99,6 +99,51 @@ async def test_stop_a_session(authed: httpx.AsyncClient) -> None:
     assert r.status_code == 404
 
 
+async def test_listen_shows_the_peer(authed: httpx.AsyncClient) -> None:
+    body = {"protocol": "tcp", "port": 9100, "duration_s": 60}
+    plan = (await authed.post(f"{TOOLS}/traffic/listen/preview", json=body)).json()
+    assert plan["lines"][0].startswith('echo "OWG-PID $$"; exec timeout -s KILL 60 socat TCP-LISTEN:9100')
+    r = await authed.post(f"{TOOLS}/traffic/listen/start", json={**body, "digest": plan["digest"]})
+    assert r.status_code == 200 and r.json()["title"] == "Traffic listen"
+    done = await _ended(authed, r.json()["id"])
+    assert done["error"] is None and done["kind"] == "listen"
+    assert done["peers"] == [
+        {"address": "192.168.1.10", "port": 51515, "bytes": 6, "first_hex": "68656c6c6f0a"}
+    ]
+
+
+async def _send(client: httpx.AsyncClient, body: dict[str, Any]) -> httpx.Response:
+    plan = (await client.post(f"{TOOLS}/traffic/send/preview", json=body)).json()
+    return await client.post(f"{TOOLS}/traffic/send/apply", json={**body, "digest": plan["digest"]})
+
+
+async def test_send_zeros(authed: httpx.AsyncClient) -> None:
+    r = await _send(authed, {"protocol": "tcp", "host": "192.168.1.10", "port": 9101, "what": "bytes"})
+    assert r.status_code == 200, r.text
+    assert r.json() == {"ok": True, "detail": "Sent 1000 bytes to 192.168.1.10 port 9101 over TCP."}
+
+
+async def test_send_to_port_1_is_refused(authed: httpx.AsyncClient) -> None:
+    r = await _send(authed, {"protocol": "tcp", "host": "192.168.1.10", "port": 1, "what": "bytes"})
+    assert r.status_code == 200 and r.json()["ok"] is False
+    assert r.json()["detail"] == "connect(5, AF=2 192.168.1.10:1, 16): Connection refused"
+
+
+async def test_send_bad_text_is_422(authed: httpx.AsyncClient) -> None:
+    body = {"protocol": "tcp", "host": "192.168.1.10", "port": 9101, "what": "text", "text": "a\nb"}
+    r = await authed.post(f"{TOOLS}/traffic/send/preview", json=body)
+    assert r.status_code == 422 and r.json()["detail"] == "A line is 1 to 200 printable ASCII characters."
+
+
+async def test_traffic_is_423_while_the_guard_is_live(authed_guard_live: httpx.AsyncClient) -> None:
+    send = {"protocol": "tcp", "host": "192.168.1.10", "port": 9101, "what": "bytes"}
+    assert (await _send(authed_guard_live, send)).status_code == 423
+    body = {"protocol": "udp", "port": 9100, "duration_s": 60}
+    plan = (await authed_guard_live.post(f"{TOOLS}/traffic/listen/preview", json=body)).json()
+    r = await authed_guard_live.post(f"{TOOLS}/traffic/listen/start", json={**body, "digest": plan["digest"]})
+    assert r.status_code == 423
+
+
 async def test_unknown_router_is_404(authed: httpx.AsyncClient) -> None:
     r = await authed.get("/api/routers/nope/tools/sessions")
     assert r.status_code == 404

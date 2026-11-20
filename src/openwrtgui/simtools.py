@@ -17,8 +17,19 @@ REFUSED = (
     "unable to connect to server - server may have stopped running or use a different port, firewall issue, "
     "etc.: Connection refused"
 )
+LISTEN_PID = 4243
+LISTEN_LINES = (
+    "C4300 192.168.1.10 51515\n"
+    "D4300=00000000  68 65 6c 6c 6f 0a                                 |hello.|\n"
+    "D4300=00000006\n"
+)
+SEND_REFUSED = "2026/11/20 10:00:00 socat[77] E connect(5, AF=2 {host}:1, 16): Connection refused\n"
 _SESSION = re.compile(r'echo "OWG-PID \$\$"; exec timeout -s KILL (\d+) (.+) 2>&1')
 _KILL = re.compile(r"kill \d+")
+_SEND = re.compile(
+    r"(?:head -c \d+ /dev/zero|printf '%s\\n' '(?:[^']|'\\'')*') \| timeout -s KILL 30 socat -u - "
+    r"(?:TCP:(?P<tcp>[^:]+):(?P<tport>\d+),connect-timeout=5|UDP-SENDTO:(?P<udp>[^:]+):(?P<uport>\d+)) 2>&1"
+)
 
 
 def _event(event: str, data: object) -> str:
@@ -51,6 +62,11 @@ class SimTools:
     def answer(self, command: str) -> CommandResult | None:
         if _KILL.fullmatch(command):
             return CommandResult(command, "", "", 0)
+        if m := _SEND.fullmatch(command):
+            host, port = m.group("tcp") or m.group("udp"), m.group("tport") or m.group("uport")
+            if port == "1":
+                return CommandResult(command, SEND_REFUSED.format(host=host), "", 1)
+            return CommandResult(command, "", "", 0)
         return None
 
     def stream(self, command: str) -> tuple[bytes, int] | None:
@@ -62,6 +78,8 @@ class SimTools:
         if args[:1] == ["iperf3"]:
             text, status = self._iperf3(args[1:])
             return f"OWG-PID {SIM_PID}\n{text}".encode(), status
+        if args[:1] == ["socat"]:  # Listen: one peer sends "hello\n"; the limit ends it
+            return f"OWG-PID {LISTEN_PID}\n{LISTEN_LINES}".encode(), 137
         return None
 
     def _iperf3(self, args: list[str]) -> tuple[str, int]:

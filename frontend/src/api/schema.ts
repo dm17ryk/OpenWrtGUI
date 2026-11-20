@@ -3446,6 +3446,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/tools/traffic/listen/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Listen Preview */
+        post: operations["listen_preview_api_routers__router_id__tools_traffic_listen_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/tools/traffic/listen/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Listen Start */
+        post: operations["listen_start_api_routers__router_id__tools_traffic_listen_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/tools/traffic/send/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Apply */
+        post: operations["send_apply_api_routers__router_id__tools_traffic_send_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/tools/traffic/send/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Preview */
+        post: operations["send_preview_api_routers__router_id__tools_traffic_send_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/wifi": {
         parameters: {
             query?: never;
@@ -6163,6 +6231,38 @@ export interface components {
             /** Skipped */
             skipped: number;
         };
+        /** ListenRequest */
+        ListenRequest: {
+            /**
+             * Duration S
+             * @default 60
+             */
+            duration_s: number;
+            /** Port */
+            port: number;
+            /**
+             * Protocol
+             * @enum {string}
+             */
+            protocol: "tcp" | "udp";
+        };
+        /** ListenStart */
+        ListenStart: {
+            /** Digest */
+            digest: string;
+            /**
+             * Duration S
+             * @default 60
+             */
+            duration_s: number;
+            /** Port */
+            port: number;
+            /**
+             * Protocol
+             * @enum {string}
+             */
+            protocol: "tcp" | "udp";
+        };
         /** LiveRoute */
         LiveRoute: {
             /** Dev */
@@ -8136,6 +8236,69 @@ export interface components {
              * @enum {string}
              */
             via: "ap" | "temporary";
+        };
+        /** SendApply */
+        SendApply: {
+            /**
+             * Count
+             * @default 1000
+             */
+            count: number;
+            /** Digest */
+            digest: string;
+            /** Host */
+            host: string;
+            /** Port */
+            port: number;
+            /**
+             * Protocol
+             * @enum {string}
+             */
+            protocol: "tcp" | "udp";
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+            /**
+             * What
+             * @enum {string}
+             */
+            what: "bytes" | "text";
+        };
+        /** SendRequest */
+        SendRequest: {
+            /**
+             * Count
+             * @default 1000
+             */
+            count: number;
+            /** Host */
+            host: string;
+            /** Port */
+            port: number;
+            /**
+             * Protocol
+             * @enum {string}
+             */
+            protocol: "tcp" | "udp";
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+            /**
+             * What
+             * @enum {string}
+             */
+            what: "bytes" | "text";
+        };
+        /** SendResult */
+        SendResult: {
+            /** Detail */
+            detail: string;
+            /** Ok */
+            ok: boolean;
         };
         /** ServiceApplyIn */
         ServiceApplyIn: {
@@ -16181,6 +16344,146 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["openwrtgui__tools__sessions__SessionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listen_preview_api_routers__router_id__tools_traffic_listen_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolPlan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listen_start_api_routers__router_id__tools_traffic_listen_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ListenStart"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["openwrtgui__tools__sessions__SessionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_apply_api_routers__router_id__tools_traffic_send_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendApply"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SendResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_preview_api_routers__router_id__tools_traffic_send_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolPlan"];
                 };
             };
             /** @description Validation Error */
