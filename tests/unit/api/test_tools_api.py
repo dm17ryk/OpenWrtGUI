@@ -226,6 +226,17 @@ async def test_neighbours_set_and_clear(authed: httpx.AsyncClient, ctx: AppConte
     assert r.json()["ok"] and (await authed.get(f"{TOOLS}/stations")).json()["aps"][0]["neighbours"] == []
 
 
+async def test_an_ap_is_not_its_own_neighbour(authed: httpx.AsyncClient) -> None:
+    """AP2 window (2026-11-20): hostapd keeps an AP's own report out of its neighbour list, so setting it there
+    would show nothing; the request is refused before anything is sent."""
+    body = {"kind": "neighbours", "ifname": "phy0-ap0", "neighbours": [AP1_OWN]}
+    r = await authed.post(f"{TOOLS}/stations/preview", json=body)
+    assert r.status_code == 422
+    assert r.json()["detail"] == (
+        f"{AP1_OWN} is this SSID's own BSSID: hostapd keeps its own report apart, not in its neighbour list."
+    )
+
+
 async def test_bss_transition(authed: httpx.AsyncClient) -> None:
     body = {"kind": "transition", "ifname": "phy0-ap0", "mac": STATION, "target": AP1_OWN}
     plan = (await authed.post(f"{TOOLS}/stations/preview", json=body)).json()

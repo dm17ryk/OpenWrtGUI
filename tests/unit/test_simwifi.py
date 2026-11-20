@@ -28,6 +28,18 @@ def _ap2() -> ReplayTransport:
     return ReplayTransport({}, state=SimState(wifi=SimWifi(text, bssid="02:00:00:00:00:02", rates_csv=RATES)))
 
 
+async def test_hostapd_keeps_its_own_report_out_of_the_neighbour_list() -> None:
+    """As AP2 showed in the 1.2b window: rrm_nr_set takes the AP's own entry, rrm_nr_list never lists it."""
+    text = (SIM_DIR / "wifi" / "ap1.uci").read_text(encoding="utf-8")
+    t = ReplayTransport({}, state=SimState(wifi=SimWifi(text, bssid="02:00:00:00:00:01")))
+    own = json.loads((await t.run("ubus call hostapd.phy0-ap0 rrm_nr_get_own")).stdout)["value"]
+    other = ["02:00:00:00:00:99", "OwgTest", "0200000000990000000000000000000000"]
+    setting = json.dumps({"list": [own, other]}, separators=(",", ":"))
+    assert (await t.run(f"ubus call hostapd.phy0-ap0 rrm_nr_set '{setting}'")).ok
+    listed = json.loads((await t.run("ubus call hostapd.phy0-ap0 rrm_nr_list")).stdout)["list"]
+    assert listed == [other]
+
+
 async def _apply(t: ReplayTransport, modes: ModeSelection, channels: ChannelSelection) -> None:
     ops = compile_modes("radio0", modes, LIMITS) + compile_channels("radio0", channels, LIMITS)
     for command in (apply_script("radio0", ops), reload_command("radio0")):

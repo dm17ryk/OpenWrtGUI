@@ -284,8 +284,9 @@ class SimWifi:
         _, section = where
         if method == "rrm_nr_get_own":
             return _ok(json.dumps({"value": self._own_nr(ifname)}) + "\n")
-        if method == "rrm_nr_list":
-            return _ok(json.dumps({"list": self._neighbours.get(ifname, [])}) + "\n")
+        if method == "rrm_nr_list":  # the AP's own report is kept apart (AP2, the 1.2b window)
+            listed = [e for e in self._neighbours.get(ifname, []) if e and e[0].lower() != self._bssid]
+            return _ok(json.dumps({"list": listed}) + "\n")
         option = "bss_transition" if method == "bss_transition_request" else "ieee80211k"
         if self._opt(section, option) != "1":
             return _fail("Command failed: Not supported\n", 8)

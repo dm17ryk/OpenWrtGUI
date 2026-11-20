@@ -141,6 +141,18 @@ test('the neighbour report: its list, set from the candidates, and Clear', async
   ])
 })
 
+test("the AP's own entry is no neighbour and no default target (AP2 window)", async () => {
+  show()
+  const ap = await screen.findByRole('region', { name: 'OwgTest (phy0-ap0, channel 11)' })
+  const nr = within(ap).getByRole('group', { name: 'Set from the routers in this app' })
+  expect(within(nr).getAllByRole('checkbox').map((c) => c.closest('label')?.textContent?.trim())).toEqual([
+    `${OTHER.source} (${OTHER.bssid})`,
+  ])
+  const target = within(ap).getByLabelText(`Target for ${MAC}`)
+  expect(target).toHaveValue(OTHER.bssid)
+  expect(within(target).getByRole('option', { name: `${OWN.source} (${OWN.bssid}) (this AP)` })).toBeInTheDocument()
+})
+
 test('hostapd saying no is an alert', async () => {
   result = { ok: false, detail: NOT_SUPPORTED, events: [], beacons: [], status_code: null }
   const user = show()

@@ -60,6 +60,8 @@ function Outcome({ result }: { result: ActionResult }) {
 
 function Neighbours({ ap, candidates, onPick }: { ap: ApStations; candidates: NeighbourEntry[]; onPick: (a: StationAction) => void }) {
   const [chosen, setChosen] = useState<string[]>([])
+  // hostapd keeps the AP's own report apart from its neighbour list (AP2 window, 2026-11-20)
+  const others = candidates.filter((c) => c.bssid !== ap.own?.bssid)
   const toggle = (bssid: string) =>
     setChosen(chosen.includes(bssid) ? chosen.filter((b) => b !== bssid) : [...chosen, bssid])
   return (
@@ -78,7 +80,7 @@ function Neighbours({ ap, candidates, onPick }: { ap: ApStations; candidates: Ne
         <>
           <fieldset>
             <legend>Set from the routers in this app</legend>
-            {candidates.map((c) => (
+            {others.map((c) => (
               <label key={c.bssid} style={{ display: 'block' }}>
                 <input type="checkbox" checked={chosen.includes(c.bssid)} onChange={() => toggle(c.bssid)} />{' '}
                 {`${c.source} (${c.bssid})`}
@@ -155,7 +157,9 @@ function ApSection({ routerId, ap, candidates }: { routerId: string; ap: ApStati
             </thead>
             <tbody>
               {ap.stations.map((s) => {
-                const target = targets[s.mac] ?? candidates[0]?.bssid ?? ''
+                // a station asked to move to the BSS it is on declines (AP2 window: status 1)
+                const first = candidates.find((c) => c.bssid !== ap.own?.bssid) ?? candidates[0]
+                const target = targets[s.mac] ?? first?.bssid ?? ''
                 return (
                   <tr key={s.mac}>
                     <td className="mono">{s.mac}</td>
@@ -168,7 +172,9 @@ function ApSection({ routerId, ap, candidates }: { routerId: string; ap: ApStati
                           <>
                             <select aria-label={`Target for ${s.mac}`} value={target} onChange={(e) => setTargets({ ...targets, [s.mac]: e.target.value })}>
                               {candidates.map((c) => (
-                                <option key={c.bssid} value={c.bssid}>{`${c.source} (${c.bssid})`}</option>
+                                <option key={c.bssid} value={c.bssid}>
+                                  {`${c.source} (${c.bssid})${c.bssid === ap.own?.bssid ? ' (this AP)' : ''}`}
+                                </option>
                               ))}
                             </select>
                             <button

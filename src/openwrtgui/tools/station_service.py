@@ -182,6 +182,12 @@ class StationTools:
             unknown = [b for b in action.neighbours if b.lower() not in by_bssid]
             if unknown:
                 raise ValueError(f"{unknown[0]} is not one of the candidates")
+            if ap.own is not None and ap.own.bssid in {b.lower() for b in action.neighbours}:
+                # AP2 window: hostapd keeps the AP's own report out of its neighbour list
+                raise ValueError(
+                    f"{ap.own.bssid} is this SSID's own BSSID: hostapd keeps its own report apart, "
+                    "not in its neighbour list."
+                )
             entries = [by_bssid[b.lower()] for b in action.neighbours]
             command = neighbours_set_command(ap.ifname, [[e.bssid, e.ssid, e.nr] for e in entries])
             return tool_plan([command], [RUNTIME]), ap

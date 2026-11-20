@@ -48,7 +48,14 @@ from openwrtgui.rf.frames_service import FrameAnalyzer
 from openwrtgui.rf.sampler import RfSampler
 from openwrtgui.rf.scan_service import ScanService
 from openwrtgui.tools.station_service import StationTools
-from openwrtgui.tools.stations import HOSTAPD_LIST, METHODS, ActionResult, ApStations, StationAction
+from openwrtgui.tools.stations import (
+    HOSTAPD_LIST,
+    METHODS,
+    ActionResult,
+    ApStations,
+    StationAction,
+    neighbours_set_command,
+)
 from openwrtgui.transport.base import CommandResult, ubus_call
 from openwrtgui.transport.ssh import SshTransport
 from openwrtgui.wifi.model import ChannelSelection, ModeSelection, RadioRequest, SsidRequest, TxPowerSetting
@@ -385,13 +392,21 @@ async def test_rates_for_the_phone(air: AirWindow, phone: tuple[AdbStation, Phon
 
 STATIONS_FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "ap2" / "stations.json"
 K_AND_V = ("ieee80211k", "bss_transition")
+NEIGHBOUR_MADE_UP = "024f57470001"  # a locally administered BSSID no device has: the neighbour list's proof
+
+
+def _mac(hexed: str) -> str:
+    return ":".join(hexed[i : i + 2] for i in range(0, 12, 2))
 
 
 async def test_station_management(air: AirWindow, phone: tuple[AdbStation, PhoneState]) -> None:
-    """v1.2b R8-R12: 802.11k/v on for OwgTest through the app's Wi-Fi options; the neighbour report set to
-    AP2's own entry and cleared; a BSS transition request to its own BSS and a beacon report request to the
-    phone. hostapd's answers and the phone's notifications are recorded, every MAC made private (R10). The
-    options come off again, and the air fixture checks the wireless config is as found."""
+    """v1.2b R8-R12: 802.11k/v on for OwgTest through the app's Wi-Fi options; a BSS transition request to its
+    own BSS and a beacon report request to the phone. The neighbour list: hostapd keeps the AP's own report
+    out of it (this window's first run), so the app refuses the AP's own entry, and the list is proven with a
+    made-up private neighbour set by the app's command and read by its parser, then cleared by the app. The
+    notifications are recorded one per line as `ubus subscribe` gives them, every MAC made private and the
+    beacon reports' raw frames (neighbours' SSIDs) left out. The options come off again, and the air fixture
+    checks the wireless config is as found."""
     station, _found = phone
     bss = await _owgtest_on_air(air)
     on = await air.w.wifi.apply_options(
@@ -418,20 +433,43 @@ async def test_station_management(air: AirWindow, phone: tuple[AdbStation, Phone
     assert set(METHODS) <= set(found.methods), found.methods
     assert found.own is not None
     own = found.own.bssid
-    assert (await act(StationAction(kind="neighbours", ifname=bss, neighbours=[own]))).ok
-    assert [n.bssid for n in (await ap()).neighbours] == [own]
+    rf = _recorder()
+    names: dict[str, str] = {}
+
+    async def nr_list() -> str:
+        return rf.sanitize_air(
+            (await air.t.run(f"ubus call hostapd.{bss} rrm_nr_list")).stdout, (), (), names
+        )
+
+    with pytest.raises(ValueError, match="own BSSID"):
+        await tools.plan(AP2, StationAction(kind="neighbours", ifname=bss, neighbours=[own]))
+    made_up = NEIGHBOUR_MADE_UP + found.own.nr[12:]  # AP2's own report with a private BSSID in front
+    entry = [_mac(NEIGHBOUR_MADE_UP), TEST_SSID, made_up]
+    assert (await air.t.run(neighbours_set_command(bss, [entry]))).ok
+    after_set = await nr_list()
+    assert [n.bssid for n in (await ap()).neighbours] == [entry[0]]
     assert (await act(StationAction(kind="neighbours", ifname=bss, neighbours=[]))).ok
     assert (await ap()).neighbours == []
     transition = await act(StationAction(kind="transition", ifname=bss, mac=mac, target=own))
     beacon = await act(StationAction(kind="beacon", ifname=bss, mac=mac))
-    assert transition.ok and beacon.ok, (transition.detail, beacon.detail)
-    rf = _recorder()
-    names: dict[str, str] = {}
+
+    def lines(result: ActionResult) -> list[str]:
+        out = [
+            json.dumps({e.type: {k: v for k, v in e.fields.items() if k != "report"}}) for e in result.events
+        ]
+        return [rf.sanitize_air(line, (), (), names) for line in out]
+
     recorded = {
         "hostapd_list": rf.sanitize_air((await air.t.run(HOSTAPD_LIST)).stdout, (), (), names),
-        "transition": rf.sanitize_air(json.dumps([e.model_dump() for e in transition.events]), (), (), names),
-        "beacon": rf.sanitize_air(json.dumps([e.model_dump() for e in beacon.events]), (), (), names),
+        "rrm_nr_list_after_set": after_set,
+        "transition": lines(transition),
+        "transition_detail": transition.detail,
+        "beacon": lines(beacon),
+        "beacon_detail": beacon.detail,
     }
+    print(f"\ntransition: {transition.detail}\nbeacon: {beacon.detail}")
+    assert transition.ok and beacon.ok, (transition.detail, beacon.detail)
+    assert '"report"' not in repr(recorded)
     assert mac not in repr(recorded) and own not in repr(recorded)
     STATIONS_FIXTURE.write_text(json.dumps(recorded, indent=2) + "\n", encoding="utf-8")
     off = await air.w.wifi.apply_options(
