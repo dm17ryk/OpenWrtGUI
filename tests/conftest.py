@@ -52,6 +52,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="the package of the phone owner's app, checked installed and untouched before and after (HW-2)",
     )
     group.addoption(
+        "--pc-iperf3",
+        type=Path,
+        help="iperf3.exe on this PC, for the 1.2b window's Throughput and 16-bit counter tests",
+    )
+    group.addoption(
         "--o16-channel",
         type=int,
         default=6,

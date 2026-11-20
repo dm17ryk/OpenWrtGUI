@@ -41,11 +41,14 @@ from test_ap2_wifi_faults import (
 )
 
 from conftest import FwWindow, wireless_snapshot
+from openwrtgui.forms import OptionEdit
 from openwrtgui.guard.writes import run_audited
 from openwrtgui.rf.air import SCAN_IF
 from openwrtgui.rf.frames_service import FrameAnalyzer
 from openwrtgui.rf.sampler import RfSampler
 from openwrtgui.rf.scan_service import ScanService
+from openwrtgui.tools.station_service import StationTools
+from openwrtgui.tools.stations import HOSTAPD_LIST, METHODS, ActionResult, ApStations, StationAction
 from openwrtgui.transport.base import CommandResult, ubus_call
 from openwrtgui.transport.ssh import SshTransport
 from openwrtgui.wifi.model import ChannelSelection, ModeSelection, RadioRequest, SsidRequest, TxPowerSetting
@@ -378,3 +381,60 @@ async def test_rates_for_the_phone(air: AirWindow, phone: tuple[AdbStation, Phon
     assert any(c.endswith("/rc_stats_csv") for c in recorded) and mac not in repr(recorded)
     RATES_FIXTURE.write_text(json.dumps(recorded, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"recorded {len(recorded)} commands to {RATES_FIXTURE}")
+
+
+STATIONS_FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "ap2" / "stations.json"
+K_AND_V = ("ieee80211k", "bss_transition")
+
+
+async def test_station_management(air: AirWindow, phone: tuple[AdbStation, PhoneState]) -> None:
+    """v1.2b R8-R12: 802.11k/v on for OwgTest through the app's Wi-Fi options; the neighbour report set to
+    AP2's own entry and cleared; a BSS transition request to its own BSS and a beacon report request to the
+    phone. hostapd's answers and the phone's notifications are recorded, every MAC made private (R10). The
+    options come off again, and the air fixture checks the wireless config is as found."""
+    station, _found = phone
+    bss = await _owgtest_on_air(air)
+    on = await air.w.wifi.apply_options(
+        AP2, "radio0", [OptionEdit("default_radio0", o, "1") for o in K_AND_V]
+    )
+    assert on.applied and on.verified, [f"{c.name}: {c.detail}" for c in on.checks if not c.ok] or on.error
+    await station.join(TEST_SSID, air.key)
+    mac = await _joined(air, station, bss)
+    tools = StationTools(
+        routers=air.w.routers, pool=air.w.pool, guard=air.w.guard, audit=air.w.audit, wifi=air.w.wifi
+    )
+
+    async def ap() -> ApStations:
+        return next(a for a in (await tools.view(AP2)).aps if a.ifname == bss)
+
+    async def act(action: StationAction) -> ActionResult:
+        plan, _ = await tools.plan(AP2, action)
+        print("\n" + "\n".join(plan.lines))
+        result = await tools.apply(AP2, action, plan.digest)
+        print(f"{action.kind}: ok={result.ok} {result.detail} {result.events}")
+        return result
+
+    found = await ap()
+    assert set(METHODS) <= set(found.methods), found.methods
+    assert found.own is not None
+    own = found.own.bssid
+    assert (await act(StationAction(kind="neighbours", ifname=bss, neighbours=[own]))).ok
+    assert [n.bssid for n in (await ap()).neighbours] == [own]
+    assert (await act(StationAction(kind="neighbours", ifname=bss, neighbours=[]))).ok
+    assert (await ap()).neighbours == []
+    transition = await act(StationAction(kind="transition", ifname=bss, mac=mac, target=own))
+    beacon = await act(StationAction(kind="beacon", ifname=bss, mac=mac))
+    assert transition.ok and beacon.ok, (transition.detail, beacon.detail)
+    rf = _recorder()
+    names: dict[str, str] = {}
+    recorded = {
+        "hostapd_list": rf.sanitize_air((await air.t.run(HOSTAPD_LIST)).stdout, (), (), names),
+        "transition": rf.sanitize_air(json.dumps([e.model_dump() for e in transition.events]), (), (), names),
+        "beacon": rf.sanitize_air(json.dumps([e.model_dump() for e in beacon.events]), (), (), names),
+    }
+    assert mac not in repr(recorded) and own not in repr(recorded)
+    STATIONS_FIXTURE.write_text(json.dumps(recorded, indent=2) + "\n", encoding="utf-8")
+    off = await air.w.wifi.apply_options(
+        AP2, "radio0", [OptionEdit("default_radio0", o, None) for o in K_AND_V]
+    )
+    assert off.applied, off.error
