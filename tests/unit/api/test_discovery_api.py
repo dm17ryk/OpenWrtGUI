@@ -56,7 +56,10 @@ async def test_state_of_sim_ap1(ctx: AppContext) -> None:
         ("missing", "needs nf_conntrack.ko"),
     ]
     # v1.2b R11: the mini image leaves out wpad, so hostapd is not in it
-    assert (caps["Station management"].state, caps["Station management"].reason) == ("missing", "needs hostapd")
+    assert (caps["Station management"].state, caps["Station management"].reason) == (
+        "missing",
+        "needs hostapd",
+    )
     assert len(s.capabilities) == 12
 
 
