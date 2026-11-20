@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from openwrtgui.api.deps import get_ctx, require_token
 from openwrtgui.context import AppContext
 from openwrtgui.tools.sessions import SessionView, ToolPlan
+from openwrtgui.tools.stations import ActionResult, StationAction, StationApply, StationsView
 from openwrtgui.tools.throughput import ThroughputRequest, ThroughputStart
 from openwrtgui.tools.traffic import ListenRequest, ListenStart, SendApply, SendRequest, SendResult
 
@@ -55,6 +56,22 @@ async def send_preview(router_id: str, body: SendRequest, ctx: Ctx) -> ToolPlan:
 async def send_apply(router_id: str, body: SendApply, ctx: Ctx) -> SendResult:
     req = SendRequest.model_validate(body.model_dump(exclude={"digest"}))
     return await ctx.tools.send(_known(ctx, router_id), req, body.digest)
+
+
+@router.get("/stations")
+async def stations(router_id: str, ctx: Ctx) -> StationsView:
+    return await ctx.tools.stations(_known(ctx, router_id))
+
+
+@router.post("/stations/preview")
+async def station_preview(router_id: str, body: StationAction, ctx: Ctx) -> ToolPlan:
+    return await ctx.tools.station_plan(_known(ctx, router_id), body)
+
+
+@router.post("/stations/apply")
+async def station_apply(router_id: str, body: StationApply, ctx: Ctx) -> ActionResult:
+    action = StationAction.model_validate(body.model_dump(exclude={"digest"}))
+    return await ctx.tools.station_apply(_known(ctx, router_id), action, body.digest)
 
 
 @router.get("/sessions")

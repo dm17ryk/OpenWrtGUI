@@ -77,6 +77,8 @@ _UBUS_READ_METHODS = frozenset(
         "getTimezones",  # the System screen's time zone list (LuCI's own read)
         "getLEDs",  # the LEDs tab (v0.6c, LuCI's own read)
         "getBlockDevices",  # Mount points with block-mount (v1.0a2, LuCI's own read)
+        "rrm_nr_get_own",  # Station management: an AP's own neighbour report (v1.2b R8)
+        "rrm_nr_list",  # Station management: the AP's neighbour list (v1.2b R8)
     ]
 )
 _FIND_ACTIONS = frozenset({"-delete", "-exec", "-execdir", "-ok", "-okdir"})

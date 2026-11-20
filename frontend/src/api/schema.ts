@@ -3466,6 +3466,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/tools/stations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stations */
+        get: operations["stations_api_routers__router_id__tools_stations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/tools/stations/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Station Apply */
+        post: operations["station_apply_api_routers__router_id__tools_stations_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/tools/stations/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Station Preview */
+        post: operations["station_preview_api_routers__router_id__tools_stations_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/tools/throughput/preview": {
         parameters: {
             query?: never;
@@ -4063,12 +4114,41 @@ export interface components {
              */
             action: "connect" | "disconnect" | "reboot";
         };
+        /** ActionResult */
+        ActionResult: {
+            /** Beacons */
+            beacons: components["schemas"]["BeaconRow"][];
+            /** Detail */
+            detail: string;
+            /** Events */
+            events: components["schemas"]["HostapdEvent"][];
+            /** Ok */
+            ok: boolean;
+            /** Status Code */
+            status_code: number | null;
+        };
         /** Address */
         Address: {
             /** Ip */
             ip: string;
             /** Prefix */
             prefix: number;
+        };
+        /** ApStations */
+        ApStations: {
+            /** Channel */
+            channel: number | null;
+            /** Ifname */
+            ifname: string;
+            /** Methods */
+            methods: string[];
+            /** Neighbours */
+            neighbours: components["schemas"]["NeighbourEntry"][];
+            own: components["schemas"]["NeighbourEntry"] | null;
+            /** Ssid */
+            ssid: string;
+            /** Stations */
+            stations: components["schemas"]["StationRow"][];
         };
         /** AppInfo */
         AppInfo: {
@@ -4192,6 +4272,17 @@ export interface components {
             name: string;
             /** Size */
             size: number;
+        };
+        /** BeaconRow */
+        BeaconRow: {
+            /** Bssid */
+            bssid: string | null;
+            /** Channel */
+            channel: number | null;
+            /** Rcpi Dbm */
+            rcpi_dbm: number | null;
+            /** Rsni */
+            rsni: number | null;
         };
         /** BlockDevice */
         BlockDevice: {
@@ -5613,6 +5704,15 @@ export interface components {
             /** Type */
             type: string;
         };
+        /** HostapdEvent */
+        HostapdEvent: {
+            /** Fields */
+            fields: {
+                [key: string]: string | number | boolean | null;
+            };
+            /** Type */
+            type: string;
+        };
         /** HostsApplyIn */
         HostsApplyIn: {
             /**
@@ -6807,6 +6907,17 @@ export interface components {
              * @default []
              */
             upserts: components["schemas"]["NatIn"][];
+        };
+        /** NeighbourEntry */
+        NeighbourEntry: {
+            /** Bssid */
+            bssid: string;
+            /** Nr */
+            nr: string;
+            /** Source */
+            source: string;
+            /** Ssid */
+            ssid: string;
         };
         /** NetApplyResult */
         NetApplyResult: {
@@ -8741,6 +8852,46 @@ export interface components {
             /** Tx Mcs */
             tx_mcs: number | null;
         };
+        /** StationAction */
+        StationAction: {
+            /** Ifname */
+            ifname: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "transition" | "beacon" | "neighbours";
+            /** Mac */
+            mac?: string | null;
+            /**
+             * Neighbours
+             * @default []
+             */
+            neighbours: string[];
+            /** Target */
+            target?: string | null;
+        };
+        /** StationApply */
+        StationApply: {
+            /** Digest */
+            digest: string;
+            /** Ifname */
+            ifname: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "transition" | "beacon" | "neighbours";
+            /** Mac */
+            mac?: string | null;
+            /**
+             * Neighbours
+             * @default []
+             */
+            neighbours: string[];
+            /** Target */
+            target?: string | null;
+        };
         /** StationInfo */
         StationInfo: {
             /** Connected S */
@@ -8753,6 +8904,26 @@ export interface components {
             signal_dbm: number;
             /** Tx Mbps */
             tx_mbps: number;
+        };
+        /** StationRow */
+        StationRow: {
+            /** Ip */
+            ip: string | null;
+            /** Mac */
+            mac: string;
+            /** Name */
+            name: string | null;
+            /** Signal Dbm */
+            signal_dbm: number | null;
+        };
+        /** StationsView */
+        StationsView: {
+            /** Aps */
+            aps: components["schemas"]["ApStations"][];
+            /** Candidates */
+            candidates: components["schemas"]["NeighbourEntry"][];
+            /** Notes */
+            notes: string[];
         };
         /** StepJob */
         StepJob: {
@@ -16468,6 +16639,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["openwrtgui__tools__sessions__SessionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stations_api_routers__router_id__tools_stations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StationsView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    station_apply_api_routers__router_id__tools_stations_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StationApply"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    station_preview_api_routers__router_id__tools_stations_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StationAction"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolPlan"];
                 };
             };
             /** @description Validation Error */

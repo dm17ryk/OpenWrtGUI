@@ -86,6 +86,31 @@ class BytesStream:
         self.exit_status, self.stderr = self._final
 
 
+class LazyStream:
+    """A stream whose bytes come from a callable at its first read (the simulator's `ubus subscribe`): one
+    opened before a request still sees what the request makes. `timeout -s KILL` ends it."""
+
+    def __init__(self, source: Callable[[], bytes], exit_status: int = 137) -> None:
+        self._source = source
+        self._data: bytes | None = None
+        self._closed = False
+        self._final = exit_status
+        self.exit_status: int | None = None
+        self.stderr = ""
+
+    async def read(self, n: int = 65536) -> bytes:
+        if self._closed:
+            return b""
+        if self._data is None:
+            self._data = self._source()
+        chunk, self._data = self._data[:n], self._data[n:]
+        return chunk
+
+    async def close(self) -> None:
+        self._closed = True
+        self.exit_status = self._final
+
+
 class ReplayTransport:
     def __init__(self, commands: Mapping[str, CommandResult], state: SimState | None = None) -> None:
         self._commands = dict(commands)
@@ -143,9 +168,13 @@ class ReplayTransport:
     async def open_shell(self, cols: int, rows: int) -> ShellChannel:
         raise NotImplementedError("simulator has no shell")
 
-    async def stream(self, command: str) -> BytesStream:
+    async def stream(self, command: str) -> BytesStream | LazyStream:
         self.calls.append(command)
         self._down()
+        if self.state is not None and self.state.wifi is not None:
+            subscribed = self.state.wifi.subscribe(command)
+            if subscribed is not None:
+                return LazyStream(subscribed)
         if self.state is not None and self.state.tools is not None:
             session = self.state.tools.stream(command)
             if session is not None:

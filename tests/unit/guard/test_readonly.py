@@ -46,8 +46,19 @@ ALLOWED = [
     "iwinfo phy0-ap0 info",
     "ip route show",
     "ip route save",
+    # Station management's reads (v1.2b R8)
+    "ubus call hostapd.phy0-ap0 rrm_nr_list",
+    "ubus call hostapd.phy0-ap0 rrm_nr_get_own",
+    "ubus -v list 'hostapd.*'",
 ]
 REFUSED = [
+    # Station management's writes and its listener (v1.2b R8)
+    "ubus call hostapd.phy0-ap0 rrm_nr_set '{\"list\":[]}'",
+    'ubus call hostapd.phy0-ap0 bss_transition_request \'{"addr":"02:00:00:00:00:30"}\'',
+    'ubus call hostapd.phy0-ap0 rrm_beacon_req \'{"addr":"02:00:00:00:00:30"}\'',
+    "ubus call hostapd.phy0-ap0 bss_mgmt_enable '{\"bss_transition\":true}'",
+    "ubus subscribe hostapd.phy0-ap0",
+    "timeout -s KILL 12 ubus subscribe hostapd.phy0-ap0",
     "awk 'BEGIN{system(\"reboot\")}'",
     "awk '{ \"reboot\" | getline x }' /etc/passwd",
     "sed 'e reboot' /etc/hosts",

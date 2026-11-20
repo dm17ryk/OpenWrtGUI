@@ -6,7 +6,10 @@ import asyncio
 from typing import Any
 
 import httpx
+import pytest
 
+from openwrtgui.context import AppContext
+from openwrtgui.simwifi import SimWifi
 from openwrtgui.tools.throughput import CPU_WARNING, HOST_TEXT
 
 TOOLS = "/api/routers/ap1/tools"
@@ -141,6 +144,123 @@ async def test_traffic_is_423_while_the_guard_is_live(authed_guard_live: httpx.A
     body = {"protocol": "udp", "port": 9100, "duration_s": 60}
     plan = (await authed_guard_live.post(f"{TOOLS}/traffic/listen/preview", json=body)).json()
     r = await authed_guard_live.post(f"{TOOLS}/traffic/listen/start", json={**body, "digest": plan["digest"]})
+    assert r.status_code == 423
+
+
+STATION = "f4:12:fa:f3:57:68"  # the simulator's station
+AP1_OWN = "02:00:00:00:00:01"
+AP2_OWN = "02:00:00:00:00:02"
+NOT_SUPPORTED_TRANSITION = (
+    "hostapd on AP2 · office says Not supported. BSS transition needs bss_transition on this SSID: "
+    "Wi-Fi › All options › bss_transition."
+)
+
+
+async def _ap2_on_air(ctx: AppContext) -> None:
+    """AP2's radio up in the simulator (it is parked there), as a second router with an SSID on air."""
+    rec = ctx.routers.get("ap2")
+    assert rec is not None
+    t = await ctx.pool.get(rec)
+    assert t.state is not None and t.state.wifi is not None  # type: ignore[attr-defined]
+    t.state.wifi._up["radio0"] = True  # type: ignore[attr-defined]  # noqa: SLF001
+
+
+async def _station(client: httpx.AsyncClient, router: str, body: dict[str, Any]) -> httpx.Response:
+    plan = await client.post(f"/api/routers/{router}/tools/stations/preview", json=body)
+    assert plan.status_code == 200, plan.text
+    return await client.post(
+        f"/api/routers/{router}/tools/stations/apply", json={**body, "digest": plan.json()["digest"]}
+    )
+
+
+async def test_stations_view(authed: httpx.AsyncClient, ctx: AppContext) -> None:
+    await _ap2_on_air(ctx)
+    view = (await authed.get(f"{TOOLS}/stations")).json()
+    ap = view["aps"][0]
+    assert (ap["ifname"], ap["ssid"], ap["channel"]) == ("phy0-ap0", "OpenWrt", 1)
+    assert ap["methods"] == [
+        "bss_transition_request",
+        "rrm_nr_get_own",
+        "rrm_nr_list",
+        "rrm_nr_set",
+        "rrm_beacon_req",
+    ]
+    assert ap["own"]["bssid"] == AP1_OWN and ap["neighbours"] == []
+    assert [s["mac"] for s in ap["stations"]] == [STATION]
+    sources = {c["bssid"]: c["source"] for c in view["candidates"]}
+    assert sources == {AP1_OWN: "AP1 · bench · OpenWrt", AP2_OWN: "AP2 · office · OpenWrt"}
+
+
+async def test_neighbours_set_and_clear(authed: httpx.AsyncClient, ctx: AppContext) -> None:
+    await _ap2_on_air(ctx)
+    body = {"kind": "neighbours", "ifname": "phy0-ap0", "neighbours": [AP2_OWN]}
+    plan = (await authed.post(f"{TOOLS}/stations/preview", json=body)).json()
+    assert plan["lines"][0].startswith(
+        'ubus call hostapd.phy0-ap0 rrm_nr_set \'{"list":[["02:00:00:00:00:02"'
+    )
+    assert "Kept until the next Wi-Fi reload: hostapd does not save it." in plan["warnings"]
+    r = await _station(authed, "ap1", body)
+    assert r.status_code == 200 and r.json()["ok"], r.text
+    ap = (await authed.get(f"{TOOLS}/stations")).json()["aps"][0]
+    assert [n["bssid"] for n in ap["neighbours"]] == [AP2_OWN]
+    r = await _station(authed, "ap1", {"kind": "neighbours", "ifname": "phy0-ap0", "neighbours": []})
+    assert r.json()["ok"] and (await authed.get(f"{TOOLS}/stations")).json()["aps"][0]["neighbours"] == []
+
+
+async def test_bss_transition(authed: httpx.AsyncClient) -> None:
+    body = {"kind": "transition", "ifname": "phy0-ap0", "mac": STATION, "target": AP1_OWN}
+    plan = (await authed.post(f"{TOOLS}/stations/preview", json=body)).json()
+    assert (
+        plan["lines"][1]
+        == "timeout -s KILL 12 ubus subscribe hostapd.phy0-ap0  # 10 s, for the station's answer"
+    )
+    result = (await _station(authed, "ap1", body)).json()
+    assert result["ok"] and result["status_code"] == 0, result
+    assert result["events"][0]["fields"]["address"] == STATION
+
+
+async def test_beacon_report(authed: httpx.AsyncClient) -> None:
+    body = {"kind": "beacon", "ifname": "phy0-ap0", "mac": STATION}
+    result = (await _station(authed, "ap1", body)).json()
+    assert result["ok"], result
+    assert [(b["channel"], b["rcpi_dbm"], b["rsni"]) for b in result["beacons"]] == [(11, -50.0, 40)]
+
+
+async def test_hostapd_refusals(authed: httpx.AsyncClient, ctx: AppContext) -> None:
+    await _ap2_on_air(ctx)
+    body = {"kind": "transition", "ifname": "phy0-ap0", "mac": STATION, "target": AP2_OWN}
+    result = (await _station(authed, "ap2", body)).json()
+    assert result == {
+        "ok": False,
+        "detail": NOT_SUPPORTED_TRANSITION,
+        "events": [],
+        "beacons": [],
+        "status_code": None,
+    }
+    beacon = (await _station(authed, "ap2", {"kind": "beacon", "ifname": "phy0-ap0", "mac": STATION})).json()
+    assert beacon["detail"] == (
+        "hostapd on AP2 · office says Not supported. The beacon report needs ieee80211k on this SSID: "
+        "Wi-Fi › All options › ieee80211k."
+    )
+
+
+async def test_a_station_that_is_not_connected(authed: httpx.AsyncClient) -> None:
+    body = {"kind": "beacon", "ifname": "phy0-ap0", "mac": "02:00:00:00:00:99"}
+    r = await authed.post(f"{TOOLS}/stations/preview", json=body)
+    assert (
+        r.status_code == 422 and r.json()["detail"] == "02:00:00:00:00:99 is no longer connected to OpenWrt."
+    )
+
+
+async def test_no_answer_from_the_station(authed: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(SimWifi, "_answer", lambda self, ifname, event: None)
+    result = (await _station(authed, "ap1", {"kind": "beacon", "ifname": "phy0-ap0", "mac": STATION})).json()
+    assert result["ok"] is True and result["detail"] == "No answer from the station in 10 s."
+    assert result["beacons"] == []
+
+
+async def test_station_requests_are_423_while_the_guard_is_live(authed_guard_live: httpx.AsyncClient) -> None:
+    r = await _station(authed_guard_live, "ap1", {"kind": "beacon", "ifname": "phy0-ap0", "mac": STATION})
     assert r.status_code == 423
 
 

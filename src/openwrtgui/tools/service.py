@@ -9,6 +9,8 @@ from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.guard.writes import run_audited
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.tools.sessions import SCREEN, SessionView, ToolPlan, ToolSessions, tool_plan
+from openwrtgui.tools.station_service import StationTools
+from openwrtgui.tools.stations import ActionResult, StationAction, StationsView
 from openwrtgui.tools.throughput import (
     CPU_WARNING,
     ThroughputRequest,
@@ -48,6 +50,7 @@ class ToolsService:
         self._guard = guard
         self._audit = audit
         self._wifi = wifi
+        self._stations = StationTools(routers=routers, pool=pool, guard=guard, audit=audit, wifi=wifi)
 
     def _record(self, router_id: str) -> RouterRecord:
         rec = self._routers.get(router_id)
@@ -126,3 +129,14 @@ class ToolsService:
             with contextlib.suppress(TransportError, OSError):
                 await own.close()
         return send_result(req, result)
+
+    # ---------------------------------------------------------------- Station management
+    async def stations(self, router_id: str) -> StationsView:
+        self._record(router_id)
+        return await self._stations.view(router_id)
+
+    async def station_plan(self, router_id: str, action: StationAction) -> ToolPlan:
+        return (await self._stations.plan(router_id, action))[0]
+
+    async def station_apply(self, router_id: str, action: StationAction, digest: str) -> ActionResult:
+        return await self._stations.apply(router_id, action, digest)

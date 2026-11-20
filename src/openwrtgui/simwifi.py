@@ -12,11 +12,14 @@ import json
 import math
 import re
 import shlex
+from collections.abc import Callable
 from typing import Any
 
 from openwrtgui.transport.base import CommandResult
 from openwrtgui.uci import parse_uci_show, shell_quote
 
+HOSTAPD_RRM = ("bss_transition_request", "rrm_nr_get_own", "rrm_nr_list", "rrm_nr_set", "rrm_beacon_req")
+NEIGHBOUR = "02:00:00:00:00:02"  # the BSSID the simulated station's beacon report names
 STATION_MAC = "f4:12:fa:f3:57:68"
 STATION_NAME = "panel"
 STATION_IP = "192.168.1.30"
@@ -76,6 +79,8 @@ class SimWifi:
         self._sessions = 0
         self._acl: dict[tuple[str, str], list[str]] = {}
         self._disabled: set[str] = set()  # BSSes stopped with `hostapd_cli disable` (AP down)
+        self._neighbours: dict[str, list[list[str]]] = {}  # rrm_nr_set, per AP (runtime only)
+        self._events: dict[str, list[dict[str, Any]]] = {}  # notifications `ubus subscribe` gives next
 
     # ---------------------------------------------------------------- what SimAir reads (v0.7)
     @property
@@ -232,7 +237,79 @@ class SimWifi:
             return self._acl_show(m.group(1), m.group(2))
         if m := re.fullmatch(r"hostapd_cli -i (\S+) (disable|enable|status)", p):
             return self._bss(m.group(1), m.group(2))
+        if p == "ubus -v list 'hostapd.*'":
+            return _ok(self._hostapd_list())
         return None
+
+    # ---------------------------------------------------------------- 802.11k/v over ubus (v1.2b)
+    def _hostapd_list(self) -> str:
+        methods = '\t"reload":{}\n\t"get_clients":{}\n\t"del_client":{"addr":"String"}\n' + "".join(
+            f'\t"{m}":{{}}\n' for m in HOSTAPD_RRM
+        )
+        return "".join(
+            f"'hostapd.{ifname}' @{0x3456734A + i:08x}\n{methods}"
+            for radio in self._radios()
+            if self._up[radio]
+            for i, (ifname, _) in enumerate(self._ifaces(radio))
+        )
+
+    def _own_nr(self, ifname: str) -> list[str]:
+        radio, section = self._iface(ifname) or ("", "")
+        hexed = self._bssid.replace(":", "")
+        nr = f"{hexed}ef00000051{self._channel(radio):02x}07000000"  # 16 bytes, as rrm_nr_get_own gives
+        return [self._bssid, self._opt(section, "ssid", "") or "", nr]
+
+    def _answer(self, ifname: str, event: dict[str, Any]) -> None:
+        """A notification `ubus subscribe` gives next, as the station answers (v1.2b R10)."""
+        self._events.setdefault(ifname, []).append(event)
+
+    def subscribe(self, command: str) -> Callable[[], bytes] | None:
+        """`ubus subscribe hostapd.<if>` as a stream whose lines are read lazily: a subscribe started before
+        a request still sees the answer the request queues."""
+        m = re.fullmatch(r"timeout -s KILL \d+ ubus subscribe hostapd\.(\S+)", command)
+        if m is None:
+            return None
+        ifname = m.group(1)
+
+        def lines() -> bytes:
+            events = self._events.pop(ifname, [])
+            return "".join(json.dumps(e) + "\n" for e in events).encode()
+
+        return lines
+
+    def _rrm(self, ifname: str, method: str, args: dict[str, Any]) -> CommandResult:
+        where = self._iface(ifname)
+        if where is None:
+            return _fail("Command failed: Not found\n", 4)
+        _, section = where
+        if method == "rrm_nr_get_own":
+            return _ok(json.dumps({"value": self._own_nr(ifname)}) + "\n")
+        if method == "rrm_nr_list":
+            return _ok(json.dumps({"list": self._neighbours.get(ifname, [])}) + "\n")
+        option = "bss_transition" if method == "bss_transition_request" else "ieee80211k"
+        if self._opt(section, option) != "1":
+            return _fail("Command failed: Not supported\n", 8)
+        if method == "rrm_nr_set":
+            self._neighbours[ifname] = [list(entry) for entry in args.get("list", [])]
+            return _ok()
+        mac = str(args.get("addr", "")).lower()
+        if mac != STATION_MAC or not self._present():
+            return _fail("Command failed: Not found\n", 4)
+        if method == "bss_transition_request":
+            self._answer(
+                ifname, {"bss-transition-response": {"address": mac, "dialog-token": 1, "status-code": 0}}
+            )
+        else:
+            report = {
+                "address": mac,
+                "op-class": 81,
+                "channel": 11,
+                "rcpi": 120,
+                "rsni": 40,
+                "bssid": NEIGHBOUR,
+            }
+            self._answer(ifname, {"beacon-report": report})
+        return _ok()
 
     def _bss(self, ifname: str, action: str) -> CommandResult:
         """AP down and back: hostapd stops the BSS (no beacons, every station gone) and starts it again."""
@@ -354,6 +431,8 @@ class SimWifi:
             here = ifname not in self._disabled and self._present()
             clients = {STATION_MAC: {"auth": True, "assoc": True, "authorized": True}} if here else {}
             return _ok(json.dumps({"freq": 2437, "clients": clients}) + "\n")
+        if obj.startswith("hostapd.") and method in HOSTAPD_RRM:
+            return self._rrm(obj.removeprefix("hostapd."), method, args)
         if obj.startswith("hostapd.") and method == "list_bans":
             if self._iface(obj.removeprefix("hostapd.")) is None:
                 return _fail("Command failed: Not found\n", 4)
