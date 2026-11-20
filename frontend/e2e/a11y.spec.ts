@@ -19,6 +19,8 @@ const SCREENS: Array<[path: string, heading: string | RegExp, loaded: (page: Pag
   ['/routers/ap1/discovery', 'Discovery', (p) => p.getByRole('region', { name: 'Image', exact: true })],
   ['/routers/ap2/lte', 'LTE', (p) => p.getByRole('region', { name: 'Modem' })],
   ['/routers/ap1/system', 'System', (p) => p.getByRole('region', { name: 'Overview' })],
+  ['/routers/ap1/tools/port-stats', 'Tools', (p) => p.getByRole('columnheader', { name: 'Rx rate' })],
+  ['/routers/ap1/tools/connections', 'Tools', (p) => p.getByRole('table', { name: 'Connections' })],
   ['/terminal/ap1', 'AP1 · bench', (p) => p.getByRole('navigation', { name: 'Routers' })],
   ['/audit', 'Audit log', (p) => p.getByRole('combobox', { name: 'Router' })],
   ['/settings', 'Settings', (p) => p.getByRole('region', { name: 'Image library' })],

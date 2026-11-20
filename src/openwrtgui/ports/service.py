@@ -4,6 +4,7 @@ the next reboot or network reload); VLANs and the mirror are `network` changes w
 from __future__ import annotations
 
 import asyncio
+import time
 from collections.abc import Awaitable, Callable, Mapping, MutableMapping, Sequence
 from typing import Any
 
@@ -30,6 +31,7 @@ from openwrtgui.ports.compile import (
     enable_all_commands,
     enable_commands,
 )
+from openwrtgui.ports.mib import PortStats, port_stats
 from openwrtgui.ports.model import SwitchLive
 from openwrtgui.ports.parse import parse_members, parse_swconfig_show
 from openwrtgui.ports.state import PortsState, read_ports
@@ -58,8 +60,10 @@ class PortsService:
         sleep: Callable[[float], Awaitable[Any]] = asyncio.sleep,
         settle_s: float = SETTLE_S,
         poll_s: float = POLL_S,
+        now: Callable[[], float] = time.time,
     ) -> None:
         self._pool = pool
+        self._now = now
         self._routers = routers
         self._guard = guard
         self._audit = audit
@@ -91,6 +95,21 @@ class PortsService:
 
     async def state(self, router_id: str) -> PortsState:
         return (await self._read(router_id))[2]
+
+    async def stats(self, router_id: str) -> PortStats:
+        """Port statistics (v1.2a R5): one `show` for the counters; the ports from the cached description."""
+        rec = self._record(router_id)
+        t = await self._pool.get(rec)
+        desc = self._descriptions.get(rec.id)
+        if desc is None:
+            desc = await describe_router(t)
+            self._descriptions[rec.id] = desc
+        board = desc.board
+        switch = board.switch_name if board else None
+        if board is None or switch is None:
+            return port_stats(None, (), rec.port_labels, None, self._now())
+        show = await t.run(c.swconfig_show(switch))
+        return port_stats(switch, board.ports, rec.port_labels, show, self._now())
 
     async def _show(self, t: Transport, state: PortsState) -> SwitchLive:
         if state.switch is None:

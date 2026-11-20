@@ -238,6 +238,37 @@ h2 {
   overflow-wrap: anywhere;
   max-width: 100%;
 }
+/* a capability the router lacks: outlined, the reason is in the text */
+.b.missing {
+  background: transparent;
+  color: var(--ink2);
+  box-shadow: inset 0 0 0 1px var(--neu-soft);
+}
+a.b {
+  text-decoration: none;
+}
+a.b:hover {
+  text-decoration: underline;
+}
+/* a counter that should be zero and is not (Tools › Port statistics) */
+td.warn {
+  color: var(--warn);
+  font-weight: 600;
+}
+/* the detail row under a table row (Tools › Port statistics' All counters) */
+tr.sub td {
+  padding-top: 0;
+  border-top: none;
+  font-size: 12px;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 .dot {
   width: 8px;
   height: 8px;

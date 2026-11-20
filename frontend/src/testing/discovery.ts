@@ -534,6 +534,11 @@ export const AP1_DISCOVERY: DiscoveryState = {
       "reason": "needs iw"
     },
     {
+      "name": "Air survey",
+      "state": "missing",
+      "reason": "needs iw"
+    },
+    {
       "name": "Throughput",
       "state": "added after flashing",
       "reason": null
@@ -546,7 +551,12 @@ export const AP1_DISCOVERY: DiscoveryState = {
     {
       "name": "Connections",
       "state": "missing",
-      "reason": "needs conntrack"
+      "reason": "needs nf_conntrack.ko"
+    },
+    {
+      "name": "Port statistics",
+      "state": "in image",
+      "reason": null
     }
   ]
 }

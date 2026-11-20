@@ -29,9 +29,12 @@ CAPABILITIES = (
     CapabilityNeed("netem", ("tc",), ("sch_netem.ko",)),
     CapabilityNeed("Firewall", ("fw4",)),
     CapabilityNeed("Monitor mode", ("iw",)),
+    CapabilityNeed("Air survey", ("iw",)),
     CapabilityNeed("Throughput", ("iperf3",)),
     CapabilityNeed("Traffic generator", ("socat",)),
-    CapabilityNeed("Connections", ("conntrack",)),
+    # The Connections page reads /proc/net/nf_conntrack: the table, not the `conntrack` program (v1.2a R4).
+    CapabilityNeed("Connections", (), ("nf_conntrack.ko",)),
+    CapabilityNeed("Port statistics", ("swconfig",)),  # the per-port MIB counters of `swconfig ... show`
 )
 
 

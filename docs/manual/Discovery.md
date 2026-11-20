@@ -78,6 +78,16 @@ The app needs the image plus 4 MiB free in the router's memory. A router with le
 about 8 MB of RAM) cannot be flashed from the app: flash it with LuCI's **System › Backup / Flash Firmware** or
 from the terminal.
 
+## Capabilities
+
+What this router can do, one chip each: the switch, LTE, capture, netem, the firewall, monitor mode, the air
+survey, throughput tests, the traffic generator, connection tracking and port statistics. Each chip says whether
+the router has what it needs **in image**, **added after flashing**, or **missing**, with what is missing (for
+example "missing: needs socat"). The state is read from the image and the files added since, not by running
+anything. A chip opens the screen that uses it: the switch opens Ports, the air survey opens the channel analysis
+on RF live, port statistics and connections open their pages on [Tools](Tools). A missing one opens it too, and
+that screen says what it needs.
+
 ## Added after flashing
 
 Files in the router's overlay that the image does not have (**added**), files it changed (**changed from the

@@ -154,6 +154,7 @@ class SimNetwork:
         self.dsa_pc_port = dsa_pc_port
         self.dsa_links: set[str] = set()  # more DSA ports with a link than the PC's
         self.dsa_wifi: list[str] = []  # Wi-Fi interfaces netifd adds to the bridge at run time
+        self._mib: dict[int, int] = {}  # port → reads it counted traffic in (v1.2a R11)
 
     # ---------------------------------------------------------------- what the connector asks
     def _expire(self) -> None:
@@ -626,8 +627,22 @@ class SimNetwork:
             up = (linked and self._enabled.get(port, False)) or port == CPU
             speed = "1000" if port == CPU else "100"
             link = f"port:{port} link:up speed:{speed}baseT full-duplex " if up else f"port:{port} link:down"
+            if up:  # each read adds 1000 packets and 1.2 MB each way on a linked port, in AP2's mt7620 format
+                self._mib[port] = self._mib.get(port, 0) + 1
+            n = self._mib.get(port, 0)
             lines += [
                 f"Port {port}:",
+                f"\tmib: Port {port} MIB counters",
+                f"TxGPC      : {n * 1000}",
+                "TxBOC      : 0",
+                f"TxGOC      : {n * 1_200_000}",
+                "TxEPC      : 0",
+                f"RxGPC      : {n * 1000}",
+                "RxBOC      : 0",
+                f"RxGOC      : {n * 1_200_000}",
+                "RxEPC1     : 0",
+                "RxEPC2     : 0",
+                "",
                 f"\tenable_mirror_rx: {int(bool(sp and sp.mirror_rx))}",
                 f"\tenable_mirror_tx: {int(bool(sp and sp.mirror_tx))}",
                 f"\tenable: {enable}",

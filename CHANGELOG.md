@@ -7,6 +7,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Discovery › **Capabilities**: what each router can do, in image, added after flashing or missing, each opening
+  the screen that uses it.
+- **Tools** › Port statistics: each switch port's packets, bytes and errors from the switch's own counters, with
+  rates, read every 5 s while the tab is open; the router's counters are never cleared.
+- **Tools** › Connections: the connection table with filters, each entry's conntrack helper, and whether SIP ALG
+  is on.
+
 ## [1.1.0] - 2026-11-19
 
 Leftovers from the 1.0 reviews, an accessibility check, LTE Recover, rate statistics and app key rotation.

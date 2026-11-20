@@ -50,6 +50,11 @@ async def test_state_of_sim_ap1(ctx: AppContext) -> None:
     assert caps["Switch"].state == "in image"
     assert caps["Throughput"].state == "added after flashing"
     assert (caps["LTE"].state, caps["LTE"].reason) == ("missing", "needs uqmi")
+    assert [(caps[n].state, caps[n].reason) for n in ("Air survey", "Port statistics", "Connections")] == [
+        ("missing", "needs iw"),  # the mini image has neither iw nor the conntrack module
+        ("in image", None),
+        ("missing", "needs nf_conntrack.ko"),
+    ]
 
 
 async def test_first_boot_configs_are_not_read(ctx: AppContext) -> None:

@@ -52,6 +52,8 @@ TZ_FILE = "cat /tmp/TZ"
 # one exec for the live charts (D3): load, bytes per interface, the connection count
 LIVE = "cat /proc/loadavg /proc/net/dev /proc/sys/net/netfilter/nf_conntrack_count"
 CONNTRACK = "head -n 500 /proc/net/nf_conntrack"  # AP2 has ~7 MB free RAM: the table is capped
+# how many entries the table has and how many it allows: two numbers, one per line (v1.2a R8)
+CONNTRACK_SIZE = "cat /proc/sys/net/netfilter/nf_conntrack_count /proc/sys/net/netfilter/nf_conntrack_max"
 BACKUP = "sysupgrade -b -"  # the archive on stdout (D9): it holds secrets, never recorded or logged
 BACKUP_SIZE = "sysupgrade -b - | wc -c"  # what the recorder keeps of it
 

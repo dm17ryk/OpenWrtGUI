@@ -9,6 +9,7 @@ from collections.abc import Awaitable, Callable, Collection
 from datetime import datetime
 from pathlib import Path
 
+from openwrtgui.fw.commands import NFT_TEXT
 from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.guard.writes import run_audited
@@ -43,9 +44,12 @@ from openwrtgui.system.cron import CronState, check_crontab, has_tasks, read_tas
 from openwrtgui.system.jobs import SCREEN, JobsMixin
 from openwrtgui.system.parse import (
     RcService,
+    SipAlg,
     parse_board,
     parse_conntrack,
+    parse_conntrack_size,
     parse_rc_list,
+    parse_sip_alg,
     parse_timezones,
     parse_top,
 )
@@ -176,7 +180,15 @@ class SystemService(JobsMixin):
         result = await t.run(s.CONNTRACK)
         if not result.ok:
             return Connections(rows=[], note=NO_CONNTRACK)
-        return Connections(rows=parse_conntrack(result.stdout))
+        size = await t.run(s.CONNTRACK_SIZE)
+        total, limit = parse_conntrack_size(size.stdout) if size.ok else (None, None)
+        return Connections(rows=parse_conntrack(result.stdout), total=total, limit=limit)
+
+    async def sip_alg(self, router_id: str) -> SipAlg:
+        """The SIP ALG state from fw4's ruleset (v1.2a R9): read on demand, never on the 5 s refresh."""
+        _rec, t = await self._transport(router_id)
+        result = await t.run(NFT_TEXT)
+        return parse_sip_alg(result.stdout) if result.ok else SipAlg(state="unknown", zones=[], ports=[])
 
     # ---------------------------------------------------------------- diagnostics (D4)
     async def diagnose(self, router_id: str, tool: DiagTool, target: str) -> DiagResult:

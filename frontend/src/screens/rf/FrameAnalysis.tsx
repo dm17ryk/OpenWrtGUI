@@ -140,7 +140,7 @@ export function FrameAnalysis({ routerId, radio, live, retryPct }: Props) {
     })
 
   return (
-    <section className="card stack" aria-labelledby="frames-h">
+    <section className="card stack" id="frame-analysis" aria-labelledby="frames-h">
       <div className="hrow">
         <h2 id="frames-h">Frame analysis</h2>
         <Help topic={HELP.rfFrames} />

@@ -19,6 +19,7 @@ import { LteScreen } from './screens/lte/LteScreen'
 import { SystemScreen } from './screens/system/SystemScreen'
 import { PortsScreen } from './screens/ports/PortsScreen'
 import { RfLive } from './screens/rf/RfLive'
+import { ToolsScreen } from './screens/tools/ToolsScreen'
 import { WifiScreen } from './screens/wifi/WifiScreen'
 import { GuardBanner } from './shell/GuardBanner'
 import { Header } from './shell/Header'
@@ -74,6 +75,8 @@ export function App() {
         <Route path="/routers/:id/firewall" element={<FirewallScreen />} />
         <Route path="/routers/:id/faults" element={<FaultsScreen />} />
         <Route path="/routers/:id/discovery" element={<DiscoveryScreen />} />
+        <Route path="/routers/:id/tools" element={<ToolsScreen />} />
+        <Route path="/routers/:id/tools/:tool" element={<ToolsScreen />} />
         <Route path="/terminal/:id?" element={<Terminal />} />
         <Route path="/audit" element={<AuditLog />} />
         <Route path="/settings" element={<SettingsScreen />} />

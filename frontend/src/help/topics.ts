@@ -63,6 +63,11 @@ export const HELP = {
   lteActions: 'LTE-modem#connect-disconnect-reboot',
   lteAt: 'LTE-modem#at-console',
   // System (v0.6b)
+  tools: 'Tools',
+  toolsPortStats: 'Tools#port-statistics',
+  toolsConnections: 'Tools#connections',
+  toolsSipAlg: 'Tools#sip-alg',
+  discoveryCapabilities: 'Discovery#capabilities',
   system: 'System',
   systemOverview: 'System#overview',
   systemLive: 'System#live-load-bandwidth-and-connections',

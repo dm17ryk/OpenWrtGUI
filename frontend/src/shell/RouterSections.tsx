@@ -12,6 +12,7 @@ export type Section =
   | 'firewall'
   | 'faults'
   | 'system'
+  | 'tools'
   | 'luci'
 
 type Props = { routerId: string; name: string; current: Section; luciPath?: string }
@@ -34,6 +35,7 @@ export function RouterSections({ routerId, name, current, luciPath }: Props) {
     ['firewall', 'Firewall', `${base}/firewall`],
     ['faults', 'Faults & capture', `${base}/faults`],
     ['system', 'System', `${base}/system`],
+    ['tools', 'Tools', `${base}/tools`],
     ['terminal', 'Terminal', `/terminal/${routerId}`],
   ]
   const fallback = (pages.data ?? []).filter((p) => p.native === null && p.available !== false)

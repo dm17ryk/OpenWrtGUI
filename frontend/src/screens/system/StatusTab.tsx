@@ -86,6 +86,9 @@ function ConnectionsCard({ routerId }: { routerId: string }) {
           <Help topic={HELP.systemConnections} />
         </div>
         <div className="spacer" />
+        <Link className="btn" to={`/routers/${routerId}/tools/connections`}>
+          All connections
+        </Link>
         <button type="button" className="btn" onClick={() => (open ? void conns.refetch() : setOpen(true))}>
           {open ? 'Read again' : 'Show connections'}
         </button>

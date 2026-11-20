@@ -583,6 +583,17 @@ class SimFirewall:
             for w in ("from", "to")
             for p in ("accept", "reject", "drop")
         ]
+        # fw4's automatic conntrack helpers, as on AP2: the SIP helper on each zone without masquerading
+        # (AP2: `chain helper_lan { udp dport 5060 ct helper set "sip" ... }`)
+        t.chains += [
+            _Chain(
+                f"helper_{z.name}",
+                None,
+                [_Rule('udp dport 5060 ct helper set "sip" comment "!fw4: SIP VoIP connection tracking"')],
+            )
+            for z in conf.zones
+            if not z.masq
+        ]
         t.chains.append(
             _Chain("dstnat", "type nat hook prerouting priority dstnat; policy accept;", _redirects(conf))
         )

@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
+import { useScrollToHash } from '../../shell/useScrollToHash'
 import { ApiError, apiFetch } from '../../api/client'
 import type { ClearIn, FaultsState, RouterDetail } from '../../api/types'
 import { usePlanApply } from '../../components/usePlanApply'
@@ -30,6 +31,7 @@ function useNow(ticking: boolean): Date {
 /** Faults and capture (spec 7.7): arm a fault on one target, see and clear what is armed, capture traffic. */
 export function FaultsScreen() {
   const { id = '' } = useParams()
+  useScrollToHash() // #capture from Discovery's Capture chip
   const client = useQueryClient()
   const detail = useQuery({ queryKey: ['router', id], queryFn: () => apiFetch<RouterDetail>(`/api/routers/${id}`) })
   const faults = useQuery({ queryKey: ['faults', id], queryFn: () => apiFetch<FaultsState>(`/api/routers/${id}/faults`) })

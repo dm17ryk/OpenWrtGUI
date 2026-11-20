@@ -123,6 +123,27 @@ def test_vlan_without_pc_port_is_unreachable() -> None:
     assert net.reachable()
 
 
+def test_sim_counters_grow() -> None:
+    from openwrtgui.ports.parse import parse_port_mib
+
+    net, _ = _net()
+    first = parse_port_mib(_run(net, c.swconfig_show("switch0")))
+    second = parse_port_mib(_run(net, c.swconfig_show("switch0")))
+    assert set(first) == set(range(8))  # every port prints its counters, as AP2's mt7620 does
+    assert (second[3]["RxGPC"] - first[3]["RxGPC"], second[3]["RxGOC"] - first[3]["RxGOC"]) == (
+        1000,
+        1_200_000,
+    )
+    assert (second[3]["TxGPC"] - first[3]["TxGPC"], second[3]["TxGOC"] - first[3]["TxGOC"]) == (
+        1000,
+        1_200_000,
+    )
+    assert second[1] == first[1]  # a port without a link counts nothing
+    assert (
+        parse_swconfig_show("switch0", _run(net, c.swconfig_show("switch0"))).ports[3].link
+    )  # attrs still read
+
+
 def test_port_disable_is_runtime_and_reload_resets_it() -> None:
     net, _ = _net()
     _run(net, "swconfig dev switch0 port 2 set enable 0")

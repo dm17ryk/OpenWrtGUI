@@ -88,7 +88,11 @@ _CONNTRACK = (
     "[UNREPLIED] src=10.64.12.1 dst=192.168.1.2 sport=53 dport=5353 packets=0 bytes=0 use=2\n"
     "ipv4     2 tcp      6 98 TIME_WAIT src=192.168.1.10 dst=192.168.1.2 sport=53510 dport=80 packets=6 "
     "bytes=900 src=192.168.1.2 dst=192.168.1.10 sport=80 dport=53510 packets=5 bytes=2400 [ASSURED] use=2\n"
+    "ipv4     2 udp      17 175 src=192.168.1.30 dst=192.168.1.1 sport=5060 dport=5060 packets=12 bytes=6400 "
+    "src=192.168.1.1 dst=192.168.1.30 sport=5060 dport=5060 packets=11 bytes=5900 [ASSURED] mark=0 "
+    "helper=sip use=2\n"
 )
+_CONNTRACK_MAX = 16384
 
 
 def _ok(command: str, out: str = "") -> CommandResult:
@@ -251,6 +255,8 @@ class SimSystem:
             return _ok(c, self._live())
         if c == s.CONNTRACK:
             return _ok(c, _CONNTRACK)
+        if c == s.CONNTRACK_SIZE:
+            return _ok(c, f"{len(_CONNTRACK.splitlines())}\n{_CONNTRACK_MAX}\n")
         if c == s.BACKUP_SIZE:
             return _ok(c, f"{len(self.backup())}\n")
         if m := _INIT.fullmatch(c):

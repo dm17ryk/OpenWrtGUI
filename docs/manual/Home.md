@@ -4,8 +4,8 @@ OpenWrtGUI lets you see and operate the OpenWrt routers of a Wi-Fi test bench fr
 instead of SSH sessions. This manual covers the current release: install, update, add routers, the dashboard,
 [Discovery](Discovery), the [Wi-Fi](Wi-Fi) screen and its step-through, [RF live](RF-live),
 [Network and DHCP](Network-and-DHCP), the [LTE modem](LTE-modem), [Ports, VLANs, mirroring](Ports-and-VLANs),
-[Firewall](Firewall), [Faults and capture](Faults-and-capture), [System](System), [LuCI pages](LuCI-pages), Bench
-Guard, the terminal and the audit log. What comes next is on the
+[Firewall](Firewall), [Faults and capture](Faults-and-capture), [System](System), [Tools](Tools),
+[LuCI pages](LuCI-pages), Bench Guard, the terminal and the audit log. What comes next is on the
 [roadmap](https://github.com/dm17ryk/OpenWrtGUI/blob/master/ROADMAP.md).
 
 ![The dashboard with three routers](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/dashboard.png)
@@ -25,7 +25,7 @@ Guard, the terminal and the audit log. What comes next is on the
   [Adding a router family](Adding-a-router-family)
 - [Wi-Fi](Wi-Fi) · [RF live](RF-live) · [LuCI pages](LuCI-pages)
 - [Network and DHCP](Network-and-DHCP) · [LTE modem](LTE-modem) · [Ports, VLANs, mirroring](Ports-and-VLANs)
-- [Firewall](Firewall) · [Faults and capture](Faults-and-capture) · [System](System)
+- [Firewall](Firewall) · [Faults and capture](Faults-and-capture) · [System](System) · [Tools](Tools)
 - [Bench Guard](Bench-Guard) · [Terminal and audit log](Terminal-and-audit-log) · [Settings](Settings)
 - [Troubleshooting](Troubleshooting) · [FAQ](FAQ) · [Files and data](Files-and-data) · [Glossary](Glossary)
 
