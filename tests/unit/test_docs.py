@@ -361,6 +361,18 @@ def test_v1_1b_is_in_the_changelog() -> None:
     assert "Which rates reach the station" in released and "**Rotate key**" in released
 
 
+def test_v1_2_is_in_the_changelog() -> None:
+    released = _read(ROOT / "CHANGELOG.md").split("## [1.2.0]", 1)[1].split("\n## [", 1)[0]
+    for words in (
+        "**Capabilities**",
+        "Port statistics",
+        "Throughput",
+        "Traffic generator",
+        "Station management",
+    ):
+        assert words in released, words
+
+
 def test_rates_are_documented_as_read() -> None:
     """v1.1b D7: the rates card is read every 5 s while it is open; the manual no longer says it is not."""
     rates = _section("RF-live", "Which rates reach the station")

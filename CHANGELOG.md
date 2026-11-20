@@ -7,6 +7,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-21
+
+Capability chips and the tool pages: Port statistics, Connections with the SIP ALG switch, Throughput, Traffic
+generator and Station management.
+
 ### Added
 
 - Discovery › **Capabilities**: what each router can do, in image, added after flashing or missing, each opening
@@ -524,7 +529,8 @@ The foundation: install, update, add routers, see them, and stay out of a runnin
 - Router simulator built from recorded router output, used for e2e tests, screenshots and demos.
 - CI, pre-release and release workflows, wiki sync, CodeQL and Dependabot.
 
-[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v1.2.0
 [1.1.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v1.1.0
 [1.0.1]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v1.0.1
 [1.0.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v1.0.0
