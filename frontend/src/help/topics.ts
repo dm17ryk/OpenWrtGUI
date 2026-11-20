@@ -67,6 +67,8 @@ export const HELP = {
   toolsPortStats: 'Tools#port-statistics',
   toolsConnections: 'Tools#connections',
   toolsSipAlg: 'Tools#sip-alg',
+  toolsThroughput: 'Tools#throughput',
+  toolsTraffic: 'Tools#traffic-generator',
   discoveryCapabilities: 'Discovery#capabilities',
   system: 'System',
   systemOverview: 'System#overview',
