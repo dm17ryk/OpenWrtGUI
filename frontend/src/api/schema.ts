@@ -3378,6 +3378,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/tools/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sessions */
+        get: operations["sessions_api_routers__router_id__tools_sessions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/tools/sessions/{session_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop Session */
+        post: operations["stop_session_api_routers__router_id__tools_sessions__session_id__stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/tools/throughput/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Throughput Preview */
+        post: operations["throughput_preview_api_routers__router_id__tools_throughput_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/tools/throughput/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Throughput Start */
+        post: operations["throughput_start_api_routers__router_id__tools_throughput_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/wifi": {
         parameters: {
             query?: never;
@@ -5646,6 +5714,21 @@ export interface components {
             /** Own */
             own: boolean;
         };
+        /** Interval */
+        Interval: {
+            /** End S */
+            end_s: number;
+            /** Jitter Ms */
+            jitter_ms?: number | null;
+            /** Lost Pct */
+            lost_pct?: number | null;
+            /** Mbps */
+            mbps: number;
+            /** Retransmits */
+            retransmits?: number | null;
+            /** Start S */
+            start_s: number;
+        };
         /** IpsetConf */
         IpsetConf: {
             /** Enabled */
@@ -6928,6 +7011,17 @@ export interface components {
              */
             uc_lc: boolean;
         };
+        /** Peer */
+        Peer: {
+            /** Address */
+            address: string;
+            /** Bytes */
+            bytes: number;
+            /** First Hex */
+            first_hex: string;
+            /** Port */
+            port: number;
+        };
         /** PendingRestore */
         PendingRestore: {
             /** Options */
@@ -8081,43 +8175,6 @@ export interface components {
              */
             source: "custom" | "overlay";
         };
-        /** SessionView */
-        SessionView: {
-            /** Changed From */
-            changed_from: string | null;
-            /** Error */
-            error: string | null;
-            /**
-             * Expected Reflash
-             * @default false
-             */
-            expected_reflash: boolean;
-            /** Host */
-            host: string;
-            host_key: components["schemas"]["HostKeyInfo"] | null;
-            /** Key Installed */
-            key_installed: boolean;
-            /** Key Path */
-            key_path: string | null;
-            /** Known Before */
-            known_before: boolean;
-            /** Login Method */
-            login_method: ("app_key" | "pc_key" | "default_password" | "no_password" | "password" | "key_file") | null;
-            /** Port */
-            port: number;
-            /** Proposed Port Labels */
-            proposed_port_labels: {
-                [key: string]: string;
-            };
-            /** Root Password */
-            root_password: string;
-            /** Sid */
-            sid: string;
-            step: components["schemas"]["openwrtgui__onboard__wizard__Step"];
-            summary: components["schemas"]["DescriptionSummary"] | null;
-            /** Username */
-            username: string;
-        };
         /** Settings */
         Settings: {
             /**
@@ -8832,6 +8889,95 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** ThroughputRequest */
+        ThroughputRequest: {
+            /**
+             * Duration S
+             * @default 10
+             */
+            duration_s: number;
+            /** Host */
+            host?: string | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "client" | "server";
+            /**
+             * Port
+             * @default 5201
+             */
+            port: number;
+            /**
+             * Protocol
+             * @default tcp
+             * @enum {string}
+             */
+            protocol: "tcp" | "udp";
+            /**
+             * Reverse
+             * @default false
+             */
+            reverse: boolean;
+            /**
+             * Udp Mbps
+             * @default 10
+             */
+            udp_mbps: number;
+        };
+        /** ThroughputStart */
+        ThroughputStart: {
+            /** Digest */
+            digest: string;
+            /**
+             * Duration S
+             * @default 10
+             */
+            duration_s: number;
+            /** Host */
+            host?: string | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "client" | "server";
+            /**
+             * Port
+             * @default 5201
+             */
+            port: number;
+            /**
+             * Protocol
+             * @default tcp
+             * @enum {string}
+             */
+            protocol: "tcp" | "udp";
+            /**
+             * Reverse
+             * @default false
+             */
+            reverse: boolean;
+            /**
+             * Udp Mbps
+             * @default 10
+             */
+            udp_mbps: number;
+        };
+        /** ThroughputSummary */
+        ThroughputSummary: {
+            /** Cpu Pct */
+            cpu_pct?: number | null;
+            /** Jitter Ms */
+            jitter_ms?: number | null;
+            /** Lost Pct */
+            lost_pct?: number | null;
+            /** Received Mbps */
+            received_mbps?: number | null;
+            /** Retransmits */
+            retransmits?: number | null;
+            /** Sent Mbps */
+            sent_mbps?: number | null;
+        };
         /** TimeZones */
         TimeZones: {
             /** Note */
@@ -8914,6 +9060,15 @@ export interface components {
             name: string;
             /** Pattern */
             pattern?: string | null;
+        };
+        /** ToolPlan */
+        ToolPlan: {
+            /** Digest */
+            digest: string;
+            /** Lines */
+            lines: string[];
+            /** Warnings */
+            warnings: string[];
         };
         /** TrafficRuleIn */
         TrafficRuleIn: {
@@ -9260,11 +9415,88 @@ export interface components {
              */
             upserts: components["schemas"]["ZoneIn"][];
         };
+        /** SessionView */
+        openwrtgui__onboard__wizard__SessionView: {
+            /** Changed From */
+            changed_from: string | null;
+            /** Error */
+            error: string | null;
+            /**
+             * Expected Reflash
+             * @default false
+             */
+            expected_reflash: boolean;
+            /** Host */
+            host: string;
+            host_key: components["schemas"]["HostKeyInfo"] | null;
+            /** Key Installed */
+            key_installed: boolean;
+            /** Key Path */
+            key_path: string | null;
+            /** Known Before */
+            known_before: boolean;
+            /** Login Method */
+            login_method: ("app_key" | "pc_key" | "default_password" | "no_password" | "password" | "key_file") | null;
+            /** Port */
+            port: number;
+            /** Proposed Port Labels */
+            proposed_port_labels: {
+                [key: string]: string;
+            };
+            /** Root Password */
+            root_password: string;
+            /** Sid */
+            sid: string;
+            step: components["schemas"]["openwrtgui__onboard__wizard__Step"];
+            summary: components["schemas"]["DescriptionSummary"] | null;
+            /** Username */
+            username: string;
+        };
         /**
          * Step
          * @enum {string}
          */
         openwrtgui__onboard__wizard__Step: "address" | "host_key" | "login" | "install_key" | "identify" | "ports" | "done";
+        /** SessionView */
+        openwrtgui__tools__sessions__SessionView: {
+            /** Command */
+            command: string;
+            /** Ends At */
+            ends_at: number;
+            /** Error */
+            error?: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Intervals
+             * @default []
+             */
+            intervals: components["schemas"]["Interval"][];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "throughput" | "listen";
+            /**
+             * Notes
+             * @default []
+             */
+            notes: string[];
+            /**
+             * Peers
+             * @default []
+             */
+            peers: components["schemas"]["Peer"][];
+            /** Router Id */
+            router_id: string;
+            /** Running */
+            running: boolean;
+            /** Started At */
+            started_at: number;
+            summary?: components["schemas"]["ThroughputSummary"] | null;
+            /** Title */
+            title: string;
+        };
         /** Step */
         openwrtgui__wifi__steps__Step: {
             /** Channel */
@@ -9807,7 +10039,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SessionView"];
+                    "application/json": components["schemas"]["openwrtgui__onboard__wizard__SessionView"];
                 };
             };
             /** @description Validation Error */
@@ -9869,7 +10101,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SessionView"];
+                    "application/json": components["schemas"]["openwrtgui__onboard__wizard__SessionView"];
                 };
             };
             /** @description Validation Error */
@@ -9935,7 +10167,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SessionView"];
+                    "application/json": components["schemas"]["openwrtgui__onboard__wizard__SessionView"];
                 };
             };
             /** @description Validation Error */
@@ -9966,7 +10198,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SessionView"];
+                    "application/json": components["schemas"]["openwrtgui__onboard__wizard__SessionView"];
                 };
             };
             /** @description Validation Error */
@@ -10032,7 +10264,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SessionView"];
+                    "application/json": components["schemas"]["openwrtgui__onboard__wizard__SessionView"];
                 };
             };
             /** @description Validation Error */
@@ -10067,7 +10299,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SessionView"];
+                    "application/json": components["schemas"]["openwrtgui__onboard__wizard__SessionView"];
                 };
             };
             /** @description Validation Error */
@@ -10102,7 +10334,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SessionView"];
+                    "application/json": components["schemas"]["openwrtgui__onboard__wizard__SessionView"];
                 };
             };
             /** @description Validation Error */
@@ -10133,7 +10365,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SessionView"];
+                    "application/json": components["schemas"]["openwrtgui__onboard__wizard__SessionView"];
                 };
             };
             /** @description Validation Error */
@@ -15816,6 +16048,139 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TimeZones"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sessions_api_routers__router_id__tools_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["openwrtgui__tools__sessions__SessionView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_session_api_routers__router_id__tools_sessions__session_id__stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["openwrtgui__tools__sessions__SessionView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    throughput_preview_api_routers__router_id__tools_throughput_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThroughputRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolPlan"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    throughput_start_api_routers__router_id__tools_throughput_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThroughputStart"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["openwrtgui__tools__sessions__SessionView"];
                 };
             };
             /** @description Validation Error */

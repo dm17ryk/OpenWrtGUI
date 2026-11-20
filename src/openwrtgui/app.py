@@ -35,6 +35,7 @@ from openwrtgui.api import (
     routers_api,
     system_access_api,
     system_api,
+    tools_api,
     update_api,
     wifi_api,
     ws_api,
@@ -129,6 +130,7 @@ def create_app(ctx: AppContext) -> FastAPI:
         fstab_api,
         iptables_api,
         key_rotation_api,
+        tools_api,
     )
     for module in modules:
         app.include_router(module.router)
