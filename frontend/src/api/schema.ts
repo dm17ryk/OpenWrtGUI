@@ -8503,6 +8503,43 @@ export interface components {
              */
             source: "custom" | "overlay";
         };
+        /** SessionView */
+        SessionView: {
+            /** Changed From */
+            changed_from: string | null;
+            /** Error */
+            error: string | null;
+            /**
+             * Expected Reflash
+             * @default false
+             */
+            expected_reflash: boolean;
+            /** Host */
+            host: string;
+            host_key: components["schemas"]["HostKeyInfo"] | null;
+            /** Key Installed */
+            key_installed: boolean;
+            /** Key Path */
+            key_path: string | null;
+            /** Known Before */
+            known_before: boolean;
+            /** Login Method */
+            login_method: ("app_key" | "pc_key" | "default_password" | "no_password" | "password" | "key_file") | null;
+            /** Port */
+            port: number;
+            /** Proposed Port Labels */
+            proposed_port_labels: {
+                [key: string]: string;
+            };
+            /** Root Password */
+            root_password: string;
+            /** Sid */
+            sid: string;
+            step: components["schemas"]["openwrtgui__onboard__wizard__Step"];
+            summary: components["schemas"]["DescriptionSummary"] | null;
+            /** Username */
+            username: string;
+        };
         /** Settings */
         Settings: {
             /**
@@ -9497,6 +9534,46 @@ export interface components {
             /** Warnings */
             warnings: string[];
         };
+        /** ToolSessionView */
+        ToolSessionView: {
+            /** Command */
+            command: string;
+            /** Ends At */
+            ends_at: number;
+            /** Error */
+            error?: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Intervals
+             * @default []
+             */
+            intervals: components["schemas"]["Interval"][];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "throughput" | "listen";
+            /**
+             * Notes
+             * @default []
+             */
+            notes: string[];
+            /**
+             * Peers
+             * @default []
+             */
+            peers: components["schemas"]["Peer"][];
+            /** Router Id */
+            router_id: string;
+            /** Running */
+            running: boolean;
+            /** Started At */
+            started_at: number;
+            summary?: components["schemas"]["ThroughputSummary"] | null;
+            /** Title */
+            title: string;
+        };
         /** TrafficRuleIn */
         TrafficRuleIn: {
             /** Dest */
@@ -9842,88 +9919,11 @@ export interface components {
              */
             upserts: components["schemas"]["ZoneIn"][];
         };
-        /** SessionView */
-        openwrtgui__onboard__wizard__SessionView: {
-            /** Changed From */
-            changed_from: string | null;
-            /** Error */
-            error: string | null;
-            /**
-             * Expected Reflash
-             * @default false
-             */
-            expected_reflash: boolean;
-            /** Host */
-            host: string;
-            host_key: components["schemas"]["HostKeyInfo"] | null;
-            /** Key Installed */
-            key_installed: boolean;
-            /** Key Path */
-            key_path: string | null;
-            /** Known Before */
-            known_before: boolean;
-            /** Login Method */
-            login_method: ("app_key" | "pc_key" | "default_password" | "no_password" | "password" | "key_file") | null;
-            /** Port */
-            port: number;
-            /** Proposed Port Labels */
-            proposed_port_labels: {
-                [key: string]: string;
-            };
-            /** Root Password */
-            root_password: string;
-            /** Sid */
-            sid: string;
-            step: components["schemas"]["openwrtgui__onboard__wizard__Step"];
-            summary: components["schemas"]["DescriptionSummary"] | null;
-            /** Username */
-            username: string;
-        };
         /**
          * Step
          * @enum {string}
          */
         openwrtgui__onboard__wizard__Step: "address" | "host_key" | "login" | "install_key" | "identify" | "ports" | "done";
-        /** SessionView */
-        openwrtgui__tools__sessions__SessionView: {
-            /** Command */
-            command: string;
-            /** Ends At */
-            ends_at: number;
-            /** Error */
-            error?: string | null;
-            /** Id */
-            id: string;
-            /**
-             * Intervals
-             * @default []
-             */
-            intervals: components["schemas"]["Interval"][];
-            /**
-             * Kind
-             * @enum {string}
-             */
-            kind: "throughput" | "listen";
-            /**
-             * Notes
-             * @default []
-             */
-            notes: string[];
-            /**
-             * Peers
-             * @default []
-             */
-            peers: components["schemas"]["Peer"][];
-            /** Router Id */
-            router_id: string;
-            /** Running */
-            running: boolean;
-            /** Started At */
-            started_at: number;
-            summary?: components["schemas"]["ThroughputSummary"] | null;
-            /** Title */
-            title: string;
-        };
         /** Step */
         openwrtgui__wifi__steps__Step: {
             /** Channel */
@@ -10466,7 +10466,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["openwrtgui__onboard__wizard__SessionView"];
+                    "application/json": components["schemas"]["SessionView"];
                 };
             };
             /** @description Validation Error */
@@ -10528,7 +10528,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["openwrtgui__onboard__wizard__SessionView"];
+                    "application/json": components["schemas"]["SessionView"];
                 };
             };
             /** @description Validation Error */
@@ -10594,7 +10594,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["openwrtgui__onboard__wizard__SessionView"];
+                    "application/json": components["schemas"]["SessionView"];
                 };
             };
             /** @description Validation Error */
@@ -10625,7 +10625,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["openwrtgui__onboard__wizard__SessionView"];
+                    "application/json": components["schemas"]["SessionView"];
                 };
             };
             /** @description Validation Error */
@@ -10691,7 +10691,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["openwrtgui__onboard__wizard__SessionView"];
+                    "application/json": components["schemas"]["SessionView"];
                 };
             };
             /** @description Validation Error */
@@ -10726,7 +10726,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["openwrtgui__onboard__wizard__SessionView"];
+                    "application/json": components["schemas"]["SessionView"];
                 };
             };
             /** @description Validation Error */
@@ -10761,7 +10761,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["openwrtgui__onboard__wizard__SessionView"];
+                    "application/json": components["schemas"]["SessionView"];
                 };
             };
             /** @description Validation Error */
@@ -10792,7 +10792,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["openwrtgui__onboard__wizard__SessionView"];
+                    "application/json": components["schemas"]["SessionView"];
                 };
             };
             /** @description Validation Error */
@@ -16606,7 +16606,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["openwrtgui__tools__sessions__SessionView"][];
+                    "application/json": components["schemas"]["ToolSessionView"][];
                 };
             };
             /** @description Validation Error */
@@ -16638,7 +16638,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["openwrtgui__tools__sessions__SessionView"];
+                    "application/json": components["schemas"]["ToolSessionView"];
                 };
             };
             /** @description Validation Error */
@@ -16809,7 +16809,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["openwrtgui__tools__sessions__SessionView"];
+                    "application/json": components["schemas"]["ToolSessionView"];
                 };
             };
             /** @description Validation Error */
@@ -16879,7 +16879,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["openwrtgui__tools__sessions__SessionView"];
+                    "application/json": components["schemas"]["ToolSessionView"];
                 };
             };
             /** @description Validation Error */

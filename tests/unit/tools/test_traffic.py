@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from openwrtgui.guard.readonly import is_read_only_command
-from openwrtgui.tools.sessions import Peer, SessionView
+from openwrtgui.tools.sessions import Peer, ToolSessionView
 from openwrtgui.tools.throughput import HOST_TEXT
 from openwrtgui.tools.traffic import (
     SIZE_CAP,
@@ -23,8 +23,8 @@ HOSTILE_HOSTS = ["x; reboot", "$(id)", "-p", "a,b", "a:b", "a b", "a" * 254]
 HELLO = "D4300=00000000  68 65 6c 6c 6f 0a                                 |hello.|"
 
 
-def _view() -> SessionView:
-    return SessionView(
+def _view() -> ToolSessionView:
+    return ToolSessionView(
         id="s2",
         router_id="ap2",
         kind="listen",
@@ -36,7 +36,7 @@ def _view() -> SessionView:
     )
 
 
-def _feed(*lines: str) -> SessionView:
+def _feed(*lines: str) -> ToolSessionView:
     parse = listen_parser()
     view = _view()
     for line in lines:

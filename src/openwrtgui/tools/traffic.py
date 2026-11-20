@@ -9,7 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from openwrtgui.tools.sessions import LineParser, Peer, SessionView, add_note, session_command
+from openwrtgui.tools.sessions import LineParser, Peer, ToolSessionView, add_note, session_command
 from openwrtgui.tools.throughput import check_host
 from openwrtgui.transport.base import CommandResult
 from openwrtgui.uci import shell_quote
@@ -80,7 +80,7 @@ def listen_parser() -> LineParser:
     """A parser for one Listen session: it keeps which child pid serves which peer."""
     owners: dict[str, tuple[str, int]] = {}
 
-    def parse(view: SessionView, line: str) -> SessionView:
+    def parse(view: ToolSessionView, line: str) -> ToolSessionView:
         if m := _PEER.fullmatch(line):
             key = (m.group(2), int(m.group(3)))
             owners[m.group(1)] = key

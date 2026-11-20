@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from openwrtgui.api.deps import get_ctx, require_token
 from openwrtgui.context import AppContext
-from openwrtgui.tools.sessions import SessionView, ToolPlan
+from openwrtgui.tools.sessions import ToolPlan, ToolSessionView
 from openwrtgui.tools.stations import ActionResult, StationAction, StationApply, StationsView
 from openwrtgui.tools.throughput import ThroughputRequest, ThroughputStart
 from openwrtgui.tools.traffic import ListenRequest, ListenStart, SendApply, SendRequest, SendResult
@@ -31,7 +31,7 @@ async def throughput_preview(router_id: str, body: ThroughputRequest, ctx: Ctx) 
 
 
 @router.post("/throughput/start")
-async def throughput_start(router_id: str, body: ThroughputStart, ctx: Ctx) -> SessionView:
+async def throughput_start(router_id: str, body: ThroughputStart, ctx: Ctx) -> ToolSessionView:
     req = ThroughputRequest.model_validate(body.model_dump(exclude={"digest"}))
     return await ctx.tools.throughput_start(_known(ctx, router_id), req, body.digest)
 
@@ -42,7 +42,7 @@ async def listen_preview(router_id: str, body: ListenRequest, ctx: Ctx) -> ToolP
 
 
 @router.post("/traffic/listen/start")
-async def listen_start(router_id: str, body: ListenStart, ctx: Ctx) -> SessionView:
+async def listen_start(router_id: str, body: ListenStart, ctx: Ctx) -> ToolSessionView:
     req = ListenRequest.model_validate(body.model_dump(exclude={"digest"}))
     return await ctx.tools.listen_start(_known(ctx, router_id), req, body.digest)
 
@@ -75,12 +75,12 @@ async def station_apply(router_id: str, body: StationApply, ctx: Ctx) -> ActionR
 
 
 @router.get("/sessions")
-async def sessions(router_id: str, ctx: Ctx) -> list[SessionView]:
+async def sessions(router_id: str, ctx: Ctx) -> list[ToolSessionView]:
     return ctx.tool_sessions.list(_known(ctx, router_id))
 
 
 @router.post("/sessions/{session_id}/stop")
-async def stop_session(router_id: str, session_id: str, ctx: Ctx) -> SessionView:
+async def stop_session(router_id: str, session_id: str, ctx: Ctx) -> ToolSessionView:
     _known(ctx, router_id)
     try:
         view = ctx.tool_sessions.get(session_id)

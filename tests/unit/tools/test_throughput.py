@@ -8,7 +8,7 @@ import json
 import pytest
 
 from openwrtgui.guard.readonly import is_read_only_command
-from openwrtgui.tools.sessions import Interval, SessionView
+from openwrtgui.tools.sessions import Interval, ToolSessionView
 from openwrtgui.tools.throughput import (
     HOST_TEXT,
     ThroughputRequest,
@@ -20,8 +20,8 @@ from openwrtgui.tools.throughput import (
 HOSTILE_HOSTS = ["x; reboot", "$(id)", "-p", "a,b", "a:b", "a b", "a" * 254, "", "host\n"]
 
 
-def _view() -> SessionView:
-    return SessionView(
+def _view() -> ToolSessionView:
+    return ToolSessionView(
         id="s1",
         router_id="ap2",
         kind="throughput",

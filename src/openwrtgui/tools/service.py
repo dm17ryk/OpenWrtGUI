@@ -8,7 +8,7 @@ from openwrtgui.guard.audit import AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.guard.writes import run_audited
 from openwrtgui.store.routers import RouterRecord, RouterStore
-from openwrtgui.tools.sessions import SCREEN, SessionView, ToolPlan, ToolSessions, tool_plan
+from openwrtgui.tools.sessions import SCREEN, ToolPlan, ToolSessions, ToolSessionView, tool_plan
 from openwrtgui.tools.station_service import StationTools
 from openwrtgui.tools.stations import ActionResult, StationAction, StationsView
 from openwrtgui.tools.throughput import (
@@ -71,7 +71,7 @@ class ToolsService:
             warnings.append(server_hint(rec.host, req.port))
         return tool_plan([command], warnings)
 
-    async def throughput_start(self, router_id: str, req: ThroughputRequest, digest: str) -> SessionView:
+    async def throughput_start(self, router_id: str, req: ThroughputRequest, digest: str) -> ToolSessionView:
         rec = self._record(router_id)
         self._checked(rec, self.throughput_plan(router_id, req), digest)
         command, limit = iperf3_command(req)
@@ -90,7 +90,7 @@ class ToolsService:
         command, _limit = listen_command(req)
         return tool_plan([command], [])
 
-    async def listen_start(self, router_id: str, req: ListenRequest, digest: str) -> SessionView:
+    async def listen_start(self, router_id: str, req: ListenRequest, digest: str) -> ToolSessionView:
         rec = self._record(router_id)
         self._checked(rec, self.listen_plan(router_id, req), digest)
         command, limit = listen_command(req)

@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from openwrtgui.tools.sessions import Interval, SessionView, ThroughputSummary, add_note, session_command
+from openwrtgui.tools.sessions import Interval, ThroughputSummary, ToolSessionView, add_note, session_command
 
 HOST = re.compile(r"(?=.{1,253}$)[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?")
 HOST_TEXT = "A host is an IPv4 address or a name: letters, digits, dots and dashes."
@@ -112,7 +112,7 @@ def _summary(data: dict[str, Any]) -> ThroughputSummary:
     )
 
 
-def parse_iperf3_line(view: SessionView, line: str) -> SessionView:
+def parse_iperf3_line(view: ToolSessionView, line: str) -> ToolSessionView:
     try:
         obj = json.loads(line)
     except ValueError:

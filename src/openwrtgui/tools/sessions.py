@@ -69,7 +69,7 @@ class Peer(_Frozen):
     first_hex: str  # at most 128 hex characters: the first 64 bytes
 
 
-class SessionView(_Frozen):
+class ToolSessionView(_Frozen):
     id: str
     router_id: str
     kind: SessionKind
@@ -85,10 +85,10 @@ class SessionView(_Frozen):
     error: str | None = None
 
 
-LineParser = Callable[[SessionView, str], SessionView]
+LineParser = Callable[[ToolSessionView, str], ToolSessionView]
 
 
-def add_note(view: SessionView, text: str) -> SessionView:
+def add_note(view: ToolSessionView, text: str) -> ToolSessionView:
     return view.model_copy(update={"notes": [*view.notes, text][-NOTES_KEPT:]})
 
 
@@ -128,7 +128,7 @@ class ToolSessions:
         self._clock = clock
         self._guard_poll_s = guard_poll_s
         self._grace_s = grace_s
-        self._views: dict[str, SessionView] = {}
+        self._views: dict[str, ToolSessionView] = {}
         self._streams: dict[str, ByteStream] = {}  # while the stream is open
         self._pids: dict[str, int] = {}
         self._pumps: dict[str, asyncio.Task[None]] = {}
@@ -147,13 +147,13 @@ class ToolSessions:
         return rec.name if rec else router_id
 
     # ---------------------------------------------------------------- reads
-    def get(self, session_id: str) -> SessionView:
+    def get(self, session_id: str) -> ToolSessionView:
         view = self._views.get(session_id)
         if view is None:
             raise ValueError(f"No tool session {session_id}")
         return view
 
-    def list(self, router_id: str) -> builtins.list[SessionView]:
+    def list(self, router_id: str) -> builtins.list[ToolSessionView]:
         return sorted(
             (v for v in self._views.values() if v.router_id == router_id), key=lambda v: v.started_at
         )
@@ -172,7 +172,7 @@ class ToolSessions:
     # ---------------------------------------------------------------- start
     async def start(
         self, router_id: str, *, kind: SessionKind, title: str, command: str, limit_s: int, parse: LineParser
-    ) -> SessionView:
+    ) -> ToolSessionView:
         rec = self._record(router_id)
         if router_id in self._running:
             held = self._views.get(self._running[router_id])
@@ -187,7 +187,7 @@ class ToolSessions:
 
     async def _start(
         self, rec: RouterRecord, kind: SessionKind, title: str, command: str, limit_s: int, parse: LineParser
-    ) -> SessionView:
+    ) -> ToolSessionView:
         # its own connection: an apply with rollback reconnects the pooled one, which would end the stream
         own = await self._pool.fresh(rec)
         try:
@@ -197,7 +197,7 @@ class ToolSessions:
             raise
         self._audit.record(router=rec.id, screen=SCREEN, command=command, exit_status=None, source="user")
         now = self._clock()
-        view = SessionView(
+        view = ToolSessionView(
             id=secrets.token_hex(4),
             router_id=rec.id,
             kind=kind,
@@ -320,7 +320,7 @@ class ToolSessions:
         with contextlib.suppress(TransportError, OSError):
             await stream.close()
 
-    async def stop(self, session_id: str, reason: str | None = None) -> SessionView:
+    async def stop(self, session_id: str, reason: str | None = None) -> ToolSessionView:
         self.get(session_id)
         await self._halt(session_id, reason)
         pump = self._pumps.get(session_id)

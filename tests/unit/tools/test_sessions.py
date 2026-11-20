@@ -14,7 +14,7 @@ from openwrtgui.guard.audit import AuditEntry, AuditLog
 from openwrtgui.guard.bench_guard import BenchGuard, GuardLocked, ProcessInfo
 from openwrtgui.store.routers import RouterRecord, RouterStore
 from openwrtgui.store.settings import GuardWatchList
-from openwrtgui.tools.sessions import SessionView, ToolSessions, add_note, session_command
+from openwrtgui.tools.sessions import ToolSessions, ToolSessionView, add_note, session_command
 from openwrtgui.transport.base import CommandResult, TransportError
 
 RUN = ProcessInfo(18244, ("python.exe", "dima_night.py"), datetime(2026, 11, 20, 21, 4))
@@ -128,12 +128,12 @@ class Env:
     def entries(self) -> list[AuditEntry]:
         return list(reversed(self.audit.query()))
 
-    async def start(self, title: str = "Throughput") -> SessionView:
+    async def start(self, title: str = "Throughput") -> ToolSessionView:
         return await self.sessions.start(
             "ap2", kind="throughput", title=title, command=COMMAND, limit_s=70, parse=_notes
         )
 
-    async def ended(self, session_id: str) -> SessionView:
+    async def ended(self, session_id: str) -> ToolSessionView:
         for _ in range(500):
             view = self.sessions.get(session_id)
             if not view.running:
@@ -142,11 +142,11 @@ class Env:
         raise AssertionError("the session did not end")
 
 
-def _notes(view: SessionView, line: str) -> SessionView:
+def _notes(view: ToolSessionView, line: str) -> ToolSessionView:
     return add_note(view, line)
 
 
-def _fails(view: SessionView, line: str) -> SessionView:
+def _fails(view: ToolSessionView, line: str) -> ToolSessionView:
     return view.model_copy(update={"error": "x"})
 
 
