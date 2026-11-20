@@ -35,6 +35,8 @@ CAPABILITIES = (
     # The Connections page reads /proc/net/nf_conntrack: the table, not the `conntrack` program (v1.2a R4).
     CapabilityNeed("Connections", (), ("nf_conntrack.ko",)),
     CapabilityNeed("Port statistics", ("swconfig",)),  # the per-port MIB counters of `swconfig ... show`
+    # wpad provides hostapd; whether its build has each 802.11k/v method is read at runtime (v1.2b R11)
+    CapabilityNeed("Station management", ("hostapd",)),
 )
 
 
