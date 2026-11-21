@@ -17,15 +17,17 @@ generator and Station management.
 - Discovery › **Capabilities**: what each router can do, in image, added after flashing or missing, each opening
   the screen that uses it.
 - **Tools** › Port statistics: each switch port's packets, bytes and errors from the switch's own counters, with
-  rates, read every 5 s while the tab is open; the router's counters are never cleared.
+  rates, read every 5 s while the tab is open and the window is in front; the router's counters are never
+  cleared.
 - **Tools** › Connections: the connection table with filters, each entry's conntrack helper, and whether SIP ALG
   is on.
 - **Tools** › Throughput: iperf3 on the router, to a host or waiting for your PC's iperf3, over TCP or UDP, with
   the rate each second, then the totals and the router's CPU; Stop ends it on the router.
 - **Tools** › Traffic generator: socat on the router listens on a port and lists each peer's bytes, or sends
   zeros or a line of text to a host and port.
-- **Tools** › Station management: BSS transition request, beacon report request and the neighbour report over
-  hostapd (802.11v and 802.11k), with the station's answer.
+- **Tools** › Station management over hostapd (802.11v and 802.11k): BSS transition request and beacon report
+  request, each with the station's answer, and the neighbour report, the list of nearby access points the router
+  tells stations about.
 - **Tools** › Connections can switch SIP ALG off or on per firewall zone, with the 60 s rollback, proven in fw4's
   ruleset.
 

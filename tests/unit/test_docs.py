@@ -362,13 +362,21 @@ def test_v1_1b_is_in_the_changelog() -> None:
 
 
 def test_v1_2_is_in_the_changelog() -> None:
-    released = _read(ROOT / "CHANGELOG.md").split("## [1.2.0]", 1)[1].split("\n## [", 1)[0]
+    changelog = _read(ROOT / "CHANGELOG.md")
+    assert "\n## [1.2.0] - " in changelog  # the dated heading release_notes.py reads
+    released = changelog.split("\n## [1.2.0] - ", 1)[1].split("\n## [", 1)[0]
     for words in (
         "**Capabilities**",
         "Port statistics",
+        "Connections",
+        "SIP ALG",
         "Throughput",
         "Traffic generator",
         "Station management",
+        # PR #98 review: reads pause while the window is not in front (the manual says so), and the neighbour
+        # report is the AP's list of nearby access points, not a station's answer
+        "while the tab is open and the window is in front",
+        "list of nearby access points",
     ):
         assert words in released, words
 
