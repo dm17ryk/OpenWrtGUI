@@ -14,7 +14,11 @@ is connected, and how each router describes itself. It never disturbs a test run
 
 ![Dashboard: three routers, the 2.4 GHz air map and one station](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/dashboard.png)
 
-> v1.1 adds LTE Recover, which finds what is wrong with the modem and tries one step at a time until LTE works,
+> v1.2 adds capability chips on Discovery, which say what each router can do and open the screen that uses it,
+> and the Tools screen with five pages: Port statistics, Connections with a SIP ALG switch per zone, Throughput
+> (iperf3 on the router), the Traffic generator (socat listens or sends) and Station management (802.11v and
+> 802.11k over hostapd).
+> v1.1 added LTE Recover, which finds what is wrong with the modem and tries one step at a time until LTE works,
 > with saved good setups to reconfigure from; which rates reach a station, on RF live; app key rotation; and the
 > 1.0 reviews' leftovers, with an accessibility check of every screen in both themes.
 > v1.0 added the complete manual, with How changes work, Files and data and a Glossary, and the hardening for
@@ -41,6 +45,19 @@ is connected, and how each router describes itself. It never disturbs a test run
 > a router-side rollback, DHCP, DNS, routes, ports and VLANs); v0.2 Wi-Fi with proof on air, RF live and the
 > LuCI fallback; v0.1 the foundation: install, update, add routers, the dashboard, Bench Guard, the terminal
 > and the audit log. What comes next is in the [roadmap](ROADMAP.md).
+
+## What v1.2 adds
+
+| Screen | What you get |
+|---|---|
+| **Discovery** | **Capabilities**: what each router can do, in image, added after flashing or missing, each chip opening the screen that uses it. |
+| **Tools › Port statistics** | Each switch port's packets, bytes and errors from the switch's own counters, with rates, read every 5 s while the tab is open and the window is in front; the router's counters are never cleared. |
+| **Tools › Connections** | The connection table with filters, each entry's conntrack helper, and whether SIP ALG is on; switch SIP ALG off or on per firewall zone, with the 60 s rollback. |
+| **Tools › Throughput** | iperf3 on the router, to a host or waiting for your PC's iperf3, over TCP or UDP: the rate each second, then the totals and the router's CPU. **Stop** ends it on the router. |
+| **Tools › Traffic generator** | socat on the router listens on a port and lists each peer's bytes, or sends zeros or a line of text to a host and port. |
+| **Tools › Station management** | Over hostapd (802.11v and 802.11k): BSS transition request and beacon report request, each with the station's answer, and the neighbour report, the list of nearby access points the router tells stations about. |
+
+The tool pages were proven on a bench router, Station management with a phone on air.
 
 ## What v1.1 adds
 

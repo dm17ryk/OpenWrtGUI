@@ -7,20 +7,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-11-21
+
+Capability chips and the tool pages: Port statistics, Connections with the SIP ALG switch, Throughput, Traffic
+generator and Station management.
+
 ### Added
 
 - Discovery › **Capabilities**: what each router can do, in image, added after flashing or missing, each opening
   the screen that uses it.
 - **Tools** › Port statistics: each switch port's packets, bytes and errors from the switch's own counters, with
-  rates, read every 5 s while the tab is open; the router's counters are never cleared.
+  rates, read every 5 s while the tab is open and the window is in front; the router's counters are never
+  cleared.
 - **Tools** › Connections: the connection table with filters, each entry's conntrack helper, and whether SIP ALG
   is on.
 - **Tools** › Throughput: iperf3 on the router, to a host or waiting for your PC's iperf3, over TCP or UDP, with
   the rate each second, then the totals and the router's CPU; Stop ends it on the router.
 - **Tools** › Traffic generator: socat on the router listens on a port and lists each peer's bytes, or sends
   zeros or a line of text to a host and port.
-- **Tools** › Station management: BSS transition request, beacon report request and the neighbour report over
-  hostapd (802.11v and 802.11k), with the station's answer.
+- **Tools** › Station management over hostapd (802.11v and 802.11k): BSS transition request and beacon report
+  request, each with the station's answer, and the neighbour report, the list of nearby access points the router
+  tells stations about.
 - **Tools** › Connections can switch SIP ALG off or on per firewall zone, with the 60 s rollback, proven in fw4's
   ruleset.
 
@@ -524,7 +531,8 @@ The foundation: install, update, add routers, see them, and stay out of a runnin
 - Router simulator built from recorded router output, used for e2e tests, screenshots and demos.
 - CI, pre-release and release workflows, wiki sync, CodeQL and Dependabot.
 
-[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v1.2.0
 [1.1.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v1.1.0
 [1.0.1]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v1.0.1
 [1.0.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v1.0.0
