@@ -15,10 +15,15 @@ class _Recover:
         self.waited += 1
         return True
 
+    async def _works(self, run: object) -> bool:
+        return True
+
 
 async def test_a_rung_that_does_not_count_still_settles_first() -> None:
     recover = _Recover()
     _not_settled_for(recover, 2)  # type: ignore[arg-type]
+    assert await recover._works(None) is False  # v1.3a I2: the check before a forced step says "not yet"
     answers = [await recover._wait_works(None) for _ in range(3)]
     assert answers == [False, False, True]
     assert recover.waited == 3  # every rung waited for LTE, as real Recover does
+    assert await recover._works(None) is True  # past the forced steps, the real answer

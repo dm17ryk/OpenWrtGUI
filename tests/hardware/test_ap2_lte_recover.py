@@ -52,6 +52,7 @@ def _not_settled_for(recover: LteRecover, rungs: int) -> None:
     Recover does (2026-11-19 window: skipping the wait cut netifd's connect script off mid-setup, and LTE
     stayed down until a router reboot)."""
     real: Callable[..., Awaitable[bool]] = recover._wait_works  # noqa: SLF001
+    real_works: Callable[..., Awaitable[bool]] = recover._works  # noqa: SLF001
     calls = 0
 
     async def wait(run: object) -> bool:
@@ -60,7 +61,12 @@ def _not_settled_for(recover: LteRecover, rungs: int) -> None:
         works = await real(run)
         return works and calls > rungs
 
+    async def works_before_step(run: object) -> bool:
+        """v1.3a I2: Recover also checks LTE before each step; a forced step is not settled there either."""
+        return calls > rungs and await real_works(run)
+
     recover._wait_works = wait  # type: ignore[method-assign] # noqa: SLF001
+    recover._works = works_before_step  # type: ignore[method-assign] # noqa: SLF001
 
 
 async def _run(recover: LteRecover) -> LteRecoverJob:

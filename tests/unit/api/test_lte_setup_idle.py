@@ -32,10 +32,16 @@ async def test_setup_idle_reads_the_process_count(ctx: AppContext, stdout: str, 
     assert t.sent == [c.SETUP_RUNNING]
 
 
-@pytest.mark.parametrize("stdout", ["garbage\n", "", None])
-async def test_setup_idle_is_false_when_the_read_fails(ctx: AppContext, stdout: str | None) -> None:
+@pytest.mark.parametrize("stdout", ["garbage\n", ""])
+async def test_setup_idle_is_false_on_an_odd_answer(ctx: AppContext, stdout: str) -> None:
     """Review Focus 3: a step must not cut off what it cannot see."""
     assert await ctx.lte.setup_idle(_Answers(stdout)) is False  # type: ignore[arg-type]
+
+
+async def test_setup_idle_lets_a_dropped_router_through(ctx: AppContext) -> None:
+    """Final review I3: a router that does not answer is not "a setup runs"; Recover fails the job instead."""
+    with pytest.raises(TransportError):
+        await ctx.lte.setup_idle(_Answers(None))  # type: ignore[arg-type]
 
 
 def test_the_setup_read_is_read_only() -> None:

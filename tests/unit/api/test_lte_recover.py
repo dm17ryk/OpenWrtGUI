@@ -62,6 +62,7 @@ def _fast(ctx: AppContext) -> Iterator[None]:
     ctx.lte.poll_s = 0.0
     ctx.lte.readback_s = 0.0
     ctx.lte_recover.autoconnect_gap_s = 0.0
+    ctx.lte_recover.setup_poll_s = 0.0
     yield
     sent = [e.command for e in ctx.audit.query()]
     assert not [c for c in sent if any(bad in c for bad in NEVER)]  # never, in any test here
@@ -338,6 +339,85 @@ async def test_a_wedge_from_before_is_not_hidden(ctx: AppContext) -> None:
     job = await _recover(ctx)
     assert [r.outcome for r in job.rungs[1:]] == ["not yet"] * 4
     assert (job.phase, job.detail) == ("not recovered", NOT_RECOVERED)
+
+
+async def test_a_router_that_stops_answering_during_the_wait_fails_the_job(ctx: AppContext) -> None:
+    """Final review I3 (Review Focus 3): a dead router is not "an LTE setup still ran"; the job fails at once
+    and says who did not answer."""
+    modem = await _modem(ctx)
+    modem.connected = False
+    real = modem.answer
+
+    def dead(command: str) -> CommandResult | None:
+        if command == SETUP_RUNNING:
+            raise TransportError("connection lost")
+        return real(command)
+
+    modem.answer = dead
+    job = await _recover(ctx)
+    assert job.phase == "failed"
+    assert job.error is not None and SETUP_RUNNING in job.error and "AP2 · office did not answer" in job.error
+    assert "ifdown lte" not in _calls(ctx)
+
+
+async def test_a_link_that_comes_up_during_the_wait_is_not_taken_down(ctx: AppContext) -> None:
+    """Final review I2: netifd's own setup succeeds while Recover waits for it; nothing is taken down."""
+    modem = await _modem(ctx)
+    modem.connected = False
+    modem.setup_reads = 3
+    modem.start_setup()
+    real = modem.answer
+    reads = [0]
+
+    def succeeding(command: str) -> CommandResult | None:
+        if command == SETUP_RUNNING:
+            reads[0] += 1
+            if reads[0] == 3:
+                modem.connected = True  # the setup's last read: it connected
+        return real(command)
+
+    modem.answer = succeeding
+    job = await _recover(ctx)
+    assert "ifdown lte" not in _calls(ctx)
+    assert (job.phase, job.detail) == ("recovered", "LTE works again.")
+
+
+async def test_a_link_back_after_skipped_steps_is_not_called_lost(ctx: AppContext) -> None:
+    """Final review I2: two steps were skipped, then netifd's own retry succeeded; the job does not say "LTE
+    did not come back"."""
+    modem = await _modem(ctx)
+    modem.connected = False
+    real = modem.answer
+    reads = [0]
+
+    def busy_then_back(command: str) -> CommandResult | None:
+        if command == SETUP_RUNNING:
+            reads[0] += 1
+            if reads[0] <= 42:  # two full waits: 21 reads each, one a second from 0 to 20 s
+                return CommandResult(command, "1\n", "", 0)
+            modem.connected = True
+            return CommandResult(command, "0\n", "", 1)
+        return real(command)
+
+    modem.answer = busy_then_back
+    job = await _recover(ctx)
+    assert [r.outcome for r in job.rungs[1:3]] == ["skipped", "skipped"]
+    assert "ifdown lte" not in _calls(ctx)
+    assert (job.phase, job.detail) == ("recovered", "LTE works again.")
+
+
+async def test_the_wait_reads_every_second_for_the_whole_20_s(ctx: AppContext) -> None:
+    """Final review I4 and minor 1: one read a second, 21 reads from 0 to 20 s, so a short gap late in a ~19 s
+    retry cycle is still seen."""
+    modem = await _modem(ctx)
+    modem.connected, modem.stale_qmi = False, True
+    modem.setup_reads, modem.retry_gap = 15, 1
+    modem.start_setup()
+    job = await _recover(ctx)
+    rung = job.rungs[1]
+    assert rung.outcome != "skipped"
+    assert rung.detail is not None and rung.detail.startswith("waited 15 s for an LTE setup to finish")
+    assert modem.setup_cut is False
 
 
 async def test_the_preview_says_each_step_waits(ctx: AppContext) -> None:
