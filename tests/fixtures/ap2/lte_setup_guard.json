@@ -1,0 +1,39 @@
+{
+  "break": "pdptype=ipv6",
+  "original": "ipv4",
+  "setup_gaps_s": [],
+  "uqmi_gaps_s": [],
+  "samples": 240,
+  "link_failing": true,
+  "rungs": [
+    [
+      "Put back the saved setup",
+      "skipped",
+      "no good setup saved"
+    ],
+    [
+      "Reconnect",
+      "not yet",
+      null
+    ],
+    [
+      "Clear QMI state",
+      "not yet",
+      null
+    ],
+    [
+      "Turn off the modem's autoconnect",
+      "not yet",
+      null
+    ],
+    [
+      "Restart the modem",
+      "not yet",
+      null
+    ]
+  ],
+  "phase": "not recovered",
+  "restore_in_a_gap": true,
+  "lte_back_s": 3.6,
+  "wedge_lines_new": 0
+}

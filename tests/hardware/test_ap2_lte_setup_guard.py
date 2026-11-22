@@ -3,10 +3,11 @@
     uv run pytest -m hardware tests/hardware/test_ap2_lte_setup_guard.py --router 192.168.1.2 \
         --identity <key> --known-hosts <file> --allow-writes --txctl-told -v -s
 
-Run it only in a window Dmitry OK'd at the time, Bench Guard clear, the txctl session told. It applies the APN
-`owg-wrong` through the app so the link fails and netifd retries qmi.sh's setup, samples the setup processes
-every 0.25 s for 60 s to measure the gaps between retries, runs Recover with no saved setup (rungs 2-5 each
-wait or skip), then puts the APN back, itself only in a gap between setups (final review I1). LTE must work
+Run it only in a window Dmitry OK'd at the time, Bench Guard clear, the txctl session told. It sets an
+IPv6-only PDP type through the app so the link fails and netifd retries qmi.sh's setup (attempt 1's wrong
+APN was accepted by the carrier), samples the setup processes every 0.25 s for 60 s to measure the gaps
+between retries, checks the link really fails, runs Recover with no saved setup (rungs 2-5 each wait or
+skip), then puts the PDP type back, itself only in a gap between setups (final review I1). LTE must work
 again within 90 s, with no new "Failed to connect to service" or "Unable to obtain client ID" in the log:
 the QMI channel was not wedged. Recover must have run at least one step: a run where every step was skipped
 proves nothing (final review I4). It never reboots the router: that needs Dmitry's OK.
@@ -32,17 +33,24 @@ from openwrtgui.transport.ssh import SshTransport
 pytestmark = pytest.mark.hardware
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "ap2" / "lte_setup_guard.json"
-WRONG_APN = "owg-wrong"
+# 2026-11-22 window, attempt 1: the APN owg-wrong did not make the link fail (the carrier accepted it), so the
+# link is broken by an IPv6-only PDP type, which the known-good setup (IPv4) suggests the network refuses
+BREAK_FIELD = "pdptype"
+BREAK_VALUE = "ipv6"
 SAMPLE_S = 60.0  # about three retry cycles
 RESTORE_GAP_S = 120.0
 BACK_S = 90.0
 WEDGE = "logread | grep -c -e 'Failed to connect to service' -e 'Unable to obtain client ID'"
 NOT_BACK = (
-    "LTE did not come back after the APN was put back: QMI may be wedged; a router reboot needs Dmitry's OK"
+    f"LTE did not come back after {BREAK_FIELD} was put back: QMI may be wedged; a router reboot needs "
+    "Dmitry's OK"
 )
 STILL_WRONG = (
-    "AP2's APN is still owg-wrong: {why}; put it back by hand (LTE > Settings) in a quiet moment "
-    "and tell Dmitry"
+    f"AP2's {BREAK_FIELD} is still {BREAK_VALUE}: {{why}}; put it back by hand (LTE > Settings) in a quiet "
+    "moment and tell Dmitry"
+)
+NOT_FAILING = (
+    f"{BREAK_FIELD}={BREAK_VALUE} did not make AP2's link fail (the carrier accepted it): nothing was proven"
 )
 
 
@@ -58,13 +66,13 @@ async def test_recover_on_a_retrying_link_leaves_qmi_working(
 ) -> None:
     assert await lte.works_now(ap2_rw), "LTE does not work on AP2 before the test: stop and tell Dmitry"
     rows = await lte.settings_options("ap2")
-    original = next((r.value for r in rows if r.name == "apn"), None)
+    original = next((r.value for r in rows if r.name == BREAK_FIELD), None)
     assert original is None or isinstance(original, str)
-    recorded: dict[str, object] = {}
+    recorded: dict[str, object] = {"break": f"{BREAK_FIELD}={BREAK_VALUE}", "original": original}
     wedges_before = await _wedge_lines(ap2_rw)
-    wrong = LteSettings(apn=WRONG_APN)
-    plan = await lte.plan_settings("ap2", wrong)
-    applied = await lte.apply_settings("ap2", wrong, plan.digest)
+    broken = LteSettings(**{BREAK_FIELD: BREAK_VALUE})  # type: ignore[arg-type]
+    plan = await lte.plan_settings("ap2", broken)
+    applied = await lte.apply_settings("ap2", broken, plan.digest)
     assert applied.applied, applied
     ran: list[str] = []
     try:
@@ -73,7 +81,11 @@ async def test_recover_on_a_retrying_link_leaves_qmi_working(
         recorded["setup_gaps_s"] = gap_widths([(at, q + u) for at, q, u in samples])
         recorded["uqmi_gaps_s"] = gap_widths([(at, u) for at, _, u in samples])
         recorded["samples"] = len(samples)
-        assert any(q + u for _, q, u in samples), "the wrong APN did not make netifd retry: no setup was seen"
+        # final review minor M5 (attempt 1): the link must really fail before Recover proves anything
+        recorded["link_failing"] = not await lte.works_now(ap2_rw)
+        if not recorded["link_failing"]:
+            return  # the finally puts the setting back; the check after it fails with NOT_FAILING
+        assert any(q + u for _, q, u in samples), "the link fails but netifd ran no setup in 60 s"
         job = await _run(_recover(lte, tmp_path))
         recorded["rungs"] = [[r.name, r.outcome, r.detail] for r in job.rungs]
         recorded["phase"] = job.phase
@@ -86,7 +98,7 @@ async def test_recover_on_a_retrying_link_leaves_qmi_working(
                 if detail.startswith("waited "):
                     assert detail.split(";")[0].endswith(WAITED.split("}", 1)[1]), rung
     finally:
-        restore = LteSettings(apn=original or "")
+        restore = LteSettings(**{BREAK_FIELD: original or ""})  # type: ignore[arg-type]
         back = await lte.plan_settings("ap2", restore)  # its reads now; the reload only in a gap
         gap = await wait_for_gap(lambda: lte.setup_idle(ap2_rw), limit_s=RESTORE_GAP_S, step_s=SAMPLE_STEP_S)
         recorded["restore_in_a_gap"] = gap
@@ -108,6 +120,7 @@ async def test_recover_on_a_retrying_link_leaves_qmi_working(
         FIXTURE.write_text(json.dumps(recorded, indent=2) + "\n", encoding="utf-8")
         print(f"\nrecorded the setup guard window to {FIXTURE}: {recorded}")
     assert recorded["wedge_lines_new"] == 0, "the log shows a wedged QMI channel: stop and tell Dmitry"
+    assert recorded["link_failing"], NOT_FAILING
     assert ran, (
         "Recover skipped every step: the guard saw no gap in 20 s. Measured gaps (s): "
         f"setup {recorded['setup_gaps_s']}, uqmi only {recorded['uqmi_gaps_s']}: C2/C3 need a ruling"
