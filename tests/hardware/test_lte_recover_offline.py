@@ -4,6 +4,7 @@ LTE stayed down until a router reboot)."""
 
 from __future__ import annotations
 
+from lte_window import gap_widths, parse_samples, wait_for_gap
 from test_ap2_lte_recover import _not_settled_for
 
 
@@ -27,3 +28,44 @@ async def test_a_rung_that_does_not_count_still_settles_first() -> None:
     assert answers == [False, False, True]
     assert recover.waited == 3  # every rung waited for LTE, as real Recover does
     assert await recover._works(None) is True  # past the forced steps, the real answer
+
+
+def test_gap_widths_measure_each_idle_run_between_setups() -> None:
+    """v1.3a final review I4: the window measures how long netifd's retries leave no setup running."""
+    samples = [(0.0, 1), (0.25, 2), (0.5, 0), (0.75, 0), (1.0, 1), (1.25, 0), (1.5, 1), (1.75, 0)]
+    assert gap_widths(samples) == [0.5, 0.25]  # the trailing idle run is not closed by a setup: not a gap
+    assert gap_widths([(0.0, 0), (1.0, 0)]) == []
+
+
+def test_parse_samples_reads_the_routers_loop() -> None:
+    text = "123.45 1 0\n123.70 0 0\nbusybox: sleep: invalid number\n123.95 1 1\n"
+    assert parse_samples(text) == [(123.45, 1, 0), (123.70, 0, 0), (123.95, 1, 1)]
+
+
+async def test_wait_for_gap_returns_at_the_first_idle_read() -> None:
+    """Final review I1: the test's own APN restore reloads lte, so it waits for a gap first."""
+    answers = iter([False, False, True, False])
+    reads = []
+
+    async def idle() -> bool:
+        reads.append(1)
+        return next(answers)
+
+    async def no_sleep(_: float) -> None:
+        return None
+
+    assert await wait_for_gap(idle, limit_s=10.0, step_s=0.25, sleep=no_sleep) is True
+    assert len(reads) == 3
+
+
+async def test_wait_for_gap_gives_up_at_its_limit() -> None:
+    now = [0.0]
+
+    async def busy() -> bool:
+        return False
+
+    async def tick(seconds: float) -> None:
+        now[0] += seconds
+
+    assert await wait_for_gap(busy, limit_s=2.0, step_s=0.5, sleep=tick, clock=lambda: now[0]) is False
+    assert now[0] >= 2.0

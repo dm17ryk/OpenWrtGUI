@@ -202,7 +202,10 @@ The answers to #93's open questions:
   '[u]qmi '`). netifd's `pending` flag is not used: it returns within about 1 s of each failed attempt and
   says nothing about a QMI exchange in flight. A read that fails counts as a setup running.
 - **Bound:** before every step that runs, rung 1's settings change included (it reloads lte through
-  netifd), Recover polls every 2 s for up to 20 s, which covers one gap between retries.
+  netifd), Recover reads once a second from 0 to 20 s (21 reads), which covers one gap between retries.
+- **Back meanwhile:** after each wait (or skip), Recover reads whether LTE works; if netifd's own setup brought
+  it back, the job ends "recovered" without sending anything more.
+- **A dead router:** a setup read that gets no answer fails the job ("did not answer"), as any other command.
 - **No gap in time:** the step is skipped ("not run: an LTE setup still ran after 20 s; cutting it off can
   wedge the modem"), and the ladder goes on; each later step waits again. Skipping leaves the modem no worse
   than it was found.
@@ -284,6 +287,9 @@ The answers to #93's open questions:
   - A setup in progress (#93, v1.3a): after `ifup lte` the setup runs for `setup_reads` reads of the running
     counts; on a failing link netifd retries after `retry_gap` idle reads (0: never idle). An `ifdown lte` or
     a network reload during a setup sets `setup_cut`, which keeps every session down past a modem restart.
+    The simulator is driven by reads, not time: a retry starts at the read after the gap's last, so a command
+    sent right after an idle read always lands in the gap. It cannot show a gap that closes before the
+    `ifdown` arrives; the AP2 window measures the real gap widths (4.8).
 - **`simnet._dump`:** puts `data.pdh_4` (a valid handle, or `0xffffffff` while wedged) in the lte status.
 - **Seeding:** tests set the flags directly. The e2e simulator can start one router wedged through an
   environment variable, like `OPENWRTGUI_SIM_GUARD`.

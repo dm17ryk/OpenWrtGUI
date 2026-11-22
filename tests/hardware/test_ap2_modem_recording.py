@@ -4,9 +4,10 @@
         --identity <key> --known-hosts <file> --allow-writes --txctl-told -v -s
 
 Run it only in a window Dmitry OK'd at the time, Bench Guard clear, the txctl session told. It sends reads
-only: uqmi's help, the SIM's PIN state, the SIM state and the SMS list when this uqmi has them, at most three
-messages, and AT `?`/`=?` queries. Never a PIN write, an SMS or a USSD code. Message bodies and phone numbers
-are replaced before anything is written (tests/fixtures/ap2/modem_sim.json is public).
+only: uqmi's help, the SIM's PIN state, the SIM state and the SMS list (message ids) when this uqmi has them,
+and AT `?`/`=?` queries. No message is read (final review I5: its sender and text are private; 1.3b decides
+how), and never a PIN write, an SMS or a USSD code. Anything private that arrives anyway (an unsolicited SMS,
+a number) is replaced before the file is written (tests/fixtures/ap2/modem_sim.json is public).
 """
 
 from __future__ import annotations
@@ -26,16 +27,6 @@ from openwrtgui.transport.ssh import SshTransport
 pytestmark = pytest.mark.hardware
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "ap2" / "modem_sim.json"
-MESSAGES_READ = 3
-
-
-def _ids(listing: str) -> list[int]:
-    """`uqmi --list-messages` prints a JSON list of message ids; anything else reads as none."""
-    try:
-        found = json.loads(listing)
-    except ValueError:
-        return []
-    return [i for i in found if isinstance(i, int)] if isinstance(found, list) else []
 
 
 async def test_record_the_modems_sim_sms_and_ussd_answers(
@@ -63,17 +54,6 @@ async def test_record_the_modems_sim_sms_and_ussd_answers(
     reads = rf.modem_reads(device, port, uqmi_help)
     for command in reads[1:]:  # UQMI_HELP was read above
         await read(command)
-    listing = next((r for r in reads if "--list-messages" in r), None)
-    if listing is not None:
-        before = recorded[listing]["stdout"]
-        for message in _ids(await read(listing))[:MESSAGES_READ]:
-            await read(c.uqmi(device, "--get-message", str(message)))
-        recorded[f"{listing}  # after --get-message"] = {
-            "stdout": rf.sanitize_modem(listing, (await ap2_rw.run(listing)).stdout),
-            "exit": 0,
-            "before": before,
-        }
-    sent = [k.split("  #")[0] for k in recorded]
-    assert set(sent) <= {c.SETUP_RUNNING, *reads, *(k for k in sent if "--get-message" in k)}
+    assert set(recorded) == {c.SETUP_RUNNING, *reads}  # nothing else was sent through the recorder
     FIXTURE.write_text(json.dumps(recorded, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"\nrecorded {len(recorded)} commands to {FIXTURE}")

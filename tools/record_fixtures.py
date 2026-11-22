@@ -421,7 +421,11 @@ MODEM_AT_QUERIES = (
 _OPTIONAL_UQMI_READS = ("--uim-get-sim-state", "--list-messages")
 _LONG_NUMBER = re.compile(r"\+?\d{7,}")
 _JSON_TEXT = re.compile(r'("text"\s*:\s*")((?:[^"\\]|\\.)*)(")')
-_AT_BODY = re.compile(r"^(\+CMG[RL]:[^\r\n]*\r?\n)([^\r\n]*)", re.MULTILINE)
+# final review I5: a message header (read, listed, or arriving unsolicited during a query) and its body line
+_MESSAGE = re.compile(r"^(\+(?:CMT|CDS|CBM|CMGR|CMGL):)([^\r\n]*)(\r?\n)([^\r\n]*)", re.MULTILINE)
+_QUOTED = re.compile(r'"[^"]*"')
+_CUSD_TEXT = re.compile(r'^(\+CUSD:\s*\d+\s*,\s*)"([^"]*)"', re.MULTILINE)
+_HEX_RUN = re.compile(r"\b[0-9A-Fa-f]{16,}\b")
 
 
 def modem_reads(device: str, port: str, uqmi_help: str = "") -> tuple[str, ...]:
@@ -437,12 +441,23 @@ def _json_text(m: re.Match[str]) -> str:
     return f"{m.group(1)}<text {len(json.loads(f'"{m.group(2)}"'))} chars>{m.group(3)}"
 
 
+def _message(m: re.Match[str]) -> str:
+    header = _QUOTED.sub('"<field>"', m.group(2))
+    return f"{m.group(1)}{header}{m.group(3)}<text {len(m.group(4))} chars>"
+
+
 def sanitize_modem(command: str, text: str) -> str:
-    """sanitize, then the modem recording's private parts (plan C10): each message body becomes
-    `<text N chars>` (uqmi's `"text"` and the line after an AT `+CMGR:`/`+CMGL:` header), and every run of
-    7 or more digits (a sender, an SMSC) becomes `<number>`."""
+    """sanitize, then the modem recording's private parts (plan C10, final review I5):
+    - each message body becomes `<text N chars>`: uqmi's `"text"`, and the line after an AT `+CMT`, `+CDS`,
+      `+CBM`, `+CMGR` or `+CMGL` header, whose quoted fields (a named or short-code sender, a time) become
+      `"<field>"`;
+    - a USSD reply's text becomes `<text N chars>`;
+    - every run of 16 or more hex digits (a PDU) becomes `<hex N chars>`;
+    - every run of 7 or more digits (a sender, an SMSC) becomes `<number>`."""
     out = _JSON_TEXT.sub(_json_text, sanitize(text))
-    out = _AT_BODY.sub(lambda m: f"{m.group(1)}<text {len(m.group(2))} chars>", out)
+    out = _MESSAGE.sub(_message, out)
+    out = _CUSD_TEXT.sub(lambda m: f'{m.group(1)}"<text {len(m.group(2))} chars>"', out)
+    out = _HEX_RUN.sub(lambda m: f"<hex {len(m.group(0))} chars>", out)
     return _LONG_NUMBER.sub("<number>", out)
 
 

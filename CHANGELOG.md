@@ -9,8 +9,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
-- LTE Recover no longer cuts off an LTE setup in progress: each step waits for it (up to 20 s) or is skipped and
-  says so, since cutting one off could leave the modem's QMI channel failing until a router reboot (#93).
+- LTE Recover waits for an LTE setup in progress before each step (up to 20 s, reading once a second) and skips
+  a step whose setup never pauses, since cutting a setup off could leave the modem's QMI channel failing until a
+  router reboot (#93). If LTE comes back by itself meanwhile, Recover stops and says so.
 
 ## [1.2.0] - 2026-11-21
 

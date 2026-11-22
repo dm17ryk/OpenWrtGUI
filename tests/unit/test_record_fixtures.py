@@ -355,7 +355,7 @@ def test_sanitize_modem_hides_numbers_and_text() -> None:
     )
     out = rf.sanitize_modem("AT+CMGL=4", answer)
     assert "+972501234567" not in out and "0501234567" not in out and "call me" not in out
-    assert "<text 21 chars>" in out and "<number>" in out
+    assert "<text 21 chars>" in out and '"<field>"' in out
     message = '{"sender":"+972501234567","text":"call me at 0501234567","smsc":"+972544444444"}'
     clean = rf.sanitize_modem("uqmi ... --get-message 1", message)
     assert clean == '{"sender":"<number>","text":"<text 21 chars>","smsc":"<number>"}'
@@ -367,6 +367,25 @@ def test_sanitize_modem_hides_ucs2_bodies() -> None:
         "AT+CMGR=1", f'+CMGR: "REC UNREAD","+972501234567",,"26/11/22"\r\n{body}\r\nOK\r\n'
     )
     assert body not in out and f"<text {len(body)} chars>" in out
+
+
+def test_sanitize_modem_hides_unsolicited_messages_and_short_senders() -> None:
+    """v1.3a final review I5: an SMS that arrives during an AT query, a named or short-code sender, a PDU body
+    and a USSD reply never reach the public recording; the queries' own answers stay readable."""
+    pdu = "0791" + "A1B2C3D4E5F60718293A4B5C6D7E8F90" * 2
+    answer = (
+        'AT+CPMS?\r\r\n+CMT: "MyBank",,"26/11/22,10:00:00+08"\r\nYour code is 4471\r\n'
+        f"+CMT: ,24\r\n{pdu}\r\n"
+        '+CMGL: 2,"REC READ","1234",,"26/11/22,10:00:00+08"\r\nhi\r\n'
+        '+CUSD: 0,"Your balance is 12.50 NIS",15\r\n'
+        '+CPMS: "SM",1,20,"SM",1,20,"SM",1,20\r\nOK\r\n'
+    )
+    out = rf.sanitize_modem("AT+CPMS?", answer)
+    for private in ("MyBank", "Your code is 4471", pdu, '"1234"', "Your balance"):
+        assert private not in out, private
+    assert '+CPMS: "SM",1,20,"SM",1,20,"SM",1,20' in out
+    assert "+CUSD: 0," in out
+    assert rf.sanitize_modem("AT+CUSD?", "+CUSD: 0\r\nOK\r\n") == "+CUSD: 0\r\nOK\r\n"
 
 
 def test_the_recording_list_has_only_reads() -> None:
