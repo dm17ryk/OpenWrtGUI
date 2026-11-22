@@ -15,7 +15,7 @@ in [GitHub milestones](https://github.com/dm17ryk/OpenWrtGUI/milestones).
 | v1.0 | Native screens for every LuCI page on the bench image (the fallback stays for pages that later images bring), manual complete, hardening |
 | v1.1 Leftovers, rate statistics and key rotation | The v1.0 reviews' open minors, an accessibility check, RF rate statistics (minstrel), app key rotation |
 | v1.2 Tool pages | The capability chips on Discovery and a page per tool: throughput, air survey, station management, traffic generator, port statistics, connections |
-| v1.3 LTE phase 2 | SIM PIN, SMS, USSD, the modem's factory reset and its mode names |
+| v1.3 LTE phase 2 | Recover waits out an LTE setup (1.3a); SIM PIN, SMS, USSD and the modem's mode names (1.3b). The factory reset is covered by Recover: the stock action only turns the modem's autoconnect off |
 | 1.x (phase 2) | When the hardware is on the bench: the DSA backend (front panel, the exact own-port lock, mirroring), 5/6 GHz checked on real hardware, Wi-Fi mirror excluded MACs and the iperf warning |
 
 The full design is in [docs/superpowers/specs/2026-11-03-openwrt-gui-design.md](docs/superpowers/specs/2026-11-03-openwrt-gui-design.md).

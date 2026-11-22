@@ -7,6 +7,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- LTE Recover no longer cuts off an LTE setup in progress: each step waits for it (up to 20 s) or is skipped and
+  says so, since cutting one off could leave the modem's QMI channel failing until a router reboot (#93).
+
 ## [1.2.0] - 2026-11-21
 
 Capability chips and the tool pages: Port statistics, Connections with the SIP ALG switch, Throughput, Traffic

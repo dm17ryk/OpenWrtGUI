@@ -193,6 +193,24 @@ rung's lines are the settings preview's lines, with secrets masked.
 
 The UI polls `GET /recover` every 2 s while the job runs (the `useStepJob` pattern).
 
+#### Waiting out an LTE setup (#93, v1.3a)
+
+While LTE keeps failing, netifd retries `qmi.sh`'s setup about every 19 s. An `ifdown lte` that cut one off
+left AP2's QMI channel failing ("Unable to obtain client ID") until a router reboot, which Recover never does.
+The answers to #93's open questions:
+- **Signal:** a setup runs while a `qmi.sh` or a `uqmi` process exists (`ps w | grep -c -e '[q]mi\.sh' -e
+  '[u]qmi '`). netifd's `pending` flag is not used: it returns within about 1 s of each failed attempt and
+  says nothing about a QMI exchange in flight. A read that fails counts as a setup running.
+- **Bound:** before every step that runs, rung 1's settings change included (it reloads lte through
+  netifd), Recover polls every 2 s for up to 20 s, which covers one gap between retries.
+- **No gap in time:** the step is skipped ("not run: an LTE setup still ran after 20 s; cutting it off can
+  wedge the modem"), and the ladder goes on; each later step waits again. Skipping leaves the modem no worse
+  than it was found.
+- **What you see:** the preview says each step waits; a step that waited shows "waited N s for an LTE setup to
+  finish".
+- **Proof:** an AP2 window makes the link fail with a wrong APN, runs Recover during the retries, puts the APN
+  back, and LTE must work within 90 s (4.8).
+
 ### 4.3 The UI
 
 - **Actions card:** **Recover** next to Connect, Disconnect and Reboot modem. While a job runs or after it
@@ -263,6 +281,9 @@ The UI polls `GET /recover` every 2 s while the job runs (the `useStepJob` patte
   - An `autoconnect_on` flag (the modem's own autoconnect holds the bearer, and qmi.sh's unchecked attempt to
     turn it off at ifup did not take). While it is set, `ifup lte` fails to start the session. It is cleared by
     `--set-autoconnect disabled`, which can be made to fail a given number of times first.
+  - A setup in progress (#93, v1.3a): after `ifup lte` the setup runs for `setup_reads` reads of the running
+    counts; on a failing link netifd retries after `retry_gap` idle reads (0: never idle). An `ifdown lte` or
+    a network reload during a setup sets `setup_cut`, which keeps every session down past a modem restart.
 - **`simnet._dump`:** puts `data.pdh_4` (a valid handle, or `0xffffffff` while wedged) in the lte status.
 - **Seeding:** tests set the flags directly. The e2e simulator can start one router wedged through an
   environment variable, like `OPENWRTGUI_SIM_GUARD`.
@@ -289,6 +310,11 @@ One window with Dmitry's OK at the time, Bench Guard clear, and the txctl sessio
 
 Nothing in the window breaks the modem on purpose: no `AT&F`, no QMI reset. Agents never type router
 passwords.
+
+v1.3a adds a second proof for the setup wait (4.2): with no saved setup, the app applies the wrong APN
+`owg-wrong`, waits until a retry is seen, runs Recover, puts the APN back, and LTE must work within 90 s with no
+"Failed to connect to service" or "Unable to obtain client ID" after. A router reboot happens only with Dmitry's
+OK.
 
 ### 4.9 The stock "restore modem defaults" (O1, traced 2026-11-17)
 
@@ -339,7 +365,9 @@ works after the rung's `ifup lte`. Not yet run on AP2 (4.8).
 ## 8. Open, for Dmitry
 
 - **A harness run starts mid-rung:** answered "Finish putting back" (4.2, Stopping).
-- **The stock restore-defaults sequence (O1):** traced, and answered "Add a Recover step" (4.9).
+- **The stock restore-defaults sequence (O1):** traced, and answered "Add a Recover step" (4.9). v1.3a ticks
+  the roadmap's "factory reset" off: the stock action is Recover's fourth step.
+- **#93, a step that cuts a setup off:** answered in 4.2, "Waiting out an LTE setup" (v1.3a plan C2-C7).
 - **Which release ships it (does not block the plan):** with 1.1.0 (1.1a, 1.1b) by default, or a 1.0.2 of its
   own.
 

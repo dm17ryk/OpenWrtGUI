@@ -381,6 +381,20 @@ def test_v1_2_is_in_the_changelog() -> None:
         assert words in released, words
 
 
+def test_recover_documents_the_setup_wait() -> None:
+    """#93 (v1.3a): each Recover step waits for an LTE setup to finish, or is skipped; the factory reset is
+    covered by Recover (C8)."""
+    recover = _section("LTE-modem", "Recovering the modem")
+    for words in ("no LTE setup runs", "20 seconds", "skipped"):
+        assert words in recover, words
+    changelog = _read(ROOT / "CHANGELOG.md")
+    unreleased = changelog.split("## [Unreleased]", 1)[1].split("\n## [", 1)[0]
+    assert "LTE Recover" in unreleased and "setup" in unreleased
+    roadmap = _read(ROOT / "ROADMAP.md")
+    assert "factory reset (once its command is found)" not in roadmap
+    assert "the modem's factory reset and its mode names" not in roadmap
+
+
 def test_rates_are_documented_as_read() -> None:
     """v1.1b D7: the rates card is read every 5 s while it is open; the manual no longer says it is not."""
     rates = _section("RF-live", "Which rates reach the station")
