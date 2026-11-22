@@ -67,6 +67,9 @@ NO_EFFECT = '"No effect"'
 # How many uqmi processes run: qmi.sh's teardown releases its client with uqmi, and netifd's `ifdown lte`
 # returns before it ends (AP2, 2026-11-19 window). `[u]` keeps grep from counting its own command line.
 UQMI_RUNNING = "ps w | grep -c '[u]qmi '"
+# #93: an LTE setup runs while netifd's qmi.sh (or a uqmi it started) is alive; cutting one off with
+# `ifdown lte` left AP2's QMI channel failing until a router reboot (2026-11-19 window)
+SETUP_RUNNING = "ps w | grep -c -e '[q]mi\\.sh' -e '[u]qmi '"
 
 
 def iface_status(name: str) -> str:

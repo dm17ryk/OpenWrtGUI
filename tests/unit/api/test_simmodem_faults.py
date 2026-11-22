@@ -112,6 +112,75 @@ async def test_a_sync_during_the_teardown_leaves_the_session_down(ctx: AppContex
     assert (await _status(t))["up"] is False
 
 
+SETUP_RUNNING = "ps w | grep -c -e '[q]mi\\.sh' -e '[u]qmi '"
+
+
+async def _reads(t: ReplayTransport, n: int) -> list[str]:
+    return [(await t.run(SETUP_RUNNING)).stdout for _ in range(n)]
+
+
+async def test_a_setup_runs_for_its_reads_after_ifup(ctx: AppContext) -> None:
+    """#93: after `ifup lte`, netifd's qmi.sh setup runs uqmi for a while."""
+    t = await _transport(ctx)
+    modem = t.state.modem  # type: ignore[union-attr]
+    modem.setup_reads = 2
+    assert (await t.run("ifup lte")).ok
+    assert await _reads(t, 3) == ["1\n", "1\n", "0\n"]
+    assert (await t.run(SETUP_RUNNING)).exit_status == 1  # grep -c exits 1 on none
+
+
+async def test_a_failing_link_retries_after_its_gap(ctx: AppContext) -> None:
+    """#93: on a link that cannot connect, netifd retries the setup after a short gap."""
+    t = await _transport(ctx)
+    modem = t.state.modem  # type: ignore[union-attr]
+    modem.setup_reads, modem.retry_gap, modem.stale_qmi = 2, 1, True
+    modem.start_setup()
+    assert await _reads(t, 6) == ["1\n", "1\n", "0\n", "1\n", "1\n", "0\n"]
+
+
+async def test_with_no_gap_a_failing_setup_never_pauses(ctx: AppContext) -> None:
+    t = await _transport(ctx)
+    modem = t.state.modem  # type: ignore[union-attr]
+    modem.setup_reads, modem.retry_gap, modem.stale_qmi = 2, 0, True
+    modem.start_setup()
+    assert await _reads(t, 10) == ["1\n"] * 10
+
+
+async def test_an_ifdown_mid_setup_wedges_until_a_reboot(ctx: AppContext) -> None:
+    """#93, AP2 2026-11-19: an `ifdown lte` that cut qmi.sh off mid-setup left the modem's QMI channel failing
+    ("Unable to obtain client ID") until a router reboot; a modem restart did not help."""
+    t = await _transport(ctx)
+    modem = t.state.modem  # type: ignore[union-attr]
+    modem.setup_reads = 3
+    modem.start_setup()
+    await t.run("ifdown lte")
+    assert modem.setup_cut is True
+    for line in (LOW, ONLINE, "ifup lte"):
+        await t.run(line)
+    assert modem.setup_cut is True
+    assert (await _status(t))["up"] is False
+
+
+async def test_an_ifdown_in_the_gap_is_harmless(ctx: AppContext) -> None:
+    t = await _transport(ctx)
+    modem = t.state.modem  # type: ignore[union-attr]
+    modem.setup_reads, modem.retry_gap = 1, 2
+    modem.start_setup()
+    assert await _reads(t, 1) == ["1\n"]  # the setup's one read; the gap follows
+    await t.run("ifdown lte")
+    assert modem.setup_cut is False
+
+
+async def test_netifd_reports_pending_while_a_setup_runs(ctx: AppContext) -> None:
+    t = await _transport(ctx)
+    modem = t.state.modem  # type: ignore[union-attr]
+    modem.connected, modem.setup_reads = False, 1
+    modem.start_setup()
+    assert (await _status(t))["pending"] is True
+    await _reads(t, 1)
+    assert (await _status(t))["pending"] is False
+
+
 async def test_a_healthy_session_has_the_ap2_handle(ctx: AppContext) -> None:
     t = await _transport(ctx)
     assert (await t.run("ifup lte")).ok

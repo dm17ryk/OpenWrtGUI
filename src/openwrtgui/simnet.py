@@ -452,7 +452,8 @@ class SimNetwork:
             entry: dict[str, Any] = {
                 "interface": conf.name,
                 "up": conf.auto and (conf.proto in ("static", "none") or (conf.proto == "qmi" and session)),
-                "pending": conf.proto in ("dhcp", "dhcpv6"),
+                "pending": conf.proto in ("dhcp", "dhcpv6")
+                or (conf.proto == "qmi" and self.modem is not None and self.modem.setup_running()),
                 "dynamic": False,
                 "proto": conf.proto,
                 "ipv4-address": [],
