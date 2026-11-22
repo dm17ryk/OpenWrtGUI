@@ -35,6 +35,25 @@ NEVER = (
     "AT&F",
     "AT&W",
     "AT+CFUN",
+    # v1.3a Global Constraints: SIM PIN writes, SMS and USSD are never sent by Recover
+    "AT+CPIN=",
+    "AT+CLCK=",
+    "AT+CPWD",
+    "--verify-pin",
+    "--set-pin-protection",
+    "--change-pin",
+    "--unblock-pin",
+    "AT+CMGS",
+    "AT+CMGD",
+    "AT+CUSD=1",
+    "--send-message",
+    "--delete-message",
+)
+SETUP_RUNNING = "ps w | grep -c -e '[q]mi\\.sh' -e '[u]qmi '"
+SETUP_BUSY = "not run: an LTE setup still ran after 20 s; cutting it off can wedge the modem"
+SETUP_WAITS = (
+    "Each step starts only when no LTE setup runs (no qmi.sh, no uqmi), waiting up to 20 s; a step that "
+    "would cut a setup off is skipped."
 )
 
 
@@ -232,6 +251,102 @@ async def test_nothing_helps_ends_not_recovered_with_the_reboot_advice(ctx: AppC
     assert (job.phase, job.detail) == ("not recovered", NOT_RECOVERED)
     assert job.rungs[4].outcome == "not yet"
     assert modem.opmode == "online"
+
+
+async def test_an_ifdown_never_lands_in_a_setup(ctx: AppContext) -> None:
+    """#93: on a failing link netifd retries qmi.sh's setup; an `ifdown lte` landing in one left AP2's QMI
+    channel failing until a router reboot. Each step waits for the gap between retries."""
+    modem = await _modem(ctx)
+    modem.connected, modem.stale_qmi = False, True
+    modem.setup_reads, modem.retry_gap = 3, 2
+    modem.start_setup()
+    job = await _recover(ctx)
+    assert modem.setup_cut is False
+    assert (job.phase, job.detail) == ("recovered", "LTE works again after: Clear QMI state.")
+    detail = job.rungs[1].detail
+    assert detail is not None and detail.startswith("waited ")
+    assert detail.endswith(" s for an LTE setup to finish")
+
+
+async def test_a_setup_that_never_pauses_skips_every_rung(ctx: AppContext) -> None:
+    modem = await _modem(ctx)
+    modem.connected, modem.stale_qmi = False, True
+    modem.setup_reads, modem.retry_gap = 3, 0
+    modem.start_setup()
+    job = await _recover(ctx)
+    assert [(r.outcome, r.detail) for r in job.rungs[1:]] == [("skipped", SETUP_BUSY)] * 4
+    assert "ifdown lte" not in _calls(ctx)
+    assert modem.setup_cut is False
+    assert (job.phase, job.detail) == ("not recovered", NOT_RECOVERED)
+
+
+async def test_rung_1_waits_before_putting_back_the_setup(ctx: AppContext) -> None:
+    """C5: putting back the saved setup reloads lte through netifd, which cuts a setup off as ifdown does."""
+    await _save(ctx)
+    await _drift(ctx)
+    modem = await _modem(ctx)
+    modem.connected = False
+    modem.setup_reads, modem.retry_gap = 2, 1
+    modem.start_setup()
+    job = await _recover(ctx)
+    assert modem.setup_cut is False
+    assert (job.phase, job.detail) == ("recovered", "LTE works again after: Put back the saved setup.")
+    detail = job.rungs[0].detail
+    assert detail is not None and detail.startswith("waited ")
+
+
+async def test_a_setup_restarting_after_one_idle_read_still_runs_the_rung(ctx: AppContext) -> None:
+    """Review Focus 1: the poll that decides is the first idle read; the step runs right after it."""
+    modem = await _modem(ctx)
+    modem.connected, modem.stale_qmi = False, True
+    modem.setup_reads, modem.retry_gap = 1, 1
+    modem.start_setup()
+    job = await _recover(ctx)
+    assert "ifdown lte" in _calls(ctx)
+    assert job.rungs[1].outcome != "skipped"
+    assert modem.setup_cut is False
+
+
+async def test_stop_during_the_wait_puts_nothing_back(ctx: AppContext) -> None:
+    """Review Focus 2: no ifdown was sent yet, so a Stop during the wait has nothing to put back."""
+    modem = await _modem(ctx)
+    modem.connected, modem.stale_qmi = False, True
+    modem.setup_reads, modem.retry_gap = 3, 0
+    modem.start_setup()
+    real = modem.answer
+    reads = [0]
+
+    def stopping(command: str) -> CommandResult | None:
+        if command == SETUP_RUNNING:
+            reads[0] += 1
+            if reads[0] == 2:
+                ctx.lte_recover.request_stop("ap2")  # Stop pressed while rung 2 waits
+        return real(command)
+
+    modem.answer = stopping
+    job = await _recover(ctx)
+    assert job.phase == "stopped"
+    calls = _calls(ctx)
+    assert "ifdown lte" not in calls and "ifup lte" not in calls
+
+
+async def test_a_wedge_from_before_is_not_hidden(ctx: AppContext) -> None:
+    """Review Focus 4: a QMI channel already wedged at start: every step runs, nothing recovers, and the job
+    says to reboot the router."""
+    modem = await _modem(ctx)
+    modem.connected, modem.setup_cut = False, True
+    job = await _recover(ctx)
+    assert [r.outcome for r in job.rungs[1:]] == ["not yet"] * 4
+    assert (job.phase, job.detail) == ("not recovered", NOT_RECOVERED)
+
+
+async def test_the_preview_says_each_step_waits(ctx: AppContext) -> None:
+    preview = await ctx.lte_recover.preview("ap2")
+    warnings = list(preview.warnings)
+    assert SETUP_WAITS in warnings
+    drops = next(i for i, w in enumerate(warnings) if "LTE session drops" in w)
+    syncs = next(i for i, w in enumerate(warnings) if "sends --sync only once" in w)
+    assert drops < warnings.index(SETUP_WAITS) < syncs
 
 
 async def test_stop_finishes_the_put_back(ctx: AppContext) -> None:

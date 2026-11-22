@@ -86,6 +86,7 @@ class SimModem:
         self.setup_cut = False
         self._setup_left = 0
         self._gap_left = 0
+        self._retry_next = False
         self._low_power_seen = False
         self.rx_bytes = 1_204_331
         self.tx_bytes = 3_876_002
@@ -100,6 +101,7 @@ class SimModem:
                 self.start_setup()
             else:  # netifd stops retrying a link it took down
                 self._setup_left = self._gap_left = 0
+                self._retry_next = False
             return _ok()
         if command in (c.UQMI_RUNNING, c.SETUP_RUNNING):
             running = 1 if self._setup_read() or self._tearing > 0 else 0
@@ -160,14 +162,18 @@ class SimModem:
     def start_setup(self) -> None:
         """netifd starts qmi.sh's setup now (an ifup, a retry, a reload). Tests use it to place a job inside a
         retry."""
-        self._setup_left, self._gap_left = self.setup_reads, 0
+        self._setup_left, self._gap_left, self._retry_next = self.setup_reads, 0, False
 
     def setup_running(self) -> bool:
         return self._setup_left > 0
 
     def _setup_read(self) -> bool:
         """One read of a running count: a setup advances by one read; on a failing link netifd retries after
-        its gap (at once when the gap is 0, so the setup never pauses)."""
+        its gap (at once when the gap is 0, so the setup never pauses). A retry starts at the read after the
+        gap's last, so a command sent right after an idle read lands in the gap."""
+        if self._retry_next:
+            self._retry_next = False
+            self._setup_left = self.setup_reads
         if self._setup_left > 0:
             self._setup_left -= 1
             if self._setup_left == 0 and self._blocked():
@@ -177,8 +183,7 @@ class SimModem:
             return True
         if self._gap_left > 0:
             self._gap_left -= 1
-            if self._gap_left == 0 and self._blocked():
-                self._setup_left = self.setup_reads
+            self._retry_next = self._gap_left == 0 and self._blocked()
         return False
 
     def netifd_restart(self) -> None:

@@ -54,6 +54,15 @@ FAILED = "{command}: {reason}; the modem was left {where}."
 NO_ANSWER = "{command}: {name} did not answer."
 NOT_DOWN = "{command} not sent: lte was not down after {s:g} s"
 SYNC_WAITS = "{rung} sends --sync only once lte is down and no uqmi runs (up to {s:g} s); else it skips it."
+# #93: an `ifdown lte` (or a network reload) that cut netifd's qmi.sh setup off left AP2's QMI channel failing
+# until a router reboot, which Recover never does; so each step first waits for a gap between setups
+SETUP_S = 20.0
+SETUP_WAITS = (
+    "Each step starts only when no LTE setup runs (no qmi.sh, no uqmi), waiting up to {s:g} s; a step that "
+    "would cut a setup off is skipped."
+)
+WAITED = "waited {s:g} s for an LTE setup to finish"
+SETUP_BUSY = "not run: an LTE setup still ran after {s:g} s; cutting it off can wedge the modem"
 
 
 class RungResult(BaseModel):
@@ -233,6 +242,7 @@ class LteRecover:
         ]
         warnings = [
             DROPS.format(name=rec.name),
+            SETUP_WAITS.format(s=SETUP_S),
             SYNC_WAITS.format(rung=RUNGS[2], s=DISCONNECT_S),
             f"{RUNGS[3]} sends its command up to {AUTOCONNECT_TRIES} times, {AUTOCONNECT_GAP_S:g} s apart.",
             *notes,
@@ -402,15 +412,20 @@ class LteRecover:
             self._update(rec.id, current=index)
             # the pool's live connection: another apply may have replaced the one the job started with
             run.t = await self._lte.transport(rec)
+            waited = await self._wait_setup(run)
+            if waited is None:  # nothing was sent: no wait for LTE either
+                self._rung(rec.id, index, "skipped", SETUP_BUSY.format(s=SETUP_S))
+                continue
             problem = await rung(run)
+            note = "; ".join(p for p in (WAITED.format(s=waited) if waited else None, problem) if p) or None
             if problem:  # shown even if a Stop or a harness run ends the job during the wait
-                self._rung(rec.id, index, "failed", problem)
+                self._rung(rec.id, index, "failed", note)
             works = await self._wait_works(run)
             if works:
-                self._rung(rec.id, index, "works", problem)
+                self._rung(rec.id, index, "works", note)
                 self._end(run, "recovered", detail=RECOVERED.format(rung=RUNGS[index]))
                 return
-            self._rung(rec.id, index, "failed" if problem else "not yet", problem)
+            self._rung(rec.id, index, "failed" if problem else "not yet", note)
         self._end(run, "not recovered", detail=NOT_RECOVERED)
 
     def _check(self, run: _Run) -> None:
@@ -554,6 +569,19 @@ class LteRecover:
                 break
             run.pending.pop(key)
         raise _Failed(FAILED.format(command=line, reason=reason, where=where))
+
+    async def _wait_setup(self, run: _Run) -> float | None:
+        """#93: before a step's first command, until no LTE setup runs, up to SETUP_S. Returns the seconds
+        waited (the polls before the idle read, at the nominal poll), or None if a setup still ran at the
+        bound. A Stop or a harness run ends the job here with nothing to put back."""
+        step = self._lte.nominal_poll_s
+        for attempt in range(max(1, int(SETUP_S / step))):
+            self._check(run)
+            if attempt:
+                await self._lte.pause()
+            if await self._lte.setup_idle(run.t):
+                return attempt * step
+        return None
 
     async def _wait_down(self, run: _Run) -> bool:
         """After `ifdown lte`: until lte is down and qmi.sh's teardown is over, up to DISCONNECT_S."""
