@@ -406,6 +406,46 @@ async def lte_commands(t: Runner) -> tuple[str, ...]:
     )
 
 
+# v1.3a (plan C9): what the modem says about its SIM, SMS and USSD, read only; 1.3b is written from it
+UQMI_HELP = "uqmi --help 2>&1"
+MODEM_AT_QUERIES = (
+    "AT+CPIN?",
+    "AT+CLCK=?",
+    "AT+CPMS?",
+    "AT+CMGF?",
+    "AT+CSCS?",
+    "AT+CNMI?",
+    "AT+CUSD?",
+    "AT+CUSD=?",
+)
+_OPTIONAL_UQMI_READS = ("--uim-get-sim-state", "--list-messages")
+_LONG_NUMBER = re.compile(r"\+?\d{7,}")
+_JSON_TEXT = re.compile(r'("text"\s*:\s*")((?:[^"\\]|\\.)*)(")')
+_AT_BODY = re.compile(r"^(\+CMG[RL]:[^\r\n]*\r?\n)([^\r\n]*)", re.MULTILINE)
+
+
+def modem_reads(device: str, port: str, uqmi_help: str = "") -> tuple[str, ...]:
+    """The modem recording's fixed list: uqmi's help, the SIM's PIN state, the SIM state and the SMS list when
+    this uqmi has them, and AT `?`/`=?` queries on the AT port. Never a PIN write, an SMS or a USSD code."""
+    reads = [UQMI_HELP, lc.uqmi(device, "--get-pin-status")]
+    reads += [lc.uqmi(device, option) for option in _OPTIONAL_UQMI_READS if option in uqmi_help]
+    reads += [lc.at(port, query) for query in MODEM_AT_QUERIES]
+    return tuple(reads)
+
+
+def _json_text(m: re.Match[str]) -> str:
+    return f"{m.group(1)}<text {len(json.loads(f'"{m.group(2)}"'))} chars>{m.group(3)}"
+
+
+def sanitize_modem(command: str, text: str) -> str:
+    """sanitize, then the modem recording's private parts (plan C10): each message body becomes
+    `<text N chars>` (uqmi's `"text"` and the line after an AT `+CMGR:`/`+CMGL:` header), and every run of
+    7 or more digits (a sender, an SMSC) becomes `<number>`."""
+    out = _JSON_TEXT.sub(_json_text, sanitize(text))
+    out = _AT_BODY.sub(lambda m: f"{m.group(1)}<text {len(m.group(2))} chars>", out)
+    return _LONG_NUMBER.sub("<number>", out)
+
+
 async def run_set(
     t: Runner, commands: tuple[str, ...], *, timed: frozenset[str] = frozenset()
 ) -> dict[str, dict[str, object]]:
