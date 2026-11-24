@@ -12,11 +12,11 @@ from openwrtgui.lte.commands import Storage
 
 GSM_RULE = "An SMS is 1 to 160 characters of the GSM basic set (letters, digits, common punctuation)"
 MAX_TEXT = 160
-# The 3GPP TS 23.038 basic table, without the escape and its extension characters. Only the characters
-# that are plain ASCII are kept: uqmi gets the text as an ASCII argument, so the accented letters and
-# the Greek capitals of the table are refused.
+# The identity subset of the 3GPP TS 23.038 basic table: only the characters whose GSM-7 code equals their
+# ASCII code. uqmi packs the argument's bytes into 7 bits without a translation table, so @ $ _ (GSM codes
+# 0x00, 0x02, 0x11) and the non-ASCII letters would arrive as other characters.
 GSM_7BIT_BASIC: frozenset[str] = frozenset(
-    "@$_\n !\"#%&'()*+,-./0123456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    "\n !\"#%&'()*+,-./0123456789:;<=>?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 )
 _CPMS_USE = re.compile(r'"(ME|SM)"\s*,\s*(\d+)\s*,\s*(\d+)')
 _STORAGE_OF: dict[str, Storage] = {"ME": "me", "SM": "sim"}

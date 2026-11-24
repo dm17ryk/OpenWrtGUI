@@ -57,7 +57,7 @@ def test_cpms_gives_use_and_capacity_per_storage() -> None:
     assert parse_cpms(("OK",)) == {}
 
 
-@pytest.mark.parametrize("bad", ["é", "€", "[", "שלום", "🙂", "x" * 161, ""])
+@pytest.mark.parametrize("bad", ["é", "€", "[", "@", "$", "_", "שלום", "🙂", "x" * 161, ""])
 def test_send_text_is_1_to_160_gsm_basic_characters(bad: str) -> None:
     with pytest.raises(ValueError, match="1 to 160 characters"):
         check_text(bad)
