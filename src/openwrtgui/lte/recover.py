@@ -58,6 +58,8 @@ SYNC_WAITS = "{rung} sends --sync only once lte is down and no uqmi runs (up to 
 # until a router reboot, which Recover never does; so each step first waits for a gap between setups
 SETUP_S = 20.0
 SETUP_POLL_S = 1.0  # final review I4: a gap between retries may be short; 21 reads cover 0 to 20 s
+SETTLE_ROUNDS = 3  # PR #100 Codex P1: a setup that ended is followed by a works check, then a fresh idle read
+BACK = "back"  # _settle: LTE works, nothing more to send
 CAME_BACK = "LTE works again."
 SETUP_WAITS = (
     "Each step starts only when no LTE setup runs (no qmi.sh, no uqmi), waiting up to {s:g} s; a step that "
@@ -416,14 +418,14 @@ class LteRecover:
             self._update(rec.id, current=index)
             # the pool's live connection: another apply may have replaced the one the job started with
             run.t = await self._lte.transport(rec)
-            waited = await self._wait_setup(run)
-            if waited is None:  # nothing was sent: no wait for LTE either
-                self._rung(rec.id, index, "skipped", SETUP_BUSY.format(s=SETUP_S))
-            if await self._works(run):  # final review I2: netifd's own setup brought it back meanwhile
+            settled = await self._settle(run)
+            if settled == BACK:  # final review I2: netifd's own setup brought it back meanwhile
                 self._came_back(run, last_ran)
                 return
-            if waited is None:
+            if settled is None:  # nothing was sent: no wait for LTE either
+                self._rung(rec.id, index, "skipped", SETUP_BUSY.format(s=SETUP_S))
                 continue
+            waited = float(settled)
             problem = await rung(run)
             last_ran = index
             note = "; ".join(p for p in (WAITED.format(s=waited) if waited else None, problem) if p) or None
@@ -594,6 +596,25 @@ class LteRecover:
                 raise _Failed(NO_ANSWER.format(command=c.SETUP_RUNNING, name=run.rec.name)) from exc
             if idle:
                 return attempt * SETUP_POLL_S
+        return None
+
+    async def _settle(self, run: _Run) -> float | str | None:
+        """Before a step: LTE does not work and no setup runs, with nothing sent between the last idle read
+        and the step (PR #100 Codex P1). Each round checks LTE, then waits for a gap; a gap found at the first
+        read follows the LTE check at once, so the step can go. A gap found after waiting means a setup just
+        ended, maybe with LTE up: another round checks LTE and reads the setup state again. Returns the
+        seconds waited, BACK when LTE works, or None when a setup still ran (no gap in SETUP_S, or setups
+        kept ending for SETTLE_ROUNDS rounds)."""
+        total = 0.0
+        for _ in range(SETTLE_ROUNDS):
+            if await self._works(run):
+                return BACK
+            waited = await self._wait_setup(run)
+            if waited is None:
+                return None
+            if waited == 0:
+                return total
+            total += waited
         return None
 
     async def _works(self, run: _Run) -> bool:

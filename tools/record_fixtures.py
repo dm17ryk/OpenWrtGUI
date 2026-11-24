@@ -421,8 +421,11 @@ MODEM_AT_QUERIES = (
 _OPTIONAL_UQMI_READS = ("--uim-get-sim-state", "--list-messages")
 _LONG_NUMBER = re.compile(r"\+?\d{7,}")
 _JSON_TEXT = re.compile(r'("text"\s*:\s*")((?:[^"\\]|\\.)*)(")')
-# final review I5: a message header (read, listed, or arriving unsolicited during a query) and its body line
-_MESSAGE = re.compile(r"^(\+(?:CMT|CDS|CBM|CMGR|CMGL):)([^\r\n]*)(\r?\n)([^\r\n]*)", re.MULTILINE)
+# final review I5, PR #100 Codex P2: a message header (read, listed, or arriving unsolicited during a
+# query) and every body line after it, up to OK, ERROR or the next `+XXX:` header
+_MESSAGE_HEADER = re.compile(r"^(\+(?:CMT|CDS|CBM|CMGR|CMGL):)(.*)$")
+_ANY_HEADER = re.compile(r"^\+[A-Z ]+:")
+HIDDEN_FIELD = '"<field>"'
 _QUOTED = re.compile(r'"[^"]*"')
 _CUSD_TEXT = re.compile(r'^(\+CUSD:\s*\d+\s*,\s*)"([^"]*)"', re.MULTILINE)
 _HEX_RUN = re.compile(r"\b[0-9A-Fa-f]{16,}\b")
@@ -441,9 +444,25 @@ def _json_text(m: re.Match[str]) -> str:
     return f"{m.group(1)}<text {len(json.loads(f'"{m.group(2)}"'))} chars>{m.group(3)}"
 
 
-def _message(m: re.Match[str]) -> str:
-    header = _QUOTED.sub('"<field>"', m.group(2))
-    return f"{m.group(1)}{header}{m.group(3)}<text {len(m.group(4))} chars>"
+def _mask_messages(text: str) -> str:
+    """Each message header keeps its kind with its quoted fields hidden; every non-empty line after it is
+    `<text N chars>` until OK, ERROR or another `+XXX:` header ends the message."""
+    out: list[str] = []
+    in_body = False
+    for line in text.split("\n"):
+        core, cr = (line[:-1], "\r") if line.endswith("\r") else (line, "")
+        header = _MESSAGE_HEADER.match(core)
+        if header:
+            out.append(f"{header.group(1)}{_QUOTED.sub(HIDDEN_FIELD, header.group(2))}{cr}")
+            in_body = True
+        elif core in ("OK", "ERROR") or _ANY_HEADER.match(core):
+            out.append(line)
+            in_body = False
+        elif in_body and core:
+            out.append(f"<text {len(core)} chars>{cr}")
+        else:
+            out.append(line)
+    return "\n".join(out)
 
 
 def sanitize_modem(command: str, text: str) -> str:
@@ -455,7 +474,7 @@ def sanitize_modem(command: str, text: str) -> str:
     - every run of 16 or more hex digits (a PDU) becomes `<hex N chars>`;
     - every run of 7 or more digits (a sender, an SMSC) becomes `<number>`."""
     out = _JSON_TEXT.sub(_json_text, sanitize(text))
-    out = _MESSAGE.sub(_message, out)
+    out = _mask_messages(out)
     out = _CUSD_TEXT.sub(lambda m: f'{m.group(1)}"<text {len(m.group(2))} chars>"', out)
     out = _HEX_RUN.sub(lambda m: f"<hex {len(m.group(0))} chars>", out)
     return _LONG_NUMBER.sub("<number>", out)

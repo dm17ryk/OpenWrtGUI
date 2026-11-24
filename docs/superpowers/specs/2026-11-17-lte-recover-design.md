@@ -203,8 +203,11 @@ The answers to #93's open questions:
   says nothing about a QMI exchange in flight. A read that fails counts as a setup running.
 - **Bound:** before every step that runs, rung 1's settings change included (it reloads lte through
   netifd), Recover reads once a second from 0 to 20 s (21 reads), which covers one gap between retries.
-- **Back meanwhile:** after each wait (or skip), Recover reads whether LTE works; if netifd's own setup brought
-  it back, the job ends "recovered" without sending anything more.
+- **Back meanwhile:** before each step Recover reads whether LTE works; if netifd's own setup brought it back,
+  the job ends "recovered" without sending anything more. A step goes only right after an idle setup read:
+  when a gap was found after waiting (a setup just ended), Recover checks LTE again and re-reads the setup
+  state, so nothing is sent between the idle read and the step (PR #100 review); a gap shorter than that LTE
+  check is not used.
 - **A dead router:** a setup read that gets no answer fails the job ("did not answer"), as any other command.
 - **No gap in time:** the step is skipped ("not run: an LTE setup still ran after 20 s; cutting it off can
   wedge the modem"), and the ladder goes on; each later step waits again. Skipping leaves the modem no worse

@@ -300,7 +300,8 @@ async def test_a_setup_restarting_after_one_idle_read_still_runs_the_rung(ctx: A
     """Review Focus 1: the poll that decides is the first idle read; the step runs right after it."""
     modem = await _modem(ctx)
     modem.connected, modem.stale_qmi = False, True
-    modem.setup_reads, modem.retry_gap = 1, 1
+    # a gap must outlast the LTE check after a setup ends (PR #100 Codex P1): two idle reads
+    modem.setup_reads, modem.retry_gap = 1, 2
     modem.start_setup()
     job = await _recover(ctx)
     assert "ifdown lte" in _calls(ctx)
@@ -373,7 +374,7 @@ async def test_a_link_that_comes_up_during_the_wait_is_not_taken_down(ctx: AppCo
         if command == SETUP_RUNNING:
             reads[0] += 1
             if reads[0] == 3:
-                modem.connected = True  # the setup's last read: it connected
+                modem.connected = True  # the setup's last read: it connected before qmi.sh exits
         return real(command)
 
     modem.answer = succeeding
@@ -393,9 +394,10 @@ async def test_a_link_back_after_skipped_steps_is_not_called_lost(ctx: AppContex
     def busy_then_back(command: str) -> CommandResult | None:
         if command == SETUP_RUNNING:
             reads[0] += 1
+            if reads[0] == 42:  # netifd's retry connects while its qmi.sh still runs
+                modem.connected = True
             if reads[0] <= 42:  # two full waits: 21 reads each, one a second from 0 to 20 s
                 return CommandResult(command, "1\n", "", 0)
-            modem.connected = True
             return CommandResult(command, "0\n", "", 1)
         return real(command)
 
@@ -411,13 +413,51 @@ async def test_the_wait_reads_every_second_for_the_whole_20_s(ctx: AppContext) -
     retry cycle is still seen."""
     modem = await _modem(ctx)
     modem.connected, modem.stale_qmi = False, True
-    modem.setup_reads, modem.retry_gap = 15, 1
+    modem.setup_reads, modem.retry_gap = 15, 2  # a gap outlasts the LTE check that follows the setup's end
     modem.start_setup()
     job = await _recover(ctx)
     rung = job.rungs[1]
     assert rung.outcome != "skipped"
     assert rung.detail is not None and rung.detail.startswith("waited 15 s for an LTE setup to finish")
     assert modem.setup_cut is False
+
+
+async def test_a_gap_shorter_than_the_lte_check_is_not_used(ctx: AppContext) -> None:
+    """PR #100 Codex P1: a one-read gap between retries closes during the LTE check that follows a setup's
+    end; Recover does not step into it, it waits again and skips the step."""
+    modem = await _modem(ctx)
+    modem.connected, modem.stale_qmi = False, True
+    modem.setup_reads, modem.retry_gap = 1, 1
+    modem.start_setup()
+    job = await _recover(ctx)
+    assert "ifdown lte" not in _calls(ctx) and modem.setup_cut is False
+    assert [r.outcome for r in job.rungs[1:]] == ["skipped"] * 4
+
+
+async def test_the_setup_read_comes_right_before_every_ifdown(ctx: AppContext) -> None:
+    """PR #100 Codex P1: after a wait, Recover checks whether LTE works; netifd may start the next setup
+    during those reads, so the step re-reads the setup state and nothing else is sent between that idle read
+    and its `ifdown lte`."""
+    modem = await _modem(ctx)
+    modem.connected, modem.stale_qmi = False, True
+    modem.setup_reads, modem.retry_gap = 3, 2
+    modem.start_setup()
+    t = await ctx.pool.get(ctx.routers.get("ap2"))  # type: ignore[arg-type]
+    sent: list[tuple[str, str]] = []
+    real_run = t.run
+
+    async def logged(command: str, **kwargs: object) -> CommandResult:
+        result = await real_run(command, **kwargs)  # type: ignore[arg-type]
+        sent.append((command, result.stdout.strip()))
+        return result
+
+    t.run = logged  # type: ignore[method-assign]
+    job = await _recover(ctx)
+    assert job.phase == "recovered" and modem.setup_cut is False
+    downs = [i for i, (command, _) in enumerate(sent) if command == "ifdown lte"]
+    assert downs
+    for i in downs:
+        assert sent[i - 1] == (SETUP_RUNNING, "0"), sent[max(0, i - 4) : i + 1]
 
 
 async def test_the_preview_says_each_step_waits(ctx: AppContext) -> None:

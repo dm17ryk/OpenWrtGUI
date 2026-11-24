@@ -388,6 +388,20 @@ def test_sanitize_modem_hides_unsolicited_messages_and_short_senders() -> None:
     assert rf.sanitize_modem("AT+CUSD?", "+CUSD: 0\r\nOK\r\n") == "+CUSD: 0\r\nOK\r\n"
 
 
+def test_sanitize_modem_hides_every_line_of_a_message() -> None:
+    """PR #100 Codex P2: a text-mode body can span lines; every line up to the response's end is hidden."""
+    answer = (
+        '+CMGR: "REC READ","+972501234567",,"26/11/22,10:00:00+08"\r\n'
+        "first line\r\nsecond line\r\n\r\nOK\r\n"
+        '+CMGL: 1,"REC READ","1234"\r\nonly line\r\n+CMGL: 2,"REC READ","1234"\r\nanother\r\nmore\r\nOK\r\n'
+    )
+    out = rf.sanitize_modem("AT+CMGR=1", answer)
+    for private in ("first line", "second line", "only line", "another", "more\r"):
+        assert private not in out, private
+    assert out.count("OK\r\n") == 2
+    assert "<text 10 chars>" in out and "<text 11 chars>" in out
+
+
 def test_the_recording_list_has_only_reads() -> None:
     from openwrtgui.lte.at import is_query
 

@@ -28,6 +28,7 @@ from test_ap2_lte_recover import _recover, _run
 from openwrtgui.lte.recover import SETUP_BUSY, SETUP_S, WAITED
 from openwrtgui.lte.service import LteService
 from openwrtgui.lte.settings import LteSettings
+from openwrtgui.net.apply import NOTHING
 from openwrtgui.transport.ssh import SshTransport
 
 pytestmark = pytest.mark.hardware
@@ -71,46 +72,59 @@ async def test_recover_on_a_retrying_link_leaves_qmi_working(
     recorded: dict[str, object] = {"break": f"{BREAK_FIELD}={BREAK_VALUE}", "original": original}
     wedges_before = await _wedge_lines(ap2_rw)
     broken = LteSettings(**{BREAK_FIELD: BREAK_VALUE})  # type: ignore[arg-type]
-    plan = await lte.plan_settings("ap2", broken)
-    applied = await lte.apply_settings("ap2", broken, plan.digest)
-    assert applied.applied, applied
+    recorded["link_failing"] = False
     ran: list[str] = []
+    exercised: list[str] = []  # steps that waited for a setup, or were skipped because one still ran
     try:
+        # PR #100 Codex P1: the break is applied inside the cleanup scope, so any exit puts it back
+        plan = await lte.plan_settings("ap2", broken)
+        applied = await lte.apply_settings("ap2", broken, plan.digest)
+        assert applied.applied, applied
         n = int(SAMPLE_S / SAMPLE_STEP_S)
         samples = parse_samples((await ap2_rw.run(SAMPLE_LOOP.format(n=n), timeout=SAMPLE_S * 2)).stdout)
         recorded["setup_gaps_s"] = gap_widths([(at, q + u) for at, q, u in samples])
         recorded["uqmi_gaps_s"] = gap_widths([(at, u) for at, _, u in samples])
         recorded["samples"] = len(samples)
-        # final review minor M5 (attempt 1): the link must really fail before Recover proves anything
+        # final review minor M5 (attempt 1): the link must really fail before Recover proves anything; with
+        # no `return` here (PR #100 Codex P1), the checks after the cleanup decide
         recorded["link_failing"] = not await lte.works_now(ap2_rw)
-        if not recorded["link_failing"]:
-            return  # the finally puts the setting back; the check after it fails with NOT_FAILING
-        assert any(q + u for _, q, u in samples), "the link fails but netifd ran no setup in 60 s"
-        job = await _run(_recover(lte, tmp_path))
-        recorded["rungs"] = [[r.name, r.outcome, r.detail] for r in job.rungs]
-        recorded["phase"] = job.phase
-        for rung in job.rungs[1:]:
-            detail = rung.detail or ""
-            if rung.outcome == "skipped":
-                assert detail == SETUP_BUSY.format(s=SETUP_S), rung
-            elif rung.outcome is not None and rung.outcome != "not needed":
-                ran.append(rung.name)
-                if detail.startswith("waited "):
-                    assert detail.split(";")[0].endswith(WAITED.split("}", 1)[1]), rung
+        if recorded["link_failing"]:
+            assert any(q + u for _, q, u in samples), "the link fails but netifd ran no setup in 60 s"
+            job = await _run(_recover(lte, tmp_path))
+            recorded["rungs"] = [[r.name, r.outcome, r.detail] for r in job.rungs]
+            recorded["phase"] = job.phase
+            for rung in job.rungs[1:]:
+                detail = rung.detail or ""
+                if rung.outcome == "skipped":
+                    assert detail == SETUP_BUSY.format(s=SETUP_S), rung
+                    exercised.append(rung.name)
+                elif rung.outcome is not None and rung.outcome != "not needed":
+                    ran.append(rung.name)
+                    if detail.startswith("waited "):
+                        assert detail.split(";")[0].endswith(WAITED.split("}", 1)[1]), rung
+                        exercised.append(rung.name)
     finally:
         restore = LteSettings(**{BREAK_FIELD: original or ""})  # type: ignore[arg-type]
-        back = await lte.plan_settings("ap2", restore)  # its reads now; the reload only in a gap
-        gap = await wait_for_gap(lambda: lte.setup_idle(ap2_rw), limit_s=RESTORE_GAP_S, step_s=SAMPLE_STEP_S)
-        recorded["restore_in_a_gap"] = gap
-        if not gap:
-            FIXTURE.write_text(json.dumps(recorded, indent=2) + "\n", encoding="utf-8")
-            pytest.fail(STILL_WRONG.format(why=f"no gap between LTE setups in {RESTORE_GAP_S:g} s"))
         try:
-            restored = await lte.apply_settings("ap2", restore, back.digest)
-        except Exception as exc:
-            print("\n" + STILL_WRONG.format(why=f"the restore failed: {exc}"))
-            raise
-        assert restored.applied, STILL_WRONG.format(why=f"the restore was not applied: {restored}")
+            back = await lte.plan_settings("ap2", restore)  # its reads now; the reload only in a gap
+        except ValueError as exc:
+            if not str(exc).startswith(NOTHING):
+                raise
+            back = None  # the break never reached AP2: nothing to put back
+        if back is not None:
+            gap = await wait_for_gap(
+                lambda: lte.setup_idle(ap2_rw), limit_s=RESTORE_GAP_S, step_s=SAMPLE_STEP_S
+            )
+            recorded["restore_in_a_gap"] = gap
+            if not gap:
+                FIXTURE.write_text(json.dumps(recorded, indent=2) + "\n", encoding="utf-8")
+                pytest.fail(STILL_WRONG.format(why=f"no gap between LTE setups in {RESTORE_GAP_S:g} s"))
+            try:
+                restored = await lte.apply_settings("ap2", restore, back.digest)
+            except Exception as exc:
+                print("\n" + STILL_WRONG.format(why=f"the restore failed: {exc}"))
+                raise
+            assert restored.applied, STILL_WRONG.format(why=f"the restore was not applied: {restored}")
         back_at = time.monotonic()
         while not await lte.works_now(ap2_rw):
             assert time.monotonic() - back_at < BACK_S, NOT_BACK
@@ -124,4 +138,9 @@ async def test_recover_on_a_retrying_link_leaves_qmi_working(
     assert ran, (
         "Recover skipped every step: the guard saw no gap in 20 s. Measured gaps (s): "
         f"setup {recorded['setup_gaps_s']}, uqmi only {recorded['uqmi_gaps_s']}: C2/C3 need a ruling"
+    )
+    # PR #100 Codex P1: a run where no step met a setup proves no wedge, not the guard itself
+    assert exercised, (
+        "the guard was not exercised: no step waited for a setup or was skipped for one (netifd was not "
+        "retrying when Recover's steps started); the run shows only that Recover left no wedge"
     )
