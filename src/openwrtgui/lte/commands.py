@@ -40,6 +40,22 @@ SERVING = _read("--get-serving-system")
 SIGNAL = _read("--get-signal-info")
 OPMODE = _read("--get-device-operating-mode")
 IMEI = _read("--get-imei")
+SIM_STATE = _read("--uim-get-sim-state")
+PIN_STATUS = _read("--get-pin-status")
+
+Storage = Literal["sim", "me"]
+PIN_RULE = re.compile(r"[0-9]{4,8}")
+TARGET_RULE = re.compile(r"\+?[0-9]{3,15}")
+USSD_CODE = re.compile(r"[*#][0-9*#]{1,30}#")
+PIN_MESSAGE = "A PIN is 4 to 8 digits"
+TARGET_MESSAGE = "A number is digits with an optional + (3 to 15)"
+USSD_MESSAGE = "A USSD code looks like *100#: * or #, digits, * or #, ending in #"
+
+# the modem waits 30 s of silence for the network's answer; `timeout -s KILL` ends microcom at 35 s; the
+# transport gives up at 45 s (v1.3b E8)
+USSD_CANCEL = "AT+CUSD=2"
+USSD_WAIT_S = 35
+USSD_TIMEOUT_S = 45.0
 
 
 def set_opmode(device: str, mode: Literal["low_power", "online"]) -> str:
@@ -96,3 +112,38 @@ def at(port: str, *commands: str) -> str:
     _checked(AT_PORT, port, "a serial port")
     args = " ".join(shell_quote(check_at(c)) for c in commands)
     return f"printf '%s\\r' {args} | timeout -s KILL 10 microcom -t 2000 -s 115200 {port}"
+
+
+def _rule(rule: re.Pattern[str], value: str, message: str) -> str:
+    if not rule.fullmatch(value):
+        raise ValueError(message)
+    return value
+
+
+def verify_pin1(device: str, pin: str) -> str:
+    return uqmi(device, "--verify-pin1", _rule(PIN_RULE, pin, PIN_MESSAGE), timeout_ms=5000)
+
+
+def list_messages(device: str, storage: Storage) -> str:
+    return uqmi(device, "--list-messages", "--storage", storage)
+
+
+def get_message(device: str, storage: Storage, message_id: int) -> str:
+    return uqmi(device, "--get-message", str(int(message_id)), "--storage", storage, timeout_ms=5000)
+
+
+def delete_message(device: str, storage: Storage, message_id: int) -> str:
+    return uqmi(device, "--delete-message", str(int(message_id)), "--storage", storage, timeout_ms=5000)
+
+
+def send_message(device: str, target: str, text: str) -> str:
+    _rule(TARGET_RULE, target, TARGET_MESSAGE)
+    return uqmi(
+        device, "--send-message", shell_quote(text), "--send-message-target", target, timeout_ms=10000
+    )
+
+
+def ussd(port: str, code: str) -> str:
+    _checked(AT_PORT, port, "a serial port")
+    command = shell_quote(f'AT+CUSD=1,"{_rule(USSD_CODE, code, USSD_MESSAGE)}",15')
+    return f"printf '%s\\r' {command} | timeout -s KILL {USSD_WAIT_S} microcom -t 30000 -s 115200 {port}"

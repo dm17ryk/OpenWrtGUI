@@ -3,6 +3,8 @@ import zipfile
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from openwrtgui.guard.audit import AuditLog, mask
 
 
@@ -168,3 +170,12 @@ def test_a_line_about_a_router_tells_the_listeners(tmp_path: Path) -> None:
     audit.record(router="ap2", screen="Wi-Fi", command="wifi reload radio0", exit_status=0, source="user")
     audit.record(router=None, screen="Settings", command="settings saved", exit_status=None, source="app")
     assert heard == ["ap2"]
+
+
+@pytest.mark.parametrize(
+    "option", ["--verify-pin1", "--verify-pin2", "--uim-verify-pin1", "--pin", "--new-pin", "--puk"]
+)
+def test_the_audit_hides_a_uqmi_pin(option: str) -> None:
+    assert mask(f"uqmi -s -d /dev/cdc-wdm0 -t 5000 {option} 4321", ()) == (
+        f"uqmi -s -d /dev/cdc-wdm0 -t 5000 {option} <hidden>"
+    )

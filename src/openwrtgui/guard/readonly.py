@@ -24,7 +24,9 @@ _FIRMWARE_HASH = re.compile(
 )
 # the LTE screen's modem reads (lte/commands.py): serving system, signal, operating mode; not the IMEI
 _UQMI_READ = re.compile(
-    r"uqmi -s -d /dev/cdc-wdm[0-9] -t 2000 --get-(serving-system|signal-info|device-operating-mode)"
+    r"uqmi -s -d /dev/cdc-wdm[0-9] -t 2000 "
+    r"(--get-(serving-system|signal-info|device-operating-mode|pin-status)|--uim-get-sim-state"
+    r"|--list-messages --storage (sim|me))"
 )
 # Discovery's service read (discovery/services.py enabled_command): `enabled` only tests the rc.d link, and
 # the echo prints its exit status; the one `;` allowed, between exactly these two (#22, the v1.0 inventory)
