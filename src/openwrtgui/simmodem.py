@@ -77,18 +77,34 @@ class SimModem:
         self.teardown_reads = 0
         self._tearing = 0
         self.sync_raced = False
+        # tests (#93): after `ifup lte`, netifd's qmi.sh setup runs uqmi for the next `setup_reads` reads of
+        # the running counts. On a link that cannot connect, netifd retries the setup after `retry_gap` idle
+        # reads (0: the setup never pauses). An `ifdown lte` or a network reload during a setup leaves the
+        # modem's QMI channel failing (setup_cut): no session starts again; a modem restart does not help.
+        self.setup_reads = 0
+        self.retry_gap = 0
+        self.setup_cut = False
+        self._setup_left = 0
+        self._gap_left = 0
+        self._retry_next = False
         self._low_power_seen = False
         self.rx_bytes = 1_204_331
         self.tx_bytes = 3_876_002
 
     def answer(self, command: str) -> CommandResult | None:
         if command in (c.IFUP_LTE, c.IFDOWN_LTE):
-            blocked = self.stale_qmi or self.autoconnect_on or self.sync_raced
-            self.connected = command == c.IFUP_LTE and not blocked  # netifd's ifup exits 0 either way
+            if command == c.IFDOWN_LTE and self.setup_running():
+                self.setup_cut = True
+            self.connected = command == c.IFUP_LTE and not self._blocked()  # netifd's ifup exits 0 either way
             self._tearing = self.teardown_reads if command == c.IFDOWN_LTE else 0
+            if command == c.IFUP_LTE:
+                self.start_setup()
+            else:  # netifd stops retrying a link it took down
+                self._setup_left = self._gap_left = 0
+                self._retry_next = False
             return _ok()
-        if command == c.UQMI_RUNNING:
-            running = 1 if self._tearing > 0 else 0
+        if command in (c.UQMI_RUNNING, c.SETUP_RUNNING):
+            running = 1 if self._setup_read() or self._tearing > 0 else 0
             self._tearing = max(0, self._tearing - 1)
             return CommandResult("", f"{running}\n", "", 0 if running else 1)  # grep -c exits 1 on none
         if command == c.TTY_LIST:
@@ -139,10 +155,44 @@ class SimModem:
             return _ok()
         return _fail("Invalid argument\n")
 
+    def _blocked(self) -> bool:
+        """A fault that keeps any session from starting."""
+        return self.stale_qmi or self.autoconnect_on or self.sync_raced or self.setup_cut
+
+    def start_setup(self) -> None:
+        """netifd starts qmi.sh's setup now (an ifup, a retry, a reload). Tests use it to place a job inside a
+        retry."""
+        self._setup_left, self._gap_left, self._retry_next = self.setup_reads, 0, False
+
+    def setup_running(self) -> bool:
+        return self._setup_left > 0
+
+    def _setup_read(self) -> bool:
+        """One read of a running count: a setup advances by one read; on a failing link netifd retries after
+        its gap (at once when the gap is 0, so the setup never pauses). A retry starts at the read after the
+        gap's last, so a command sent right after an idle read lands in the gap."""
+        if self._retry_next:
+            self._retry_next = False
+            self._setup_left = self.setup_reads
+        if self._setup_left > 0:
+            self._setup_left -= 1
+            if self._setup_left == 0 and self._blocked():
+                self._gap_left = self.retry_gap
+                if self.retry_gap == 0:
+                    self._setup_left = self.setup_reads
+            return True
+        if self._gap_left > 0:
+            self._gap_left -= 1
+            self._retry_next = self._gap_left == 0 and self._blocked()
+        return False
+
     def netifd_restart(self) -> None:
         """netifd restarts an interface whose config changed (a network reload): the session comes back unless
-        a fault keeps it down."""
-        self.connected = not (self.stale_qmi or self.autoconnect_on)
+        a fault keeps it down. A setup it cuts off wedges QMI as an `ifdown lte` does (#93)."""
+        if self.setup_running():
+            self.setup_cut = True
+        self.connected = not self._blocked()
+        self.start_setup()
 
     def session_data(self) -> dict[str, str]:
         """The `data` entry of the lte interface's status while its session is up."""

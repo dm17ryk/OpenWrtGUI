@@ -124,6 +124,13 @@ Reconfigure for that). Otherwise it tries these steps in order, and stops as soo
    one second apart, then `ifup lte`. This is what the stock firmware's "Restore modem defaults" does.
 5. **Restart the modem**: `ifdown lte`, then Reboot modem's low power and online.
 
+Each step starts only when no LTE setup runs: the router's own LTE connect script (`qmi.sh`) and the `uqmi` it
+starts are not running. While LTE keeps failing, the router retries that setup about every 19 seconds, and a
+step that cut one off could leave the modem's QMI channel failing until the router reboots. So before each step
+Recover waits up to 20 seconds for a gap between retries, checking once a second. If no gap comes, the step is
+skipped and says so, and the next step waits again. If LTE starts working while Recover waits, it stops there
+and sends nothing more.
+
 After each step it waits up to 60 seconds for LTE to work. The preview lists every command it may run; each
 one after the first checks runs "only if LTE does not work after the step before". While it runs, the card
 lists each step with its result, and the other LTE writes on this router wait for it.

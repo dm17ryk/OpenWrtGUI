@@ -347,6 +347,92 @@ def test_lte_recording_hides_imei_and_iccid() -> None:
     assert "<imei>" in out and "<iccid>" in out and "ATI" in out
 
 
+def test_sanitize_modem_hides_numbers_and_text() -> None:
+    """v1.3a C10: the modem recording is public; message bodies and phone numbers never reach it."""
+    answer = (
+        'AT+CMGL=4\r\r\n+CMGL: 1,"REC READ","+972501234567",,"26/11/22,10:00:00+08"\r\n'
+        "call me at 0501234567\r\nOK\r\n"
+    )
+    out = rf.sanitize_modem("AT+CMGL=4", answer)
+    assert "+972501234567" not in out and "0501234567" not in out and "call me" not in out
+    assert "<text 21 chars>" in out and '"<field>"' in out
+    message = '{"sender":"+972501234567","text":"call me at 0501234567","smsc":"+972544444444"}'
+    clean = rf.sanitize_modem("uqmi ... --get-message 1", message)
+    assert clean == '{"sender":"<number>","text":"<text 21 chars>","smsc":"<number>"}'
+
+
+def test_sanitize_modem_hides_ucs2_bodies() -> None:
+    body = "0063006100006C006C0020006D0065"
+    out = rf.sanitize_modem(
+        "AT+CMGR=1", f'+CMGR: "REC UNREAD","+972501234567",,"26/11/22"\r\n{body}\r\nOK\r\n'
+    )
+    assert body not in out and f"<text {len(body)} chars>" in out
+
+
+def test_sanitize_modem_hides_unsolicited_messages_and_short_senders() -> None:
+    """v1.3a final review I5: an SMS that arrives during an AT query, a named or short-code sender, a PDU body
+    and a USSD reply never reach the public recording; the queries' own answers stay readable."""
+    pdu = "0791" + "A1B2C3D4E5F60718293A4B5C6D7E8F90" * 2
+    answer = (
+        'AT+CPMS?\r\r\n+CMT: "MyBank",,"26/11/22,10:00:00+08"\r\nYour code is 4471\r\n'
+        f"+CMT: ,24\r\n{pdu}\r\n"
+        '+CMGL: 2,"REC READ","1234",,"26/11/22,10:00:00+08"\r\nhi\r\n'
+        '+CUSD: 0,"Your balance is 12.50 NIS",15\r\n'
+        '+CPMS: "SM",1,20,"SM",1,20,"SM",1,20\r\nOK\r\n'
+    )
+    out = rf.sanitize_modem("AT+CPMS?", answer)
+    for private in ("MyBank", "Your code is 4471", pdu, '"1234"', "Your balance"):
+        assert private not in out, private
+    assert '+CPMS: "SM",1,20,"SM",1,20,"SM",1,20' in out
+    assert "+CUSD: 0," in out
+    assert rf.sanitize_modem("AT+CUSD?", "+CUSD: 0\r\nOK\r\n") == "+CUSD: 0\r\nOK\r\n"
+
+
+def test_sanitize_modem_hides_every_line_of_a_message() -> None:
+    """PR #100 Codex P2: a text-mode body can span lines; every line up to the response's end is hidden."""
+    answer = (
+        '+CMGR: "REC READ","+972501234567",,"26/11/22,10:00:00+08"\r\n'
+        "first line\r\nsecond line\r\n\r\nOK\r\n"
+        '+CMGL: 1,"REC READ","1234"\r\nonly line\r\n+CMGL: 2,"REC READ","1234"\r\nanother\r\nmore\r\nOK\r\n'
+    )
+    out = rf.sanitize_modem("AT+CMGR=1", answer)
+    for private in ("first line", "second line", "only line", "another", "more\r"):
+        assert private not in out, private
+    assert out.count("OK\r\n") == 2
+    assert "<text 10 chars>" in out and "<text 11 chars>" in out
+
+
+def test_the_recording_list_has_only_reads() -> None:
+    from openwrtgui.lte.at import is_query
+
+    help_text = "--get-pin-status --uim-get-sim-state --list-messages --get-message <id>"
+    reads = rf.modem_reads("/dev/cdc-wdm0", "/dev/ttyUSB1", help_text)
+    forbidden = (
+        "AT+CPIN=",
+        "AT+CPWD",
+        "--verify-pin",
+        "--set-pin-protection",
+        "--change-pin",
+        "--unblock-pin",
+        "AT+CMGS",
+        "AT+CMGD",
+        "AT+CUSD=1",
+        "--send-message",
+        "--delete-message",
+        "mode reset",
+        "AT&F",
+        "AT&W",
+        "AT+CFUN=",
+    )
+    assert not [r for r in reads for bad in forbidden if bad in r]
+    assert rf.UQMI_HELP in reads
+    assert any("--uim-get-sim-state" in r for r in reads) and any("--list-messages" in r for r in reads)
+    assert all(is_query(q) for q in rf.MODEM_AT_QUERIES)
+    # without them in this uqmi's help, the two optional reads are not sent
+    bare = rf.modem_reads("/dev/cdc-wdm0", "/dev/ttyUSB1", "")
+    assert not any("--uim-get-sim-state" in r or "--list-messages" in r for r in bare)
+
+
 MTD = (
     "dev:    size   erasesize  name\n"
     'mtd0: 00030000 00010000 "u-boot"\n'

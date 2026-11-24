@@ -184,6 +184,13 @@ class LteService:
             return False
         return (await t.run(c.UQMI_RUNNING)).stdout.strip() == "0"
 
+    async def setup_idle(self, t: Transport) -> bool:
+        """#93: no LTE setup runs (no qmi.sh, no uqmi), so an `ifdown lte` now cuts nothing off. Any answer
+        but 0 counts as a setup running: a step must not cut off what it cannot see. A router that does not
+        answer raises TransportError, so Recover fails the job instead of calling it a setup (final review
+        I3)."""
+        return (await t.run(c.SETUP_RUNNING)).stdout.strip() == "0"
+
     async def pause(self) -> None:
         await self._sleep(self.poll_s)
 

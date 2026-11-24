@@ -35,6 +35,25 @@ NEVER = (
     "AT&F",
     "AT&W",
     "AT+CFUN",
+    # v1.3a Global Constraints: SIM PIN writes, SMS and USSD are never sent by Recover
+    "AT+CPIN=",
+    "AT+CLCK=",
+    "AT+CPWD",
+    "--verify-pin",
+    "--set-pin-protection",
+    "--change-pin",
+    "--unblock-pin",
+    "AT+CMGS",
+    "AT+CMGD",
+    "AT+CUSD=1",
+    "--send-message",
+    "--delete-message",
+)
+SETUP_RUNNING = "ps w | grep -c -e '[q]mi\\.sh' -e '[u]qmi '"
+SETUP_BUSY = "not run: an LTE setup still ran after 20 s; cutting it off can wedge the modem"
+SETUP_WAITS = (
+    "Each step starts only when no LTE setup runs (no qmi.sh, no uqmi), waiting up to 20 s; a step that "
+    "would cut a setup off is skipped."
 )
 
 
@@ -43,6 +62,7 @@ def _fast(ctx: AppContext) -> Iterator[None]:
     ctx.lte.poll_s = 0.0
     ctx.lte.readback_s = 0.0
     ctx.lte_recover.autoconnect_gap_s = 0.0
+    ctx.lte_recover.setup_poll_s = 0.0
     yield
     sent = [e.command for e in ctx.audit.query()]
     assert not [c for c in sent if any(bad in c for bad in NEVER)]  # never, in any test here
@@ -232,6 +252,221 @@ async def test_nothing_helps_ends_not_recovered_with_the_reboot_advice(ctx: AppC
     assert (job.phase, job.detail) == ("not recovered", NOT_RECOVERED)
     assert job.rungs[4].outcome == "not yet"
     assert modem.opmode == "online"
+
+
+async def test_an_ifdown_never_lands_in_a_setup(ctx: AppContext) -> None:
+    """#93: on a failing link netifd retries qmi.sh's setup; an `ifdown lte` landing in one left AP2's QMI
+    channel failing until a router reboot. Each step waits for the gap between retries."""
+    modem = await _modem(ctx)
+    modem.connected, modem.stale_qmi = False, True
+    modem.setup_reads, modem.retry_gap = 3, 2
+    modem.start_setup()
+    job = await _recover(ctx)
+    assert modem.setup_cut is False
+    assert (job.phase, job.detail) == ("recovered", "LTE works again after: Clear QMI state.")
+    detail = job.rungs[1].detail
+    assert detail is not None and detail.startswith("waited ")
+    assert detail.endswith(" s for an LTE setup to finish")
+
+
+async def test_a_setup_that_never_pauses_skips_every_rung(ctx: AppContext) -> None:
+    modem = await _modem(ctx)
+    modem.connected, modem.stale_qmi = False, True
+    modem.setup_reads, modem.retry_gap = 3, 0
+    modem.start_setup()
+    job = await _recover(ctx)
+    assert [(r.outcome, r.detail) for r in job.rungs[1:]] == [("skipped", SETUP_BUSY)] * 4
+    assert "ifdown lte" not in _calls(ctx)
+    assert modem.setup_cut is False
+    assert (job.phase, job.detail) == ("not recovered", NOT_RECOVERED)
+
+
+async def test_rung_1_waits_before_putting_back_the_setup(ctx: AppContext) -> None:
+    """C5: putting back the saved setup reloads lte through netifd, which cuts a setup off as ifdown does."""
+    await _save(ctx)
+    await _drift(ctx)
+    modem = await _modem(ctx)
+    modem.connected = False
+    modem.setup_reads, modem.retry_gap = 2, 1
+    modem.start_setup()
+    job = await _recover(ctx)
+    assert modem.setup_cut is False
+    assert (job.phase, job.detail) == ("recovered", "LTE works again after: Put back the saved setup.")
+    detail = job.rungs[0].detail
+    assert detail is not None and detail.startswith("waited ")
+
+
+async def test_a_setup_restarting_after_one_idle_read_still_runs_the_rung(ctx: AppContext) -> None:
+    """Review Focus 1: the poll that decides is the first idle read; the step runs right after it."""
+    modem = await _modem(ctx)
+    modem.connected, modem.stale_qmi = False, True
+    # a gap must outlast the LTE check after a setup ends (PR #100 Codex P1): two idle reads
+    modem.setup_reads, modem.retry_gap = 1, 2
+    modem.start_setup()
+    job = await _recover(ctx)
+    assert "ifdown lte" in _calls(ctx)
+    assert job.rungs[1].outcome != "skipped"
+    assert modem.setup_cut is False
+
+
+async def test_stop_during_the_wait_puts_nothing_back(ctx: AppContext) -> None:
+    """Review Focus 2: no ifdown was sent yet, so a Stop during the wait has nothing to put back."""
+    modem = await _modem(ctx)
+    modem.connected, modem.stale_qmi = False, True
+    modem.setup_reads, modem.retry_gap = 3, 0
+    modem.start_setup()
+    real = modem.answer
+    reads = [0]
+
+    def stopping(command: str) -> CommandResult | None:
+        if command == SETUP_RUNNING:
+            reads[0] += 1
+            if reads[0] == 2:
+                ctx.lte_recover.request_stop("ap2")  # Stop pressed while rung 2 waits
+        return real(command)
+
+    modem.answer = stopping
+    job = await _recover(ctx)
+    assert job.phase == "stopped"
+    calls = _calls(ctx)
+    assert "ifdown lte" not in calls and "ifup lte" not in calls
+
+
+async def test_a_wedge_from_before_is_not_hidden(ctx: AppContext) -> None:
+    """Review Focus 4: a QMI channel already wedged at start: every step runs, nothing recovers, and the job
+    says to reboot the router."""
+    modem = await _modem(ctx)
+    modem.connected, modem.setup_cut = False, True
+    job = await _recover(ctx)
+    assert [r.outcome for r in job.rungs[1:]] == ["not yet"] * 4
+    assert (job.phase, job.detail) == ("not recovered", NOT_RECOVERED)
+
+
+async def test_a_router_that_stops_answering_during_the_wait_fails_the_job(ctx: AppContext) -> None:
+    """Final review I3 (Review Focus 3): a dead router is not "an LTE setup still ran"; the job fails at once
+    and says who did not answer."""
+    modem = await _modem(ctx)
+    modem.connected = False
+    real = modem.answer
+
+    def dead(command: str) -> CommandResult | None:
+        if command == SETUP_RUNNING:
+            raise TransportError("connection lost")
+        return real(command)
+
+    modem.answer = dead
+    job = await _recover(ctx)
+    assert job.phase == "failed"
+    assert job.error is not None and SETUP_RUNNING in job.error and "AP2 · office did not answer" in job.error
+    assert "ifdown lte" not in _calls(ctx)
+
+
+async def test_a_link_that_comes_up_during_the_wait_is_not_taken_down(ctx: AppContext) -> None:
+    """Final review I2: netifd's own setup succeeds while Recover waits for it; nothing is taken down."""
+    modem = await _modem(ctx)
+    modem.connected = False
+    modem.setup_reads = 3
+    modem.start_setup()
+    real = modem.answer
+    reads = [0]
+
+    def succeeding(command: str) -> CommandResult | None:
+        if command == SETUP_RUNNING:
+            reads[0] += 1
+            if reads[0] == 3:
+                modem.connected = True  # the setup's last read: it connected before qmi.sh exits
+        return real(command)
+
+    modem.answer = succeeding
+    job = await _recover(ctx)
+    assert "ifdown lte" not in _calls(ctx)
+    assert (job.phase, job.detail) == ("recovered", "LTE works again.")
+
+
+async def test_a_link_back_after_skipped_steps_is_not_called_lost(ctx: AppContext) -> None:
+    """Final review I2: two steps were skipped, then netifd's own retry succeeded; the job does not say "LTE
+    did not come back"."""
+    modem = await _modem(ctx)
+    modem.connected = False
+    real = modem.answer
+    reads = [0]
+
+    def busy_then_back(command: str) -> CommandResult | None:
+        if command == SETUP_RUNNING:
+            reads[0] += 1
+            if reads[0] == 42:  # netifd's retry connects while its qmi.sh still runs
+                modem.connected = True
+            if reads[0] <= 42:  # two full waits: 21 reads each, one a second from 0 to 20 s
+                return CommandResult(command, "1\n", "", 0)
+            return CommandResult(command, "0\n", "", 1)
+        return real(command)
+
+    modem.answer = busy_then_back
+    job = await _recover(ctx)
+    assert [r.outcome for r in job.rungs[1:3]] == ["skipped", "skipped"]
+    assert "ifdown lte" not in _calls(ctx)
+    assert (job.phase, job.detail) == ("recovered", "LTE works again.")
+
+
+async def test_the_wait_reads_every_second_for_the_whole_20_s(ctx: AppContext) -> None:
+    """Final review I4 and minor 1: one read a second, 21 reads from 0 to 20 s, so a short gap late in a ~19 s
+    retry cycle is still seen."""
+    modem = await _modem(ctx)
+    modem.connected, modem.stale_qmi = False, True
+    modem.setup_reads, modem.retry_gap = 15, 2  # a gap outlasts the LTE check that follows the setup's end
+    modem.start_setup()
+    job = await _recover(ctx)
+    rung = job.rungs[1]
+    assert rung.outcome != "skipped"
+    assert rung.detail is not None and rung.detail.startswith("waited 15 s for an LTE setup to finish")
+    assert modem.setup_cut is False
+
+
+async def test_a_gap_shorter_than_the_lte_check_is_not_used(ctx: AppContext) -> None:
+    """PR #100 Codex P1: a one-read gap between retries closes during the LTE check that follows a setup's
+    end; Recover does not step into it, it waits again and skips the step."""
+    modem = await _modem(ctx)
+    modem.connected, modem.stale_qmi = False, True
+    modem.setup_reads, modem.retry_gap = 1, 1
+    modem.start_setup()
+    job = await _recover(ctx)
+    assert "ifdown lte" not in _calls(ctx) and modem.setup_cut is False
+    assert [r.outcome for r in job.rungs[1:]] == ["skipped"] * 4
+
+
+async def test_the_setup_read_comes_right_before_every_ifdown(ctx: AppContext) -> None:
+    """PR #100 Codex P1: after a wait, Recover checks whether LTE works; netifd may start the next setup
+    during those reads, so the step re-reads the setup state and nothing else is sent between that idle read
+    and its `ifdown lte`."""
+    modem = await _modem(ctx)
+    modem.connected, modem.stale_qmi = False, True
+    modem.setup_reads, modem.retry_gap = 3, 2
+    modem.start_setup()
+    t = await ctx.pool.get(ctx.routers.get("ap2"))  # type: ignore[arg-type]
+    sent: list[tuple[str, str]] = []
+    real_run = t.run
+
+    async def logged(command: str, **kwargs: object) -> CommandResult:
+        result = await real_run(command, **kwargs)  # type: ignore[arg-type]
+        sent.append((command, result.stdout.strip()))
+        return result
+
+    t.run = logged  # type: ignore[method-assign]
+    job = await _recover(ctx)
+    assert job.phase == "recovered" and modem.setup_cut is False
+    downs = [i for i, (command, _) in enumerate(sent) if command == "ifdown lte"]
+    assert downs
+    for i in downs:
+        assert sent[i - 1] == (SETUP_RUNNING, "0"), sent[max(0, i - 4) : i + 1]
+
+
+async def test_the_preview_says_each_step_waits(ctx: AppContext) -> None:
+    preview = await ctx.lte_recover.preview("ap2")
+    warnings = list(preview.warnings)
+    assert SETUP_WAITS in warnings
+    drops = next(i for i, w in enumerate(warnings) if "LTE session drops" in w)
+    syncs = next(i for i, w in enumerate(warnings) if "sends --sync only once" in w)
+    assert drops < warnings.index(SETUP_WAITS) < syncs
 
 
 async def test_stop_finishes_the_put_back(ctx: AppContext) -> None:

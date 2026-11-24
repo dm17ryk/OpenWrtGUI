@@ -406,6 +406,80 @@ async def lte_commands(t: Runner) -> tuple[str, ...]:
     )
 
 
+# v1.3a (plan C9): what the modem says about its SIM, SMS and USSD, read only; 1.3b is written from it
+UQMI_HELP = "uqmi --help 2>&1"
+MODEM_AT_QUERIES = (
+    "AT+CPIN?",
+    "AT+CLCK=?",
+    "AT+CPMS?",
+    "AT+CMGF?",
+    "AT+CSCS?",
+    "AT+CNMI?",
+    "AT+CUSD?",
+    "AT+CUSD=?",
+)
+_OPTIONAL_UQMI_READS = ("--uim-get-sim-state", "--list-messages")
+_LONG_NUMBER = re.compile(r"\+?\d{7,}")
+_JSON_TEXT = re.compile(r'("text"\s*:\s*")((?:[^"\\]|\\.)*)(")')
+# final review I5, PR #100 Codex P2: a message header (read, listed, or arriving unsolicited during a
+# query) and every body line after it, up to OK, ERROR or the next `+XXX:` header
+_MESSAGE_HEADER = re.compile(r"^(\+(?:CMT|CDS|CBM|CMGR|CMGL):)(.*)$")
+_ANY_HEADER = re.compile(r"^\+[A-Z ]+:")
+HIDDEN_FIELD = '"<field>"'
+_QUOTED = re.compile(r'"[^"]*"')
+_CUSD_TEXT = re.compile(r'^(\+CUSD:\s*\d+\s*,\s*)"([^"]*)"', re.MULTILINE)
+_HEX_RUN = re.compile(r"\b[0-9A-Fa-f]{16,}\b")
+
+
+def modem_reads(device: str, port: str, uqmi_help: str = "") -> tuple[str, ...]:
+    """The modem recording's fixed list: uqmi's help, the SIM's PIN state, the SIM state and the SMS list when
+    this uqmi has them, and AT `?`/`=?` queries on the AT port. Never a PIN write, an SMS or a USSD code."""
+    reads = [UQMI_HELP, lc.uqmi(device, "--get-pin-status")]
+    reads += [lc.uqmi(device, option) for option in _OPTIONAL_UQMI_READS if option in uqmi_help]
+    reads += [lc.at(port, query) for query in MODEM_AT_QUERIES]
+    return tuple(reads)
+
+
+def _json_text(m: re.Match[str]) -> str:
+    return f"{m.group(1)}<text {len(json.loads(f'"{m.group(2)}"'))} chars>{m.group(3)}"
+
+
+def _mask_messages(text: str) -> str:
+    """Each message header keeps its kind with its quoted fields hidden; every non-empty line after it is
+    `<text N chars>` until OK, ERROR or another `+XXX:` header ends the message."""
+    out: list[str] = []
+    in_body = False
+    for line in text.split("\n"):
+        core, cr = (line[:-1], "\r") if line.endswith("\r") else (line, "")
+        header = _MESSAGE_HEADER.match(core)
+        if header:
+            out.append(f"{header.group(1)}{_QUOTED.sub(HIDDEN_FIELD, header.group(2))}{cr}")
+            in_body = True
+        elif core in ("OK", "ERROR") or _ANY_HEADER.match(core):
+            out.append(line)
+            in_body = False
+        elif in_body and core:
+            out.append(f"<text {len(core)} chars>{cr}")
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
+def sanitize_modem(command: str, text: str) -> str:
+    """sanitize, then the modem recording's private parts (plan C10, final review I5):
+    - each message body becomes `<text N chars>`: uqmi's `"text"`, and the line after an AT `+CMT`, `+CDS`,
+      `+CBM`, `+CMGR` or `+CMGL` header, whose quoted fields (a named or short-code sender, a time) become
+      `"<field>"`;
+    - a USSD reply's text becomes `<text N chars>`;
+    - every run of 16 or more hex digits (a PDU) becomes `<hex N chars>`;
+    - every run of 7 or more digits (a sender, an SMSC) becomes `<number>`."""
+    out = _JSON_TEXT.sub(_json_text, sanitize(text))
+    out = _mask_messages(out)
+    out = _CUSD_TEXT.sub(lambda m: f'{m.group(1)}"<text {len(m.group(2))} chars>"', out)
+    out = _HEX_RUN.sub(lambda m: f"<hex {len(m.group(0))} chars>", out)
+    return _LONG_NUMBER.sub("<number>", out)
+
+
 async def run_set(
     t: Runner, commands: tuple[str, ...], *, timed: frozenset[str] = frozenset()
 ) -> dict[str, dict[str, object]]:
