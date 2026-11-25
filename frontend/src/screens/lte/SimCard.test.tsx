@@ -10,7 +10,8 @@ const BLOCKED_NOTE = 'The SIM is blocked: it needs its PUK, which the app does n
 const LAST_TRY_NOTE = 'One try left: enter the PIN in a phone or the D-Link UI, so a wrong PIN does not block the SIM'
 
 let sim: SimState = NEEDED
-let answer: PinResult | Error | null = null
+let answer: PinResult | Error | 'pending' | null = null
+let release: (() => void) | null = null
 const posts: Array<{ path: string; body: unknown }> = []
 
 vi.mock('../../api/client', async (orig) => {
@@ -24,6 +25,10 @@ vi.mock('../../api/client', async (orig) => {
     postJson: vi.fn(async (path: string, body?: unknown) => {
       posts.push({ path, body })
       if (path !== '/api/routers/ap2/lte/sim/pin') throw new Error(`unexpected ${path}`)
+      if (answer === 'pending') {
+        await new Promise<void>((resolve) => (release = resolve))
+        return { accepted: true, sim: { ...NEEDED, pin: 'entered', can_enter_pin: false }, message: 'PIN accepted' }
+      }
       if (answer instanceof Error) throw answer
       return answer
     }),
@@ -40,6 +45,7 @@ const LIVE: GuardOut = {
 beforeEach(() => {
   sim = NEEDED
   answer = null
+  release = null
   posts.length = 0
 })
 
@@ -109,6 +115,21 @@ test('an accepted PIN says so and the field is empty', async () => {
   await user.click(screen.getByRole('button', { name: 'Enter PIN' }))
   expect(await screen.findByText('PIN accepted')).toBeInTheDocument()
   expect(document.body).not.toHaveTextContent('4321')
+})
+
+test('the PIN field is locked while the verify is pending, and empty after it settles', async () => {
+  const user = userEvent.setup()
+  answer = 'pending'
+  renderSim()
+  const field = await screen.findByLabelText('SIM PIN')
+  await user.type(field, '1234')
+  await user.click(screen.getByRole('button', { name: 'Enter PIN' }))
+  await waitFor(() => expect(field).toBeDisabled())
+  expect(field).toHaveValue('')
+  release?.()
+  expect(await screen.findByText('PIN accepted')).toBeInTheDocument()
+  expect(field).toHaveValue('')
+  expect(document.body).not.toHaveTextContent('1234')
 })
 
 test('a refusal from the server shows its text and still empties the field', async () => {

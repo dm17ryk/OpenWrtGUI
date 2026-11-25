@@ -59,6 +59,7 @@ export function SimCard({ routerId }: { routerId: string }) {
       setAnswer({ text: err instanceof ApiError ? err.detail : String(err), ok: false })
     } finally {
       setBusy(false)
+      setPin('') // anything typed meanwhile goes too
       void client.invalidateQueries({ queryKey: ['lte-sim', routerId] })
     }
   }
@@ -91,6 +92,7 @@ export function SimCard({ routerId }: { routerId: string }) {
                 autoComplete="off"
                 spellCheck={false}
                 maxLength={8}
+                disabled={isBusy}
                 value={pin}
                 onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
               />
