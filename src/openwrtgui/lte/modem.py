@@ -4,7 +4,7 @@ connection, modem device, AT lock and write slot they borrow."""
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from openwrtgui.guard.audit import HIDDEN, AuditLog, mask
 from openwrtgui.guard.bench_guard import BenchGuard
@@ -12,9 +12,10 @@ from openwrtgui.guard.writes import run_audited
 from openwrtgui.lte import commands as c
 from openwrtgui.lte.commands import Storage
 from openwrtgui.lte.parse import parse_at
-from openwrtgui.lte.service import SCREEN, LteService
+from openwrtgui.lte.service import PUT_BACK_SCREEN, SCREEN, LteService
 from openwrtgui.lte.sim import NOTE_BLOCKED, NOTE_LAST_TRY, SimState, parse_sim_state
 from openwrtgui.lte.sms import SmsMessage, check_text, parse_cpms, parse_ids, parse_message
+from openwrtgui.lte.ussd import UssdReply, parse_cusd, reply_of
 from openwrtgui.net.apply import NetPlan
 from openwrtgui.store.routers import RouterRecord
 from openwrtgui.transport.base import Transport, TransportError
@@ -30,6 +31,8 @@ LIST_CHANGED = "The message list changed; preview again"
 SEND_WARNING = "This sends an SMS from the router's SIM to {target}; the carrier may charge for it"
 WRITE_TIMEOUT_S = 15.0
 SEND_TIMEOUT_S = 15.0
+USSD_WARNING = "The app listens up to 35 s for the network's reply; the AT console waits until then"
+NO_AT_PORT = "No AT port answered on {name}"
 
 
 class NoSuchMessage(LookupError):
@@ -79,6 +82,13 @@ def _plan(rec: RouterRecord, lines: tuple[str, ...], warnings: tuple[str, ...]) 
         warnings=warnings,
         secrets=(),
     )
+
+
+def _ussd_reply(stdout: str) -> UssdReply:
+    """The network's +CUSD answer comes after the request's OK (E8), past where parse_at's lines end, so every
+    line microcom printed is searched. Its exit status is not: a reply that kept microcom listening past the
+    35 s kill was still printed."""
+    return reply_of(parse_cusd([line.strip() for line in stdout.splitlines()]))
 
 
 class PinRefused(Exception):
@@ -290,3 +300,69 @@ class ModemService:
                 return SmsDone(ok=False, lines=tuple(done), error=mask(reason, secrets))
             done.append(line)
         return SmsDone(ok=True, lines=tuple(done), error=None)
+
+    # ---------------------------------------------------------------- USSD (E8, E9)
+    async def _at_port(self, rec: RouterRecord, t: Transport) -> str:
+        """The modem's AT port; the caller holds the AT lock."""
+        port = await self._lte.at_port(rec, t)
+        if port is None:
+            raise ValueError(NO_AT_PORT.format(name=rec.name))
+        return port
+
+    def _ussd_plan(self, rec: RouterRecord, port: str, code: str) -> NetPlan:
+        return _plan(rec, (c.ussd(port, code),), (USSD_WARNING,))
+
+    async def plan_ussd(self, router_id: str, code: str) -> NetPlan:
+        """The line names the AT port: finding it takes the AT lock, so a preview waits behind a running
+        exchange as the AT console does."""
+        rec, t, _device = await self._lte.connection(router_id)
+        async with self._lte.at_lock(rec.id):
+            port = await self._at_port(rec, t)
+        return self._ussd_plan(rec, port, code)
+
+    async def ussd(self, router_id: str, code: str, digest: str) -> UssdReply:
+        """E8: the request and its 35 s listen hold the write slot, and with it the AT lock. The port is found
+        inside the slot, so a USSD refuses (409) behind another write instead of waiting for the AT lock.
+        A harness run that starts during the wait ends nothing: the request went out before, and its reply
+        comes back (Review Focus 4)."""
+        rec, t, _device = await self._lte.connection(router_id)
+        self._guard.require_clear()
+        async with self._lte.write_slot(rec):
+            port = await self._at_port(rec, t)
+            plan = self._ussd_plan(rec, port, code)
+            if plan.digest != digest:
+                raise PreviewChanged(rec.name)
+            done = await run_audited(
+                t,
+                plan.lines[0],
+                router_id=rec.id,
+                screen=SCREEN,
+                guard=self._guard,
+                audit=self._audit,
+                timeout=c.USSD_TIMEOUT_S,
+            )
+            reply = _ussd_reply(done.stdout)
+            if reply.status not in ("more", "no reply"):
+                return reply
+            return replace(reply, closed=await self._cancel(rec, t, port))
+
+    async def _cancel(self, rec: RouterRecord, t: Transport, port: str) -> bool:
+        """E9: AT+CUSD=2 through the 2 s AT path, for a menu the app cannot follow or a reply that never came.
+        It ends only the session this request opened, so a harness run that started during the wait does not
+        stop it: it is then sent past Bench Guard and audited as a put-back line (spec 4.2). True: the modem
+        took it."""
+        screen = PUT_BACK_SCREEN if self._guard.state().live else SCREEN
+        try:
+            done = await run_audited(
+                t,
+                c.at(port, c.USSD_CANCEL),
+                router_id=rec.id,
+                screen=screen,
+                guard=self._guard,
+                audit=self._audit,
+                require_guard=False,
+            )
+        except TransportError:  # the reply is already in hand: it still goes back, not closed
+            return False
+        answer = parse_at(done.stdout, c.USSD_CANCEL)
+        return answer is not None and answer.status == "OK"

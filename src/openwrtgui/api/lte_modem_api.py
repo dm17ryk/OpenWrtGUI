@@ -15,6 +15,7 @@ from openwrtgui.lte.commands import Storage
 from openwrtgui.lte.modem import NoSuchMessage, PinRefused, PinResult, SmsDone, SmsList
 from openwrtgui.lte.sim import SimState
 from openwrtgui.lte.sms import SmsMessage
+from openwrtgui.lte.ussd import UssdReply
 
 router = APIRouter(prefix="/api/routers/{router_id}/lte", dependencies=[Depends(require_token)], tags=["lte"])
 Ctx = Annotated[AppContext, Depends(get_ctx)]
@@ -108,3 +109,24 @@ async def sms_send_preview(router_id: str, body: SmsSendIn, ctx: Ctx) -> NetPlan
 async def sms_send_apply(router_id: str, body: SmsSendApplyIn, ctx: Ctx) -> SmsDone:
     """423 during a harness run; 409 when the text changed since the preview or an LTE action runs."""
     return await ctx.lte_modem.send(_known(ctx, router_id), body.target, body.text, body.digest)
+
+
+# ---------------------------------------------------------------- USSD (E8, E9)
+class UssdIn(BaseModel):
+    code: str = Field(max_length=40)
+
+
+class UssdApplyIn(UssdIn, Digest):
+    pass
+
+
+@router.post("/ussd/preview")
+async def ussd_preview(router_id: str, body: UssdIn, ctx: Ctx) -> NetPlanOut:
+    return NetPlanOut.of(await ctx.lte_modem.plan_ussd(_known(ctx, router_id), body.code))
+
+
+@router.post("/ussd/apply")
+async def ussd_apply(router_id: str, body: UssdApplyIn, ctx: Ctx) -> UssdReply:
+    """Up to 45 s: the network's reply, or "no reply". 423 during a harness run; 409 when the code changed
+    since the preview or an LTE action runs."""
+    return await ctx.lte_modem.ussd(_known(ctx, router_id), body.code, body.digest)
