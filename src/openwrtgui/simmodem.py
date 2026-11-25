@@ -109,6 +109,8 @@ class SimModem:
             "*111#": (1, "1 Balance 2 Packages", 15),
             "*200#": (0, "05E905DC05D505DD", 72),
         }
+        # codes the modem refuses at once, with its final line (ERROR or +CME ERROR: n): no OK, no +CUSD (P10)
+        self.ussd_errors: dict[str, str] = {"*400#": "ERROR"}
         self.rx_bytes = 1_204_331
         self.tx_bytes = 3_876_002
 
@@ -255,6 +257,10 @@ class SimModem:
         reply = self.ussd_replies.get(m.group(1)) if m is not None else None
         return None if reply is None else f'+CUSD: {reply[0]},"{reply[1]}",{reply[2]}'
 
+    def _ussd_error(self, command: str) -> str | None:
+        m = _CUSD.fullmatch(command)
+        return self.ussd_errors.get(m.group(1)) if m is not None else None
+
     def _blocked(self) -> bool:
         """A fault that keeps any session from starting."""
         return self.stale_qmi or self.autoconnect_on or self.sync_raced or self.setup_cut
@@ -306,6 +312,9 @@ class SimModem:
         out: list[str] = []
         for command in commands:
             out.append(f"{command}\r\r\n")
+            if (refused := self._ussd_error(command)) is not None:
+                out.append(f"{refused}\r\n")
+                continue
             lines = self._at_lines(command)
             if lines is None and re.fullmatch(r"AT\+[A-Z]+=.*", command, re.IGNORECASE):
                 lines = ()  # a setting the simulator accepts

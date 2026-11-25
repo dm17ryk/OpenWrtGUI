@@ -153,6 +153,15 @@ def test_ussd() -> None:
     assert _out(m, c.at(AT, c.USSD_CANCEL)).endswith("OK\r\n")
 
 
+def test_a_ussd_code_the_modem_refuses_answers_its_error_line() -> None:
+    """P10: no OK and no +CUSD, only the final error line."""
+    m = _modem()
+    refused = [line for line in _out(m, c.ussd(AT, "*400#")).splitlines() if line]
+    assert refused == ['AT+CUSD=1,"*400#",15', "ERROR"]
+    m.ussd_errors["*401#"] = "+CME ERROR: 30"
+    assert _out(m, c.ussd(AT, "*401#")).endswith("\r\n+CME ERROR: 30\r\n")
+
+
 def test_ussd_on_a_silent_port_and_bmmododr_range() -> None:
     m = _modem()
     assert _out(m, c.ussd("/dev/ttyUSB0", "*100#")) == ""

@@ -143,7 +143,12 @@ def send_message(device: str, target: str, text: str) -> str:
     )
 
 
+def ussd_request(code: str) -> str:
+    """The AT text of a USSD request, as the modem echoes it."""
+    return f'AT+CUSD=1,"{_rule(USSD_CODE, code, USSD_MESSAGE)}",15'
+
+
 def ussd(port: str, code: str) -> str:
     _checked(AT_PORT, port, "a serial port")
-    command = shell_quote(f'AT+CUSD=1,"{_rule(USSD_CODE, code, USSD_MESSAGE)}",15')
+    command = shell_quote(ussd_request(code))
     return f"printf '%s\\r' {command} | timeout -s KILL {USSD_WAIT_S} microcom -t 30000 -s 115200 {port}"

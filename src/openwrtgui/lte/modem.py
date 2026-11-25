@@ -84,11 +84,19 @@ def _plan(rec: RouterRecord, lines: tuple[str, ...], warnings: tuple[str, ...]) 
     )
 
 
-def _ussd_reply(stdout: str) -> UssdReply:
-    """The network's +CUSD answer comes after the request's OK (E8), past where parse_at's lines end, so every
+def _ussd_reply(stdout: str, request: str) -> tuple[UssdReply, bool]:
+    """The reply, and whether the app closes the session (E9): the network asked for more, or no +CUSD came.
+
+    The network's +CUSD answer comes after the request's OK (E8), past where parse_at's lines end, so every
     line microcom printed is searched. Its exit status is not: a reply that kept microcom listening past the
-    35 s kill was still printed."""
-    return reply_of(parse_cusd([line.strip() for line in stdout.splitlines()]))
+    35 s kill was still printed (P9). No +CUSD and an ERROR for the request: the modem refused it at once, an
+    "error" with its line, not "no reply" (P10)."""
+    parsed = parse_cusd([line.strip() for line in stdout.splitlines()])
+    reply = reply_of(parsed)
+    answer = parse_at(stdout, request) if parsed is None else None
+    if answer is not None and answer.status == "ERROR":
+        reply = UssdReply(status="error", text=answer.error, dcs=None, closed=False)
+    return reply, parsed is None or reply.status == "more"
 
 
 class PinRefused(Exception):
@@ -341,8 +349,8 @@ class ModemService:
                 audit=self._audit,
                 timeout=c.USSD_TIMEOUT_S,
             )
-            reply = _ussd_reply(done.stdout)
-            if reply.status not in ("more", "no reply"):
+            reply, close = _ussd_reply(done.stdout, c.ussd_request(code))
+            if not close:
                 return reply
             return replace(reply, closed=await self._cancel(rec, t, port))
 

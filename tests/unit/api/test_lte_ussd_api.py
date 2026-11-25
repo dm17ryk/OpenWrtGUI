@@ -122,6 +122,21 @@ async def test_an_unknown_code_is_no_reply_and_the_app_closes_the_session(
     assert _audited(ctx) == [(_line("*999#"), SCREEN), (CANCEL, SCREEN)]
 
 
+@pytest.mark.parametrize(("code", "error"), [("*400#", "ERROR"), ("*401#", "+CME ERROR: 30")])
+async def test_an_at_error_to_the_code_is_an_error_and_the_app_closes_the_session(
+    authed: httpx.AsyncClient, ctx: AppContext, code: str, error: str
+) -> None:
+    """P10: the modem refused the request at once (no network, a session already open): "error" with its line,
+    not "no reply"; AT+CUSD=2 still goes, and closed follows its answer."""
+    (await _modem(ctx)).ussd_errors[code] = error
+    answer = await _apply(authed, code)
+    assert (answer.status_code, answer.json()) == (
+        200,
+        {"status": "error", "text": error, "dcs": None, "closed": True},
+    )
+    assert _audited(ctx) == [(_line(code), SCREEN), (CANCEL, SCREEN)]
+
+
 @pytest.mark.parametrize(("m", "status"), [(2, "ended"), (3, "ended"), (4, "error"), (5, "error")])
 async def test_a_session_the_network_ended_or_refused_is_not_cancelled(
     authed: httpx.AsyncClient, ctx: AppContext, m: int, status: str

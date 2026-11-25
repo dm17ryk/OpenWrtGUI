@@ -121,6 +121,7 @@ def test_ussd_waits_30_s_of_silence_and_is_killed_at_35() -> None:
         "printf '%s\\r' 'AT+CUSD=1,\"*100#\",15' | "
         "timeout -s KILL 35 microcom -t 30000 -s 115200 /dev/ttyUSB1"
     )
+    assert c.ussd_request("*100#") == 'AT+CUSD=1,"*100#",15'  # the AT text alone (P10)
     assert c.USSD_CANCEL == "AT+CUSD=2"
     assert c.USSD_WAIT_S == 35
     assert c.USSD_TIMEOUT_S == 45.0
@@ -142,6 +143,8 @@ def test_a_target_is_digits_with_an_optional_plus(bad: str) -> None:
 def test_a_ussd_code_is_star_or_hash_digits_and_hash(bad: str) -> None:
     with pytest.raises(ValueError, match=r"A USSD code looks like \*100#"):
         c.ussd("/dev/ttyUSB1", bad)
+    with pytest.raises(ValueError, match=r"A USSD code looks like \*100#"):
+        c.ussd_request(bad)
 
 
 def test_reads_are_read_only_and_writes_are_not() -> None:
