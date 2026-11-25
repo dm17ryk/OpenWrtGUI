@@ -162,8 +162,9 @@ class ModemService:
 
     async def enter_pin(self, router_id: str, pin: str) -> PinResult:
         """E4: the PIN rule before anything is sent, Bench Guard clear, the write slot, audited with the PIN
-        hidden. The SIM's state is read inside the slot, right before the PIN goes, so two tries can never
-        both pass the last-try check (E3)."""
+        hidden by the audit's uqmi rule (by position: a PIN 5000 leaves `-t 5000` as sent). The SIM's state is
+        read inside the slot, right before the PIN goes, so two tries can never both pass the last-try check
+        (E3)."""
         rec, t, device = await self._lte.connection(router_id)
         command = c.verify_pin1(device, pin)
         self._guard.require_clear()
@@ -179,7 +180,6 @@ class ModemService:
                     screen=SCREEN,
                     guard=self._guard,
                     audit=self._audit,
-                    secrets=(pin,),
                     timeout=VERIFY_TIMEOUT_S,
                 )
             except TransportError as exc:  # an error that names the command would show the PIN (E4)
@@ -261,7 +261,7 @@ class ModemService:
             plan = self._delete_plan(rec, device, storage, ids)
             if plan.digest != digest:
                 raise PreviewChanged(rec.name)
-            return await self._run_all(rec, t, plan, secrets=())
+            return await self._run_all(rec, t, plan)
 
     def _send_plan(self, rec: RouterRecord, device: str, target: str, text: str) -> NetPlan:
         command = c.send_message(device, target, check_text(text))
@@ -273,22 +273,18 @@ class ModemService:
         return self._send_plan(rec, device, target, text)
 
     async def send(self, router_id: str, target: str, text: str, digest: str) -> SmsDone:
+        """The audit hides the text by its position in the command, never as a substring (E6, final review
+        I1), so it keeps the number whatever the text is."""
         rec, t, device = await self._lte.connection(router_id)
         plan = self._send_plan(rec, device, target, text)
         self._guard.require_clear()
         async with self._lte.write_slot(rec):
             if plan.digest != digest:
                 raise PreviewChanged(rec.name)
-            return await self._run_all(rec, t, plan, secrets=(text,), timeout=SEND_TIMEOUT_S)
+            return await self._run_all(rec, t, plan, timeout=SEND_TIMEOUT_S)
 
     async def _run_all(
-        self,
-        rec: RouterRecord,
-        t: Transport,
-        plan: NetPlan,
-        *,
-        secrets: tuple[str, ...],
-        timeout: float = WRITE_TIMEOUT_S,
+        self, rec: RouterRecord, t: Transport, plan: NetPlan, *, timeout: float = WRITE_TIMEOUT_S
     ) -> SmsDone:
         """One audited command per plan line, in order; the first failure stops the rest."""
         done: list[str] = []
@@ -300,12 +296,11 @@ class ModemService:
                 screen=SCREEN,
                 guard=self._guard,
                 audit=self._audit,
-                secrets=secrets,
                 timeout=timeout,
             )
             if not result.ok:
                 reason = (result.stderr or result.stdout).strip() or f"exit {result.exit_status}"
-                return SmsDone(ok=False, lines=tuple(done), error=mask(reason, secrets))
+                return SmsDone(ok=False, lines=tuple(done), error=mask(reason, ()))
             done.append(line)
         return SmsDone(ok=True, lines=tuple(done), error=None)
 

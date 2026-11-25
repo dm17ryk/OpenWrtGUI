@@ -34,6 +34,10 @@ AT_MASKED_COMMANDS = r"[+$]\s*(?:CPIN|CLCK|CPWD|CGAUTH|QICSGP|QCPDPP)\s*=(?!\s*\
 _AT_SECRET = re.compile(rf"({AT_MASKED_COMMANDS})((?:'\\''|[^'\r\n])*)", re.IGNORECASE)
 # a PIN or PUK given to uqmi as an option value (v1.3b): `--verify-pin1 1234`
 _UQMI_PIN = re.compile(r"(--(?:uim-)?verify-pin[12]|--pin|--new-pin|--puk)\s+\S+")
+# an SMS text given to uqmi (v1.3b E6), shell-quoted '…' with a ' inside written as '\'': hidden by its
+# position, whole, so neither a ' inside nor a text as short as one digit can leave it in clear or shred the
+# number after it (final review I1, security M1/L3)
+_UQMI_SMS_TEXT = re.compile(r"(--send-message )('(?:[^']*'\\'')*[^']*'|\S+)")
 
 
 def _hide_value(match: re.Match[str]) -> str:
@@ -63,6 +67,7 @@ def mask(command: str, secrets: Sequence[str]) -> str:
     command = _UCI_SECRET.sub(_hide_value, command)
     command = _AT_SECRET.sub(rf"\1{HIDDEN}", command)
     command = _UQMI_PIN.sub(rf"\1 {HIDDEN}", command)
+    command = _UQMI_SMS_TEXT.sub(rf"\1'{HIDDEN}'", command)
     return _JSON_SECRET.sub(rf'\1"{HIDDEN}"', command)
 
 

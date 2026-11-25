@@ -175,6 +175,17 @@ async def test_the_pin_is_shown_nowhere_but_the_command_sent(
     assert modem.pin1 == "verified"
 
 
+async def test_a_pin_equal_to_the_timeout_hides_only_the_pin(
+    authed: httpx.AsyncClient, ctx: AppContext
+) -> None:
+    """Security L3: the audit hides the PIN by position, so PIN 5000 leaves `-t 5000` as sent; hiding both
+    would tell the PIN."""
+    await _needs_pin(ctx)
+    answer = await authed.post(PIN, json={"pin": "5000"})
+    assert answer.status_code == 200 and "5000" not in answer.text
+    assert _audited(ctx) == [AUDITED_VERIFY]
+
+
 @pytest.mark.parametrize(
     ("pin", "detail"),
     [("12ab", "A PIN is 4 to 8 digits"), ("123", "A PIN is 4 to 8 digits"), ("1" * 17, None)],

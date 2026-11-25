@@ -10,7 +10,7 @@ from openwrtgui.context import AppContext
 from openwrtgui.lte import commands as c
 from openwrtgui.lte.sms import GSM_RULE
 from openwrtgui.simmodem import SimModem
-from openwrtgui.transport.base import CommandResult
+from openwrtgui.transport.base import CommandResult, TransportError
 from openwrtgui.transport.fake import ReplayTransport
 
 BASE = "/api/routers/ap1/lte/sms"
@@ -265,6 +265,44 @@ async def test_apply_sends_and_the_audit_hides_the_text_but_not_the_number(
     (audited,) = _audited(ctx)
     assert "<hidden>" in audited and "Hello there" not in audited
     assert "--send-message-target +15550104" in audited
+
+
+AUDITED_SEND = "uqmi -s -d /dev/cdc-wdm0 -t 10000 --send-message '<hidden>' --send-message-target +15550104"
+
+
+@pytest.mark.parametrize("text", ["It's ok", "a", "5", "0101", "line one\nline two", "Hello there"])
+async def test_the_audit_hides_any_text_whole_and_keeps_the_number(
+    authed: httpx.AsyncClient, ctx: AppContext, text: str
+) -> None:
+    """Final review I1 / security M1, L3: by position, so a `'` cannot leave the text in clear and a short
+    text cannot shred the line or hide digits of the number (E6)."""
+    body = {"target": "+15550101", "text": text}
+    digest = (await authed.post(f"{BASE}/send/preview", json=body)).json()["digest"]
+    answer = await authed.post(f"{BASE}/send/apply", json={**body, "digest": digest})
+    assert answer.status_code == 200 and answer.json()["ok"] is True
+    assert (await _modem(ctx)).sent == [("+15550101", text)]
+    assert _audited(ctx) == [AUDITED_SEND.replace("+15550104", "+15550101")]
+
+
+async def test_a_lost_connection_still_audits_the_text_hidden(
+    authed: httpx.AsyncClient, ctx: AppContext
+) -> None:
+    """The TransportError path of run_audited masks the same way."""
+    digest = (await _preview_send(authed, "It's ok")).json()["digest"]
+    modem = await _modem(ctx)
+    real = modem.answer
+
+    def lost(command: str) -> CommandResult | None:
+        if "--send-message " in command:
+            raise TransportError("connection lost")
+        return real(command)
+
+    modem.answer = lost  # type: ignore[method-assign]
+    answer = await authed.post(
+        f"{BASE}/send/apply", json={"target": "+15550104", "text": "It's ok", "digest": digest}
+    )
+    assert answer.status_code == 502
+    assert _audited(ctx) == [AUDITED_SEND]
 
 
 async def test_a_changed_text_is_a_409_and_sends_nothing(authed: httpx.AsyncClient, ctx: AppContext) -> None:
