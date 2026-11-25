@@ -85,7 +85,7 @@ app deletes its saved setup.
 ## Modem
 
 Manufacturer, model and firmware (from `AT+CGMI`, `AT+CGMM`, `AT+CGMR`), the operating mode, and the
-network mode order the modem reports (`AT+BMMODODR?`; the numbers are not mapped to names yet). The IMEI
+network mode order the modem reports (`AT+BMMODODR?`), as its number and the modem's own name for it. The IMEI
 shows as dots until you press **Reveal**; it is read from the modem then and never stored, logged or written to
 the audit log.
 

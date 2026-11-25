@@ -18,6 +18,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - LTE modem › **USSD**: send one USSD code and read the network's reply. The app listens up to 35 s, the AT
   console waits meanwhile, and menus are not supported: the session is closed after the first reply. Codes that
   change or unblock a PIN, set call barring, or start with `**` or `##` are refused.
+- LTE modem › **Modem**: the network mode order shows the modem's own name for it, for example "17 · AUTO
+  (LTE>WCDMA>GSM>TDS>HDR>CDMA)". SMS texts that the modem stores in UCS-2 (other alphabets) are read too.
 
 ### Fixed
 

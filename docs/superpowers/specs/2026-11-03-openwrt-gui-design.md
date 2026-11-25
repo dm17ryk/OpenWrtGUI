@@ -295,7 +295,7 @@ The wizard described in section 5.
 - **Settings** (uci `network.lte`): APN, auth (none/PAP/CHAP/both) with user/password, PIN, PDP type (`ipv4` / `ipv6` / `ipv4v6`), MTU (1420 on AP2), metric, bring up at boot, default route. The `qmi` option `autoconnect` is the modem's own autoconnect: this image's `qmi.sh` (custom `dwr921_qmi_*` functions) writes it into the modem's memory, so the UI keeps it apart from "bring up at boot". `lte_4` stays DHCP; the UI explains why. The other options of the `qmi` handler (25 in all, e.g. `modes`, `plmn`, `delay`, `profile`, `v6apn`) appear under **All options**.
 - **Modem**:
   - info: manufacturer, model, firmware (ATI); IMEI hidden until revealed
-  - network mode order (`AT+BMMODODR`; code names still to map)
+  - network mode order (`AT+BMMODODR`; shown with the modem's own name for the code, from `AT+BMMODODR=?`)
 - **Actions**:
   - connect / disconnect (`ifup`/`ifdown lte`)
   - reboot modem (QMI operating mode reset, or AT; to be verified)
@@ -492,7 +492,7 @@ Each milestone gets its own implementation plan. The first plan covers v0.1 Foun
 | # | Item | How to close it |
 |---|---|---|
 | O1 | BM806C "reset to defaults" command. The D-Link firmware's `libusbmodem.so` resets its DWP-812 modem profile with `AT%SYSCMD="/etc/sysconfig/script/cus_restore_default.sh"`, but the BM806C answers `AT%SYSCMD=?` with ERROR. `usbmodem_set_defaults` references `AT+BMMODODR=17`. An earlier Claude Code session reportedly reset this modem over SSH; the command is not in the local transcripts | Ask Dmitry for the command, or disassemble `usbmodem_set_defaults`; then test on AP2's modem with Dmitry's OK |
-| O2 | Names for the `AT+BMMODODR` codes (17 now) | BroadMobi AT manual. v0.6 shows the code read-only ("names not mapped yet") |
+| O2 | Names for the `AT+BMMODODR` codes (17 now) | Resolved: the names come from the modem's own `AT+BMMODODR=?` answer (21 orders; AP2 window 2026-11-25). The screen shows the code with its name |
 | O3 | Operator name from QMI comes back garbled (encoding) | v0.6: the operator comes from `AT+COPS?`; QMI's name only when no AT port answers, marked "(from QMI, may be garbled)" |
 | O4 | rt2800 noise floor and RX/TX air-time split are expected missing; confirm with the radio up | **Done 2026-11-05 on AP2 (on air, ch 6):** `survey dump` has no `noise` line and no RX/TX time on any channel, only active, busy and extension busy time. rt2800 also marks every channel `[in use]`, so the RF sampler takes the entry of the radio's own frequency (`current_survey`). The radio's own beacons, read on a monitor interface of the same radio, come from the TX path: `6.0 Mb/s [bit 15] BSSID:…`, with no `<freq> MHz` (the beacon parser reads the rate after the timestamp). So the beacon check reads the rate the driver reports for the beacons it sent, not beacons heard over the air. The monitor interface goes only with `iw dev owgmon0 del`; `ip link del` answers "Not supported" |
 | O5 | `txpower limit` on rt2800 is expected to equal fixed | Open: not measured in the 2026-11-05 window |
