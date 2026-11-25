@@ -6,11 +6,11 @@ import { useLocation } from 'react-router'
  * `/routers/ap1/rf#channel-analysis`; React Router does not scroll to hashes). The card may render after the
  * screen's first paint, so it looks again after each render until it finds it.
  */
-export function useScrollToHash(): void {
+export function useScrollToHash(ready = true): void {
   const { hash } = useLocation()
   const done = useRef<string | null>(null)
   useEffect(() => {
-    if (hash.length < 2 || done.current === hash) return
+    if (!ready || hash.length < 2 || done.current === hash) return
     const el = document.getElementById(decodeURIComponent(hash.slice(1)))
     if (el) {
       el.scrollIntoView({ block: 'start' })

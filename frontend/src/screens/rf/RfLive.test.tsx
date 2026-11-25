@@ -64,6 +64,44 @@ function renderRf(path = '/routers/ap1/rf') {
   )
 }
 
+test('a deep link waits for the first RF sample before scrolling once', async () => {
+  const original = Element.prototype.scrollIntoView
+  const scroll = vi.fn()
+  Element.prototype.scrollIntoView = scroll
+  try {
+    renderRf('/routers/ap1/rf#channel-analysis')
+    await screen.findByRole('heading', { name: 'RF live', level: 1 })
+    expect(scroll).not.toHaveBeenCalled()
+    FakeSocket.last?.emit({ type: 'rf', sample: sample(0) })
+    expect(scroll).toHaveBeenCalledTimes(1)
+    expect(scroll.mock.instances[0]).toBe(screen.getByRole('region', { name: 'Channel analysis' }))
+    FakeSocket.last?.emit({ type: 'rf', sample: sample(1) })
+    expect(scroll).toHaveBeenCalledTimes(1)
+  } finally {
+    Element.prototype.scrollIntoView = original
+  }
+})
+
+test.each(['idle', 'lost'])('a deep link scrolls when RF is %s', async (state) => {
+  const original = Element.prototype.scrollIntoView
+  const scroll = vi.fn()
+  Element.prototype.scrollIntoView = scroll
+  try {
+    renderRf('/routers/ap1/rf#frame-analysis')
+    await screen.findByRole('heading', { name: 'RF live', level: 1 })
+    expect(scroll).not.toHaveBeenCalled()
+    if (state === 'idle') {
+      FakeSocket.last?.emit({ type: 'rf-idle', reason: 'radio0 is parked' })
+    } else {
+      const lost = FakeSocket.last?.onclose as unknown as ((ev: { code: number; reason: string }) => void) | null
+      act(() => lost?.({ code: 1006, reason: '' }))
+    }
+    expect(scroll).toHaveBeenCalledTimes(1)
+  } finally {
+    Element.prototype.scrollIntoView = original
+  }
+})
+
 test('samples fill the tiles and the RX/TX columns', async () => {
   renderRf()
   expect(await screen.findByRole('heading', { name: 'RF live', level: 1 })).toBeInTheDocument()
