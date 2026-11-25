@@ -182,7 +182,10 @@ class SimModem:
         return _fail("Invalid argument\n")
 
     def _sim_state(self, *, unlock_key: str) -> CommandResult:
-        card = "ready" if self.pin1 in ("disabled", "verified") else "pin_required"
+        card = {
+            "not_verified": "pin1_or_upin_pin_required",
+            "blocked": "puk1_or_upin_puk_required",
+        }.get(self.pin1, "ready")
         state: dict[str, object] = {}
         if unlock_key == "pin1_unlock_tries":  # --uim-get-sim-state; --get-pin-status has no card keys
             state.update(card_slot=1, card_application_state=card)
@@ -244,7 +247,9 @@ class SimModem:
     def _at_lines(self, command: str) -> tuple[str, ...] | None:
         upper = command.upper()
         if upper == "AT+CPIN?":
-            return ("+CPIN: READY" if self.pin1 in ("disabled", "verified") else "+CPIN: SIM PIN",)
+            if self.pin1 in ("disabled", "verified"):
+                return ("+CPIN: READY",)
+            return ("+CPIN: SIM PUK" if self.pin1 == "blocked" else "+CPIN: SIM PIN",)
         if upper == "AT+CPMS?":
             return (self._cpms(),)
         if _CUSD.fullmatch(command) is not None:

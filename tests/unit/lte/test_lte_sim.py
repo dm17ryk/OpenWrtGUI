@@ -78,6 +78,36 @@ def test_pin_needed_with_unknown_tries_cannot_be_entered(answer: str) -> None:
     )
 
 
-@pytest.mark.parametrize("bad", ["", "not json", "[1]", '{"card_slot":1}'])
+@pytest.mark.parametrize(
+    ("answer", "pin"),
+    [
+        ('{"card_application_state":"pin1_or_upin_pin_required","pin1_verify_tries":3}', "needed"),
+        ('{"pin1_status":"changed","card_application_state":"pin1_or_upin_pin_required"}', "needed"),
+        ('{"card_application_state":"puk1_or_upin_puk_required"}', "blocked"),
+        ('{"card_application_state":"pin1_blocked"}', "blocked"),
+        ('{"pin1_status":"changed","card_application_state":"puk1_or_upin_puk_required"}', "blocked"),
+    ],
+)
+def test_the_card_state_decides_when_pin1_status_is_missing_or_unknown(answer: str, pin: str) -> None:
+    state = parse_sim_state(answer)
+    assert state is not None
+    assert state.pin == pin
+
+
+def test_a_known_pin1_status_wins_over_the_card_state() -> None:
+    state = parse_sim_state('{"pin1_status":"verified","card_application_state":"pin1_or_upin_pin_required"}')
+    assert state is not None
+    assert (state.pin, state.can_enter_pin) == ("entered", False)
+
+
+def test_card_state_alone_needed_still_fails_closed_without_tries() -> None:
+    state = parse_sim_state('{"card_application_state":"pin1_or_upin_pin_required"}')
+    assert state is not None
+    assert (state.pin, state.tries_left, state.can_enter_pin) == ("needed", None, False)
+
+
+@pytest.mark.parametrize(
+    "bad", ["", "not json", "[1]", '{"card_slot":1}', '{"card_application_state":"ready"}']
+)
 def test_no_pin_status_is_no_answer(bad: str) -> None:
     assert parse_sim_state(bad) is None

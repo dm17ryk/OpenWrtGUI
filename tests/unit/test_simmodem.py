@@ -94,6 +94,17 @@ def test_sim_state_answers_ap2_shape() -> None:
     assert _out(m, c.at(AT, "AT+CPIN?")).endswith("+CPIN: READY\r\n\r\nOK\r\n")
 
 
+def test_sim_state_card_names_are_uqmis() -> None:
+    m = _modem()
+    assert json.loads(_out(m, c.SIM_STATE(DEV)))["card_application_state"] == "ready"
+    m.pin1 = "not_verified"
+    assert json.loads(_out(m, c.SIM_STATE(DEV)))["card_application_state"] == "pin1_or_upin_pin_required"
+    m.pin1 = "blocked"
+    state = json.loads(_out(m, c.SIM_STATE(DEV)))
+    assert state["card_application_state"] == "puk1_or_upin_puk_required"
+    assert _out(m, c.at(AT, "AT+CPIN?")).endswith("+CPIN: SIM PUK\r\n\r\nOK\r\n")
+
+
 def test_verify_pin_right_wrong_and_blocked() -> None:
     m = _modem()
     m.pin1 = "not_verified"
