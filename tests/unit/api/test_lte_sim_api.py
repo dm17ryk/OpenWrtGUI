@@ -19,6 +19,10 @@ SIM = "/api/routers/ap1/lte/sim"
 PIN = f"{SIM}/pin"
 VERIFY = "--verify-pin1"
 AUDITED_VERIFY = "uqmi -s -d /dev/cdc-wdm0 -t 5000 --verify-pin1 <hidden>"
+NOTE_NO_TRIES = (
+    "The modem did not say how many tries are left: enter the PIN in a phone or the D-Link UI, "
+    "so a wrong PIN does not block the SIM"
+)
 OFF = {
     "pin": "off",
     "tries_left": 3,
@@ -222,6 +226,26 @@ async def test_enter_pin_is_refused_with_nothing_sent(
     assert (answer.status_code, answer.json()) == (409, {"detail": detail})
     assert not [c for c in sent if VERIFY in c] and _audited(ctx) == []
     assert (modem.pin1, modem.pin1_tries) == (pin1, tries)
+
+
+async def test_enter_pin_without_a_tries_count_is_refused_with_nothing_sent(
+    authed: httpx.AsyncClient, ctx: AppContext
+) -> None:
+    """E3 fails closed (security L5, ruling P15): the modem does not say how many tries are left."""
+    modem = await _needs_pin(ctx)
+    modem.pin1_tries = None  # type: ignore[assignment]
+    sent = await _sent(ctx)
+    state = (await authed.get(SIM)).json()
+    assert (state["pin"], state["tries_left"], state["can_enter_pin"], state["note"]) == (
+        "needed",
+        None,
+        False,
+        NOTE_NO_TRIES,
+    )
+    answer = await authed.post(PIN, json={"pin": "0000"})
+    assert (answer.status_code, answer.json()) == (409, {"detail": NOTE_NO_TRIES})
+    assert not [c for c in sent if VERIFY in c] and _audited(ctx) == []
+    assert modem.pin1 == "not_verified"
 
 
 async def test_enter_pin_during_a_run_is_a_423_with_nothing_sent(

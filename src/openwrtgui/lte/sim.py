@@ -20,6 +20,10 @@ NOTE_BLOCKED = "The SIM is blocked: it needs its PUK, which the app does not off
 NOTE_LAST_TRY = (
     "One try left: enter the PIN in a phone or the D-Link UI, so a wrong PIN does not block the SIM"
 )
+NOTE_NO_TRIES = (
+    "The modem did not say how many tries are left: enter the PIN in a phone or the D-Link UI, "
+    "so a wrong PIN does not block the SIM"
+)
 
 
 @dataclass(frozen=True)
@@ -51,10 +55,13 @@ def parse_sim_state(text: str) -> SimState | None:
         puk = _int(data.get("pin1_unblock_tries"))
     card = data.get("card_application_state")
     needed = pin == "needed"
-    can_enter = needed and (tries is None or tries >= _MIN_TRIES_TO_ENTER)
+    # E3 fails closed (security L5, ruling P15): with no tries count the next try may be the last
+    can_enter = needed and tries is not None and tries >= _MIN_TRIES_TO_ENTER
     note = None
     if pin == "blocked":
         note = NOTE_BLOCKED
+    elif needed and tries is None:
+        note = NOTE_NO_TRIES
     elif needed and not can_enter:
         note = NOTE_LAST_TRY
     return SimState(

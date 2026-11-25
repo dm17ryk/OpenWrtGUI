@@ -64,11 +64,18 @@ def test_notes_are_the_uis_words() -> None:
     )
 
 
-def test_pin_needed_with_unknown_tries_can_be_entered() -> None:
-    state = parse_sim_state('{"pin1_status":"not_verified"}')
+@pytest.mark.parametrize(
+    "answer", ['{"pin1_status":"not_verified"}', '{"pin1_status":"not_verified","pin1_verify_tries":null}']
+)
+def test_pin_needed_with_unknown_tries_cannot_be_entered(answer: str) -> None:
+    """E3 fails closed (security L5, ruling P15): without the tries count the next try may be the last."""
+    state = parse_sim_state(answer)
     assert state is not None
-    assert state.can_enter_pin is True
-    assert state.tries_left is None
+    assert (state.pin, state.tries_left, state.can_enter_pin) == ("needed", None, False)
+    assert state.note == (
+        "The modem did not say how many tries are left: enter the PIN in a phone or the D-Link UI, "
+        "so a wrong PIN does not block the SIM"
+    )
 
 
 @pytest.mark.parametrize("bad", ["", "not json", "[1]", '{"card_slot":1}'])

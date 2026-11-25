@@ -116,13 +116,14 @@ class PinResult:
 
 
 def _refusal(state: SimState) -> str | None:
-    """Why the PIN is not sent: the SIM does not ask for one, is blocked, or has one try left (E3)."""
+    """Why the PIN is not sent: the SIM does not ask for one, is blocked, has one try left, or the modem does
+    not say how many are left (E3, P15): the state's own note."""
     if state.pin == "blocked":
         return NOTE_BLOCKED
     if state.pin != "needed":
         return NO_PIN_ASKED
     if not state.can_enter_pin:
-        return NOTE_LAST_TRY
+        return state.note or NOTE_LAST_TRY
     return None
 
 
