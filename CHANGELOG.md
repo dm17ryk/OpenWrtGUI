@@ -12,6 +12,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - LTE Recover waits for an LTE setup in progress before each step (up to 20 s, reading once a second) and skips
   a step whose setup never pauses, since cutting a setup off could leave the modem's QMI channel failing until a
   router reboot (#93). If LTE comes back by itself meanwhile, Recover stops and says so.
+- App log: router commands are no longer written to the app log; a command that carried a Wi-Fi key, an APN
+  password or a SIM PIN could reach it.
 
 ## [1.2.0] - 2026-11-21
 
