@@ -9,9 +9,9 @@ export const TARGET_RULE = "A number is digits with an optional + (3 to 15)"
 export const TARGET = /^\+?[0-9]{3,15}$/
 export const MAX_TEXT = 160
 
-/** A USSD code: * or #, digits, * or #, ending in #; never a PIN, PUK, call barring or ** / ## string. */
-export const USSD_CODE = /^(?!\*\*|##)(?![*#]{1,2}(?:0[3-5]2?|33[0-3]?|35[13]?)[*#])[*#][0-9*#]{1,30}#$/
-export const USSD_RULE = "A USSD code looks like *100#: * or #, digits, * or #, ending in #. PIN, PUK and call barring codes, and codes starting with ** or ##, are refused"
+/** A USSD code: * or #, digits, * or #, ending in #; never a PIN, PUK, call barring, call forwarding or other service, or ** / ## string. */
+export const USSD_CODE = /^(?!\*\*|##)(?![*#]{1,2}(?:0[3-5]2?|33[0-3]?|35[13]?|00[24]|21|6[127]|43|30|31|76|77)[*#])[*#][0-9*#]{1,30}#$/
+export const USSD_RULE = "A USSD code looks like *100#: * or #, digits, * or #, ending in #. PIN, PUK, call barring and call forwarding codes, and codes starting with ** or ##, are refused"
 
 const GSM = new Set(GSM_CHARS)
 

@@ -48,14 +48,19 @@ PIN_RULE = re.compile(r"[0-9]{4,8}")
 TARGET_RULE = re.compile(r"\+?[0-9]{3,15}")
 # * or #, digits, * or #, ending in #; never a 3GPP TS 22.030 supplementary-service string (security L4, P16):
 # nothing that starts with ** (registration) or ## (erasure), and no PIN change (03, 04, 042), PUK unblock
-# (05, 052) or call barring service (33, 330-333, 35, 351, 353) under any procedure, since those carry a PIN,
-# PUK or barring password into the preview and the audit, or change the line's services
-USSD_CODE = re.compile(r"(?!\*\*|##)(?![*#]{1,2}(?:0[3-5]2?|33[0-3]?|35[13]?)[*#])[*#][0-9*#]{1,30}#")
+# (05, 052), call barring (33, 330-333, 35, 351, 353), call forwarding (002, 004, 21, 61, 62, 67), call waiting
+# (43) or CLIP/CLIR/COLP/COLR (30, 31, 76, 77) service under any procedure (P24), since those carry a PIN, PUK
+# or barring password into the preview and the audit, or change the line's services
+USSD_CODE = re.compile(
+    r"(?!\*\*|##)"
+    r"(?![*#]{1,2}(?:0[3-5]2?|33[0-3]?|35[13]?|00[24]|21|6[127]|43|30|31|76|77)[*#])"
+    r"[*#][0-9*#]{1,30}#"
+)
 PIN_MESSAGE = "A PIN is 4 to 8 digits"
 TARGET_MESSAGE = "A number is digits with an optional + (3 to 15)"
 USSD_MESSAGE = (
     "A USSD code looks like *100#: * or #, digits, * or #, ending in #. "
-    "PIN, PUK and call barring codes, and codes starting with ** or ##, are refused"
+    "PIN, PUK, call barring and call forwarding codes, and codes starting with ** or ##, are refused"
 )
 
 # the modem waits 30 s of silence for the network's answer; `timeout -s KILL` ends microcom at 35 s; the

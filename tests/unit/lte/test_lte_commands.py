@@ -172,8 +172,37 @@ SS_CODES = [
     "**21*15550101#",
     "##002#",
     "##21#",
+    # P24: a supplementary-service code is refused whatever the procedure
+    "*21#",
+    "#21#",
+    "*#21#",
+    "*21*0501234567#",
+    "*67#",
+    "#002#",
+    "*43#",
+    "#31#",
+    "*#31#",
+    "*30#",
+    "*61*5#",
+    "*62#",
+    "*#004#",
+    "*76#",
+    "*77#",
 ]
-USSD_CODES = ["*100#", "#100#", "*#100#", "*111#", "*123*1#", "*3500#", "*0330#", "*400#"]
+USSD_CODES = [
+    "*100#",
+    "#100#",
+    "*#100#",
+    "*111#",
+    "*123*1#",
+    "*3500#",
+    "*0330#",
+    "*400#",
+    "*#06#",
+    "*300#",
+    "*210#",
+    "*43210#",
+]
 
 
 @pytest.mark.parametrize("code", SS_CODES)
@@ -193,7 +222,7 @@ def test_ordinary_ussd_codes_stay_allowed(code: str) -> None:
 def test_the_ussd_rule_names_what_it_refuses() -> None:
     assert c.USSD_MESSAGE == (
         "A USSD code looks like *100#: * or #, digits, * or #, ending in #. "
-        "PIN, PUK and call barring codes, and codes starting with ** or ##, are refused"
+        "PIN, PUK, call barring and call forwarding codes, and codes starting with ** or ##, are refused"
     )
 
 

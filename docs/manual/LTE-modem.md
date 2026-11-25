@@ -120,7 +120,7 @@ waits until then, because both use the modem's AT port. USSD menus are not suppo
 more, the app shows what it got and closes the session, and the same happens when no reply comes. If closing the session fails, the card says
 so: the session may still be open. The code field is locked while the app listens. A reply the
 carrier charges for is the carrier's business, so use only codes you know. Sending waits for a harness run to
-end. Codes that change or unblock a PIN, set call barring, or start with `**` or `##` are refused: they are not
+end. Codes that change or unblock a PIN, set call barring or call forwarding (such as `*21#` or `#21#`), or start with `**` or `##` are refused: they are not
 USSD, and they would put a PIN or a password into the command and the audit log.
 
 ## Connect, disconnect, reboot

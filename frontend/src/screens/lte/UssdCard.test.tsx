@@ -7,7 +7,7 @@ import { UssdCard } from './UssdCard'
 
 const WARNING = "The app listens up to 35 s for the network's reply; the AT console waits until then"
 const RULE =
-  'A USSD code looks like *100#: * or #, digits, * or #, ending in #. PIN, PUK and call barring codes, and codes starting with ** or ##, are refused'
+  'A USSD code looks like *100#: * or #, digits, * or #, ending in #. PIN, PUK, call barring and call forwarding codes, and codes starting with ** or ##, are refused'
 
 let answer: UssdReply | Error | 'pending' = { status: 'reply', text: 'Balance 12.34', dcs: 15, closed: true }
 let release: (() => void) | null = null
@@ -87,7 +87,7 @@ test('the card has a code field, its help button, and Preview waits for a valid 
   expect(preview).toBeDisabled() // "100#" does not start with * or #
 })
 
-test.each(['**04*1234*5678*5678#', '*33*0000#', '##002#', '**21*15550101#'])(
+test.each(['**04*1234*5678*5678#', '*33*0000#', '##002#', '**21*15550101#', '*21#', '#21#', '*#31#', '*21*0501234567#', '*43#'])(
   'a PIN, call barring or ** / ## code %s is refused with the rule and never previewed',
   async (code) => {
     renderUssd()
@@ -99,7 +99,7 @@ test.each(['**04*1234*5678*5678#', '*33*0000#', '##002#', '**21*15550101#'])(
   },
 )
 
-test.each(['*100#', '#100#', '*#100#', '*111#'])('the ordinary code %s can be previewed', async (code) => {
+test.each(['*100#', '#100#', '*#100#', '*111#', '*#06#', '*300#', '*210#', '*43210#'])('the ordinary code %s can be previewed', async (code) => {
   renderUssd()
   await userEvent.setup().type(screen.getByRole('textbox', { name: 'USSD code' }), code)
   expect(screen.queryByText(RULE)).not.toBeInTheDocument()
