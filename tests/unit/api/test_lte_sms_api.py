@@ -81,6 +81,29 @@ async def test_no_at_port_leaves_the_use_unknown(authed: httpx.AsyncClient, ctx:
     assert (body["ids"], body["used"], body["capacity"], body["full"]) == ([0, 1, 2], None, None, False)
 
 
+async def test_a_dead_cached_at_port_is_forgotten_so_the_next_read_probes_again(
+    authed: httpx.AsyncClient, ctx: AppContext
+) -> None:
+    modem = await _modem(ctx)
+    t = await ctx.pool.get(ctx.routers.get("ap1"))  # type: ignore[arg-type]
+    assert isinstance(t, ReplayTransport)
+    await authed.get(BASE, params={"storage": "sim"})  # finds and keeps the AT port
+    real = modem.answer
+
+    def dead(command: str) -> CommandResult | None:
+        if "AT+CPMS?" in command:
+            return CommandResult(command, "", "", 1)  # the kept port no longer answers
+        return real(command)
+
+    modem.answer = dead  # type: ignore[method-assign]
+    body = (await authed.get(BASE, params={"storage": "sim"})).json()
+    assert (body["used"], body["capacity"]) == (None, None)
+    modem.answer = real  # type: ignore[method-assign]
+    probes = t.calls.count(c.TTY_LIST)
+    assert (await authed.get(BASE, params={"storage": "sim"})).json()["used"] == 3
+    assert t.calls.count(c.TTY_LIST) == probes + 1  # the dead port was dropped: found again
+
+
 async def test_the_list_is_a_read_that_is_not_audited(authed: httpx.AsyncClient, ctx: AppContext) -> None:
     await authed.get(BASE, params={"storage": "sim"})
     assert ctx.audit.query() == []

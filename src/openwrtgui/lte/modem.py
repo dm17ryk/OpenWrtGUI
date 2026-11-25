@@ -230,7 +230,11 @@ class ModemService:
             command = "AT+CPMS?"
             result = await t.run(c.at(port, command))
             answer = parse_at(result.stdout, command) if result.ok else None
-            return parse_cpms(answer.lines).get(storage) if answer is not None else None
+            if answer is None:
+                # the kept port gave no AT answer (the modem re-enumerated?): probe again on the next use
+                self._lte.forget_port(rec.id)
+                return None
+            return parse_cpms(answer.lines).get(storage)
 
     async def messages(self, router_id: str, storage: Storage) -> SmsList:
         rec, t, device = await self._lte.connection(router_id)
