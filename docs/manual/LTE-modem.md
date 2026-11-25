@@ -97,6 +97,16 @@ never keeps the PIN: the field is emptied after every try. On the last try the a
 in a phone or the D-Link UI, so a wrong PIN does not block the SIM. A blocked SIM needs its PUK, which the app does
 not offer.
 
+## SMS
+
+The SMS card lists the messages on the SIM or in the phone memory, and shows how many of the modem's places they
+use. **Read** shows a message's sender, time and text, and works even while a harness run is live, because it only
+reads. Tick messages and press **Delete** to remove them: the card shows the exact command first, and deleting
+waits while a harness run is live. If the list changed since the preview, the app says so and you preview again.
+**Send SMS** takes a number and a text of 1 to 160 characters of the GSM basic set (letters, digits and common
+punctuation; for example `@`, `$` and accented letters are refused). Its preview warns that the carrier may charge
+for the message, and sending also waits for a harness run to end.
+
 ## Connect, disconnect, reboot
 
 - **Connect** brings the session up (`ifup lte`) and waits up to 60 seconds for it. If the carrier has not

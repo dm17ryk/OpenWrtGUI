@@ -17,10 +17,12 @@ export type PlanApply<R = NetApplyResult> = {
  * Apply, which sends the same body with the preview's digest to `<base>/apply` (so only the lines shown run).
  * `onApplied` runs only when the router took the change; the result shows either way.
  */
-export function usePlanApply<R extends { applied: boolean } = NetApplyResult>(
+export function usePlanApply<R = NetApplyResult>(
   base: string,
   body: object | null,
   onApplied: (result: R) => void,
+  /** Whether the router took the change; by default the result's `applied` field (SMS has `ok`, USSD `status`). */
+  isDone: (result: R) => boolean = (r) => (r as { applied?: boolean }).applied === true,
 ): PlanApply<R> {
   const preview = usePreview<NetPlan>(`${base}/preview`, body)
   const [isBusy, setBusy] = useState(false)
@@ -36,7 +38,7 @@ export function usePlanApply<R extends { applied: boolean } = NetApplyResult>(
       const done = await postJson<R>(`${base}/apply`, { ...body, digest: plan.digest })
       setResult(done)
       // a refused or rolled-back change left the router as it was: keep the user's edits
-      if (done.applied) onApplied(done)
+      if (isDone(done)) onApplied(done)
     } catch (err) {
       setApplyError(err instanceof ApiError ? err.detail : String(err))
     } finally {
