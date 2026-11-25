@@ -66,7 +66,8 @@ export function SmsCard({ routerId }: { routerId: string; routerName: string }) 
       setReading(null)
       void client.invalidateQueries({ queryKey: listKey })
     },
-    (r) => r.ok,
+    // a delete that failed part-way already removed messages (its done commands are in `lines`): refresh too
+    (r) => r.ok || r.lines.length > 0,
   )
   // after a 409 the ticks are void: the list is read again (below) and the user chooses again
   const [seenError, setSeenError] = useState<string | null>(null)

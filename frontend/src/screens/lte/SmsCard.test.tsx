@@ -139,6 +139,22 @@ test('ticking two rows enables Delete 2 messages, which previews and applies wit
   expect(screen.queryAllByRole('checkbox', { checked: true })).toHaveLength(0)
 })
 
+test('a partly done delete still reads the list again and shows the failure', async () => {
+  const user = userEvent.setup()
+  applyAnswer = { ok: false, lines: ['deleted 1'], error: 'The modem refused message 3' }
+  const client = renderSms()
+  const invalidate = vi.spyOn(client, 'invalidateQueries')
+  await screen.findByText('3 of 20 on the SIM')
+  await user.click(screen.getByRole('checkbox', { name: 'Select message 1' }))
+  await user.click(screen.getByRole('checkbox', { name: 'Select message 3' }))
+  const button = await screen.findByRole('button', { name: 'Delete 2 messages' })
+  await waitFor(() => expect(button).toBeEnabled())
+  await user.click(button)
+  expect(await screen.findByText('The modem refused message 3')).toBeInTheDocument()
+  await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: ['lte-sms', 'ap2', 'sim'] }))
+  expect(screen.queryAllByRole('checkbox', { checked: true })).toHaveLength(0)
+})
+
 test('a 409 shows its text, clears the ticks and reads the list again', async () => {
   const user = userEvent.setup()
   const { ApiError } = await vi.importActual<typeof import('../../api/client')>('../../api/client')
