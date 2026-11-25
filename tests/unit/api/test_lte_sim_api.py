@@ -157,6 +157,70 @@ async def test_a_sim_blocked_by_the_try_is_not_called_accepted(
     assert (body["accepted"], body["message"], body["sim"]["pin"]) == (False, NOTE_BLOCKED, "blocked")
 
 
+SENT_NO_STATE = (
+    "The PIN was sent, but the SIM's state could not be read: check the tries left before trying again"
+)
+SENT_STATE_UNKNOWN = "The PIN was sent; check the SIM's state before trying again"
+
+
+@pytest.mark.parametrize(
+    ("after", "accepted", "message"),
+    [("disabled", True, "PIN accepted"), ("changed", False, SENT_STATE_UNKNOWN)],
+)
+async def test_only_entered_or_off_after_the_try_is_accepted(
+    authed: httpx.AsyncClient, ctx: AppContext, after: str, accepted: bool, message: str
+) -> None:
+    """Final review I3 (b): a state the app does not know after the try is not "PIN accepted"."""
+    modem = await _needs_pin(ctx)
+    real = modem.answer
+
+    def becomes(command: str) -> CommandResult | None:
+        if VERIFY in command:
+            modem.pin1 = after
+            return CommandResult(command, "", "", 0)
+        return real(command)
+
+    modem.answer = becomes  # type: ignore[method-assign]
+    answer = await authed.post(PIN, json={"pin": "0000"})
+    assert answer.status_code == 200 and "0000" not in answer.text
+    body = answer.json()
+    assert (body["accepted"], body["message"]) == (accepted, message)
+    assert body["sim"]["pin"] == ("off" if after == "disabled" else "unknown")
+
+
+@pytest.mark.parametrize("fault", ["unreadable", "lost"])
+async def test_a_failed_read_back_says_the_pin_was_sent(
+    authed: httpx.AsyncClient, ctx: AppContext, fault: str
+) -> None:
+    """Final review I3 (a): the PIN went out, then the SIM's state could not be read back. Not a bare error
+    that hides the spent try: not accepted, the state unknown, and a message that says the PIN was sent."""
+    modem = await _needs_pin(ctx)
+    real = modem.answer
+    verified: list[str] = []
+
+    def no_read_back(command: str) -> CommandResult | None:
+        if VERIFY in command:
+            verified.append(command)
+        elif verified and ("--uim-get-sim-state" in command or "--get-pin-status" in command):
+            if fault == "lost":
+                raise TransportError(f"{command}: connection lost")
+            return CommandResult(command, "not json\n", "", 0)
+        return real(command)
+
+    modem.answer = no_read_back  # type: ignore[method-assign]
+    answer = await authed.post(PIN, json={"pin": "9999"})
+    assert answer.status_code == 200 and "9999" not in answer.text
+    body = answer.json()
+    assert (body["accepted"], body["message"]) == (False, SENT_NO_STATE)
+    assert (body["sim"]["pin"], body["sim"]["tries_left"], body["sim"]["can_enter_pin"]) == (
+        "unknown",
+        None,
+        False,
+    )
+    assert len(verified) == 1 and _audited(ctx) == [AUDITED_VERIFY]
+    assert modem.pin1_tries == 2  # the try was spent
+
+
 async def test_the_pin_is_shown_nowhere_but_the_command_sent(
     authed: httpx.AsyncClient, ctx: AppContext, caplog: pytest.LogCaptureFixture
 ) -> None:

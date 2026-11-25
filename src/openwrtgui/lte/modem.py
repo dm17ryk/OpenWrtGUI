@@ -25,6 +25,14 @@ NO_SIM_STATE = "The modem did not give its SIM state"
 NO_PIN_ASKED = "The SIM does not ask for a PIN"
 PIN_ACCEPTED = "PIN accepted"
 PIN_NOT_TAKEN = "The SIM did not take the PIN"
+PIN_SENT_NO_STATE = (
+    "The PIN was sent, but the SIM's state could not be read: check the tries left before trying again"
+)
+PIN_SENT_STATE_UNKNOWN = "The PIN was sent; check the SIM's state before trying again"
+# what an answer shows when the SIM's state after the try could not be read
+_UNREAD = SimState(
+    pin="unknown", tries_left=None, puk_tries_left=None, card=None, can_enter_pin=False, note=None
+)
 VERIFY_TIMEOUT_S = 15.0
 NO_MESSAGE_LIST = "The modem did not list its messages"
 LIST_CHANGED = "The message list changed; preview again"
@@ -135,12 +143,14 @@ def _not_taken(state: SimState) -> str:
 
 
 def _result(after: SimState) -> PinResult:
-    """Accepted: the SIM no longer asks for the PIN. A SIM blocked meanwhile (its tries spent elsewhere) is
-    not called accepted."""
+    """Accepted: the SIM's PIN is entered, or off. A SIM blocked meanwhile (its tries spent elsewhere) is not
+    called accepted, nor a state the app does not know (final review I3)."""
     if after.pin == "blocked":
         return PinResult(accepted=False, sim=after, message=NOTE_BLOCKED)
     if after.pin == "needed":
         return PinResult(accepted=False, sim=after, message=_not_taken(after))
+    if after.pin == "unknown":
+        return PinResult(accepted=False, sim=after, message=PIN_SENT_STATE_UNKNOWN)
     return PinResult(accepted=True, sim=after, message=PIN_ACCEPTED)
 
 
@@ -191,7 +201,11 @@ class ModemService:
                 if pin in str(exc):
                     raise TransportError(str(exc).replace(pin, HIDDEN)) from None
                 raise
-            return _result(await self._sim(t, device))
+            try:
+                after = await self._sim(t, device)
+            except (ValueError, TransportError):  # the PIN went out: say so, never a bare read error (I3)
+                return PinResult(accepted=False, sim=_UNREAD, message=PIN_SENT_NO_STATE)
+            return _result(after)
 
     # ---------------------------------------------------------------- SMS (E5, E6, E7)
     async def _ids(self, t: Transport, device: str, storage: Storage) -> tuple[int, ...]:

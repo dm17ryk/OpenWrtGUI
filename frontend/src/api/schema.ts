@@ -1724,8 +1724,9 @@ export interface paths {
         put?: never;
         /**
          * Enter Pin
-         * @description 409 when the SIM does not ask for a PIN, is blocked or has one try left (E3), or another LTE write or
-         *     Recover holds the router; 423 during a harness run.
+         * @description 409 when the SIM does not ask for a PIN, is blocked, has one try left or no tries count (E3), or another
+         *     LTE write or Recover holds the router; 423 during a harness run. A 200 that is not accepted may still have
+         *     sent the PIN: its message says so.
          */
         post: operations["enter_pin_api_routers__router_id__lte_sim_pin_post"];
         delete?: never;

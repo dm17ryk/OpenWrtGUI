@@ -40,8 +40,9 @@ async def sim(router_id: str, ctx: Ctx) -> SimState:
 
 @router.post("/sim/pin")
 async def enter_pin(router_id: str, body: PinIn, ctx: Ctx) -> PinResult:
-    """409 when the SIM does not ask for a PIN, is blocked or has one try left (E3), or another LTE write or
-    Recover holds the router; 423 during a harness run."""
+    """409 when the SIM does not ask for a PIN, is blocked, has one try left or no tries count (E3), or another
+    LTE write or Recover holds the router; 423 during a harness run. A 200 that is not accepted may still have
+    sent the PIN: its message says so."""
     try:
         return await ctx.lte_modem.enter_pin(_known(ctx, router_id), body.pin)
     except PinRefused as exc:
