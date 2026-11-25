@@ -7,6 +7,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-26
+
+LTE Recover waits out an LTE setup, and the LTE screen gets SIM PIN, SMS and USSD and the modem's own mode names;
+the app log no longer records router commands.
+
 ### Added
 
 - LTE modem › **SIM PIN**: the SIM card shows whether the SIM asks for its PIN and the tries left, and Enter PIN
@@ -554,7 +559,8 @@ The foundation: install, update, add routers, see them, and stay out of a runnin
 - Router simulator built from recorded router output, used for e2e tests, screenshots and demos.
 - CI, pre-release and release workflows, wiki sync, CodeQL and Dependabot.
 
-[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/dm17ryk/OpenWrtGUI/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v1.3.0
 [1.2.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v1.2.0
 [1.1.0]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v1.1.0
 [1.0.1]: https://github.com/dm17ryk/OpenWrtGUI/releases/tag/v1.0.1
