@@ -56,7 +56,7 @@ is connected, and how each router describes itself. It never disturbs a test run
 | **LTE modem › Recover** | Waits for an LTE setup in progress before each step (up to 20 s) and skips a step whose setup never pauses; if LTE comes back by itself, Recover stops and says so. |
 | **LTE modem › SIM PIN** | Whether the SIM asks for its PIN and the tries left; Enter PIN appears only while it asks and never sends on the last try. The app never keeps the PIN. |
 | **LTE modem › SMS** | List the messages on the SIM or in the phone memory, read one, delete some, and send a text of 1 to 160 GSM basic characters. |
-| **LTE modem › USSD** | Send one USSD code and read the network's reply; menus are not supported, and codes that change a PIN or set call barring are refused. |
+| **LTE modem › USSD** | Send one USSD code and read the network's reply; menus are not supported, and codes that change a PIN or set call barring, call forwarding or call waiting are refused. |
 | **LTE modem › Modem** | The network mode order shows the modem's own name for each mode. |
 | **App log** | Router commands are no longer written to it, since they could carry a Wi-Fi key, an APN password or a SIM PIN. |
 
