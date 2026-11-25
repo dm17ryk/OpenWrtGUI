@@ -84,8 +84,9 @@ def _plan(rec: RouterRecord, lines: tuple[str, ...], warnings: tuple[str, ...]) 
     )
 
 
-def _ussd_reply(stdout: str, request: str) -> tuple[UssdReply, bool]:
+def _ussd_reply(stdout: str, request: str) -> tuple[UssdReply, bool] | None:
     """The reply, and whether the app closes the session (E9): the network asked for more, or no +CUSD came.
+    None: the modem never answered the request (no +CUSD, no OK or ERROR), so it never reached the modem.
 
     The network's +CUSD answer comes after the request's OK (E8), past where parse_at's lines end, so every
     line microcom printed is searched. Its exit status is not: a reply that kept microcom listening past the
@@ -93,9 +94,12 @@ def _ussd_reply(stdout: str, request: str) -> tuple[UssdReply, bool]:
     "error" with its line, not "no reply" (P10)."""
     parsed = parse_cusd([line.strip() for line in stdout.splitlines()])
     reply = reply_of(parsed)
-    answer = parse_at(stdout, request) if parsed is None else None
-    if answer is not None and answer.status == "ERROR":
-        reply = UssdReply(status="error", text=answer.error, dcs=None, closed=False)
+    if parsed is None:
+        answer = parse_at(stdout, request)
+        if answer is None:
+            return None
+        if answer.status == "ERROR":
+            reply = UssdReply(status="error", text=answer.error, dcs=None, closed=False)
     return reply, parsed is None or reply.status == "more"
 
 
@@ -344,7 +348,15 @@ class ModemService:
                 audit=self._audit,
                 timeout=c.USSD_TIMEOUT_S,
             )
-            reply, close = _ussd_reply(done.stdout, c.ussd_request(code))
+            outcome = _ussd_reply(done.stdout, c.ussd_request(code))
+            if outcome is None:
+                # microcom could not open the kept port or nothing was echoed (the modem re-enumerated): no
+                # session was opened, so there is nothing to cancel; the next use probes the ports again
+                self._lte.forget_port(rec.id)
+                return UssdReply(
+                    status="error", text=NO_AT_PORT.format(name=rec.name), dcs=None, closed=False
+                )
+            reply, close = outcome
             if not close:
                 return reply
             return replace(reply, closed=await self._cancel(rec, t, port))

@@ -137,6 +137,29 @@ async def test_an_at_error_to_the_code_is_an_error_and_the_app_closes_the_sessio
     assert _audited(ctx) == [(_line(code), SCREEN), (CANCEL, SCREEN)]
 
 
+async def test_a_request_that_never_reached_the_modem_is_an_error_and_the_port_is_forgotten(
+    authed: httpx.AsyncClient, ctx: AppContext
+) -> None:
+    """Final review I2: the modem re-enumerated after the preview, so microcom cannot open the kept port and
+    nothing is echoed. Not "no reply": an error naming the AT port, no AT+CUSD=2 (no session was opened), and
+    the kept port is dropped so the next use probes again."""
+    digest = (await _preview(authed, "*100#")).json()["digest"]
+    modem = await _modem(ctx)
+    modem.plugged = False
+    answer = await authed.post(f"{BASE}/apply", json={"code": "*100#", "digest": digest})
+    assert (answer.status_code, answer.json()) == (
+        200,
+        {"status": "error", "text": "No AT port answered on AP1 · bench", "dcs": None, "closed": False},
+    )
+    t = await _transport(ctx)
+    assert CANCEL not in t.calls
+    assert _audited(ctx) == [(_line("*100#"), SCREEN)]
+    modem.plugged = True
+    probes = t.calls.count(c.TTY_LIST)
+    assert (await _preview(authed, "*100#")).status_code == 200
+    assert t.calls.count(c.TTY_LIST) == probes + 1  # the port was forgotten: found again
+
+
 @pytest.mark.parametrize(("m", "status"), [(2, "ended"), (3, "ended"), (4, "error"), (5, "error")])
 async def test_a_session_the_network_ended_or_refused_is_not_cancelled(
     authed: httpx.AsyncClient, ctx: AppContext, m: int, status: str
