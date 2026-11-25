@@ -100,12 +100,22 @@ not offer.
 ## SMS
 
 The SMS card lists the messages on the SIM or in the phone memory, and shows how many of the modem's places they
-use. **Read** shows a message's sender, time and text, and works even while a harness run is live, because it only
-reads. Tick messages and press **Delete** to remove them: the card shows the exact command first, and deleting
-waits while a harness run is live. If the list changed since the preview, the app says so and you preview again.
+use. **Read** shows a message's sender, time and text, and works during a harness run, because it only reads. Tick
+messages and press **Delete** to remove them: the card shows the exact command first, and deleting waits for a
+harness run to end. If the list changed since the preview, the app says so and you preview again.
 **Send SMS** takes a number and a text of 1 to 160 characters of the GSM basic set (letters, digits and common
 punctuation; for example `@`, `$` and accented letters are refused). Its preview warns that the carrier may charge
-for the message, and sending also waits for a harness run to end.
+for the message, and sending also waits for a harness run to end. The app never writes a message's text to the
+audit log, only the command and the number.
+
+## USSD
+
+The USSD card sends one code, such as `*100#`, and shows the network's reply. Press **Preview** to see the
+command and the warning, then **Send USSD**. The app listens up to 35 seconds for the reply, and the AT console
+waits until then, because both use the modem's AT port. USSD menus are not supported: if the network asks for
+more, the app shows what it got and closes the session, and the same happens when no reply comes. A reply the
+carrier charges for is the carrier's business, so use only codes you know. Sending waits for a harness run to
+end.
 
 ## Connect, disconnect, reboot
 

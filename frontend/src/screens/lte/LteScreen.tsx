@@ -14,6 +14,9 @@ import { SettingsCard } from './SettingsCard'
 import { SignalCharts } from './SignalCharts'
 import { EMPTY_SERIES, pushLte, type LteSeries } from './signal'
 import { SignalTiles, StatusCard } from './StatusCard'
+import { SimCard } from './SimCard'
+import { SmsCard } from './SmsCard'
+import { UssdCard } from './UssdCard'
 
 /** The live signal: one sample every 10 s from /ws/lte while the screen is open; it reconnects (v1.0c D7). */
 function useLiveSignal(routerId: string, enabled: boolean) {
@@ -79,6 +82,11 @@ export function LteScreen() {
             <ActionsCard routerId={id} routerName={name} onDone={refresh} />
             <AtConsole routerId={id} />
           </div>
+          <div className="rf-cols">
+            <SimCard routerId={id} />
+            <UssdCard routerId={id} routerName={name} />
+          </div>
+          <SmsCard routerId={id} routerName={name} />
           <SettingsCard routerId={id} routerName={name} autoconnectNote={state.autoconnect_note} works={state.works} onApplied={refresh} />
         </>
       )}

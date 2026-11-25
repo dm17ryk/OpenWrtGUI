@@ -40,6 +40,26 @@ test('Save good setup, then Reconfigure from it changes nothing', async ({ page 
   await expect(page.getByText('Nothing to apply: the router already has these settings.')).toBeVisible()
 })
 
+test('read message 0 and send a USSD code in the simulator', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop-light', 'one project talks to the simulator modem')
+  await open(page, '/routers/ap1/lte')
+  const sms = page.getByRole('region', { name: 'SMS', exact: true })
+  await sms.getByRole('button', { name: 'Read' }).first().click()
+  await expect(page.getByRole('region', { name: 'Message 0' })).toBeVisible()
+  const ussd = page.getByRole('region', { name: 'USSD', exact: true })
+  await ussd.getByRole('textbox', { name: 'USSD code' }).fill('*100#')
+  await ussd.getByRole('button', { name: 'Preview' }).click()
+  await expect(ussd).toContainText('listens up to 35 s')
+  await ussd.getByRole('button', { name: 'Send USSD' }).click()
+  await expect(ussd.getByRole('region', { name: 'USSD reply' })).toContainText('Balance 12.34')
+})
+
+test('the SIM, SMS and USSD cards fit a phone', async ({ page }) => {
+  await open(page, '/routers/ap1/lte')
+  await expect(page.getByRole('region', { name: 'USSD', exact: true })).toBeVisible()
+  await noHorizontalScroll(page)
+})
+
 test('an AT query, then disconnect and connect in the simulator', async ({ page }, info) => {
   test.skip(info.project.name !== 'desktop-light', 'one project changes the simulator')
   await open(page, '/routers/ap1/lte')

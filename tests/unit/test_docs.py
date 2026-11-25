@@ -553,6 +553,28 @@ def test_the_lte_page_explains_recover_and_saved_setups() -> None:
     assert "Recover" in _section("Troubleshooting", "LTE does not connect")
 
 
+def test_the_lte_page_explains_sim_sms_and_ussd() -> None:
+    """v1.3b: the three sections follow Modem, say what each write waits for, and the CHANGELOG names them."""
+    sections = _sections(_read(MANUAL / "LTE-modem.md"))
+    for name in ("SIM PIN", "SMS", "USSD"):
+        assert len(sections[name].split()) >= 30, name
+    assert "last try" in sections["SIM PIN"] or "last tries" in sections["SIM PIN"]
+    assert "during a harness run" in sections["SMS"] and "160" in sections["SMS"]
+    assert "35 seconds" in sections["USSD"] and "AT console" in sections["USSD"]
+    assert "menus" in sections["USSD"] and "closes the session" in sections["USSD"]
+    order = [m for m in re.findall(r"^## (.+)$", _read(MANUAL / "LTE-modem.md"), flags=re.M)]
+    assert order.index("Modem") < order.index("SIM PIN") < order.index("SMS") < order.index("USSD")
+    unreleased = _read(ROOT / "CHANGELOG.md").split("## [Unreleased]", 1)[1].split("\n## [", 1)[0]
+    added = unreleased.split("### Added", 1)[1].split("\n### ", 1)[0]
+    for name in ("SIM PIN", "SMS", "USSD"):
+        assert f"**{name}**" in added, name
+
+
+def test_security_says_the_pin_is_briefly_on_the_router() -> None:
+    security = _read(ROOT / "SECURITY.md")
+    assert "command line" in security and "Enter PIN" in security
+
+
 def test_uninstall_deletes_the_lte_setups() -> None:
     """Spec 4.4: saved good setups hold APN passwords and SIM PINs, so Yes deletes them as it does backups,
     and a folder that stays is named."""

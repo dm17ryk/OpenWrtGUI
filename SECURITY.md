@@ -79,6 +79,9 @@ installer runs. The installer is not Authenticode-signed yet.
 - **Discovery, Plugins and a LuCI page's change list** show a secret option as `<hidden>`: any option whose name
   contains `key`, `secret`, `pass`, `psk`, `token`, `pin` or `pwd`, and the audit log's list. Discovery still
   lists a secret that differs from the image, with both values hidden.
+- **Enter PIN** (LTE screen): uqmi takes the PIN on its command line, so it is on the router's process list for
+  a moment while the command runs. The audit log hides it, and the app never keeps it. SMS texts are hidden in
+  the audit log the same way.
 - **The AT console** shows a SIM PIN or an APN password as `<hidden>` and does not keep the command for Up/Down.
 - **Backups** hold the router's secrets; they stay in `backups\`, readable by your Windows user only.
 

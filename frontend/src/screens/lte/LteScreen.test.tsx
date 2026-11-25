@@ -125,6 +125,18 @@ test('parts of the modem that did not answer are named', async () => {
   expect(await screen.findByText('No answer from the modem for: signal, AT')).toBeInTheDocument()
 })
 
+test('the SIM, USSD and SMS cards follow the actions row, in that order', async () => {
+  renderLte()
+  const names = ['AT console', 'SIM', 'USSD', 'SMS']
+  const found = await Promise.all(names.map((name) => screen.findByRole('heading', { name, level: 2 })))
+  for (let i = 1; i < found.length; i++) {
+    expect(found[i - 1]!.compareDocumentPosition(found[i]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  }
+  expect(screen.getByRole('button', { name: 'Help: SIM PIN' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Help: USSD' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Help: SMS' })).toBeInTheDocument()
+})
+
 test('a router without LTE shows the note only', async () => {
   state = NO_LTE
   renderLte()

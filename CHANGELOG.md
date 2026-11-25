@@ -7,6 +7,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- LTE modem › **SIM PIN**: the SIM card shows whether the SIM asks for its PIN and the tries left, and Enter PIN
+  appears only while it asks. The app never sends the PIN on the last try, never keeps it, and hides it in the
+  audit log.
+- LTE modem › **SMS**: list the messages on the SIM or in the phone memory, read one (also during a harness run),
+  delete some, and send a text of 1 to 160 GSM basic characters. Delete and Send show their command first and
+  wait for a harness run to end.
+- LTE modem › **USSD**: send one USSD code and read the network's reply. The app listens up to 35 s, the AT
+  console waits meanwhile, and menus are not supported: the session is closed after the first reply.
+
 ### Fixed
 
 - LTE Recover waits for an LTE setup in progress before each step (up to 20 s, reading once a second) and skips
