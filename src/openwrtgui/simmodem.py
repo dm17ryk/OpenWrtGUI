@@ -35,10 +35,15 @@ AT_ANSWERS = {
     "AT+COPS?": ('+COPS: 0,0,"Partner",7',),
     "AT+BMMODODR?": ("+BMMODODR: 17",),
     "AT+CSQ": ("+CSQ: 20,99",),
+    "AT+BMMODODR=?": ("+BMMODODR: (2,3,17)",),
+    "AT+CUSD=2": (),
 }
 _MICROCOM = re.compile(
-    r"printf '%s\\r' (.+) \| timeout -s KILL 10 microcom -t 2000 -s 115200 (/dev/ttyUSB[0-9])"
+    r"printf '%s\\r' (.+) \| timeout -s KILL (?:10 microcom -t 2000|35 microcom -t 30000)"
+    r" -s 115200 (/dev/ttyUSB[0-9])"
 )
+_CUSD = re.compile(r'AT\+CUSD=1,"([^"]*)",15', re.IGNORECASE)
+MESSAGE_TIME = "2026-01-01T12:00:00+00:00"
 _SET_OPMODE = re.compile(
     re.escape(c.uqmi(DEVICE, "--set-device-operating-mode", "", timeout_ms=3000)) + r"(\w+)"
 )
@@ -64,6 +69,7 @@ class SimModem:
         self.lease = True  # lte_4 holds an address while connected (AP2's real lte_4 waited for one)
         self.opmode = "online"
         self.plugged = True
+        self.cut_after_echo = False  # a USSD request's output ends at its echo (a cut-off microcom)
         self.stays_low_power = False  # tests: the modem does not come back online
         self.wedged = False  # tests: ifup brings the session up without a packet-data handle until a restart
         self.stale_qmi = False  # tests: ifup starts no session until `uqmi --sync` releases the client ids
@@ -88,6 +94,24 @@ class SimModem:
         self._gap_left = 0
         self._retry_next = False
         self._low_power_seen = False
+        # tests: the SIM's PIN state ("disabled", "not_verified", "verified", "blocked"), tries, accepted PIN
+        self.pin1 = "disabled"
+        self.pin1_tries = 3
+        self.puk_tries = 10
+        self.pin_code = "0000"
+        self.messages: dict[str, dict[int, dict[str, object]]] = {
+            "sim": {i: {"sender": f"+155501{i + 1:02d}", "text": f"Test message {i + 1}"} for i in range(3)},
+            "me": {},
+        }
+        self.capacity = {"sim": 20, "me": 23}
+        self.sent: list[tuple[str, str]] = []
+        self.ussd_replies: dict[str, tuple[int, str, int]] = {
+            "*100#": (0, "Balance 12.34", 15),
+            "*111#": (1, "1 Balance 2 Packages", 15),
+            "*200#": (0, "05E905DC05D505DD", 72),
+        }
+        # codes the modem refuses at once, with its final line (ERROR or +CME ERROR: n): no OK, no +CUSD (P10)
+        self.ussd_errors: dict[str, str] = {"*400#": "ERROR"}
         self.rx_bytes = 1_204_331
         self.tx_bytes = 3_876_002
 
@@ -153,7 +177,95 @@ class SimModem:
             elif self.opmode == "online" and self._low_power_seen:
                 self.wedged = self._low_power_seen = False  # a low_power, online cycle restarts the modem
             return _ok()
+        sim = self._sim_or_messages(command)
+        if sim is not None:
+            return sim
         return _fail("Invalid argument\n")
+
+    def _sim_state(self, *, unlock_key: str) -> CommandResult:
+        card = {
+            "not_verified": "pin1_or_upin_pin_required",
+            "blocked": "puk1_or_upin_puk_required",
+        }.get(self.pin1, "ready")
+        state: dict[str, object] = {}
+        if unlock_key == "pin1_unlock_tries":  # --uim-get-sim-state; --get-pin-status has no card keys
+            state.update(card_slot=1, card_application_state=card)
+        state.update(pin1_status=self.pin1, pin1_verify_tries=self.pin1_tries)
+        state[unlock_key] = self.puk_tries
+        state.update(pin2_status="not_verified", pin2_verify_tries=3)
+        state["pin2_" + unlock_key.removeprefix("pin1_")] = 10
+        return _ok(json.dumps(state, separators=(",", ":")) + "\n")
+
+    def _verify_pin(self, pin: str) -> CommandResult:
+        if self.pin1 != "not_verified":
+            return _fail("Request failed\n")
+        if pin == self.pin_code:
+            self.pin1 = "verified"
+            return _ok()
+        self.pin1_tries = max(0, self.pin1_tries - 1)
+        if self.pin1_tries == 0:
+            self.pin1 = "blocked"
+        return _fail("Request failed\n")  # never echoes the PIN
+
+    def _sim_or_messages(self, command: str) -> CommandResult | None:
+        """The SIM and SMS options: `uqmi -s -d DEV -t MS <option> [args]`."""
+        try:
+            words = shlex.split(command)
+        except ValueError:
+            return None
+        option, args = (words[6], words[7:]) if len(words) > 6 else ("", [])
+        if option == "--uim-get-sim-state":
+            return self._sim_state(unlock_key="pin1_unlock_tries")
+        if option == "--get-pin-status":
+            return self._sim_state(unlock_key="pin1_unblock_tries")
+        if option == "--verify-pin1" and len(args) == 1:
+            return self._verify_pin(args[0])
+        if option == "--send-message" and len(args) == 3 and args[1] == "--send-message-target":
+            self.sent.append((args[2], args[0]))
+            return _ok()
+        if option not in ("--list-messages", "--get-message", "--delete-message"):
+            return None
+        by_id = option != "--list-messages"
+        if len(args) != (3 if by_id else 2) or args[-2] != "--storage" or args[-1] not in self.messages:
+            return _fail("Invalid argument\n")
+        store = self.messages[args[-1]]
+        if not by_id:
+            return _ok(json.dumps(sorted(store), separators=(",", ":")) + "\n")
+        message = store.get(int(args[0])) if args[0].isdigit() else None
+        if message is None:
+            return _fail("Request failed\n")
+        if option == "--delete-message":
+            del store[int(args[0])]
+            return _ok()
+        body = {"smsc": "+15550100", "timestamp": MESSAGE_TIME, **message}
+        return _ok(json.dumps(body, separators=(",", ":")) + "\n")
+
+    def _cpms(self) -> str:
+        me, sim = self.messages["me"], self.messages["sim"]
+        cap = self.capacity
+        return f'+CPMS: "ME",{len(me)},{cap["me"]},"ME",{len(me)},{cap["me"]},"SM",{len(sim)},{cap["sim"]}'
+
+    def _at_lines(self, command: str) -> tuple[str, ...] | None:
+        upper = command.upper()
+        if upper == "AT+CPIN?":
+            if self.pin1 in ("disabled", "verified"):
+                return ("+CPIN: READY",)
+            return ("+CPIN: SIM PUK" if self.pin1 == "blocked" else "+CPIN: SIM PIN",)
+        if upper == "AT+CPMS?":
+            return (self._cpms(),)
+        if _CUSD.fullmatch(command) is not None:
+            return ()  # the reply comes after the OK (_ussd_line)
+        return AT_ANSWERS.get(upper)
+
+    def _ussd_line(self, command: str) -> str | None:
+        """The network's +CUSD answer to a USSD request; none for a code the network does not know."""
+        m = _CUSD.fullmatch(command)
+        reply = self.ussd_replies.get(m.group(1)) if m is not None else None
+        return None if reply is None else f'+CUSD: {reply[0]},"{reply[1]}",{reply[2]}'
+
+    def _ussd_error(self, command: str) -> str | None:
+        m = _CUSD.fullmatch(command)
+        return self.ussd_errors.get(m.group(1)) if m is not None else None
 
     def _blocked(self) -> bool:
         """A fault that keeps any session from starting."""
@@ -206,7 +318,12 @@ class SimModem:
         out: list[str] = []
         for command in commands:
             out.append(f"{command}\r\r\n")
-            lines = AT_ANSWERS.get(command.upper())
+            if self.cut_after_echo and _CUSD.fullmatch(command) is not None:
+                break  # the output stops after the echo: no OK, ERROR or +CUSD
+            if (refused := self._ussd_error(command)) is not None:
+                out.append(f"{refused}\r\n")
+                continue
+            lines = self._at_lines(command)
             if lines is None and re.fullmatch(r"AT\+[A-Z]+=.*", command, re.IGNORECASE):
                 lines = ()  # a setting the simulator accepts
             if lines is None:
@@ -214,4 +331,6 @@ class SimModem:
                 continue
             out.extend(f"{line}\r\n\r\n" for line in lines)
             out.append("OK\r\n")
+            if (ussd := self._ussd_line(command)) is not None:
+                out.append(f"\r\n{ussd}\r\n")
         return _ok("".join(out))

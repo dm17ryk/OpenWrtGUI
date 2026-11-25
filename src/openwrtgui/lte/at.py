@@ -8,7 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from openwrtgui.lte import commands as c
-from openwrtgui.lte.parse import AtAnswer, parse_at, parse_cops, parse_identity, parse_mode_order
+from openwrtgui.lte.parse import MODE_NAMES, AtAnswer, parse_at, parse_cops, parse_identity, parse_mode_order
 from openwrtgui.transport.base import Transport
 
 IDENTITY = ("AT+CGMI", "AT+CGMM", "AT+CGMR")  # one exec each: the BM806C drops the third of a burst (AP2)
@@ -49,6 +49,7 @@ class ModemInfo(BaseModel):
     firmware: str | None = None
     operator: str | None = None
     mode_order: int | None = None
+    mode_order_name: str | None = None
     at_port: str | None = None
 
 
@@ -124,6 +125,7 @@ def modem_info(identity: ModemIdentity | None, operator: str | None, port: str |
         firmware=known.firmware,
         operator=operator,
         mode_order=known.mode_order,
+        mode_order_name=MODE_NAMES.get(known.mode_order) if known.mode_order is not None else None,
         at_port=port,
     )
 

@@ -85,9 +85,43 @@ app deletes its saved setup.
 ## Modem
 
 Manufacturer, model and firmware (from `AT+CGMI`, `AT+CGMM`, `AT+CGMR`), the operating mode, and the
-network mode order the modem reports (`AT+BMMODODR?`; the numbers are not mapped to names yet). The IMEI
+network mode order the modem reports (`AT+BMMODODR?`), as its number and the modem's own name for it. The IMEI
 shows as dots until you press **Reveal**; it is read from the modem then and never stored, logged or written to
 the audit log.
+
+## SIM PIN
+
+The SIM card shows whether the SIM asks for its PIN: off, needed (with the tries left), entered, or blocked. The
+**Enter PIN** form appears only while the SIM asks for the PIN, and it waits while a harness run is live. The app
+never keeps the PIN: the field is emptied after every try. **Enter PIN** never sends the PIN on the last try, nor
+when the modem does not say how many tries are left: then enter it in a phone or the D-Link UI, so a wrong PIN does
+not block the SIM. If the SIM's state cannot be read after a try, the card says the PIN was sent: check the tries
+left before trying again. A blocked SIM needs its PUK, which the app does not offer. The AT console has no such
+check: it sends what you type, such as `AT+CPIN=`, after its usual question.
+
+## SMS
+
+The SMS card lists the messages on the SIM or in the phone memory, and shows how many of the modem's places they
+use. The list is read when the card opens; press **Refresh** to read it again and see new messages (it only reads,
+so it works during a harness run). **Read** shows a message's sender, time, text and, for a long message sent in
+parts, which part it is (for example "Part 2 of 3"), and works during a harness run, because it only reads. Tick
+messages and press **Delete** to remove them: the card shows the exact command first, and deleting waits for a
+harness run to end. If the list changed since the preview, the app says so and you preview again.
+**Send SMS** takes a number and a text of 1 to 160 characters of the GSM basic set (letters, digits and common
+punctuation; for example `@`, `$` and accented letters are refused). Its preview warns that the carrier may charge
+for the message, and sending also waits for a harness run to end. The app never writes a message's text to the
+audit log, only the command and the number. The number and text are locked while a send is waiting for the modem.
+
+## USSD
+
+The USSD card sends one code, such as `*100#`, and shows the network's reply. Press **Preview** to see the
+command and the warning, then **Send USSD**. The app listens up to 35 seconds for the reply, and the AT console
+waits until then, because both use the modem's AT port. USSD menus are not supported: if the network asks for
+more, the app shows what it got and closes the session, and the same happens when no reply comes. If closing the session fails, the card says
+so: the session may still be open. The code field is locked while the app listens. A reply the
+carrier charges for is the carrier's business, so use only codes you know. Sending waits for a harness run to
+end. Codes that change or unblock a PIN, set call barring or call forwarding (such as `*21#` or `#21#`), or start with `**` or `##` are refused: they are not
+USSD, and they would put a PIN or a password into the command and the audit log.
 
 ## Connect, disconnect, reboot
 
@@ -152,7 +186,8 @@ Type an AT command (printable text starting with AT, at most 200 characters) and
 shows with its status (OK, ERROR or no answer). Up and Down recall the last 50 commands. A command with a SIM
 PIN (`AT+CPIN=`, `AT+CLCK=`, `AT+CPWD=`) or an APN password (`AT+CGAUTH=`, `AT+QICSGP=`, `AT$QCPDPP=`) shows
 everything after its `=` as `<hidden>`, here and in the audit log, and is not kept for recall; a `=?` query of
-them shows as typed. Every command goes to the audit log.
+them shows as typed. Every command goes to the audit log. The console does not check the SIM's tries left: a wrong
+PIN sent here spends a try, the last one too, so enter the PIN with **Enter PIN** on the SIM card instead.
 
 Queries (`AT`, `ATI`, `AT+CSQ`, `AT+CGMI`, `AT+CGMM`, `AT+CGMR`, and any `AT+<name>?` or `AT+<name>=?`)
 cannot change the modem and work any time, also during a harness run. Any other command may change the modem:

@@ -97,3 +97,148 @@ def test_autoconnect_off_command_text() -> None:
     with pytest.raises(ValueError):
         c.autoconnect_off("/dev/x")
     assert not is_read_only_command(c.autoconnect_off(DEV))
+
+
+def test_sim_reads_and_their_text() -> None:
+    assert c.SIM_STATE(DEV) == "uqmi -s -d /dev/cdc-wdm0 -t 2000 --uim-get-sim-state"
+    assert c.PIN_STATUS(DEV) == "uqmi -s -d /dev/cdc-wdm0 -t 2000 --get-pin-status"
+    assert c.list_messages(DEV, "me") == "uqmi -s -d /dev/cdc-wdm0 -t 2000 --list-messages --storage me"
+
+
+def test_sms_and_pin_writes_text() -> None:
+    assert c.verify_pin1(DEV, "1234") == "uqmi -s -d /dev/cdc-wdm0 -t 5000 --verify-pin1 1234"
+    assert c.get_message(DEV, "sim", 7) == "uqmi -s -d /dev/cdc-wdm0 -t 5000 --get-message 7 --storage sim"
+    assert (
+        c.delete_message(DEV, "sim", 7) == "uqmi -s -d /dev/cdc-wdm0 -t 5000 --delete-message 7 --storage sim"
+    )
+    assert c.send_message(DEV, "+15550101", "it's ok") == (
+        "uqmi -s -d /dev/cdc-wdm0 -t 10000 --send-message 'it'\\''s ok' --send-message-target +15550101"
+    )
+
+
+def test_ussd_waits_30_s_of_silence_and_is_killed_at_35() -> None:
+    assert c.ussd("/dev/ttyUSB1", "*100#") == (
+        "printf '%s\\r' 'AT+CUSD=1,\"*100#\",15' | "
+        "timeout -s KILL 35 microcom -t 30000 -s 115200 /dev/ttyUSB1"
+    )
+    assert c.ussd_request("*100#") == 'AT+CUSD=1,"*100#",15'  # the AT text alone (P10)
+    assert c.USSD_CANCEL == "AT+CUSD=2"
+    assert c.USSD_WAIT_S == 35
+    assert c.USSD_TIMEOUT_S == 45.0
+
+
+@pytest.mark.parametrize("bad", ["123", "123456789", "12a4", " 1234", ""])
+def test_a_pin_is_4_to_8_digits(bad: str) -> None:
+    with pytest.raises(ValueError, match="A PIN is 4 to 8 digits"):
+        c.verify_pin1(DEV, bad)
+
+
+@pytest.mark.parametrize("bad", ["12", "+12a4567", "1" * 16, ""])
+def test_a_target_is_digits_with_an_optional_plus(bad: str) -> None:
+    with pytest.raises(ValueError, match=r"A number is digits with an optional \+ \(3 to 15\)"):
+        c.send_message(DEV, bad, "x")
+
+
+@pytest.mark.parametrize("bad", ["100#", "*100", "*10;0#", "*" + "1" * 31 + "#"])
+def test_a_ussd_code_is_star_or_hash_digits_and_hash(bad: str) -> None:
+    with pytest.raises(ValueError, match=r"A USSD code looks like \*100#"):
+        c.ussd("/dev/ttyUSB1", bad)
+    with pytest.raises(ValueError, match=r"A USSD code looks like \*100#"):
+        c.ussd_request(bad)
+
+
+# 3GPP TS 22.030 supplementary-service strings (security L4, ruling P16): change PIN (03/04/042), unblock with
+# the PUK (05/052), every call barring service (33, 331, 332, 35, 351, 330, 333, 353) with any procedure
+# (*, #, *#, **, ##), and any code that starts with ** (registration) or ## (erasure)
+SS_CODES = [
+    "**04*1234*5678*5678#",
+    "*04*1234*5678*5678#",
+    "**042*1234*5678*5678#",
+    "**05*12345678*1234*1234#",
+    "**052*12345678*1234*1234#",
+    "**03*330*0000*1111*1111#",
+    "*03*330*0000*1111*1111#",
+    "*33*0000#",
+    "#33*0000#",
+    "*#33#",
+    "*331*0000#",
+    "*332*0000#",
+    "*35*0000#",
+    "*351*0000#",
+    "#330*0000#",
+    "*333*0000#",
+    "*353#",
+    "**21*+15550101#",
+    "**21*15550101#",
+    "##002#",
+    "##21#",
+    # P24: a supplementary-service code is refused whatever the procedure
+    "*21#",
+    "#21#",
+    "*#21#",
+    "*21*0501234567#",
+    "*67#",
+    "#002#",
+    "*43#",
+    "#31#",
+    "*#31#",
+    "*30#",
+    "*61*5#",
+    "*62#",
+    "*#004#",
+    "*76#",
+    "*77#",
+]
+USSD_CODES = [
+    "*100#",
+    "#100#",
+    "*#100#",
+    "*111#",
+    "*123*1#",
+    "*3500#",
+    "*0330#",
+    "*400#",
+    "*#06#",
+    "*300#",
+    "*210#",
+    "*43210#",
+]
+
+
+@pytest.mark.parametrize("code", SS_CODES)
+def test_a_supplementary_service_string_is_not_a_ussd_code(code: str) -> None:
+    """Such a code would put a PIN, PUK or barring password in clear into the preview and the audit, or change
+    the line's services; D1 offers no such write."""
+    assert c.USSD_CODE.fullmatch(code) is None
+    with pytest.raises(ValueError, match=r"^A USSD code looks like \*100#"):
+        c.ussd_request(code)
+
+
+@pytest.mark.parametrize("code", USSD_CODES)
+def test_ordinary_ussd_codes_stay_allowed(code: str) -> None:
+    assert c.ussd_request(code) == f'AT+CUSD=1,"{code}",15'
+
+
+def test_the_ussd_rule_names_what_it_refuses() -> None:
+    assert c.USSD_MESSAGE == (
+        "A USSD code looks like *100#: * or #, digits, * or #, ending in #. "
+        "PIN, PUK, call barring and call forwarding codes, and codes starting with ** or ##, are refused"
+    )
+
+
+def test_reads_are_read_only_and_writes_are_not() -> None:
+    for read in (
+        c.SIM_STATE(DEV),
+        c.PIN_STATUS(DEV),
+        c.list_messages(DEV, "sim"),
+        c.list_messages(DEV, "me"),
+    ):
+        assert is_read_only_command(read), read
+    for write in (
+        c.verify_pin1(DEV, "1234"),
+        c.get_message(DEV, "sim", 1),
+        c.delete_message(DEV, "sim", 1),
+        c.send_message(DEV, "+15550101", "x"),
+        c.ussd("/dev/ttyUSB1", "*100#"),
+    ):
+        assert not is_read_only_command(write), write

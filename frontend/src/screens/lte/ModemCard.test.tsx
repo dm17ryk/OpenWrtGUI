@@ -21,7 +21,7 @@ test('shows the modem details; Reveal shows the IMEI and Hide masks it again', a
   const user = userEvent.setup()
   render(<ModemCard routerId="ap2" modem={AP2_LTE.modem} opmode={AP2_LTE.opmode} />)
   const card = screen.getByRole('region', { name: 'Modem' })
-  for (const text of ['BroadMobi', 'BM806C', 'M1.2.0_E1.0.3_A1.1.8', 'online', '17 (names not mapped yet)', '/dev/ttyUSB2']) {
+  for (const text of ['BroadMobi', 'BM806C', 'M1.2.0_E1.0.3_A1.1.8', 'online', '17 · AUTO (LTE>WCDMA>GSM>TDS>HDR>CDMA)', '/dev/ttyUSB2']) {
     expect(card).toHaveTextContent(text)
   }
   expect(card).not.toHaveTextContent(IMEI)

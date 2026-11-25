@@ -3,11 +3,11 @@ import { ApiError, postJson } from '../api/client'
 import type { NetApplyResult, NetPlan } from '../api/types'
 import { usePreview } from '../screens/wifi/usePreview'
 
-export type PlanApply = {
+export type PlanApply<R = NetApplyResult> = {
   plan: NetPlan | null
   error: string | null
   isBusy: boolean
-  result: NetApplyResult | null
+  result: R | null
   apply: () => Promise<void>
   clear: () => void
 }
@@ -17,11 +17,17 @@ export type PlanApply = {
  * Apply, which sends the same body with the preview's digest to `<base>/apply` (so only the lines shown run).
  * `onApplied` runs only when the router took the change; the result shows either way.
  */
-export function usePlanApply(base: string, body: object | null, onApplied: (result: NetApplyResult) => void): PlanApply {
+export function usePlanApply<R = NetApplyResult>(
+  base: string,
+  body: object | null,
+  onApplied: (result: R) => void,
+  /** Whether the router took the change; by default the result's `applied` field (SMS has `ok`, USSD `status`). */
+  isDone: (result: R) => boolean = (r) => (r as { applied?: boolean }).applied === true,
+): PlanApply<R> {
   const preview = usePreview<NetPlan>(`${base}/preview`, body)
   const [isBusy, setBusy] = useState(false)
   const [applyError, setApplyError] = useState<string | null>(null)
-  const [result, setResult] = useState<NetApplyResult | null>(null)
+  const [result, setResult] = useState<R | null>(null)
   const plan = preview?.plan ?? null
   const apply = async (): Promise<void> => {
     if (!body || !plan) return
@@ -29,10 +35,10 @@ export function usePlanApply(base: string, body: object | null, onApplied: (resu
     setApplyError(null)
     setResult(null) // the result on screen is always the last apply's
     try {
-      const done = await postJson<NetApplyResult>(`${base}/apply`, { ...body, digest: plan.digest })
+      const done = await postJson<R>(`${base}/apply`, { ...body, digest: plan.digest })
       setResult(done)
       // a refused or rolled-back change left the router as it was: keep the user's edits
-      if (done.applied) onApplied(done)
+      if (isDone(done)) onApplied(done)
     } catch (err) {
       setApplyError(err instanceof ApiError ? err.detail : String(err))
     } finally {

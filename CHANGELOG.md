@@ -7,11 +7,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- LTE modem › **SIM PIN**: the SIM card shows whether the SIM asks for its PIN and the tries left, and Enter PIN
+  appears only while it asks. Enter PIN never sends it on the last try, or when the modem does not say how many
+  tries are left; the app never keeps the PIN and hides it in the audit log.
+- LTE modem › **SMS**: list the messages on the SIM or in the phone memory, read one (also during a harness run),
+  delete some, and send a text of 1 to 160 GSM basic characters. Delete and Send show their command first and
+  wait for a harness run to end.
+- LTE modem › **USSD**: send one USSD code and read the network's reply. The app listens up to 35 s, the AT
+  console waits meanwhile, and menus are not supported: the session is closed after the first reply. Codes that
+  change or unblock a PIN, set call barring, or start with `**` or `##` are refused.
+- LTE modem › **Modem**: the network mode order shows the modem's own name for it, for example "17 · AUTO
+  (LTE>WCDMA>GSM>TDS>HDR>CDMA)". SMS texts that the modem stores in UCS-2 (other alphabets) are read too.
+
 ### Fixed
 
 - LTE Recover waits for an LTE setup in progress before each step (up to 20 s, reading once a second) and skips
   a step whose setup never pauses, since cutting a setup off could leave the modem's QMI channel failing until a
   router reboot (#93). If LTE comes back by itself meanwhile, Recover stops and says so.
+- App log: router commands are no longer written to the app log; a command that carried a Wi-Fi key, an APN
+  password or a SIM PIN could reach it. App logs written by earlier versions (`logs\app.log` and its numbered
+  copies) may hold Wi-Fi keys, APN passwords and SIM PINs typed in the AT console; delete them.
 
 ## [1.2.0] - 2026-11-21
 

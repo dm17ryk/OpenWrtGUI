@@ -56,6 +56,7 @@ async def test_modem_info_on_the_port_one_command_per_exec() -> None:
     info = await read_modem_info(t, port)  # type: ignore[arg-type]
     assert (info.manufacturer, info.model, info.firmware) == ("BroadMobi", "BM806C", "M1.2.0_E1.0.3_A1.1.8")
     assert (info.operator, info.mode_order, info.at_port) == ("Partner", 17, port)
+    assert info.mode_order_name == "AUTO (LTE>WCDMA>GSM>TDS>HDR>CDMA)"
     assert all(call.count("'AT") == 1 for call in t.calls)  # never two AT commands in one exec
 
 

@@ -1,0 +1,67 @@
+{
+  "sim": {
+    "pin": "off",
+    "tries_left": 3,
+    "puk_tries_left": 10,
+    "card": "ready",
+    "can_enter_pin": false,
+    "note": null
+  },
+  "lists": {
+    "sim": {
+      "count": 20,
+      "used": 20,
+      "capacity": 20
+    },
+    "me": {
+      "count": 0,
+      "used": 0,
+      "capacity": 23
+    }
+  },
+  "cpms": [
+    "+CPMS: \"ME\",0,23,\"ME\",0,23,\"SM\",20,20"
+  ],
+  "bmmododr_test": [
+    "+BMMODODR:",
+    "1:WCDMA ONLY",
+    "2:AUTO(LTE>TDS>GSM>WCDMA>HDR>CDMA)",
+    "3:GSM+CDMA",
+    "4:AUTO(TDS>GSM>LTE>WCDMA>HDR>CDMA)",
+    "5:LTE ONLY",
+    "6:TDS ONLY",
+    "7:TDS+WCDMA",
+    "8:TDS+GSM",
+    "9:LTE+TDS",
+    "10:EVDO ONLY",
+    "11:AUTO(LTE>EVDO>CDMA>TDS>WCDMA>GSM)",
+    "12:AUTO(EVDO>CMDA>LTE>TDS>WCDMA>GSM)",
+    "13:EVDO+LTE",
+    "14:CDMA+EVDO",
+    "15:CDMA ONLY",
+    "16:AUTO (TDS>LTE>GSM>WCDMA>HDR>CMDA)",
+    "17:AUTO (LTE>WCDMA>GSM>TDS>HDR>CDMA)",
+    "18:AUTO(WCDMA>GSM>LTE>TDS>HDR>CDMA)",
+    "19 AUTO(WCDMA>LTE>GSM>TDS>HDR>CDMA)",
+    "20:LTE+WCDMA",
+    "21:WCDMA+GSM"
+  ],
+  "message_keys": [
+    "concat_part",
+    "concat_parts",
+    "concat_ref",
+    "sender",
+    "smsc",
+    "timestamp",
+    "ucs-2"
+  ],
+  "message": {
+    "id": 0,
+    "storage": "<str 3 chars>",
+    "sender": "<str 8 chars>",
+    "time": "<str 19 chars>",
+    "text": null,
+    "part": "<str 6 chars>"
+  },
+  "deleted": 20
+}

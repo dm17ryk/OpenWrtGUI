@@ -3,7 +3,10 @@ import zipfile
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from openwrtgui.guard.audit import AuditLog, mask
+from openwrtgui.lte.commands import send_message
 
 
 def test_secret_never_reaches_disk(tmp_path: Path) -> None:
@@ -168,3 +171,56 @@ def test_a_line_about_a_router_tells_the_listeners(tmp_path: Path) -> None:
     audit.record(router="ap2", screen="Wi-Fi", command="wifi reload radio0", exit_status=0, source="user")
     audit.record(router=None, screen="Settings", command="settings saved", exit_status=None, source="app")
     assert heard == ["ap2"]
+
+
+@pytest.mark.parametrize(
+    "option", ["--verify-pin1", "--verify-pin2", "--uim-verify-pin1", "--pin", "--new-pin", "--puk"]
+)
+def test_the_audit_hides_a_uqmi_pin(option: str) -> None:
+    assert mask(f"uqmi -s -d /dev/cdc-wdm0 -t 5000 {option} 4321", ()) == (
+        f"uqmi -s -d /dev/cdc-wdm0 -t 5000 {option} <hidden>"
+    )
+
+
+def test_a_pin_equal_to_the_timeout_hides_only_the_pin() -> None:
+    """Security L3: by position, so PIN 5000 does not also hide `-t 5000` (which would tell it)."""
+    assert mask("uqmi -s -d /dev/cdc-wdm0 -t 5000 --verify-pin1 5000", ()) == (
+        "uqmi -s -d /dev/cdc-wdm0 -t 5000 --verify-pin1 <hidden>"
+    )
+
+
+SMS_TEXTS = [
+    "It's ok",
+    "a",
+    "5",
+    "0101",
+    "line one\nline two",
+    "Hello there",
+    "'",
+    "x --send-message y",
+    "my secret words --pin 1234",
+    "call me --puk now",
+    "a b c --new-pin z",
+    "my secret words --pin don't",
+    "wifi.key='abc' and more",
+]
+
+
+@pytest.mark.parametrize("text", SMS_TEXTS)
+def test_an_sms_text_is_hidden_by_position_and_the_number_stays(text: str) -> None:
+    """Final review I1 / security M1, L3: the text is hidden whole in its shell quoting (a `'` inside is
+    written '\\''), never matched as a substring, so a short text cannot shred the line or the number."""
+    command = send_message("/dev/cdc-wdm0", "+15550101", text)
+    assert mask(command, ()) == (
+        "uqmi -s -d /dev/cdc-wdm0 -t 10000 --send-message '<hidden>' --send-message-target +15550101"
+    )
+
+
+def test_an_sms_text_in_an_older_line_is_hidden_when_shown(tmp_path: Path) -> None:
+    """An entry written before the positional rule, its text in clear (a `'` defeated the substring mask)."""
+    command = send_message("/dev/cdc-wdm0", "+15550101", "It's ok")
+    (tmp_path / "2026-11-25.jsonl").write_text(_old_line(command), encoding="utf-8")
+    [entry] = AuditLog(tmp_path).query()
+    assert "It" not in entry.command and "--send-message-target +15550101" in entry.command
+    with zipfile.ZipFile(AuditLog(tmp_path).export_zip(tmp_path / "export.zip")) as z:
+        assert "ok" not in z.read("2026-11-25.jsonl").decode("utf-8")

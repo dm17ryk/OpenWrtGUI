@@ -121,6 +121,9 @@ def _setup_logging(data: DataDir) -> None:
     if not any(isinstance(h, RotatingFileHandler) for h in root.handlers):
         root.addHandler(handler)
     root.setLevel(logging.INFO)
+    # asyncssh logs every command it runs at INFO ("  Command: ..."), and a command can carry a SIM PIN, an
+    # APN password or a Wi-Fi key: only its warnings and errors reach the app log (v1.3b review)
+    logging.getLogger("asyncssh").setLevel(logging.WARNING)
 
 
 def _start_server(ctx: AppContext) -> tuple[uvicorn.Server, threading.Thread]:

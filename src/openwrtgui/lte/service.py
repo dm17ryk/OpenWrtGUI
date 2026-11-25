@@ -6,7 +6,8 @@ import asyncio
 import json
 import re
 import weakref
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
+from contextlib import asynccontextmanager
 from dataclasses import replace
 from datetime import datetime
 from typing import Literal
@@ -143,11 +144,26 @@ class LteService:
             raise RouterBusy(why)
 
     def action_busy(self, router_id: str) -> str | None:
-        """Why the Recover job may not start: an LTE action or AT write holds the router."""
+        """Why the Recover job may not start: an LTE action or a write slot (AT, SIM, SMS, USSD) holds the
+        router."""
         lock = self._busy.get(router_id)
         if lock is None or not lock.locked():
             return None
         return f"An LTE action is already running on {self._record(router_id).name}"
+
+    @asynccontextmanager
+    async def write_slot(self, rec: RouterRecord) -> AsyncIterator[None]:
+        """One LTE write at a time per router (v1.3b E12), as the actions: a write never waits behind a
+        connect, a reboot or another write to run later; it is refused (LteBusy, 409), and refused
+        (RouterBusy) while Recover runs. Held: the LTE reservation (so `action_busy` names the router and
+        Recover cannot start), the write lock and the AT lock. The checks run when the slot is entered, with
+        no await before the reservation (PR #82 review)."""
+        self._refuse_if_busy(rec.id)
+        busy = self._busy.setdefault(rec.id, asyncio.Lock())
+        if busy.locked():
+            raise LteBusy(f"An LTE action is already running on {rec.name}")
+        async with busy, self._pool.write_lock(rec.id), self._at_lock(rec.id):
+            yield
 
     # ---------------------------------------------------------------- what the Recover job uses
     async def transport(self, rec: RouterRecord) -> Transport:
@@ -209,6 +225,14 @@ class LteService:
         device = qmi[1] if qmi is not None else None
         return device if device is not None and MODEM_DEVICE.fullmatch(device) else None
 
+    async def connection(self, router_id: str) -> tuple[RouterRecord, Transport, str]:
+        """The router, its connection and its modem's QMI device, for the SIM, SMS and USSD cards."""
+        rec = self._record(router_id)
+        device = await self.modem_device(router_id)
+        if device is None:
+            raise ValueError(NO_LTE)
+        return rec, await self._pool.get(rec), device
+
     async def at_port(self, rec: RouterRecord, t: Transport) -> str | None:
         """D4: a port that answered is kept for this connection; none found is probed again next time (a modem
         plugged in or still enumerating), and a kept port that stops answering is dropped (`forget_port`)."""
@@ -224,6 +248,10 @@ class LteService:
 
     def _at_lock(self, router_id: str) -> asyncio.Lock:
         return self._at.setdefault(router_id, asyncio.Lock())
+
+    def at_lock(self, router_id: str) -> asyncio.Lock:
+        """One microcom on the modem's port at a time (v1.0b2 D11): the SMS and USSD cards take it too."""
+        return self._at_lock(router_id)
 
     def forget_port(self, router_id: str) -> None:
         """The kept AT port gave no answer (the modem re-enumerated): probe again on the next use."""
@@ -554,14 +582,10 @@ class LteService:
             async with self._at_lock(rec.id):
                 port, done = await self._exchange(rec, t, command, write=False)
         else:
-            # one LTE write at a time, as the actions: a command that may change the modem never waits behind
-            # a connect or reboot to run later; it is refused (409). Recover may have started while the
-            # connection was made: checked again with no await before the reservation (PR #82 review)
-            self._refuse_if_busy(rec.id)
-            busy = self._busy.setdefault(rec.id, asyncio.Lock())
-            if busy.locked():
-                raise LteBusy(f"An LTE action is already running on {rec.name}")
-            async with busy, self._pool.write_lock(rec.id), self._at_lock(rec.id):
+            # a command that may change the modem takes the write slot: refused (409) behind another LTE
+            # write, and Recover, which may have started while the connection was made, is checked again
+            # on entry (PR #82 review)
+            async with self.write_slot(rec):
                 try:
                     port, done = await self._exchange(rec, t, command, write=True)
                 finally:

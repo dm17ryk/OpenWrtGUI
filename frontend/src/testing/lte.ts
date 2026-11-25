@@ -45,6 +45,7 @@ export const AP2_LTE: LteState = {
     "firmware": "M1.2.0_E1.0.3_A1.1.8",
     "operator": "Partner",
     "mode_order": 17,
+    "mode_order_name": "AUTO (LTE>WCDMA>GSM>TDS>HDR>CDMA)",
     "at_port": "/dev/ttyUSB2"
   },
   "autoconnect_note": "This image's qmi.sh turns the modem's autoconnect off at every connect, so the setting has no effect",
@@ -83,6 +84,7 @@ export const NO_LTE: LteState = {
     "firmware": null,
     "operator": null,
     "mode_order": null,
+    "mode_order_name": null,
     "at_port": null
   },
   "autoconnect_note": "This image's qmi.sh turns the modem's autoconnect off at every connect, so the setting has no effect",

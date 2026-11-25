@@ -1696,6 +1696,194 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/routers/{router_id}/lte/sim": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sim */
+        get: operations["sim_api_routers__router_id__lte_sim_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/sim/pin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enter Pin
+         * @description 409 when the SIM does not ask for a PIN, is blocked, has one try left or no tries count (E3), or
+         *     another LTE write or Recover holds the router; 423 during a harness run. A 200 that is not accepted may
+         *     still have sent the PIN: its message says so.
+         */
+        post: operations["enter_pin_api_routers__router_id__lte_sim_pin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/sms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Sms List */
+        get: operations["sms_list_api_routers__router_id__lte_sms_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/sms/delete/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sms Delete Apply
+         * @description 423 during a harness run; 409 when the list changed since the preview or an LTE action runs.
+         */
+        post: operations["sms_delete_apply_api_routers__router_id__lte_sms_delete_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/sms/delete/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sms Delete Preview */
+        post: operations["sms_delete_preview_api_routers__router_id__lte_sms_delete_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/sms/send/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sms Send Apply
+         * @description 423 during a harness run; 409 when the text changed since the preview or an LTE action runs.
+         */
+        post: operations["sms_send_apply_api_routers__router_id__lte_sms_send_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/sms/send/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sms Send Preview */
+        post: operations["sms_send_preview_api_routers__router_id__lte_sms_send_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/sms/{storage}/{message_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sms Message
+         * @description Read during a harness run too; 404 for an id that is not in the list.
+         */
+        get: operations["sms_message_api_routers__router_id__lte_sms__storage___message_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/ussd/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ussd Apply
+         * @description Up to 45 s: the network's reply, or "no reply". 423 during a harness run; 409 when the code changed
+         *     since the preview or an LTE action runs.
+         */
+        post: operations["ussd_apply_api_routers__router_id__lte_ussd_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routers/{router_id}/lte/ussd/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ussd Preview */
+        post: operations["ussd_preview_api_routers__router_id__lte_ussd_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/routers/{router_id}/luci/bridges/{bridge_id}": {
         parameters: {
             query?: never;
@@ -6774,6 +6962,8 @@ export interface components {
             manufacturer?: string | null;
             /** Mode Order */
             mode_order?: number | null;
+            /** Mode Order Name */
+            mode_order_name?: string | null;
             /** Model */
             model?: string | null;
             /** Operator */
@@ -7302,6 +7492,22 @@ export interface components {
              * Format: date-time
              */
             saved_at: string;
+        };
+        /**
+         * PinIn
+         * @description E4: never stored, logged or returned; the 422 handler drops the input it would echo.
+         */
+        PinIn: {
+            /** Pin */
+            pin: string;
+        };
+        /** PinResult */
+        PinResult: {
+            /** Accepted */
+            accepted: boolean;
+            /** Message */
+            message: string;
+            sim: components["schemas"]["SimState"];
         };
         /** PinView */
         PinView: {
@@ -8660,6 +8866,24 @@ export interface components {
             /** Source */
             source: string;
         };
+        /** SimState */
+        SimState: {
+            /** Can Enter Pin */
+            can_enter_pin: boolean;
+            /** Card */
+            card: string | null;
+            /** Note */
+            note: string | null;
+            /**
+             * Pin
+             * @enum {string}
+             */
+            pin: "off" | "needed" | "entered" | "blocked" | "unknown";
+            /** Puk Tries Left */
+            puk_tries_left: number | null;
+            /** Tries Left */
+            tries_left: number | null;
+        };
         /**
          * SipAlg
          * @description Whether fw4 hands SIP to the `sip` conntrack helper (v1.2a R9), on which zones and UDP ports.
@@ -8713,6 +8937,87 @@ export interface components {
             sip: boolean;
             /** Zone */
             zone: string;
+        };
+        /** SmsDeleteApplyIn */
+        SmsDeleteApplyIn: {
+            /** Digest */
+            digest: string;
+            /** Ids */
+            ids: number[];
+            /**
+             * Storage
+             * @enum {string}
+             */
+            storage: "sim" | "me";
+        };
+        /** SmsDeleteIn */
+        SmsDeleteIn: {
+            /** Ids */
+            ids: number[];
+            /**
+             * Storage
+             * @enum {string}
+             */
+            storage: "sim" | "me";
+        };
+        /** SmsDone */
+        SmsDone: {
+            /** Error */
+            error: string | null;
+            /** Lines */
+            lines: string[];
+            /** Ok */
+            ok: boolean;
+        };
+        /** SmsList */
+        SmsList: {
+            /** Capacity */
+            capacity: number | null;
+            /** Full */
+            full: boolean;
+            /** Ids */
+            ids: number[];
+            /**
+             * Storage
+             * @enum {string}
+             */
+            storage: "sim" | "me";
+            /** Used */
+            used: number | null;
+        };
+        /** SmsMessage */
+        SmsMessage: {
+            /** Id */
+            id: number;
+            /** Part */
+            part: string | null;
+            /** Sender */
+            sender: string | null;
+            /**
+             * Storage
+             * @enum {string}
+             */
+            storage: "sim" | "me";
+            /** Text */
+            text: string | null;
+            /** Time */
+            time: string | null;
+        };
+        /** SmsSendApplyIn */
+        SmsSendApplyIn: {
+            /** Digest */
+            digest: string;
+            /** Target */
+            target: string;
+            /** Text */
+            text: string;
+        };
+        /** SmsSendIn */
+        SmsSendIn: {
+            /** Target */
+            target: string;
+            /** Text */
+            text: string;
         };
         /** SshApplyIn */
         SshApplyIn: {
@@ -9708,6 +10013,32 @@ export interface components {
             use_pct: number;
             /** Used Kib */
             used_kib: number;
+        };
+        /** UssdApplyIn */
+        UssdApplyIn: {
+            /** Code */
+            code: string;
+            /** Digest */
+            digest: string;
+        };
+        /** UssdIn */
+        UssdIn: {
+            /** Code */
+            code: string;
+        };
+        /** UssdReply */
+        UssdReply: {
+            /** Closed */
+            closed: boolean;
+            /** Dcs */
+            dcs: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "reply" | "more" | "ended" | "no reply" | "error";
+            /** Text */
+            text: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -13153,6 +13484,348 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["SetupSourceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sim_api_routers__router_id__lte_sim_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SimState"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enter_pin_api_routers__router_id__lte_sim_pin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PinIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PinResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sms_list_api_routers__router_id__lte_sms_get: {
+        parameters: {
+            query?: {
+                storage?: "sim" | "me";
+            };
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmsList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sms_delete_apply_api_routers__router_id__lte_sms_delete_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmsDeleteApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmsDone"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sms_delete_preview_api_routers__router_id__lte_sms_delete_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmsDeleteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sms_send_apply_api_routers__router_id__lte_sms_send_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmsSendApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmsDone"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sms_send_preview_api_routers__router_id__lte_sms_send_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SmsSendIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NetPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sms_message_api_routers__router_id__lte_sms__storage___message_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+                storage: "sim" | "me";
+                message_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SmsMessage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ussd_apply_api_routers__router_id__lte_ussd_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UssdApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UssdReply"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ussd_preview_api_routers__router_id__lte_ussd_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                router_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UssdIn"];
             };
         };
         responses: {

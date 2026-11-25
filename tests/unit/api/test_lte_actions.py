@@ -238,8 +238,13 @@ async def test_an_at_command_that_may_change_the_modem_waits_for_no_action(
     ctx.lte._sleep = slow  # type: ignore[assignment]
     plan = await ctx.lte.plan_action("ap2", "reboot")
     first = asyncio.create_task(ctx.lte.apply_action("ap2", "reboot", plan.digest))
-    await asyncio.sleep(0.05)
+    # until the reboot holds the router, about 2 s at most: a fixed 0.05 s sleep raced it under load (P13)
+    for _ in range(200):
+        if ctx.lte.action_busy("ap2") is not None:
+            break
+        await asyncio.sleep(0.01)
     try:
+        assert ctx.lte.action_busy("ap2") is not None, "the reboot did not take the router within 2 s"
         with pytest.raises(LteBusy, match=r"^An LTE action is already running on AP2 · office$"):
             await asyncio.wait_for(ctx.lte.at_command("ap2", "AT+CFUN=0", confirmed=True), 2.0)
         body = {"command": "AT+CFUN=0", "confirmed": True}

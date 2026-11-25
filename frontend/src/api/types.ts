@@ -218,6 +218,13 @@ export type LteRecoverJob = S['LteRecoverJob']
 export type RungResult = S['RungResult']
 export type RecoverPreview = S['RecoverPreviewOut']
 export type LteSetupSummary = S['LteSetupSummary']
+// The LTE screen's SIM, SMS and USSD cards (v1.3b)
+export type SimState = S['SimState']
+export type PinResult = S['PinResult']
+export type SmsList = S['SmsList']
+export type SmsMessage = S['SmsMessage']
+export type SmsDone = S['SmsDone']
+export type UssdReply = S['UssdReply']
 export type LteSample = {
   t: number
   rssi: number | null
