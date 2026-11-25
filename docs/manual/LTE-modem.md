@@ -89,6 +89,14 @@ network mode order the modem reports (`AT+BMMODODR?`; the numbers are not mapped
 shows as dots until you press **Reveal**; it is read from the modem then and never stored, logged or written to
 the audit log.
 
+## SIM PIN
+
+The SIM card shows whether the SIM asks for its PIN: off, needed (with the tries left), entered, or blocked. The
+**Enter PIN** form appears only while the SIM asks for the PIN, and it waits while a harness run is live. The app
+never keeps the PIN: the field is emptied after every try. On the last try the app does not send the PIN: enter it
+in a phone or the D-Link UI, so a wrong PIN does not block the SIM. A blocked SIM needs its PUK, which the app does
+not offer.
+
 ## Connect, disconnect, reboot
 
 - **Connect** brings the session up (`ifup lte`) and waits up to 60 seconds for it. If the carrier has not
