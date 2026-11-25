@@ -562,6 +562,7 @@ def test_the_lte_page_explains_sim_sms_and_ussd() -> None:
     assert "during a harness run" in sections["SMS"] and "160" in sections["SMS"]
     assert "35 seconds" in sections["USSD"] and "AT console" in sections["USSD"]
     assert "menus" in sections["USSD"] and "closes the session" in sections["USSD"]
+    assert "call barring" in sections["USSD"] and "`**` or `##` are refused" in sections["USSD"]  # P16
     order = [m for m in re.findall(r"^## (.+)$", _read(MANUAL / "LTE-modem.md"), flags=re.M)]
     assert order.index("Modem") < order.index("SIM PIN") < order.index("SMS") < order.index("USSD")
     unreleased = _read(ROOT / "CHANGELOG.md").split("## [Unreleased]", 1)[1].split("\n## [", 1)[0]

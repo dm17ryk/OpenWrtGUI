@@ -115,7 +115,8 @@ command and the warning, then **Send USSD**. The app listens up to 35 seconds fo
 waits until then, because both use the modem's AT port. USSD menus are not supported: if the network asks for
 more, the app shows what it got and closes the session, and the same happens when no reply comes. A reply the
 carrier charges for is the carrier's business, so use only codes you know. Sending waits for a harness run to
-end.
+end. Codes that change or unblock a PIN, set call barring, or start with `**` or `##` are refused: they are not
+USSD, and they would put a PIN or a password into the command and the audit log.
 
 ## Connect, disconnect, reboot
 

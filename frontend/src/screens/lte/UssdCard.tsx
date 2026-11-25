@@ -7,10 +7,8 @@ import { usePlanApply } from '../../components/usePlanApply'
 import { Help } from '../../help/Help'
 import { HELP } from '../../help/topics'
 import { guardReasonText } from '../../shell/guardText'
+import { USSD_CODE, USSD_RULE } from './sms'
 
-// A copy of the server's rule (lte/commands.py): * or #, then digits, * or #, ending in #.
-const CODE = /^[*#][0-9*#]{1,30}#$/
-const CODE_RULE = 'A USSD code looks like *100#: * or #, digits, * or #, ending in #'
 const LISTENING = "Listening for the network's reply (up to 35 s)…"
 
 const STATUS_TEXT: Record<UssdReply['status'], string | null> = {
@@ -37,7 +35,7 @@ export function UssdCard({ routerId }: { routerId: string; routerName: string })
     () => {},
     () => true,
   )
-  const codeOk = CODE.test(code)
+  const codeOk = USSD_CODE.test(code)
   const reply = ussd.result
   const note = reply ? STATUS_TEXT[reply.status] : null
 
@@ -62,7 +60,7 @@ export function UssdCard({ routerId }: { routerId: string; routerName: string })
           }}
         />
       </label>
-      {code !== '' && !codeOk && <div className="note w">{CODE_RULE}</div>}
+      {code !== '' && !codeOk && <div className="note w">{USSD_RULE}</div>}
       <div className="row">
         <button type="button" disabled={!codeOk || live} title={runTitle} onClick={() => setBody({ code })}>
           Preview

@@ -1,7 +1,8 @@
-"""#29 (the v1.0 inventory): the frontend keeps copies of three server tables; they must stay the same.
+"""#29 (the v1.0 inventory): the frontend keeps copies of server tables and rules; they must stay the same.
 
 The AT console's query forms (lte/at.py is_query), the AT commands whose argument the server hides
-(guard/audit.py AT_MASKED_COMMANDS), and the LTE signal quality thresholds (lte/quality.py, v0.6a D11)."""
+(guard/audit.py AT_MASKED_COMMANDS), the LTE signal quality thresholds (lte/quality.py, v0.6a D11), and the
+SMS and USSD cards' rules (v1.3b: lte/sms.py, lte/commands.py)."""
 
 from __future__ import annotations
 
@@ -11,7 +12,7 @@ from pathlib import Path
 
 from openwrtgui.guard.audit import AT_MASKED_COMMANDS
 from openwrtgui.lte.at import _QUERY
-from openwrtgui.lte.commands import TARGET_MESSAGE, TARGET_RULE
+from openwrtgui.lte.commands import TARGET_MESSAGE, TARGET_RULE, USSD_CODE, USSD_MESSAGE
 from openwrtgui.lte.quality import THRESHOLDS
 from openwrtgui.lte.sms import GSM_7BIT_BASIC, GSM_RULE
 
@@ -56,6 +57,16 @@ def test_the_sms_card_says_the_servers_rules() -> None:
     m = re.search(r"^export const TARGET = /(.+)/$", SMS, re.MULTILINE)
     assert m is not None, "TARGET is not a one-line regex literal in sms.ts"
     assert m.group(1) == f"^{TARGET_RULE.pattern}$"
+
+
+def test_the_ussd_card_says_and_checks_the_servers_rule() -> None:
+    """Security L4 (P16): the card refuses the same supplementary-service strings the server refuses."""
+    assert _sms_literal("USSD_RULE") == USSD_MESSAGE
+    m = re.search(r"^export const USSD_CODE = /(.+)/$", SMS, re.MULTILINE)
+    assert m is not None, "USSD_CODE is not a one-line regex literal in sms.ts"
+    assert m.group(1) == f"^{USSD_CODE.pattern}$"
+    card = (LTE / "UssdCard.tsx").read_text(encoding="utf-8")
+    assert "USSD_CODE" in card and "USSD_RULE" in card and "const CODE" not in card
 
 
 def test_the_signal_labels_use_the_servers_thresholds() -> None:

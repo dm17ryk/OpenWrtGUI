@@ -70,6 +70,17 @@ async def test_a_code_that_is_not_ussd_is_a_422_with_the_rule(authed: httpx.Asyn
     assert (await _preview(authed, "*" + "1" * 39 + "#")).status_code == 422  # 41 characters
 
 
+@pytest.mark.parametrize("code", ["**04*1234*5678*5678#", "*33*0000#", "##002#", "**21*15550101#"])
+async def test_a_supplementary_service_string_is_a_422_and_shows_nowhere(
+    authed: httpx.AsyncClient, ctx: AppContext, code: str
+) -> None:
+    """Security L4 (P16): a PIN change, call barring or ** / ## string is not sent, previewed or audited."""
+    answer = await _preview(authed, code)
+    assert (answer.status_code, answer.json()) == (422, {"detail": c.USSD_MESSAGE})
+    assert ctx.audit.query() == []
+    assert not any(code in call for call in (await _transport(ctx)).calls)
+
+
 async def test_no_at_port_is_a_422_naming_the_router(authed: httpx.AsyncClient, ctx: AppContext) -> None:
     (await _modem(ctx)).plugged = False
     answer = await _preview(authed, "*100#")

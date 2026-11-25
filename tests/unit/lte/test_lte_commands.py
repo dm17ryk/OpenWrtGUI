@@ -147,6 +147,56 @@ def test_a_ussd_code_is_star_or_hash_digits_and_hash(bad: str) -> None:
         c.ussd_request(bad)
 
 
+# 3GPP TS 22.030 supplementary-service strings (security L4, ruling P16): change PIN (03/04/042), unblock with
+# the PUK (05/052), every call barring service (33, 331, 332, 35, 351, 330, 333, 353) with any procedure
+# (*, #, *#, **, ##), and any code that starts with ** (registration) or ## (erasure)
+SS_CODES = [
+    "**04*1234*5678*5678#",
+    "*04*1234*5678*5678#",
+    "**042*1234*5678*5678#",
+    "**05*12345678*1234*1234#",
+    "**052*12345678*1234*1234#",
+    "**03*330*0000*1111*1111#",
+    "*03*330*0000*1111*1111#",
+    "*33*0000#",
+    "#33*0000#",
+    "*#33#",
+    "*331*0000#",
+    "*332*0000#",
+    "*35*0000#",
+    "*351*0000#",
+    "#330*0000#",
+    "*333*0000#",
+    "*353#",
+    "**21*+15550101#",
+    "**21*15550101#",
+    "##002#",
+    "##21#",
+]
+USSD_CODES = ["*100#", "#100#", "*#100#", "*111#", "*123*1#", "*3500#", "*0330#", "*400#"]
+
+
+@pytest.mark.parametrize("code", SS_CODES)
+def test_a_supplementary_service_string_is_not_a_ussd_code(code: str) -> None:
+    """Such a code would put a PIN, PUK or barring password in clear into the preview and the audit, or change
+    the line's services; D1 offers no such write."""
+    assert c.USSD_CODE.fullmatch(code) is None
+    with pytest.raises(ValueError, match=r"^A USSD code looks like \*100#"):
+        c.ussd_request(code)
+
+
+@pytest.mark.parametrize("code", USSD_CODES)
+def test_ordinary_ussd_codes_stay_allowed(code: str) -> None:
+    assert c.ussd_request(code) == f'AT+CUSD=1,"{code}",15'
+
+
+def test_the_ussd_rule_names_what_it_refuses() -> None:
+    assert c.USSD_MESSAGE == (
+        "A USSD code looks like *100#: * or #, digits, * or #, ending in #. "
+        "PIN, PUK and call barring codes, and codes starting with ** or ##, are refused"
+    )
+
+
 def test_reads_are_read_only_and_writes_are_not() -> None:
     for read in (
         c.SIM_STATE(DEV),
