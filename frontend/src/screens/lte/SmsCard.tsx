@@ -128,6 +128,9 @@ export function SmsCard({ routerId }: { routerId: string; routerName: string }) 
             {label}
           </button>
         ))}
+        <button type="button" onClick={() => void client.invalidateQueries({ queryKey: listKey })}>
+          Refresh
+        </button>
       </div>
       {list.isError && (
         <div className="note x" role="alert">
@@ -160,6 +163,7 @@ export function SmsCard({ routerId }: { routerId: string; routerName: string }) 
         <div className="stack" role="region" aria-label={`Message ${reading}`} style={{ gap: 2 }}>
           <span className="b">{message.data.sender ?? 'Unknown sender'}</span>
           <span className="muted">{message.data.time ?? 'Time not known'}</span>
+          {message.data.part && <span className="muted">{`Part ${message.data.part}`}</span>}
           <span style={{ whiteSpace: 'pre-wrap' }}>{message.data.text ?? ''}</span>
         </div>
       )}
@@ -201,6 +205,7 @@ export function SmsCard({ routerId }: { routerId: string; routerName: string }) 
             inputMode="tel"
             autoComplete="off"
             maxLength={16}
+            disabled={send.isBusy}
             value={number}
             onChange={(e) => edit(() => setNumber(e.target.value))}
           />
@@ -208,14 +213,14 @@ export function SmsCard({ routerId }: { routerId: string; routerName: string }) 
         {number !== '' && !numberOk && <div className="note w">{TARGET_RULE}</div>}
         <label className="stack" style={{ gap: 2 }}>
           <span className="muted">Text</span>
-          <textarea className="in" aria-label="Text" rows={3} value={text} onChange={(e) => edit(() => setText(e.target.value))} />
+          <textarea className="in" aria-label="Text" rows={3} disabled={send.isBusy} value={text} onChange={(e) => edit(() => setText(e.target.value))} />
         </label>
         <span className={text.length > MAX_TEXT ? 'b bad' : 'muted'}>{`${text.length} / ${MAX_TEXT}`}</span>
         {text !== '' && !textOk && <div className="note w">{GSM_RULE}</div>}
         <div className="row">
           <button
             type="button"
-            disabled={!numberOk || !textOk || live}
+            disabled={!numberOk || !textOk || live || send.isBusy}
             title={runTitle}
             onClick={() => setSendBody({ target: number, text })}
           >

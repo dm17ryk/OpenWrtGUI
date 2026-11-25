@@ -102,13 +102,15 @@ check: it sends what you type, such as `AT+CPIN=`, after its usual question.
 ## SMS
 
 The SMS card lists the messages on the SIM or in the phone memory, and shows how many of the modem's places they
-use. **Read** shows a message's sender, time and text, and works during a harness run, because it only reads. Tick
+use. The list is read when the card opens; press **Refresh** to read it again and see new messages (it only reads,
+so it works during a harness run). **Read** shows a message's sender, time, text and, for a long message sent in
+parts, which part it is (for example "Part 2 of 3"), and works during a harness run, because it only reads. Tick
 messages and press **Delete** to remove them: the card shows the exact command first, and deleting waits for a
 harness run to end. If the list changed since the preview, the app says so and you preview again.
 **Send SMS** takes a number and a text of 1 to 160 characters of the GSM basic set (letters, digits and common
 punctuation; for example `@`, `$` and accented letters are refused). Its preview warns that the carrier may charge
 for the message, and sending also waits for a harness run to end. The app never writes a message's text to the
-audit log, only the command and the number.
+audit log, only the command and the number. The number and text are locked while a send is waiting for the modem.
 
 ## USSD
 

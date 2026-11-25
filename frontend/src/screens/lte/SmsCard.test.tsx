@@ -13,7 +13,9 @@ const NUMBER_RULE = 'A number is digits with an optional + (3 to 15)'
 const STALE = 'The message list changed; preview again'
 
 let lists: Record<string, SmsList> = {}
-let applyAnswer: SmsDone | Error = { ok: true, lines: [], error: null }
+let applyAnswer: SmsDone | Error | 'pending' = { ok: true, lines: [], error: null }
+let release: (() => void) | null = null
+let messagePart: string | null = null
 const posts: Array<{ path: string; body: unknown }> = []
 const listReads: string[] = []
 
@@ -47,7 +49,7 @@ vi.mock('../../api/client', async (orig) => {
           sender: '+15550102',
           time: '2026-11-25 10:00',
           text: `Test message ${one[2]}`,
-          part: null,
+          part: messagePart,
         }
         return message
       }
@@ -57,6 +59,10 @@ vi.mock('../../api/client', async (orig) => {
       posts.push({ path, body })
       if (path.endsWith('/preview')) return plan(path)
       if (path.endsWith('/apply')) {
+        if (applyAnswer === 'pending') {
+          await new Promise<void>((resolve) => (release = resolve))
+          return { ok: true, lines: ['done'], error: null }
+        }
         if (applyAnswer instanceof Error) throw applyAnswer
         return applyAnswer
       }
@@ -77,6 +83,8 @@ beforeEach(() => {
   applyAnswer = { ok: true, lines: ['done'], error: null }
   posts.length = 0
   listReads.length = 0
+  release = null
+  messagePart = null
 })
 
 function renderSms(guard: GuardOut = CLEAR) {
@@ -191,6 +199,56 @@ test('the send form counts characters and previews, then sends with the digest',
   )
   expect(await screen.findByText('SMS sent')).toBeInTheDocument()
   expect(within(form).getByLabelText('Text')).toHaveValue('')
+})
+
+test('the number, text and Preview are locked while a send is pending, and work after', async () => {
+  const user = userEvent.setup()
+  applyAnswer = 'pending'
+  renderSms()
+  await screen.findByText('3 of 20 on the SIM')
+  const form = screen.getByRole('group', { name: 'Send SMS' })
+  await user.type(within(form).getByLabelText('Number'), '+15550101')
+  await user.type(within(form).getByLabelText('Text'), 'Test message')
+  await user.click(within(form).getByRole('button', { name: 'Preview' }))
+  expect(await screen.findByText(/the carrier may charge for it/)).toBeInTheDocument()
+  const sendButton = await screen.findByRole('button', { name: 'Send' })
+  await waitFor(() => expect(sendButton).toBeEnabled())
+  await user.click(sendButton)
+  await waitFor(() => expect(within(form).getByLabelText('Number')).toBeDisabled())
+  expect(within(form).getByLabelText('Text')).toBeDisabled()
+  expect(within(form).getByRole('button', { name: 'Preview' })).toBeDisabled()
+  release?.()
+  expect(await screen.findByText('SMS sent')).toBeInTheDocument()
+  await user.type(within(form).getByLabelText('Text'), 'Next')
+  expect(within(form).getByLabelText('Text')).toHaveValue('Next')
+})
+
+test('reading a multipart message shows its position; a single message shows none', async () => {
+  const user = userEvent.setup()
+  messagePart = '1 of 7'
+  renderSms()
+  await screen.findByText('3 of 20 on the SIM')
+  await user.click(screen.getAllByRole('button', { name: 'Read' })[0]!)
+  expect(await screen.findByRole('region', { name: 'Message 1' })).toHaveTextContent('Part 1 of 7')
+})
+
+test('a single-part message shows no part line', async () => {
+  const user = userEvent.setup()
+  renderSms()
+  await screen.findByText('3 of 20 on the SIM')
+  await user.click(screen.getAllByRole('button', { name: 'Read' })[0]!)
+  expect(await screen.findByRole('region', { name: 'Message 1' })).not.toHaveTextContent('Part')
+})
+
+test('Refresh reads the list again, also during a harness run', async () => {
+  const user = userEvent.setup()
+  renderSms(LIVE)
+  await screen.findByText('3 of 20 on the SIM')
+  lists = { ...lists, sim: { ...SIM, ids: [1, 2, 3, 4], used: 4 } }
+  const reads = listReads.length
+  await user.click(screen.getByRole('button', { name: 'Refresh' }))
+  expect(await screen.findByText('4 of 20 on the SIM')).toBeInTheDocument()
+  expect(listReads.length).toBeGreaterThan(reads)
 })
 
 test('a character outside the GSM set shows the rule and disables Preview', async () => {
