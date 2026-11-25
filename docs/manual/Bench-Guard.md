@@ -58,7 +58,7 @@ router. In detail:
   firewall).
 - On the Network screen, Wi-Fi access by MAC too.
 - LTE actions (connect, disconnect, modem reboot, settings, Reconfigure), AT commands that are not queries,
-  and the SIM card's **Enter PIN**.
+  and the SIM and SMS cards' **Enter PIN, Delete SMS, Send SMS**. Reading a message is not refused.
 - LTE **Recover**: starting it, and its next step. A run that starts while Recover or Reboot modem has the
   modem in low power or LTE down still gets two lines, sent past the guard and marked in the audit log as
   "put back during a harness run": the modem back online, then `ifup lte`. Then it stops and says so.

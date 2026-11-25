@@ -5,13 +5,16 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Path
 from pydantic import BaseModel, Field
 
 from openwrtgui.api.deps import get_ctx, require_token
+from openwrtgui.api.net_api import Digest, NetPlanOut
 from openwrtgui.context import AppContext
-from openwrtgui.lte.modem import PinRefused, PinResult
+from openwrtgui.lte.commands import Storage
+from openwrtgui.lte.modem import NoSuchMessage, PinRefused, PinResult, SmsDone, SmsList
 from openwrtgui.lte.sim import SimState
+from openwrtgui.lte.sms import SmsMessage
 
 router = APIRouter(prefix="/api/routers/{router_id}/lte", dependencies=[Depends(require_token)], tags=["lte"])
 Ctx = Annotated[AppContext, Depends(get_ctx)]
@@ -42,3 +45,66 @@ async def enter_pin(router_id: str, body: PinIn, ctx: Ctx) -> PinResult:
         return await ctx.lte_modem.enter_pin(_known(ctx, router_id), body.pin)
     except PinRefused as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+# ---------------------------------------------------------------- SMS (E5, E6, E7)
+MessageId = Annotated[int, Field(ge=0)]
+
+
+class SmsDeleteIn(BaseModel):
+    storage: Storage
+    ids: list[MessageId] = Field(min_length=1, max_length=50)
+
+
+class SmsDeleteApplyIn(SmsDeleteIn, Digest):
+    pass
+
+
+class SmsSendIn(BaseModel):
+    target: str
+    text: str = Field(max_length=500)
+
+
+class SmsSendApplyIn(SmsSendIn, Digest):
+    pass
+
+
+@router.get("/sms")
+async def sms_list(router_id: str, ctx: Ctx, storage: Storage = "sim") -> SmsList:
+    return await ctx.lte_modem.messages(_known(ctx, router_id), storage)
+
+
+@router.get("/sms/{storage}/{message_id}")
+async def sms_message(
+    router_id: str, storage: Storage, message_id: Annotated[int, Path(ge=0)], ctx: Ctx
+) -> SmsMessage:
+    """Read during a harness run too; 404 for an id that is not in the list."""
+    try:
+        return await ctx.lte_modem.message(_known(ctx, router_id), storage, message_id)
+    except NoSuchMessage as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/sms/delete/preview")
+async def sms_delete_preview(router_id: str, body: SmsDeleteIn, ctx: Ctx) -> NetPlanOut:
+    try:
+        return NetPlanOut.of(await ctx.lte_modem.plan_delete(_known(ctx, router_id), body.storage, body.ids))
+    except NoSuchMessage as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/sms/delete/apply")
+async def sms_delete_apply(router_id: str, body: SmsDeleteApplyIn, ctx: Ctx) -> SmsDone:
+    """423 during a harness run; 409 when the list changed since the preview or an LTE action runs."""
+    return await ctx.lte_modem.delete(_known(ctx, router_id), body.storage, body.ids, body.digest)
+
+
+@router.post("/sms/send/preview")
+async def sms_send_preview(router_id: str, body: SmsSendIn, ctx: Ctx) -> NetPlanOut:
+    return NetPlanOut.of(await ctx.lte_modem.plan_send(_known(ctx, router_id), body.target, body.text))
+
+
+@router.post("/sms/send/apply")
+async def sms_send_apply(router_id: str, body: SmsSendApplyIn, ctx: Ctx) -> SmsDone:
+    """423 during a harness run; 409 when the text changed since the preview or an LTE action runs."""
+    return await ctx.lte_modem.send(_known(ctx, router_id), body.target, body.text, body.digest)

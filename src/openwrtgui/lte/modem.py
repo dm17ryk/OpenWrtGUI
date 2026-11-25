@@ -3,21 +3,82 @@ connection, modem device, AT lock and write slot they borrow."""
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
-from openwrtgui.guard.audit import HIDDEN, AuditLog
+from openwrtgui.guard.audit import HIDDEN, AuditLog, mask
 from openwrtgui.guard.bench_guard import BenchGuard
 from openwrtgui.guard.writes import run_audited
 from openwrtgui.lte import commands as c
+from openwrtgui.lte.commands import Storage
+from openwrtgui.lte.parse import parse_at
 from openwrtgui.lte.service import SCREEN, LteService
 from openwrtgui.lte.sim import NOTE_BLOCKED, NOTE_LAST_TRY, SimState, parse_sim_state
+from openwrtgui.lte.sms import SmsMessage, check_text, parse_cpms, parse_ids, parse_message
+from openwrtgui.net.apply import NetPlan
+from openwrtgui.store.routers import RouterRecord
 from openwrtgui.transport.base import Transport, TransportError
+from openwrtgui.wifi.service import PreviewChanged
 
 NO_SIM_STATE = "The modem did not give its SIM state"
 NO_PIN_ASKED = "The SIM does not ask for a PIN"
 PIN_ACCEPTED = "PIN accepted"
 PIN_NOT_TAKEN = "The SIM did not take the PIN"
 VERIFY_TIMEOUT_S = 15.0
+NO_MESSAGE_LIST = "The modem did not list its messages"
+LIST_CHANGED = "The message list changed; preview again"
+SEND_WARNING = "This sends an SMS from the router's SIM to {target}; the carrier may charge for it"
+WRITE_TIMEOUT_S = 15.0
+SEND_TIMEOUT_S = 15.0
+
+
+class NoSuchMessage(LookupError):
+    """An id that is not in the storage's list (404). Its text is "No message {id} in {storage}"."""
+
+
+class ListChanged(PreviewChanged):
+    """A message listed at the preview is gone at Apply (409): nothing is deleted."""
+
+    def __init__(self, text: str) -> None:
+        Exception.__init__(self, text)
+
+
+@dataclass(frozen=True)
+class SmsList:
+    storage: Storage
+    ids: tuple[int, ...]
+    used: int | None
+    capacity: int | None
+    full: bool
+
+
+@dataclass(frozen=True)
+class SmsDone:
+    ok: bool
+    lines: tuple[str, ...]
+    error: str | None
+
+
+def _check_present(message_id: int, storage: Storage, listed: Sequence[int]) -> None:
+    if message_id not in listed:
+        raise NoSuchMessage(f"No message {message_id} in {storage}")
+
+
+def _plan(rec: RouterRecord, lines: tuple[str, ...], warnings: tuple[str, ...]) -> NetPlan:
+    """The preview of an SMS write: the commands as they will be sent (the digest names them)."""
+    return NetPlan(
+        router_id=rec.id,
+        screen=SCREEN,
+        config=None,
+        lines=lines,
+        ops=(),
+        commands=lines,
+        reloads=(),
+        rollback=False,
+        target_host=None,
+        warnings=warnings,
+        secrets=(),
+    )
 
 
 class PinRefused(Exception):
@@ -108,3 +169,124 @@ class ModemService:
                     raise TransportError(str(exc).replace(pin, HIDDEN)) from None
                 raise
             return _result(await self._sim(t, device))
+
+    # ---------------------------------------------------------------- SMS (E5, E6, E7)
+    async def _ids(self, t: Transport, device: str, storage: Storage) -> tuple[int, ...]:
+        """The ids the modem lists in one storage: a read, not audited, allowed during a harness run."""
+        result = await t.run(c.list_messages(device, storage))
+        ids = parse_ids(result.stdout) if result.ok else None
+        if ids is None:
+            raise ValueError(NO_MESSAGE_LIST)
+        return ids
+
+    async def _use(self, rec: RouterRecord, t: Transport, storage: Storage) -> tuple[int, int] | None:
+        """AT+CPMS? is the only read of a storage's use: an app-internal AT query, not audited (P3). None when
+        no AT port answers."""
+        async with self._lte.at_lock(rec.id):
+            port = await self._lte.at_port(rec, t)
+            if port is None:
+                return None
+            command = "AT+CPMS?"
+            result = await t.run(c.at(port, command))
+            answer = parse_at(result.stdout, command) if result.ok else None
+            return parse_cpms(answer.lines).get(storage) if answer is not None else None
+
+    async def messages(self, router_id: str, storage: Storage) -> SmsList:
+        rec, t, device = await self._lte.connection(router_id)
+        ids = await self._ids(t, device, storage)
+        use = await self._use(rec, t, storage)
+        used, capacity = use if use is not None else (None, None)
+        return SmsList(
+            storage=storage,
+            ids=ids,
+            used=used,
+            capacity=capacity,
+            full=capacity is not None and used is not None and used >= capacity,
+        )
+
+    async def message(self, router_id: str, storage: Storage, message_id: int) -> SmsMessage:
+        """E5: read during a run too; the audit holds the command, never the text."""
+        rec, t, device = await self._lte.connection(router_id)
+        _check_present(message_id, storage, await self._ids(t, device, storage))
+        result = await run_audited(
+            t,
+            c.get_message(device, storage, message_id),
+            router_id=rec.id,
+            screen=SCREEN,
+            guard=self._guard,
+            audit=self._audit,
+            require_guard=False,
+        )
+        message = parse_message(result.stdout, message_id, storage) if result.ok else None
+        if message is None:
+            raise ValueError(f"The modem did not give message {message_id} of {storage}")
+        return message
+
+    def _delete_plan(self, rec: RouterRecord, device: str, storage: Storage, ids: Sequence[int]) -> NetPlan:
+        return _plan(rec, tuple(c.delete_message(device, storage, i) for i in dict.fromkeys(ids)), ())
+
+    async def plan_delete(self, router_id: str, storage: Storage, ids: Sequence[int]) -> NetPlan:
+        rec, t, device = await self._lte.connection(router_id)
+        listed = await self._ids(t, device, storage)
+        for message_id in ids:
+            _check_present(message_id, storage, listed)
+        return self._delete_plan(rec, device, storage, ids)
+
+    async def delete(self, router_id: str, storage: Storage, ids: Sequence[int], digest: str) -> SmsDone:
+        """E7: the list is read again inside the slot; an id gone since the preview is a 409, nothing sent."""
+        rec, t, device = await self._lte.connection(router_id)
+        self._guard.require_clear()
+        async with self._lte.write_slot(rec):
+            listed = await self._ids(t, device, storage)
+            if any(i not in listed for i in ids):
+                raise ListChanged(LIST_CHANGED)
+            plan = self._delete_plan(rec, device, storage, ids)
+            if plan.digest != digest:
+                raise PreviewChanged(rec.name)
+            return await self._run_all(rec, t, plan, secrets=())
+
+    def _send_plan(self, rec: RouterRecord, device: str, target: str, text: str) -> NetPlan:
+        command = c.send_message(device, target, check_text(text))
+        return _plan(rec, (command,), (SEND_WARNING.format(target=target),))
+
+    async def plan_send(self, router_id: str, target: str, text: str) -> NetPlan:
+        """E6: the preview shows the person's own text; the audit will not."""
+        rec, _t, device = await self._lte.connection(router_id)
+        return self._send_plan(rec, device, target, text)
+
+    async def send(self, router_id: str, target: str, text: str, digest: str) -> SmsDone:
+        rec, t, device = await self._lte.connection(router_id)
+        plan = self._send_plan(rec, device, target, text)
+        self._guard.require_clear()
+        async with self._lte.write_slot(rec):
+            if plan.digest != digest:
+                raise PreviewChanged(rec.name)
+            return await self._run_all(rec, t, plan, secrets=(text,), timeout=SEND_TIMEOUT_S)
+
+    async def _run_all(
+        self,
+        rec: RouterRecord,
+        t: Transport,
+        plan: NetPlan,
+        *,
+        secrets: tuple[str, ...],
+        timeout: float = WRITE_TIMEOUT_S,
+    ) -> SmsDone:
+        """One audited command per plan line, in order; the first failure stops the rest."""
+        done: list[str] = []
+        for line in plan.lines:
+            result = await run_audited(
+                t,
+                line,
+                router_id=rec.id,
+                screen=SCREEN,
+                guard=self._guard,
+                audit=self._audit,
+                secrets=secrets,
+                timeout=timeout,
+            )
+            if not result.ok:
+                reason = (result.stderr or result.stdout).strip() or f"exit {result.exit_status}"
+                return SmsDone(ok=False, lines=tuple(done), error=mask(reason, secrets))
+            done.append(line)
+        return SmsDone(ok=True, lines=tuple(done), error=None)
