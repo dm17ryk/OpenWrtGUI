@@ -48,9 +48,9 @@ PIN_RULE = re.compile(r"[0-9]{4,8}")
 TARGET_RULE = re.compile(r"\+?[0-9]{3,15}")
 # * or #, digits, * or #, ending in #; never a 3GPP TS 22.030 supplementary-service string (security L4, P16):
 # nothing that starts with ** (registration) or ## (erasure), and no PIN change (03, 04, 042), PUK unblock
-# (05, 052), call barring (33, 330-333, 35, 351, 353), call forwarding (002, 004, 21, 61, 62, 67), call waiting
-# (43) or CLIP/CLIR/COLP/COLR (30, 31, 76, 77) service under any procedure (P24), since those carry a PIN, PUK
-# or barring password into the preview and the audit, or change the line's services
+# (05, 052), call barring (33, 330-333, 35, 351, 353), call forwarding (002, 004, 21, 61, 62, 67), call
+# waiting (43) or CLIP/CLIR/COLP/COLR (30, 31, 76, 77) service under any procedure (P24), since those carry
+# a PIN, PUK or barring password into the preview and the audit, or change the line's services
 USSD_CODE = re.compile(
     r"(?!\*\*|##)"
     r"(?![*#]{1,2}(?:0[3-5]2?|33[0-3]?|35[13]?|00[24]|21|6[127]|43|30|31|76|77)[*#])"
