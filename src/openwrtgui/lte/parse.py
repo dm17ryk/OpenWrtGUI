@@ -12,6 +12,32 @@ from typing import Any, Literal
 _COPS = re.compile(r'\+COPS:\s*\d+\s*,\s*(\d+)\s*,\s*"([^"]*)"')
 _COPS_NUMERIC = "2"  # AT+COPS format 2: the MCC and MNC as digits, not a name
 _MODE_ORDER = re.compile(r"\+BMMODODR:\s*(\d+)")
+_MODE_NAME = re.compile(r"(\d+)\s*[:\s]\s*(\S.*)")
+# The BM806C's own names for its network mode orders (its AT+BMMODODR=? answer, AP2 window 2026-11-25),
+# spelled as the modem prints them (including its "CMDA" typos).
+MODE_NAMES: dict[int, str] = {
+    1: "WCDMA ONLY",
+    2: "AUTO(LTE>TDS>GSM>WCDMA>HDR>CDMA)",
+    3: "GSM+CDMA",
+    4: "AUTO(TDS>GSM>LTE>WCDMA>HDR>CDMA)",
+    5: "LTE ONLY",
+    6: "TDS ONLY",
+    7: "TDS+WCDMA",
+    8: "TDS+GSM",
+    9: "LTE+TDS",
+    10: "EVDO ONLY",
+    11: "AUTO(LTE>EVDO>CDMA>TDS>WCDMA>GSM)",
+    12: "AUTO(EVDO>CMDA>LTE>TDS>WCDMA>GSM)",
+    13: "EVDO+LTE",
+    14: "CDMA+EVDO",
+    15: "CDMA ONLY",
+    16: "AUTO (TDS>LTE>GSM>WCDMA>HDR>CMDA)",
+    17: "AUTO (LTE>WCDMA>GSM>TDS>HDR>CDMA)",
+    18: "AUTO(WCDMA>GSM>LTE>TDS>HDR>CDMA)",
+    19: "AUTO(WCDMA>LTE>GSM>TDS>HDR>CDMA)",
+    20: "LTE+WCDMA",
+    21: "WCDMA+GSM",
+}
 _CGM_PREFIX = re.compile(r"^\+CGM[IMR]:\s*", re.IGNORECASE)
 
 
@@ -137,6 +163,15 @@ def parse_mode_order(lines: Sequence[str]) -> int | None:
         if m := _MODE_ORDER.search(line):
             return int(m.group(1))
     return None
+
+
+def parse_mode_names(lines: Sequence[str]) -> dict[int, str]:
+    """The answer to AT+BMMODODR=?: one `N:NAME` per line (the firmware prints entry 19 as `N NAME`)."""
+    names: dict[int, str] = {}
+    for line in lines:
+        if m := _MODE_NAME.fullmatch(line.strip()):
+            names[int(m.group(1))] = m.group(2).strip()
+    return names
 
 
 def parse_identity(text: str, command: str) -> str | None:

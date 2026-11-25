@@ -27,7 +27,7 @@ export function ModemCard({ routerId, modem, opmode }: Props) {
     ['Model', modem.model ?? '—'],
     ['Firmware', modem.firmware ?? '—'],
     ['Operating mode', opmode ?? '—'],
-    ['Mode order', modem.mode_order != null ? `${modem.mode_order} (names not mapped yet)` : '—'],
+    ['Mode order', modem.mode_order != null ? [modem.mode_order, modem.mode_order_name].filter((p) => p != null).join(' · ') : '—'],
     ['AT port', modem.at_port ?? 'none answered'],
   ]
   return (

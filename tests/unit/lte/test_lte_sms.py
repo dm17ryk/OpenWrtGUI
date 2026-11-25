@@ -37,6 +37,31 @@ def test_a_message_part_and_a_binary_message() -> None:
     assert binary.text is None
 
 
+def test_a_ucs2_body_is_decoded() -> None:
+    # AP2 (2026-11-25): real messages carry no "text", the body is UTF-16BE hex under "ucs-2"
+    msg = parse_message(
+        '{"smsc":"+15550100","sender":"x","timestamp":"2026-11-20 10:00:00","concat_ref":7,'
+        '"concat_part":1,"concat_parts":7,"ucs-2":"05E905DC05D505DD"}',
+        0,
+        "sim",
+    )
+    assert msg is not None
+    assert (msg.text, msg.part) == ("שלום", "1 of 7")
+
+
+def test_a_text_key_wins_over_ucs2() -> None:
+    msg = parse_message('{"sender":"x","text":"Hi","ucs-2":"05E9"}', 0, "sim")
+    assert msg is not None
+    assert msg.text == "Hi"
+
+
+@pytest.mark.parametrize("body", ["05E", "zz05", "", 5])
+def test_a_bad_ucs2_body_gives_no_text(body: object) -> None:
+    msg = parse_message(json.dumps({"sender": "x", "ucs-2": body}), 0, "sim")
+    assert msg is not None
+    assert msg.text is None
+
+
 @pytest.mark.parametrize("bad", ["", "nope", "[1,"])
 def test_bad_ids_and_messages_are_no_answer(bad: str) -> None:
     assert parse_ids(bad) is None

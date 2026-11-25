@@ -5,9 +5,11 @@ from __future__ import annotations
 import pytest
 
 from openwrtgui.lte.parse import (
+    MODE_NAMES,
     parse_at,
     parse_cops,
     parse_identity,
+    parse_mode_names,
     parse_mode_order,
     parse_opmode,
     parse_serving,
@@ -102,6 +104,27 @@ def test_at_answers() -> None:
     assert parse_mode_order(("+BMMODODR: 17",)) == 17
     assert parse_mode_order(("OK",)) is None
     assert parse_cops(("+COPS: 0",)) is None
+
+
+def test_mode_names_read_both_spellings_and_skip_the_header() -> None:
+    lines = (
+        "+BMMODODR:",
+        "1:WCDMA ONLY",
+        "17:AUTO (LTE>WCDMA>GSM>TDS>HDR>CDMA)",
+        "19 AUTO(WCDMA>LTE>GSM)",
+        "junk",
+    )
+    assert parse_mode_names(lines) == {
+        1: "WCDMA ONLY",
+        17: "AUTO (LTE>WCDMA>GSM>TDS>HDR>CDMA)",
+        19: "AUTO(WCDMA>LTE>GSM)",
+    }
+
+
+def test_the_recorded_mode_names() -> None:
+    assert sorted(MODE_NAMES) == list(range(1, 22))
+    assert MODE_NAMES[17] == "AUTO (LTE>WCDMA>GSM>TDS>HDR>CDMA)"
+    assert MODE_NAMES[5] == "LTE ONLY"
 
 
 def test_a_numeric_operator_answer_is_a_network_code() -> None:

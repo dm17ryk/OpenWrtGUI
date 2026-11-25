@@ -6962,6 +6962,8 @@ export interface components {
             manufacturer?: string | null;
             /** Mode Order */
             mode_order?: number | null;
+            /** Mode Order Name */
+            mode_order_name?: string | null;
             /** Model */
             model?: string | null;
             /** Operator */

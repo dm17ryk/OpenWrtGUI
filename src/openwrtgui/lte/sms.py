@@ -44,6 +44,16 @@ def _str(value: Any) -> str | None:
     return value if isinstance(value, str) else None
 
 
+def _ucs2(value: Any) -> str | None:
+    """uqmi gives a message without a `text` key as UTF-16BE hex under `ucs-2` (AP2, 2026-11-25)."""
+    if not isinstance(value, str) or not value or len(value) % 2:
+        return None
+    try:
+        return bytes.fromhex(value).decode("utf-16-be", errors="replace")
+    except ValueError:
+        return None
+
+
 def parse_ids(text: str) -> tuple[int, ...] | None:
     try:
         value = json.loads(text)
@@ -66,7 +76,7 @@ def parse_message(text: str, message_id: int, storage: Storage) -> SmsMessage | 
         storage=storage,
         sender=_str(data.get("sender")),
         time=_str(data.get("timestamp")),
-        text=_str(data.get("text")),
+        text=_str(data.get("text")) if isinstance(data.get("text"), str) else _ucs2(data.get("ucs-2")),
         part=part,
     )
 
