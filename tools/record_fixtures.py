@@ -480,6 +480,18 @@ def sanitize_modem(command: str, text: str) -> str:
     return _LONG_NUMBER.sub("<number>", out)
 
 
+def shape_only(value: object) -> object:
+    """v1.3b (E13): the shape of a value and nothing private. A string becomes `<str N chars>`; numbers,
+    booleans and None stay; dict keys stay; a list keeps its length and the shape of each item."""
+    if isinstance(value, str):
+        return f"<str {len(value)} chars>"
+    if isinstance(value, dict):
+        return {k: shape_only(v) for k, v in value.items()}
+    if isinstance(value, list | tuple):
+        return [shape_only(v) for v in value]
+    return value
+
+
 async def run_set(
     t: Runner, commands: tuple[str, ...], *, timed: frozenset[str] = frozenset()
 ) -> dict[str, dict[str, object]]:

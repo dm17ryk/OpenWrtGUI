@@ -509,3 +509,19 @@ def test_firewall_set_is_exactly_the_firewall_and_fault_reads() -> None:
         BRIDGE_CHECK,
     )
     assert rf.out_file(Path("tests/fixtures/ap2"), "firewall") == Path("tests/fixtures/ap2/firewall.json")
+
+
+def test_shape_only_keeps_keys_numbers_and_lengths_only() -> None:
+    """v1.3b Task 10 (E13): a message read leaves only its shape in a public fixture."""
+    rf = _load()
+    assert rf.shape_only({"sender": "+15550101", "concat_part": 2, "text": "Hi"}) == {
+        "sender": "<str 9 chars>",
+        "concat_part": 2,
+        "text": "<str 2 chars>",
+    }
+    assert rf.shape_only({"a": None, "b": True, "c": ["xy", 7, {"d": "z"}], "e": []}) == {
+        "a": None,
+        "b": True,
+        "c": ["<str 2 chars>", 7, {"d": "<str 1 chars>"}],
+        "e": [],
+    }

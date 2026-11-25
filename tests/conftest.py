@@ -56,6 +56,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         type=Path,
         help="iperf3.exe on this PC, for the 1.2b window's Throughput and 16-bit counter tests",
     )
+    group.addoption("--sms-read", help="1.3b window part 1: read one message, <storage>:<id> (sim:0)")
+    group.addoption("--sms-delete", help="1.3b window part 2: delete these messages, <storage>:<id>,<id>...")
+    group.addoption("--sms-to", help="1.3b window part 3: send an SMS to this number (with --sms-text)")
+    group.addoption("--sms-text", help="1.3b window part 3: the SMS text (with --sms-to)")
+    group.addoption("--ussd", help="1.3b window part 4: send this USSD code")
     group.addoption(
         "--o16-channel",
         type=int,
