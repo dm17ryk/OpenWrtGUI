@@ -60,7 +60,6 @@ function Kv({ rows }: { rows: ReadonlyArray<readonly [string, string]> }) {
 
 export function RfLive() {
   const { id = '' } = useParams()
-  useScrollToHash() // #channel-analysis and #frame-analysis from Discovery's chips
   const [params] = useSearchParams()
   const radio = params.get('radio') ?? 'radio0'
   const detail = useQuery({ queryKey: ['router', id], queryFn: () => apiFetch<RouterDetail>(`/api/routers/${id}`) })
@@ -112,6 +111,7 @@ export function RfLive() {
     }
   }, onLost)
   const isLost = live.phase === 'reconnecting' || live.phase === 'ended'
+  useScrollToHash(latest !== null || idle !== null || isLost) // wait for the station charts before scrolling
   const { send } = live
   const isOpen = live.phase === 'open'
 
