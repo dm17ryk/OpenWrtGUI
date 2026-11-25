@@ -25,6 +25,7 @@ from openwrtgui.guard.bench_guard import BenchGuard, psutil_lister
 from openwrtgui.images.library import ImageLibrary
 from openwrtgui.images.store import ProfileStore
 from openwrtgui.live import LiveHub
+from openwrtgui.lte.modem import ModemService
 from openwrtgui.lte.recover import LteRecover
 from openwrtgui.lte.sampler import LteHub
 from openwrtgui.lte.service import LteService
@@ -99,6 +100,7 @@ class AppContext:
     discovery: DiscoveryService
     flash: FlashService
     lte: LteService
+    lte_modem: ModemService  # v1.3b: the SIM, SMS and USSD cards
     lte_live: LteHub
     lte_setups: SetupStore  # saved good LTE setups (spec 4.4)
     lte_recover: LteRecover  # the Recover job (spec 4.2)
@@ -317,6 +319,7 @@ def build_context(
         net=net,
     )
     lte = LteService(pool=pool, routers=routers, guard=guard, audit=audit, net=net)
+    lte_modem = ModemService(lte=lte, guard=guard, audit=audit)
     access = AccessService(
         pool=pool,
         routers=routers,
@@ -424,6 +427,7 @@ def build_context(
         discovery=discovery,
         flash=flash,
         lte=lte,
+        lte_modem=lte_modem,
         lte_live=LteHub(pool=pool, routers=routers, locate=lte.modem_device),
         lte_setups=lte_setups,
         lte_recover=lte_recover,
