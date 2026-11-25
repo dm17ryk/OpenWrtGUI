@@ -11,12 +11,21 @@ import { USSD_CODE, USSD_RULE } from './sms'
 
 const LISTENING = "Listening for the network's reply (up to 35 s)…"
 
-const STATUS_TEXT: Record<UssdReply['status'], string | null> = {
-  reply: null,
-  more: 'The network asked for more; menus are not supported, so the session was closed',
-  ended: 'The network ended the session',
-  'no reply': 'No reply in 35 s; the session was closed',
-  error: null,
+const OPEN = 'closing the session failed: it may still be open'
+
+function statusText(reply: UssdReply): string | null {
+  switch (reply.status) {
+    case 'more':
+      return reply.closed
+        ? 'The network asked for more; menus are not supported, so the session was closed'
+        : `The network asked for more; menus are not supported, and ${OPEN}`
+    case 'ended':
+      return 'The network ended the session'
+    case 'no reply':
+      return reply.closed ? 'No reply in 35 s; the session was closed' : `No reply in 35 s, and ${OPEN}`
+    default:
+      return null
+  }
 }
 
 /**
@@ -37,7 +46,7 @@ export function UssdCard({ routerId }: { routerId: string; routerName: string })
   )
   const codeOk = USSD_CODE.test(code)
   const reply = ussd.result
-  const note = reply ? STATUS_TEXT[reply.status] : null
+  const note = reply ? statusText(reply) : null
 
   return (
     <section className="card stack" aria-labelledby="lte-ussd-h">
@@ -52,6 +61,7 @@ export function UssdCard({ routerId }: { routerId: string; routerName: string })
           aria-label="USSD code"
           autoComplete="off"
           maxLength={32}
+          disabled={ussd.isBusy}
           value={code}
           onChange={(e) => {
             setCode(e.target.value)
@@ -62,7 +72,7 @@ export function UssdCard({ routerId }: { routerId: string; routerName: string })
       </label>
       {code !== '' && !codeOk && <div className="note w">{USSD_RULE}</div>}
       <div className="row">
-        <button type="button" disabled={!codeOk || live} title={runTitle} onClick={() => setBody({ code })}>
+        <button type="button" disabled={!codeOk || live || ussd.isBusy} title={runTitle} onClick={() => setBody({ code })}>
           Preview
         </button>
       </div>

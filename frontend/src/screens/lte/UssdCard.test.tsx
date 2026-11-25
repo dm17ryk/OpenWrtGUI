@@ -141,6 +141,37 @@ test('"no reply" says the session was closed after 35 s', async () => {
   expect(await screen.findByText('No reply in 35 s; the session was closed')).toBeInTheDocument()
 })
 
+test('"more" with a failed close says the session may still be open', async () => {
+  answer = { status: 'more', text: 'Reply 1 for A', dcs: 15, closed: false }
+  renderUssd()
+  await send('*111#')
+  expect(
+    await screen.findByText('The network asked for more; menus are not supported, and closing the session failed: it may still be open'),
+  ).toBeInTheDocument()
+})
+
+test('"no reply" with a failed close says the session may still be open', async () => {
+  answer = { status: 'no reply', text: null, dcs: null, closed: false }
+  renderUssd()
+  await send('*300#')
+  expect(await screen.findByText('No reply in 35 s, and closing the session failed: it may still be open')).toBeInTheDocument()
+})
+
+test('the code field and Preview are disabled while the apply listens, and editable after', async () => {
+  answer = 'pending'
+  renderUssd()
+  const user = await send('*100#')
+  const field = screen.getByRole('textbox', { name: 'USSD code' })
+  expect(await screen.findByText("Listening for the network's reply (up to 35 s)…")).toBeInTheDocument()
+  expect(field).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Preview' })).toBeDisabled()
+  release?.()
+  expect(await screen.findByText('Balance 12.34')).toBeInTheDocument()
+  expect(field).toBeEnabled()
+  await user.type(field, '1')
+  expect(field).toHaveValue('*100#1')
+})
+
 test('"error" shows the modem error line as an alert', async () => {
   answer = { status: 'error', text: '+CME ERROR: 30', dcs: null, closed: true }
   renderUssd()
