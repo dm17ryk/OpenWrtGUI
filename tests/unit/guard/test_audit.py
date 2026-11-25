@@ -189,7 +189,21 @@ def test_a_pin_equal_to_the_timeout_hides_only_the_pin() -> None:
     )
 
 
-SMS_TEXTS = ["It's ok", "a", "5", "0101", "line one\nline two", "Hello there", "'", "x --send-message y"]
+SMS_TEXTS = [
+    "It's ok",
+    "a",
+    "5",
+    "0101",
+    "line one\nline two",
+    "Hello there",
+    "'",
+    "x --send-message y",
+    "my secret words --pin 1234",
+    "call me --puk now",
+    "a b c --new-pin z",
+    "my secret words --pin don't",
+    "wifi.key='abc' and more",
+]
 
 
 @pytest.mark.parametrize("text", SMS_TEXTS)

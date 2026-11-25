@@ -61,13 +61,13 @@ class AuditEntry:
 
 
 def mask(command: str, secrets: Sequence[str]) -> str:
+    command = _UQMI_SMS_TEXT.sub(rf"\1'{HIDDEN}'", command)
     for secret in secrets:
         if secret:
             command = command.replace(secret, HIDDEN)
     command = _UCI_SECRET.sub(_hide_value, command)
     command = _AT_SECRET.sub(rf"\1{HIDDEN}", command)
     command = _UQMI_PIN.sub(rf"\1 {HIDDEN}", command)
-    command = _UQMI_SMS_TEXT.sub(rf"\1'{HIDDEN}'", command)
     return _JSON_SECRET.sub(rf'\1"{HIDDEN}"', command)
 
 
