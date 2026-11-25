@@ -94,7 +94,8 @@ def _plan(rec: RouterRecord, lines: tuple[str, ...], warnings: tuple[str, ...]) 
 
 def _ussd_reply(stdout: str, request: str) -> tuple[UssdReply, bool] | None:
     """The reply, and whether the app closes the session (E9): the network asked for more, or no +CUSD came.
-    None: the modem never answered the request (no +CUSD, no OK or ERROR), so it never reached the modem.
+    None: no +CUSD, no OK or ERROR and no echo of the request, so it never reached the modem. An echo with no
+    final status ("no reply") may have opened a session: it is cancelled like any no reply.
 
     The network's +CUSD answer comes after the request's OK (E8), past where parse_at's lines end, so every
     line microcom printed is searched. Its exit status is not: a reply that kept microcom listening past the
@@ -105,7 +106,10 @@ def _ussd_reply(stdout: str, request: str) -> tuple[UssdReply, bool] | None:
     if parsed is None:
         answer = parse_at(stdout, request)
         if answer is None:
-            return None
+            # no final status and no +CUSD: with the request's echo the modem got it and a carrier session may
+            # be open ("no reply", cancelled); without it the request never reached the modem
+            echoed = any(ln.strip().upper() == request.strip().upper() for ln in stdout.splitlines())
+            return (reply, True) if echoed else None
         if answer.status == "ERROR":
             reply = UssdReply(status="error", text=answer.error, dcs=None, closed=False)
     return reply, parsed is None or reply.status == "more"

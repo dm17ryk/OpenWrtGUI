@@ -69,6 +69,7 @@ class SimModem:
         self.lease = True  # lte_4 holds an address while connected (AP2's real lte_4 waited for one)
         self.opmode = "online"
         self.plugged = True
+        self.cut_after_echo = False  # a USSD request's output ends at its echo (a cut-off microcom)
         self.stays_low_power = False  # tests: the modem does not come back online
         self.wedged = False  # tests: ifup brings the session up without a packet-data handle until a restart
         self.stale_qmi = False  # tests: ifup starts no session until `uqmi --sync` releases the client ids
@@ -317,6 +318,8 @@ class SimModem:
         out: list[str] = []
         for command in commands:
             out.append(f"{command}\r\r\n")
+            if self.cut_after_echo and _CUSD.fullmatch(command) is not None:
+                break  # the output stops after the echo: no OK, ERROR or +CUSD
             if (refused := self._ussd_error(command)) is not None:
                 out.append(f"{refused}\r\n")
                 continue

@@ -171,6 +171,28 @@ async def test_a_request_that_never_reached_the_modem_is_an_error_and_the_port_i
     assert t.calls.count(c.TTY_LIST) == probes + 1  # the port was forgotten: found again
 
 
+async def test_an_echoed_request_with_no_final_status_is_no_reply_and_is_cancelled(
+    authed: httpx.AsyncClient, ctx: AppContext
+) -> None:
+    """The modem got the request (its echo is there) but the output stops before OK, ERROR or +CUSD: a carrier
+    session may be open. "no reply", a best-effort AT+CUSD=2 (closed follows its answer), the port is kept."""
+    digest = (await _preview(authed, "*100#")).json()["digest"]
+    modem = await _modem(ctx)
+    modem.cut_after_echo = True
+    answer = await authed.post(f"{BASE}/apply", json={"code": "*100#", "digest": digest})
+    modem.cut_after_echo = False
+    assert (answer.status_code, answer.json()) == (
+        200,
+        {"status": "no reply", "text": None, "dcs": None, "closed": True},
+    )
+    t = await _transport(ctx)
+    assert CANCEL in t.calls
+    assert _audited(ctx) == [(_line("*100#"), SCREEN), (CANCEL, SCREEN)]
+    probes = t.calls.count(c.TTY_LIST)
+    assert (await _preview(authed, "*100#")).status_code == 200
+    assert t.calls.count(c.TTY_LIST) == probes  # the port was kept: not probed again
+
+
 @pytest.mark.parametrize(("m", "status"), [(2, "ended"), (3, "ended"), (4, "error"), (5, "error")])
 async def test_a_session_the_network_ended_or_refused_is_not_cancelled(
     authed: httpx.AsyncClient, ctx: AppContext, m: int, status: str
