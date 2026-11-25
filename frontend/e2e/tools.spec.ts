@@ -16,6 +16,7 @@ test('the Air survey chip lands on RF live with the channel analysis in view', a
   await open(page, '/routers/ap1/discovery')
   await page.getByRole('region', { name: 'Capabilities' }).getByRole('link', { name: /^Air survey/ }).click()
   await expect(page).toHaveURL(/#\/routers\/ap1\/rf#channel-analysis$/)
+  await expect(page.getByRole('heading', { name: 'RX at AP' })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Channel analysis' })).toBeInViewport()
 })
 
