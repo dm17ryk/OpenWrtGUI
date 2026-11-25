@@ -81,8 +81,14 @@ installer runs. The installer is not Authenticode-signed yet.
   lists a secret that differs from the image, with both values hidden.
 - **Enter PIN** (LTE screen): uqmi takes the PIN on its command line, so it is on the router's process list for
   a moment while the command runs. The audit log hides it, and the app never keeps it. SMS texts are hidden in
-  the audit log the same way.
+  the audit log the same way. Enter PIN never sends the PIN on the SIM's last try, or when the modem does not
+  say how many tries are left.
 - **The AT console** shows a SIM PIN or an APN password as `<hidden>` and does not keep the command for Up/Down.
+  It sends what you type after its usual question, with no check of the SIM's tries left, so a wrong PIN sent
+  there (`AT+CPIN=`) can spend the last try.
+- **The app's own log** (`logs\`) does not hold the commands the app sends. App logs written by earlier versions
+  (`logs\app.log` and its numbered copies) may hold Wi-Fi keys, APN passwords and SIM PINs typed in the AT
+  console; delete them.
 - **Backups** hold the router's secrets; they stay in `backups\`, readable by your Windows user only.
 
 ## How the code is checked

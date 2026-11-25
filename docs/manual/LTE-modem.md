@@ -93,9 +93,11 @@ the audit log.
 
 The SIM card shows whether the SIM asks for its PIN: off, needed (with the tries left), entered, or blocked. The
 **Enter PIN** form appears only while the SIM asks for the PIN, and it waits while a harness run is live. The app
-never keeps the PIN: the field is emptied after every try. On the last try the app does not send the PIN: enter it
-in a phone or the D-Link UI, so a wrong PIN does not block the SIM. A blocked SIM needs its PUK, which the app does
-not offer.
+never keeps the PIN: the field is emptied after every try. **Enter PIN** never sends the PIN on the last try, nor
+when the modem does not say how many tries are left: then enter it in a phone or the D-Link UI, so a wrong PIN does
+not block the SIM. If the SIM's state cannot be read after a try, the card says the PIN was sent: check the tries
+left before trying again. A blocked SIM needs its PUK, which the app does not offer. The AT console has no such
+check: it sends what you type, such as `AT+CPIN=`, after its usual question.
 
 ## SMS
 
@@ -181,7 +183,8 @@ Type an AT command (printable text starting with AT, at most 200 characters) and
 shows with its status (OK, ERROR or no answer). Up and Down recall the last 50 commands. A command with a SIM
 PIN (`AT+CPIN=`, `AT+CLCK=`, `AT+CPWD=`) or an APN password (`AT+CGAUTH=`, `AT+QICSGP=`, `AT$QCPDPP=`) shows
 everything after its `=` as `<hidden>`, here and in the audit log, and is not kept for recall; a `=?` query of
-them shows as typed. Every command goes to the audit log.
+them shows as typed. Every command goes to the audit log. The console does not check the SIM's tries left: a wrong
+PIN sent here spends a try, the last one too, so enter the PIN with **Enter PIN** on the SIM card instead.
 
 Queries (`AT`, `ATI`, `AT+CSQ`, `AT+CGMI`, `AT+CGMM`, `AT+CGMR`, and any `AT+<name>?` or `AT+<name>=?`)
 cannot change the modem and work any time, also during a harness run. Any other command may change the modem:
