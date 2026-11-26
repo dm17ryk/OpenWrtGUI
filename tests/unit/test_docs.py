@@ -389,11 +389,26 @@ def test_recover_documents_the_setup_wait() -> None:
     for words in ("no LTE setup runs", "20 seconds", "skipped"):
         assert words in recover, words
     changelog = _read(ROOT / "CHANGELOG.md")
-    unreleased = changelog.split("## [Unreleased]", 1)[1].split("\n## [", 1)[0]
-    assert "LTE Recover" in unreleased and "setup" in unreleased
+    release = changelog.split("## [1.3.0]", 1)[1].split("\n## [", 1)[0]
+    # the detailed Fixed entry, not the release's summary line, which names Recover and a setup too (PR #110)
+    fixed = " ".join(release.split("### Fixed", 1)[1].split("\n### ", 1)[0].split())
+    for words in ("LTE Recover waits for an LTE setup in progress before each step", "skips", "(#93)"):
+        assert words in fixed, words
     roadmap = _read(ROOT / "ROADMAP.md")
     assert "factory reset (once its command is found)" not in roadmap
     assert "the modem's factory reset and its mode names" not in roadmap
+
+
+def test_v1_3_is_in_the_changelog() -> None:
+    released = _read(ROOT / "CHANGELOG.md").split("## [1.3.0]", 1)[1].split("\n## [", 1)[0]
+    for words in (
+        "**SIM PIN**",
+        "**SMS**",
+        "**USSD**",
+        "LTE Recover waits",
+        "router commands are no longer written to the app log",
+    ):
+        assert words in released, words
 
 
 def test_rates_are_documented_as_read() -> None:
@@ -565,7 +580,7 @@ def test_the_lte_page_explains_sim_sms_and_ussd() -> None:
     assert "call barring" in sections["USSD"] and "`**` or `##` are refused" in sections["USSD"]  # P16
     order = [m for m in re.findall(r"^## (.+)$", _read(MANUAL / "LTE-modem.md"), flags=re.M)]
     assert order.index("Modem") < order.index("SIM PIN") < order.index("SMS") < order.index("USSD")
-    unreleased = _read(ROOT / "CHANGELOG.md").split("## [Unreleased]", 1)[1].split("\n## [", 1)[0]
+    unreleased = _read(ROOT / "CHANGELOG.md").split("## [1.3.0]", 1)[1].split("\n## [", 1)[0]
     added = unreleased.split("### Added", 1)[1].split("\n### ", 1)[0]
     for name in ("SIM PIN", "SMS", "USSD"):
         assert f"**{name}**" in added, name
@@ -581,7 +596,7 @@ def _flat(text: str) -> str:
 
 
 def _unreleased(kind: str) -> str:
-    unreleased = _read(ROOT / "CHANGELOG.md").split("## [Unreleased]", 1)[1].split("\n## [", 1)[0]
+    unreleased = _read(ROOT / "CHANGELOG.md").split("## [1.3.0]", 1)[1].split("\n## [", 1)[0]
     return unreleased.split(f"### {kind}", 1)[1].split("\n### ", 1)[0]
 
 

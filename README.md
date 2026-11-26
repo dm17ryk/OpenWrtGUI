@@ -14,7 +14,10 @@ is connected, and how each router describes itself. It never disturbs a test run
 
 ![Dashboard: three routers, the 2.4 GHz air map and one station](https://raw.githubusercontent.com/wiki/dm17ryk/OpenWrtGUI/screenshots/dashboard.png)
 
-> v1.2 adds capability chips on Discovery, which say what each router can do and open the screen that uses it,
+> v1.3 adds SIM PIN, SMS and USSD on the LTE modem screen, which shows the modem's own names for its network
+> modes, and LTE Recover that waits out an LTE setup before each step. The app log no longer records router
+> commands.
+> v1.2 added capability chips on Discovery, which say what each router can do and open the screen that uses it,
 > and the Tools screen with five pages: Port statistics, Connections with a SIP ALG switch per zone, Throughput
 > (iperf3 on the router), the Traffic generator (socat listens or sends) and Station management (802.11v and
 > 802.11k over hostapd).
@@ -45,6 +48,17 @@ is connected, and how each router describes itself. It never disturbs a test run
 > a router-side rollback, DHCP, DNS, routes, ports and VLANs); v0.2 Wi-Fi with proof on air, RF live and the
 > LuCI fallback; v0.1 the foundation: install, update, add routers, the dashboard, Bench Guard, the terminal
 > and the audit log. What comes next is in the [roadmap](ROADMAP.md).
+
+## What v1.3 adds
+
+| Screen | What you get |
+|---|---|
+| **LTE modem › Recover** | Waits for an LTE setup in progress before each step (up to 20 s) and skips a step whose setup never pauses; if LTE comes back by itself, Recover stops and says so. |
+| **LTE modem › SIM PIN** | Whether the SIM asks for its PIN and the tries left; Enter PIN appears only while it asks and never sends on the last try. The app never keeps the PIN. |
+| **LTE modem › SMS** | List the messages on the SIM or in the phone memory, read one, delete some, and send a text of 1 to 160 GSM basic characters. |
+| **LTE modem › USSD** | Send one USSD code and read the network's reply; menus are not supported, and codes that change a PIN or set call barring, call forwarding or call waiting are refused. |
+| **LTE modem › Modem** | The network mode order shows the modem's own name for each mode. |
+| **App log** | Router commands are no longer written to it, since they could carry a Wi-Fi key, an APN password or a SIM PIN. |
 
 ## What v1.2 adds
 
