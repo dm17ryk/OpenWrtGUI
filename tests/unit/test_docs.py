@@ -389,8 +389,11 @@ def test_recover_documents_the_setup_wait() -> None:
     for words in ("no LTE setup runs", "20 seconds", "skipped"):
         assert words in recover, words
     changelog = _read(ROOT / "CHANGELOG.md")
-    unreleased = changelog.split("## [1.3.0]", 1)[1].split("\n## [", 1)[0]
-    assert "LTE Recover" in unreleased and "setup" in unreleased
+    release = changelog.split("## [1.3.0]", 1)[1].split("\n## [", 1)[0]
+    # the detailed Fixed entry, not the release's summary line, which names Recover and a setup too (PR #110)
+    fixed = " ".join(release.split("### Fixed", 1)[1].split("\n### ", 1)[0].split())
+    for words in ("LTE Recover waits for an LTE setup in progress before each step", "skips", "(#93)"):
+        assert words in fixed, words
     roadmap = _read(ROOT / "ROADMAP.md")
     assert "factory reset (once its command is found)" not in roadmap
     assert "the modem's factory reset and its mode names" not in roadmap
