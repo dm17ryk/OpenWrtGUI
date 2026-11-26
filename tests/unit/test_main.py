@@ -205,6 +205,14 @@ def test_an_old_log_that_cannot_be_deleted_is_tried_again_next_start(
     (warning,) = [line for line in text.splitlines() if " WARNING openwrtgui: " in line]
     assert "app.log.2" in warning and "app.log.1" not in warning
     assert "--verify-pin1" not in text
+    # the next start, once the other program let go of the file
+    monkeypatch.undo()
+    root = logging.getLogger()
+    root.handlers = [h for h in root.handlers if not isinstance(h, RotatingFileHandler)]
+    main._setup_logging(data)
+    assert " WARNING openwrtgui: " not in _app_log_text(data)
+    assert not (data.logs_dir / "app.log.2").exists()
+    assert (data.logs_dir / main.OLD_LOGS_MARKER).is_file()
 
 
 @pytest.mark.usefixtures("_own_logging")

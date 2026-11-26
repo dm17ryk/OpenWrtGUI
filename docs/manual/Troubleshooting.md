@@ -178,7 +178,7 @@ export, to a [bug report](https://github.com/dm17ryk/OpenWrtGUI/issues/new/choos
 
 The first start of 1.4.0 or a later version deletes the app logs written by earlier versions, once, since they
 may hold Wi-Fi keys, APN passwords and SIM PINs. If one of them is open in another program, the app log says so,
-and each start deletes the app logs again until that file is gone.
+and each start deletes the app logs again until it can delete them all.
 
 ## A radio was left at a step-through step
 

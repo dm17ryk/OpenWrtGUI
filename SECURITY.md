@@ -88,7 +88,9 @@ installer runs. The installer is not Authenticode-signed yet.
   there (`AT+CPIN=`) can spend the last try.
 - **The app's own log** (`logs\`) does not hold the commands the app sends. App logs written by earlier versions
   (`logs\app.log` and its numbered copies) may hold Wi-Fi keys, APN passwords and SIM PINs typed in the AT
-  console. Version 1.4.0 and later delete them once, on their first start; with 1.3.0, delete them yourself.
+  console. Version 1.4.0 and later delete them once, on their first start. If one cannot be deleted, for example
+  while another program has it open, the app log names it and each start deletes the app logs again. With 1.3.0,
+  delete them yourself.
 - **Backups** hold the router's secrets; they stay in `backups\`, readable by your Windows user only.
 
 ## How the code is checked

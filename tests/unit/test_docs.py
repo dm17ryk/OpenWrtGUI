@@ -614,7 +614,9 @@ OLD_LOGS = (
 
 
 OLD_LOGS_DELETED = (
-    "Version 1.4.0 and later delete them once, on their first start; with 1.3.0, delete them yourself."
+    "Version 1.4.0 and later delete them once, on their first start. If one cannot be deleted, for example "
+    "while another program has it open, the app log names it and each start deletes the app logs again. "
+    "With 1.3.0, delete them yourself."
 )
 
 
@@ -633,6 +635,9 @@ def test_old_app_logs_are_named_as_holding_secrets() -> None:
     assert "on its first start, the app deletes the app logs written by earlier versions" in _bullet(
         security_notes, "App log:"
     )
+    where = _section("Troubleshooting", "Where are the logs?")
+    assert "deletes the app logs written by earlier versions, once" in where
+    assert "each start deletes the app logs again until it can delete them all" in where
 
 
 def test_never_on_the_last_try_is_enter_pins_alone() -> None:
