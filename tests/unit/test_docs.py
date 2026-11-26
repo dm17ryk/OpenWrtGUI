@@ -613,14 +613,26 @@ OLD_LOGS = (
 )
 
 
+OLD_LOGS_DELETED = (
+    "Version 1.4.0 and later delete them once, on their first start; with 1.3.0, delete them yourself."
+)
+
+
 def test_old_app_logs_are_named_as_holding_secrets() -> None:
-    """P14 (security M2): nothing scrubs old logs, so the app-log fix and SECURITY.md tell users to delete
-    them."""
+    """P14 (security M2): 1.3.0's app-log fix tells users to delete their old logs. Since #112 the app deletes
+    them once, on its first start, and the CHANGELOG and SECURITY.md say so."""
     assert OLD_LOGS in _bullet(_unreleased("Fixed"), "App log:")
     security = (
         _read(ROOT / "SECURITY.md").split("## Secrets on screen and in the log", 1)[1].split("\n## ", 1)[0]
     )
-    assert OLD_LOGS in _bullet(security, "**The app's own log**")
+    own_log = _bullet(security, "**The app's own log**")
+    assert OLD_LOGS.removesuffix("; delete them.") in own_log
+    assert OLD_LOGS_DELETED in own_log
+    unreleased = _read(ROOT / "CHANGELOG.md").split("## [Unreleased]", 1)[1].split("\n## [", 1)[0]
+    security_notes = unreleased.split("### Security", 1)[1].split("\n### ", 1)[0]
+    assert "on its first start, the app deletes the app logs written by earlier versions" in _bullet(
+        security_notes, "App log:"
+    )
 
 
 def test_never_on_the_last_try_is_enter_pins_alone() -> None:

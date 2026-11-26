@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
 import secrets
 import socket
 import sys
@@ -31,6 +32,9 @@ log = logging.getLogger("openwrtgui")
 ALREADY_RUNNING = "OpenWrtGUI is already running."
 EXIT_SECOND_INSTANCE = 3
 STARTUP_TIMEOUT_S = 20.0
+# In logs\: its presence means the app logs written by earlier versions are gone (#112)
+OLD_LOGS_MARKER = ".old-logs-deleted"
+_APP_LOG_NAME = re.compile(r"app\.log(\.\d+)?")
 
 
 @dataclass(frozen=True)
@@ -112,7 +116,28 @@ def _free_port() -> int:
         return int(s.getsockname()[1])
 
 
+def _delete_old_logs(logs_dir: Path) -> list[str]:
+    """Deletes the app log and its rotation copies once, then leaves OLD_LOGS_MARKER. Returns the names it
+    could not delete; then it leaves no marker, so the next start tries again (#112)."""
+    marker = logs_dir / OLD_LOGS_MARKER
+    if marker.exists():
+        return []
+    failed = []
+    for path in sorted(logs_dir.iterdir()):
+        if _APP_LOG_NAME.fullmatch(path.name) and path.is_file():
+            try:
+                path.unlink()
+            except OSError:
+                failed.append(path.name)
+    if not failed:
+        marker.touch()
+    return failed
+
+
 def _setup_logging(data: DataDir) -> None:
+    # Logs up to 1.2.x hold every router command asyncssh ran, some with a secret: deleted before the handler
+    # opens app.log
+    not_deleted = _delete_old_logs(data.logs_dir)
     handler = RotatingFileHandler(
         data.logs_dir / "app.log", maxBytes=1_000_000, backupCount=5, encoding="utf-8"
     )
@@ -124,6 +149,11 @@ def _setup_logging(data: DataDir) -> None:
     # asyncssh logs every command it runs at INFO ("  Command: ..."), and a command can carry a SIM PIN, an
     # APN password or a Wi-Fi key: only its warnings and errors reach the app log (v1.3b review)
     logging.getLogger("asyncssh").setLevel(logging.WARNING)
+    if not_deleted:
+        log.warning(
+            "could not delete the app logs of earlier versions (%s); the next start tries again",
+            ", ".join(not_deleted),
+        )
 
 
 def _start_server(ctx: AppContext) -> tuple[uvicorn.Server, threading.Thread]:
