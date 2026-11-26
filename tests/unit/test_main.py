@@ -139,3 +139,99 @@ def test_the_app_log_never_records_router_commands(tmp_path: Path) -> None:
     assert "--verify-pin1" not in text and "1234" not in text
     assert "WARNING asyncssh: Connection lost to the router" in text
     assert "the app's own INFO lines stay" in text
+
+
+OLD_LOG_LINE = "2026-11-01 10:00:00,000 INFO asyncssh:   Command: uqmi -t 5000 --verify-pin1 1234\n"
+
+
+def _write_old_logs(logs: Path, *names: str) -> None:
+    for name in names:
+        (logs / name).write_text(OLD_LOG_LINE, encoding="utf-8")
+
+
+def _app_log_text(data: DataDir) -> str:
+    """Closes the app log handler `_setup_logging` attached, then reads what it wrote."""
+    for h in logging.getLogger().handlers:
+        if isinstance(h, RotatingFileHandler):
+            h.close()
+    return (data.logs_dir / "app.log").read_text(encoding="utf-8")
+
+
+@pytest.mark.usefixtures("_own_logging")
+def test_the_first_start_deletes_the_app_logs_of_earlier_versions(tmp_path: Path) -> None:
+    """#112: logs up to 1.2.x can hold router secrets (asyncssh's `Command:` lines), so the first start of 1.4
+    deletes every app log file before it opens its own, and leaves a marker so that happens once."""
+    data = DataDir.at(tmp_path / "data")
+    _write_old_logs(data.logs_dir, "app.log", "app.log.1", "app.log.5")
+    main._setup_logging(data)
+    text = _app_log_text(data)
+    assert "--verify-pin1" not in text
+    assert not (data.logs_dir / "app.log.1").exists()
+    assert not (data.logs_dir / "app.log.5").exists()
+    assert (data.logs_dir / main.OLD_LOGS_MARKER).is_file()
+
+
+@pytest.mark.usefixtures("_own_logging")
+def test_later_starts_keep_the_app_logs(tmp_path: Path) -> None:
+    data = DataDir.at(tmp_path / "data")
+    (data.logs_dir / main.OLD_LOGS_MARKER).touch()
+    _write_old_logs(data.logs_dir, "app.log", "app.log.1")
+    main._setup_logging(data)
+    assert "--verify-pin1" in _app_log_text(data)
+    assert (data.logs_dir / "app.log.1").is_file()
+
+
+@pytest.mark.usefixtures("_own_logging")
+def test_an_old_log_that_cannot_be_deleted_is_tried_again_next_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Another program may hold a log open: the others go, no marker is left, and the app log names the file
+    (never its content)."""
+    data = DataDir.at(tmp_path / "data")
+    _write_old_logs(data.logs_dir, "app.log", "app.log.1", "app.log.2")
+    real_unlink = Path.unlink
+
+    def unlink(self: Path, missing_ok: bool = False) -> None:
+        if self.name == "app.log.2":
+            raise PermissionError(13, "in use by another program", str(self))
+        real_unlink(self, missing_ok=missing_ok)
+
+    monkeypatch.setattr(Path, "unlink", unlink)
+    main._setup_logging(data)
+    text = _app_log_text(data)
+    assert not (data.logs_dir / "app.log.1").exists()
+    assert (data.logs_dir / "app.log.2").is_file()
+    assert not (data.logs_dir / main.OLD_LOGS_MARKER).exists()
+    (warning,) = [line for line in text.splitlines() if " WARNING openwrtgui: " in line]
+    assert "app.log.2" in warning and "app.log.1" not in warning
+    assert "--verify-pin1" not in text
+    # the next start, once the other program let go of the file
+    monkeypatch.undo()
+    root = logging.getLogger()
+    root.handlers = [h for h in root.handlers if not isinstance(h, RotatingFileHandler)]
+    main._setup_logging(data)
+    assert " WARNING openwrtgui: " not in _app_log_text(data)
+    assert not (data.logs_dir / "app.log.2").exists()
+    assert (data.logs_dir / main.OLD_LOGS_MARKER).is_file()
+
+
+@pytest.mark.usefixtures("_own_logging")
+def test_the_old_logs_delete_leaves_other_files_alone(tmp_path: Path) -> None:
+    data = DataDir.at(tmp_path / "data")
+    _write_old_logs(data.logs_dir, "app.log.3", "notes.txt", "app.log.bak", "audit.log.1")
+    (data.logs_dir / "app.log.4").mkdir()
+    main._setup_logging(data)
+    _app_log_text(data)
+    assert not (data.logs_dir / "app.log.3").exists()
+    for kept in ("notes.txt", "app.log.bak", "audit.log.1"):
+        assert (data.logs_dir / kept).is_file(), kept
+    assert (data.logs_dir / "app.log.4").is_dir()
+    assert (data.logs_dir / main.OLD_LOGS_MARKER).is_file()
+
+
+@pytest.mark.usefixtures("_own_logging")
+def test_a_fresh_install_leaves_the_marker(tmp_path: Path) -> None:
+    data = DataDir.at(tmp_path / "data")
+    main._setup_logging(data)
+    _app_log_text(data)
+    assert (data.logs_dir / main.OLD_LOGS_MARKER).is_file()

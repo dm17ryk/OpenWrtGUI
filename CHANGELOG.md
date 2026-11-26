@@ -7,6 +7,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+
+- App log: on its first start, the app deletes the app logs written by earlier versions (`logs\app.log` and its
+  numbered copies), which may hold Wi-Fi keys, APN passwords and SIM PINs typed in the AT console (#112). If a
+  file cannot be deleted, for example while another program has it open, the app log says so and the next start
+  deletes the app logs again.
+
 ## [1.3.0] - 2026-11-26
 
 LTE Recover waits out an LTE setup, and the LTE screen gets SIM PIN, SMS and USSD and the modem's own mode names;
