@@ -34,7 +34,7 @@ EXIT_SECOND_INSTANCE = 3
 STARTUP_TIMEOUT_S = 20.0
 # In logs\: its presence means the app logs written by earlier versions are gone (#112)
 OLD_LOGS_MARKER = ".old-logs-deleted"
-_APP_LOG_NAME = re.compile(r"app\.log(\.\d+)?")
+_APP_LOG_NAME = re.compile(r"app\.log(\.[0-9]+)?")
 
 
 @dataclass(frozen=True)
@@ -151,7 +151,8 @@ def _setup_logging(data: DataDir) -> None:
     logging.getLogger("asyncssh").setLevel(logging.WARNING)
     if not_deleted:
         log.warning(
-            "could not delete the app logs of earlier versions (%s); the next start tries again",
+            "could not delete the app logs of earlier versions (%s), maybe open in another program; the next "
+            "start deletes the app logs again",
             ", ".join(not_deleted),
         )
 

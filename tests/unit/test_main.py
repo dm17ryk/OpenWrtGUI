@@ -218,6 +218,7 @@ def test_the_old_logs_delete_leaves_other_files_alone(tmp_path: Path) -> None:
     for kept in ("notes.txt", "app.log.bak", "audit.log.1"):
         assert (data.logs_dir / kept).is_file(), kept
     assert (data.logs_dir / "app.log.4").is_dir()
+    assert (data.logs_dir / main.OLD_LOGS_MARKER).is_file()
 
 
 @pytest.mark.usefixtures("_own_logging")

@@ -176,8 +176,9 @@ Open the screen again from the menu. If it repeats, attach the end of the app lo
 `logs\app.log` in the data folder (Settings → **Open data folder**). Attach its end, with the audit-log
 export, to a [bug report](https://github.com/dm17ryk/OpenWrtGUI/issues/new/choose).
 
-The first start of version 1.4.0 or later deletes the app logs written by earlier versions, once: they may hold
-Wi-Fi keys, APN passwords and SIM PINs. The new log starts empty.
+The first start of 1.4.0 or a later version deletes the app logs written by earlier versions, once, since they
+may hold Wi-Fi keys, APN passwords and SIM PINs. If one of them is open in another program, the app log says so,
+and each start deletes the app logs again until that file is gone.
 
 ## A radio was left at a step-through step
 
